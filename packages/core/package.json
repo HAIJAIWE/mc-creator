@@ -1,0 +1,21 @@
+{
+  "name": "@mc-creator/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mc-creator/shared": "workspace:*",
+    "ai": "^4.0.0",
+    "execa": "^9.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "memfs": "^4.9.0",
+    "vitest": "^2.0.0"
+  }
+}
