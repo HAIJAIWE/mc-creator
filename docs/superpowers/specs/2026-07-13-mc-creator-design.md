@@ -51,7 +51,7 @@
 
 | 组件 | 职责 |
 |---|---|
-| AI 编排器 | 多步任务流、工具调用、流式输出、上下文/token 管理 |
+| AI 编排器 | 多步任务流、工具调用、流式输出、上下文/token 管理（基于 Vercel AI SDK 原语 + 自建薄编排层，见 2.4） |
 | 模型提供者 | 统一接口：云端 + 本地，能力声明（是否支持工具调用/视觉） |
 | 文件系统 | 项目读写、原子写入、diff 生成、回滚、忽略规则 |
 | 项目管理 | 多项目、元数据、导入/导出（预留产品化）、版本历史 |
@@ -60,6 +60,15 @@
 
 ### 2.3 生成器层（插件 · 实现统一 Generator 接口）
 统一接口：`describe → spec → generate → build`，核心引擎按类型路由。第一版实现 Mod 生成器，其余按路线图接入。
+
+### 2.4 AI 编排技术选型
+
+采用 **Vercel AI SDK（基础原语）+ 自建薄编排层**，不使用 LangChain/LangGraph。
+
+- **Vercel AI SDK 提供**：`streamText` 流式输出、工具调用（tool calling）、多步循环（multi-step）等原语，统一各家云端模型 + 本地 Ollama 的调用接口。
+- **自建薄编排层负责**：spec-first 结构化流程（描述→spec→生成→编译→修复）、Spec JSON Schema 校验重试、Gradle 构建失败修复循环。
+- **不用 LangChain/LangGraph 的理由**：我们的流程是结构化的（非自由游走的 coding agent），重框架的图式工作流抽象过重、调试难、纯 TS 核心引擎不需其依赖。
+- **模型提供者抽象**：AI SDK 的 provider 机制 + 能力声明（是否支持工具调用/视觉），云端为主、本地可选切换。
 
 ---
 
@@ -94,6 +103,8 @@
 | 映射 | Yarn / Mojang | Mojang 官方 |
 
 切换 loader 时，Adapter 重新翻译同一 Spec → 重新生成代码（不丢规格）。
+
+**内部命名规范**：Loader Adapter **以 Mojang 官方名为内部规范名**。1.21.11 阶段 Fabric 侧加一层「Yarn → 官方」映射薄层；NeoForge 本就用官方名，无需转换。这样 26.1（两者都用官方名）切换时 Adapter 几乎不用改，去混淆对多 loader 支持是利好。
 
 ### 3.3 关键数据结构
 
@@ -185,7 +196,7 @@ mc-creator/
 | 节点画布（可选） | React Flow |
 | 状态管理 | Zustand |
 | IPC | 类型化（zod schema 校验） |
-| AI 调用 | Vercel AI SDK 统一抽象 + 各家官方 SDK |
+| AI 调用 | Vercel AI SDK（原语）+ 自建薄编排层（详见 2.4） |
 | 测试 | Vitest |
 | 打包 | electron-builder |
 
