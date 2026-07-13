@@ -1,0 +1,33 @@
+# 依赖
+node_modules/
+.pnpm-store/
+
+# 构建产物
+dist/
+build/
+out/
+*.jar
+
+# Electron 打包
+release/
+
+# IDE
+.idea/
+.vscode/
+*.tsbuildinfo
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 头脑风暴视觉伴侣会话（本地临时）
+.superpowers/
+
+# 环境变量与密钥
+.env
+.env.local
+*.local
+
+# 日志
+*.log
+logs/
