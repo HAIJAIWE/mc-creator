@@ -87,4 +87,133 @@ describe('DatapackGenerator', () => {
     const result = await gen.generate(makeCtx({ packId: 'p' }));
     expect(result.buildCmd).toBe('');
   });
+
+  it('P10：生成战利品表 loot_tables（带子路径）', async () => {
+    const result = await gen.generate(makeCtx({
+      packId: 'my_pack',
+      lootTables: [
+        {
+          namespace: 'my_pack',
+          path: 'blocks/custom_block',
+          type: 'block',
+          pools: [
+            {
+              rolls: 2,
+              entries: [
+                { name: 'my_pack:custom_item', weight: 3, count: 1 },
+                { name: 'minecraft:stick', weight: 1, count: 2 },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+    const loot = result.files.find(
+      (f) => f.path === 'data/my_pack/loot_tables/block/blocks/custom_block.json',
+    );
+    expect(loot).toBeDefined();
+    const parsed = JSON.parse(loot!.content);
+    expect(parsed.type).toBe('minecraft:block');
+    expect(parsed.pools[0].rolls).toBe(2);
+    expect(parsed.pools[0].entries).toHaveLength(2);
+  });
+
+  it('P10：生成战利品表（简单路径）', async () => {
+    const result = await gen.generate(makeCtx({
+      packId: 'my_pack',
+      lootTables: [
+        {
+          namespace: 'my_pack',
+          path: 'custom_block',
+          type: 'block',
+          pools: [
+            {
+              rolls: 1,
+              entries: [{ name: 'minecraft:diamond', weight: 1, count: 1 }],
+            },
+          ],
+        },
+      ],
+    }));
+    const loot = result.files.find(
+      (f) => f.path === 'data/my_pack/loot_tables/block/custom_block.json',
+    );
+    expect(loot).toBeDefined();
+    const parsed = JSON.parse(loot!.content);
+    expect(parsed.type).toBe('minecraft:block');
+    expect(parsed.pools[0].rolls).toBe(1);
+    expect(parsed.pools[0].entries[0].name).toBe('minecraft:diamond');
+    expect(parsed.pools[0].entries[0].weight).toBe(1);
+  });
+
+  it('P10：生成 predicates', async () => {
+    const result = await gen.generate(makeCtx({
+      packId: 'my_pack',
+      predicates: [
+        {
+          namespace: 'my_pack',
+          path: 'has_diamond',
+          condition: JSON.stringify({
+            condition: 'minecraft:inventory_changed',
+            items: ['minecraft:diamond'],
+          }),
+        },
+      ],
+    }));
+    const pred = result.files.find(
+      (f) => f.path === 'data/my_pack/predicates/has_diamond.json',
+    );
+    expect(pred).toBeDefined();
+    const parsed = JSON.parse(pred!.content);
+    expect(parsed.condition.condition).toBe('minecraft:inventory_changed');
+  });
+
+  it('P10：生成 itemTags', async () => {
+    const result = await gen.generate(makeCtx({
+      packId: 'my_pack',
+      itemTags: [
+        {
+          namespace: 'my_pack',
+          tag: 'custom_items',
+          values: ['my_pack:ruby', 'my_pack:sapphire'],
+          replace: false,
+        },
+      ],
+    }));
+    const tag = result.files.find(
+      (f) => f.path === 'data/my_pack/tags/item/custom_items.json',
+    );
+    expect(tag).toBeDefined();
+    const parsed = JSON.parse(tag!.content);
+    expect(parsed.values).toContain('my_pack:ruby');
+    expect(parsed.replace).toBe(false);
+  });
+
+  it('P10：生成 blockTags', async () => {
+    const result = await gen.generate(makeCtx({
+      packId: 'my_pack',
+      blockTags: [
+        {
+          namespace: 'my_pack',
+          tag: 'custom_blocks',
+          values: ['my_pack:ruby_block'],
+          replace: true,
+        },
+      ],
+    }));
+    const tag = result.files.find(
+      (f) => f.path === 'data/my_pack/tags/block/custom_blocks.json',
+    );
+    expect(tag).toBeDefined();
+    const parsed = JSON.parse(tag!.content);
+    expect(parsed.values).toContain('my_pack:ruby_block');
+    expect(parsed.replace).toBe(true);
+  });
+
+  it('P10：默认空新字段不产生额外文件', async () => {
+    const result = await gen.generate(makeCtx({
+      packId: 'my_pack',
+    }));
+    expect(result.files).toHaveLength(1); // 仅 pack.mcmeta
+  });
 });

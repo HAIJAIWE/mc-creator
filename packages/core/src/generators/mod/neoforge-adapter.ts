@@ -24,7 +24,44 @@ export class NeoForgeAdapter implements LoaderAdapter {
       this.modItemsJava(spec, pkg, mainCls),
       this.modBlocksJava(spec, pkg, mainCls),
       this.langJson(spec),
+      this.metaJson(spec),
     ];
+  }
+
+  /**
+   * P10：生成 <modId>_meta.json 元数据文件（最小侵入，避免改动 mods.toml）。
+   * 汇总所有新增字段（license/authors/credits/dependencies/website + items/blocks 新属性）。
+   */
+  private metaJson(spec: ModSpecLike): FileNode {
+    const meta = {
+      modId: spec.modId,
+      license: spec.license,
+      authors: spec.authors,
+      credits: spec.credits,
+      website: spec.website,
+      dependencies: spec.dependencies,
+      items: spec.items.map((it) => ({
+        id: it.id,
+        rarity: it.rarity,
+        maxDamage: it.maxDamage,
+        fuelTick: it.fuelTick,
+        food: it.food ?? null,
+        lore: it.lore,
+      })),
+      blocks: spec.blocks.map((b) => ({
+        id: b.id,
+        miningLevel: b.miningLevel,
+        lightLevel: b.lightLevel,
+        resistance: b.resistance,
+        soundType: b.soundType,
+        dropSelf: b.dropSelf,
+        dropItem: b.dropItem,
+      })),
+    };
+    return {
+      path: `src/main/resources/${spec.modId}_meta.json`,
+      content: JSON.stringify(meta, null, 2),
+    };
   }
 
   private langJson(spec: ModSpecLike): FileNode {
@@ -203,6 +240,32 @@ type ModSpecLike = {
   version: string;
   name: string;
   description: string;
-  items: Array<{ id: string; name: string; maxStackSize: number }>;
-  blocks: Array<{ id: string; name: string; material: string; hardness: number }>;
+  // P10 新增字段（向后兼容：均为可选，由 spec.default 兜底）
+  license: string;
+  authors: string[];
+  credits: string;
+  website: string;
+  dependencies: Array<{ modId: string; version: string; mandatory: boolean }>;
+  items: Array<{
+    id: string;
+    name: string;
+    maxStackSize: number;
+    rarity: 'common' | 'uncommon' | 'rare' | 'epic';
+    maxDamage: number;
+    fuelTick: number;
+    food?: { hunger: number; saturation: number };
+    lore: string;
+  }>;
+  blocks: Array<{
+    id: string;
+    name: string;
+    material: string;
+    hardness: number;
+    miningLevel: number;
+    lightLevel: number;
+    resistance: number;
+    soundType: 'wood' | 'stone' | 'metal' | 'grass' | 'sand' | 'glass';
+    dropSelf: boolean;
+    dropItem: string;
+  }>;
 };

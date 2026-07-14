@@ -1,6 +1,15 @@
 import type { FileNode, GeneratorContext, GenerationResult, Loader, McVersion } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
-import type { DatapackSpec, RecipeSpec, TagSpec, FunctionSpec, AdvancementSpec } from '@mc-creator/shared';
+import type {
+  DatapackSpec,
+  RecipeSpec,
+  TagSpec,
+  FunctionSpec,
+  AdvancementSpec,
+  LootTableSpec,
+  PredicateSpec,
+  SimpleTagSpec,
+} from '@mc-creator/shared';
 
 /**
  * 数据包生成器（路线图第 3 阶段）。
@@ -45,6 +54,26 @@ export class DatapackGenerator implements Generator {
     // 进度
     for (const adv of spec.advancements ?? []) {
       files.push(this.generateAdvancement(spec.packId, adv));
+    }
+
+    // P10 新增：战利品表
+    for (const loot of spec.lootTables ?? []) {
+      files.push(this.generateLootTable(loot));
+    }
+
+    // P10 新增：谓词
+    for (const pred of spec.predicates ?? []) {
+      files.push(this.generatePredicate(pred));
+    }
+
+    // P10 新增：itemTags
+    for (const tag of spec.itemTags ?? []) {
+      files.push(this.generateSimpleTag('item', tag));
+    }
+
+    // P10 新增：blockTags
+    for (const tag of spec.blockTags ?? []) {
+      files.push(this.generateSimpleTag('block', tag));
     }
 
     return {
@@ -129,6 +158,49 @@ export class DatapackGenerator implements Generator {
     return {
       path: `data/${namespace}/advancement/${a.id}.json`,
       content: JSON.stringify(advObj, null, 2),
+    };
+  }
+
+  /** P10：生成战利品表 → data/<namespace>/loot_tables/<type>/<path>.json */
+  private generateLootTable(l: LootTableSpec): FileNode {
+    const lootObj = {
+      type: `minecraft:${l.type}`,
+      pools: l.pools.map((p) => ({
+        rolls: p.rolls,
+        entries: p.entries.map((e) => ({
+          type: 'minecraft:item',
+          name: e.name,
+          weight: e.weight,
+          count: e.count,
+        })),
+      })),
+    };
+    return {
+      path: `data/${l.namespace}/loot_tables/${l.type}/${l.path}.json`,
+      content: JSON.stringify(lootObj, null, 2),
+    };
+  }
+
+  /** P10：生成谓词 → data/<namespace>/predicates/<path>.json */
+  private generatePredicate(p: PredicateSpec): FileNode {
+    const predObj = {
+      condition: JSON.parse(p.condition) as unknown,
+    };
+    return {
+      path: `data/${p.namespace}/predicates/${p.path}.json`,
+      content: JSON.stringify(predObj, null, 2),
+    };
+  }
+
+  /** P10：生成 itemTag / blockTag → data/<namespace>/tags/<kind>/<tag>.json */
+  private generateSimpleTag(kind: 'item' | 'block', t: SimpleTagSpec): FileNode {
+    const tagObj = {
+      replace: t.replace,
+      values: t.values,
+    };
+    return {
+      path: `data/${t.namespace}/tags/${kind}/${t.tag}.json`,
+      content: JSON.stringify(tagObj, null, 2),
     };
   }
 }

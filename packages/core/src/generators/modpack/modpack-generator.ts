@@ -29,6 +29,22 @@ export class ModpackGenerator implements Generator {
       content: `此目录存放整合包的配置文件覆盖。\n整合包: ${spec.packName} v${spec.packVersion}\nMC: ${spec.mcVersion} / ${spec.loader} ${spec.loaderVersion}\n`,
     });
 
+    // P10 新增：写入用户声明的 overrides 文件（path 加 overrides/ 前缀）
+    for (const ov of spec.overrides ?? []) {
+      files.push({
+        path: `overrides/${ov.path}`,
+        content: ov.content,
+      });
+    }
+
+    // P10 新增：写入 serverOverrides 文件（path 加 server-overrides/ 前缀）
+    for (const ov of spec.serverOverrides ?? []) {
+      files.push({
+        path: `server-overrides/${ov.path}`,
+        content: ov.content,
+      });
+    }
+
     return {
       files,
       warnings: spec.mods.length === 0 ? ['警告：整合包未包含任何 mod'] : [],
@@ -38,7 +54,7 @@ export class ModpackGenerator implements Generator {
 
   /** Modrinth 格式：modrinth.index.json */
   private generateModrinthIndex(spec: ModpackSpec): FileNode {
-    const index = {
+    const index: Record<string, unknown> = {
       formatVersion: 1,
       game: 'minecraft',
       versionId: spec.packVersion,
@@ -55,6 +71,14 @@ export class ModpackGenerator implements Generator {
       },
     };
 
+    // P10 新增：credits / launchMessage（仅在非空时写入，避免污染输出）
+    if (spec.credits) {
+      index.credits = spec.credits;
+    }
+    if (spec.launchMessage) {
+      index.launchMessage = spec.launchMessage;
+    }
+
     return {
       path: 'modrinth.index.json',
       content: JSON.stringify(index, null, 2),
@@ -63,7 +87,7 @@ export class ModpackGenerator implements Generator {
 
   /** CurseForge 格式：manifest.json */
   private generateCurseForgeManifest(spec: ModpackSpec): FileNode {
-    const manifest = {
+    const manifest: Record<string, unknown> = {
       minecraft: {
         version: spec.mcVersion,
         modLoaders: [
@@ -85,6 +109,14 @@ export class ModpackGenerator implements Generator {
       })),
       overrides: 'overrides',
     };
+
+    // P10 新增：credits / launchMessage 写入自定义字段（CurseForge 格式无原生支持）
+    if (spec.credits) {
+      manifest.credits = spec.credits;
+    }
+    if (spec.launchMessage) {
+      manifest.launchMessage = spec.launchMessage;
+    }
 
     return {
       path: 'manifest.json',
