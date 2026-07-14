@@ -65,6 +65,13 @@ export const ChatResponse = z.object({ reply: z.string() });
 export type ChatReq = z.infer<typeof ChatRequest>;
 export type ChatRes = z.infer<typeof ChatResponse>;
 
+// === 流式 AI 聊天 ===
+export const CHAT_STREAM = 'ai:chatStream';
+export const CHAT_STREAM_CHUNK = 'ai:chatStream:chunk'; // 主进程→渲染进程的事件
+
+export const ChatStreamRequest = z.object({ message: z.string().min(1) });
+export type ChatStreamReq = z.infer<typeof ChatStreamRequest>;
+
 // === 带修复的构建 ===
 export const BUILD_WITH_FIX = 'mod:buildWithFix';
 

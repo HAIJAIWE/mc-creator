@@ -12,6 +12,8 @@ export const ipcClient = {
   saveModelConfig: (config: { name: string; modelId: string; baseURL: string; apiKey: string }) =>
     window.mcApi.saveModelConfig(config),
   chat: (message: string) => window.mcApi.chat(message),
+  chatStream: (message: string, onChunk: (delta: string, done: boolean) => void) =>
+    window.mcApi.chatStream(message, onChunk),
   buildWithFix: (projectPath: string): Promise<BuildWithFixRes> =>
     window.mcApi.buildWithFix(projectPath),
 };

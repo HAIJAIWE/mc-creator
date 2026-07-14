@@ -10,9 +10,12 @@ import {
   SaveModelConfigRequest,
   ModelConfigResponse,
   ChatRequest,
+  ChatStreamRequest,
   LOAD_MODEL_CONFIG,
   SAVE_MODEL_CONFIG,
   CHAT,
+  CHAT_STREAM,
+  CHAT_STREAM_CHUNK,
   BUILD_WITH_FIX,
   BuildWithFixRequest,
   type GenerateSpecRes,
@@ -83,6 +86,27 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       system: '你是 Minecraft mod 专家助手，帮助用户设计 mod。',
     });
     return { reply };
+  });
+
+  // 流式 AI 聊天
+  ipcMain.handle(CHAT_STREAM, async (e, raw: unknown) => {
+    const req = ChatStreamRequest.parse(raw);
+    const config = loadModelConfig();
+    if (!config.apiKey) {
+      e.sender.send(CHAT_STREAM_CHUNK, { delta: '请先在设置中配置 API Key。', done: true });
+      return;
+    }
+
+    const provider = new VercelAiProvider(config);
+    try {
+      for await (const chunk of provider.stream(req.message, {
+        system: '你是 Minecraft mod 专家助手，帮助用户设计 mod。简洁回答。',
+      })) {
+        e.sender.send(CHAT_STREAM_CHUNK, { delta: chunk.delta, done: chunk.done });
+      }
+    } catch (err) {
+      e.sender.send(CHAT_STREAM_CHUNK, { delta: `错误：${(err as Error).message}`, done: true });
+    }
   });
 
   // 带修复循环的构建

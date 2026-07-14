@@ -17,22 +17,33 @@ export function AiChat() {
     if (!input.trim() || sending) return;
     const text = input;
     setInput('');
-    setMessages((m) => [...m, { role: 'user', text }]);
+    setMessages((m) => [...m, { role: 'user', text }, { role: 'assistant', text: '' }]);
     setSending(true);
 
-    try {
-      if (!apiKey) {
-        setMessages((m) => [...m, { role: 'assistant', text: '请先在「设置」中配置 API Key。' }]);
-        return;
-      }
-      const res = await ipcClient.chat(text);
-      setMessages((m) => [...m, { role: 'assistant', text: (res as any).reply }]);
-    } catch (e) {
-      setMessages((m) => [...m, { role: 'assistant', text: `错误：${(e as Error).message}` }]);
-    } finally {
+    if (!apiKey) {
+      setMessages((m) => {
+        const next = [...m];
+        next[next.length - 1] = { role: 'assistant', text: '请先在「设置」中配置 API Key。' };
+        return next;
+      });
       setSending(false);
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      return;
     }
+
+    ipcClient.chatStream(text, (delta, done) => {
+      setMessages((m) => {
+        const next = [...m];
+        const last = next[next.length - 1];
+        if (last.role === 'assistant') {
+          next[next.length - 1] = { role: 'assistant', text: last.text + delta };
+        }
+        return next;
+      });
+      if (done) {
+        setSending(false);
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
   };
 
   return (
@@ -44,6 +55,12 @@ export function AiChat() {
             m.role === 'user' ? 'bg-blue-900/40' : 'bg-zinc-800'
           }`}>
             {m.text}
+            {m.role === 'assistant' && sending && i === messages.length - 1 && m.text === '' && (
+              <span className="animate-pulse text-zinc-500">思考中…</span>
+            )}
+            {m.role === 'assistant' && sending && i === messages.length - 1 && m.text !== '' && (
+              <span className="inline-block w-1 h-3 bg-zinc-400 animate-pulse ml-0.5" />
+            )}
           </div>
         ))}
         <div ref={bottomRef} />
@@ -62,7 +79,7 @@ export function AiChat() {
           disabled={sending || !input.trim()}
           className="rounded bg-blue-600 px-3 py-1 text-xs text-white disabled:opacity-50"
         >
-          发送
+          {sending ? '…' : '发送'}
         </button>
       </div>
     </div>
