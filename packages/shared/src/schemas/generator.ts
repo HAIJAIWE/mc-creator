@@ -9,7 +9,7 @@ export const FileNode = z.object({
 
 /** 生成器上下文（规格 §3.3） */
 export const GeneratorContext = z.object({
-  loader: z.enum(['fabric', 'neoforge']),
+  loader: z.enum(['fabric', 'neoforge', 'quilt']),
   mcVersion: z.string(),
   modId: z.string(),
   spec: ModSpec,

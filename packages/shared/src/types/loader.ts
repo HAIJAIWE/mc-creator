@@ -1,5 +1,5 @@
-/** Mod 加载器（规格 §1.2：Fabric + NeoForge 同时支持） */
-export type Loader = 'fabric' | 'neoforge';
+/** Mod 加载器（规格 §1.2：Fabric + NeoForge + Quilt 同时支持） */
+export type Loader = 'fabric' | 'neoforge' | 'quilt';
 
 /** MC 版本（规格 §1.2：1.21.11 为主，预留 26.1） */
 export const MC_VERSIONS = ['1.21.11', '1.21.1', '26.1'] as const;

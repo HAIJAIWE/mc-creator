@@ -25,7 +25,7 @@ export const ModpackSpec = z.object({
   description: z.string().default(''),
   format: z.enum(['modrinth', 'curseforge']).default('modrinth'),
   mcVersion: z.string(),
-  loader: z.enum(['fabric', 'neoforge']),
+  loader: z.enum(['fabric', 'neoforge', 'quilt']),
   loaderVersion: z.string().default(''),
   mods: z.array(ModEntry).default([]),
   // P10 新增字段（向后兼容：均带 default）

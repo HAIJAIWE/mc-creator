@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
+import { TemplatePicker } from './TemplatePicker.js';
 
 export function ChatPanel() {
   const {
@@ -14,6 +15,8 @@ export function ChatPanel() {
   const [editorText, setEditorText] = useState('');
   const [originalSpec, setOriginalSpec] = useState('');
   const [specError, setSpecError] = useState<string | null>(null);
+  // 模板选择器显隐
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const generateSpec = async () => {
     setLoading(true);
@@ -128,7 +131,25 @@ export function ChatPanel() {
           )}
           生成代码
         </button>
+        <button
+          onClick={() => setShowTemplates(true)}
+          disabled={loading}
+          className="flex items-center gap-1.5 rounded bg-zinc-700 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
+          title="从模板库选择一个预填描述"
+        >
+          📋 模板
+        </button>
       </div>
+      {showTemplates && (
+        <TemplatePicker
+          generatorType={generatorType}
+          onClose={() => setShowTemplates(false)}
+          onPick={(template) => {
+            setDescription(template.description);
+            setShowTemplates(false);
+          }}
+        />
+      )}
       {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
       {spec && (
         <div className={`rounded border bg-zinc-900 p-2 ${specError ? 'border-red-500' : 'border-zinc-800'}`}>

@@ -1,4 +1,4 @@
-import type { FileNode, GeneratorContext } from '@mc-creator/shared';
+import type { FileNode, GeneratorContext, Loader } from '@mc-creator/shared';
 import type { LoaderAdapter } from './adapter.js';
 import { mainClassName, packageName, packagePath } from './templates.js';
 
@@ -11,7 +11,7 @@ import { mainClassName, packageName, packagePath } from './templates.js';
  * 与 NeoForge 一致，26.1 切换无需改 Adapter。
  */
 export class FabricAdapter implements LoaderAdapter {
-  readonly loader = 'fabric' as const;
+  readonly loader: Loader = 'fabric';
 
   translate(ctx: GeneratorContext): FileNode[] {
     const { spec, mcVersion } = ctx;
@@ -137,7 +137,7 @@ java {
     };
   }
 
-  private gradleProperties(spec: ModSpecLike, mcVersion: string): FileNode {
+  protected gradleProperties(spec: ModSpecLike, mcVersion: string): FileNode {
     const content = `# Mod
 mod_version=${spec.version}
 maven_group=com.example.${spec.modId}

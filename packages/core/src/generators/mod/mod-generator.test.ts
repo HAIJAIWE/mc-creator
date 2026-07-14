@@ -26,7 +26,7 @@ describe('ModGenerator', () => {
 
   it('type/loaders/versions 声明正确', () => {
     expect(gen.type).toBe('mod');
-    expect(gen.loaders).toEqual(['fabric', 'neoforge']);
+    expect(gen.loaders).toEqual(['fabric', 'neoforge', 'quilt']);
     expect(gen.versions).toEqual(['1.21.11', '1.21.1', '26.1']);
   });
 
@@ -53,6 +53,20 @@ describe('ModGenerator', () => {
     };
     const result = await gen.generate(ctx);
     expect(result.files.some((f) => f.path === 'src/main/resources/META-INF/mods.toml')).toBe(true);
+  });
+
+  it('quilt ctx → 生成 quilt.mod.json', async () => {
+    const ctx: GeneratorContext = {
+      loader: 'quilt',
+      mcVersion: '1.21.11',
+      modId: 'demo',
+      spec: SPEC,
+      projectPath: '/proj',
+    };
+    const result = await gen.generate(ctx);
+    expect(result.files.some((f) => f.path === 'src/main/resources/quilt.mod.json')).toBe(true);
+    // 不应出现 fabric.mod.json
+    expect(result.files.some((f) => f.path === 'src/main/resources/fabric.mod.json')).toBe(false);
   });
 });
 
