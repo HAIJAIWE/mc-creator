@@ -6,7 +6,7 @@ import type { GeneratorType, Project } from '../../../shared/ipc-channels.js';
 
 interface SaveProjectData {
   generatorType: GeneratorType;
-  loader: 'fabric' | 'neoforge' | 'quilt';
+  loader: 'fabric' | 'neoforge' | 'quilt' | 'legacy_fabric';
   mcVersion: string;
   description: string;
   spec: unknown;

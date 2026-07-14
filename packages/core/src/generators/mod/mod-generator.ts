@@ -3,6 +3,7 @@ import type { Loader, McVersion } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import type { LoaderAdapter } from './adapter.js';
 import { FabricAdapter } from './fabric-adapter.js';
+import { LegacyFabricAdapter } from './legacy-fabric-adapter.js';
 import { NeoForgeAdapter } from './neoforge-adapter.js';
 import { QuiltAdapter } from './quilt-adapter.js';
 
@@ -12,13 +13,14 @@ import { QuiltAdapter } from './quilt-adapter.js';
  */
 export class ModGenerator implements Generator {
   readonly type = 'mod';
-  readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt'];
+  readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt', 'legacy_fabric'];
   readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1'];
 
   private readonly adapters: Record<Loader, LoaderAdapter> = {
     fabric: new FabricAdapter(),
     neoforge: new NeoForgeAdapter(),
     quilt: new QuiltAdapter(),
+    legacy_fabric: new LegacyFabricAdapter(),
   };
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {

@@ -46,6 +46,7 @@ export function TopBar({ onBackToDashboard, onSaveProject, canSaveProject }: Top
           <option value="fabric">Fabric</option>
           <option value="neoforge">NeoForge</option>
           <option value="quilt">Quilt</option>
+          <option value="legacy_fabric">Legacy Fabric</option>
         </select>
       </div>
       <div className="flex items-center gap-2">

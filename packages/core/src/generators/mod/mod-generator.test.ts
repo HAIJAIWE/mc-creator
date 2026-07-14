@@ -26,7 +26,7 @@ describe('ModGenerator', () => {
 
   it('type/loaders/versions 声明正确', () => {
     expect(gen.type).toBe('mod');
-    expect(gen.loaders).toEqual(['fabric', 'neoforge', 'quilt']);
+    expect(gen.loaders).toEqual(['fabric', 'neoforge', 'quilt', 'legacy_fabric']);
     expect(gen.versions).toEqual(['1.21.11', '1.21.1', '26.1']);
   });
 
@@ -67,6 +67,23 @@ describe('ModGenerator', () => {
     expect(result.files.some((f) => f.path === 'src/main/resources/quilt.mod.json')).toBe(true);
     // 不应出现 fabric.mod.json
     expect(result.files.some((f) => f.path === 'src/main/resources/fabric.mod.json')).toBe(false);
+  });
+
+  it('legacy_fabric ctx → 生成 fabric.mod.json 且 build.gradle 用旧 loom', async () => {
+    const ctx: GeneratorContext = {
+      loader: 'legacy_fabric',
+      mcVersion: '1.21.11',
+      modId: 'demo',
+      spec: SPEC,
+      projectPath: '/proj',
+    };
+    const result = await gen.generate(ctx);
+    // legacy_fabric 复用 Fabric 的 fabric.mod.json
+    expect(result.files.some((f) => f.path === 'src/main/resources/fabric.mod.json')).toBe(true);
+    // build.gradle 用旧版 fabric-loom 0.5-SNAPSHOT
+    const bg = result.files.find((f) => f.path === 'build.gradle');
+    expect(bg).toBeDefined();
+    expect(bg!.content).toContain('0.5-SNAPSHOT');
   });
 });
 
