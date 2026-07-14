@@ -39,7 +39,13 @@ export function ChatPanel() {
     ? '描述你想要的 mod（如：做一个添加红宝石工具的 mod）'
     : generatorType === 'datapack'
     ? '描述你想要的数据包（如：添加一个钻石换铁的配方）'
-    : '描述你想要的整合包（如：性能优化整合包，含 Sodium + Iris）';
+    : generatorType === 'modpack'
+    ? '描述你想要的整合包（如：性能优化整合包，含 Sodium + Iris）'
+    : generatorType === 'server'
+    ? '描述你想要的服务器配置（如：20 人生存服，难度 normal，开启白名单）'
+    : generatorType === 'texture'
+    ? '描述你想要的材质（如：16x16 红色方块材质，蓝色工具材质）'
+    : '描述你想要的皮肤（如：classic 模型，蓝头发白衣服）';
 
   return (
     <div className="flex flex-col gap-3 border-b border-zinc-800 p-4">

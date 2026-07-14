@@ -19,9 +19,10 @@ describe('IPC 处理逻辑（不经过 ipcMain）', () => {
       mcVersion: '1.21.11',
       spec: { modId: 'demo', version: '1.0.0', name: 'Demo', description: '', items: [], blocks: [] },
     });
+    const spec = req.spec as any;
     const gen = new ModGenerator();
     const result = await gen.generate({
-      loader: req.loader, mcVersion: req.mcVersion, modId: req.spec.modId, spec: req.spec, projectPath: '',
+      loader: req.loader, mcVersion: req.mcVersion, modId: spec.modId, spec, projectPath: '',
     });
     expect(result.files.some((f) => f.path === 'src/main/resources/fabric.mod.json')).toBe(true);
   });

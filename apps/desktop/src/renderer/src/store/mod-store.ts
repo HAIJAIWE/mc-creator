@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import type { ModSpec, Loader, McVersion, FileNode } from '@mc-creator/shared';
+import type { GeneratorType } from '../../../shared/ipc-channels.js';
 
 interface ModState {
   // 输入
   loader: Loader;
   mcVersion: McVersion;
   description: string;
-  generatorType: 'mod' | 'datapack' | 'modpack';
+  generatorType: GeneratorType;
   // 产出
   spec: ModSpec | null;
   files: FileNode[];
@@ -22,7 +23,7 @@ interface ModState {
 
   setLoader: (l: Loader) => void;
   setMcVersion: (v: McVersion) => void;
-  setGeneratorType: (t: 'mod' | 'datapack' | 'modpack') => void;
+  setGeneratorType: (t: GeneratorType) => void;
   setDescription: (d: string) => void;
   setSpec: (s: ModSpec | null) => void;
   setFiles: (f: FileNode[]) => void;

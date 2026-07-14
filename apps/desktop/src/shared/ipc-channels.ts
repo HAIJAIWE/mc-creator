@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { ModSpec } from '@mc-creator/shared';
 
+/** 生成器类型联合（mod/datapack/modpack/server/texture/skin） */
+export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'texture', 'skin'] as const;
+export type GeneratorType = typeof GENERATOR_TYPES[number];
+
 /** IPC 通道名常量 */
 export const IPC = {
   GENERATE_SPEC: 'mod:generateSpec',
@@ -15,8 +19,10 @@ export const GenerateSpecResponse = z.object({ spec: ModSpec, raw: z.string() })
 export const GenerateFilesRequest = z.object({
   loader: z.enum(['fabric', 'neoforge']),
   mcVersion: z.string(),
-  spec: ModSpec,
-  generatorType: z.enum(['mod', 'datapack', 'modpack']).default('mod'),
+  // spec 可能是 ModSpec/ServerSpec/TextureSpec/SkinSpec 等，由各 Generator 内部用对应 schema.parse 校验
+  spec: z.record(z.unknown()),
+  modId: z.string().default(''),
+  generatorType: z.enum(GENERATOR_TYPES).default('mod'),
 });
 export const GenerateFilesResponse = z.object({
   files: z.array(z.object({ path: z.string(), content: z.string() })),

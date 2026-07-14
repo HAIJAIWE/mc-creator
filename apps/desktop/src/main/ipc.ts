@@ -49,14 +49,31 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
         gen = new ModpackGenerator();
         break;
       }
+      case 'server': {
+        const { ServerGenerator } = await import('@mc-creator/core');
+        gen = new ServerGenerator();
+        break;
+      }
+      case 'texture': {
+        const { TextureGenerator } = await import('@mc-creator/core');
+        gen = new TextureGenerator();
+        break;
+      }
+      case 'skin': {
+        const { SkinGenerator } = await import('@mc-creator/core');
+        gen = new SkinGenerator();
+        break;
+      }
       default:
         gen = new ModGenerator();
     }
+    // modId 可能从 spec 顶层或单独字段取
+    const modId = req.modId || (req.spec as { modId?: string }).modId || 'mc_creator';
     const result = await gen.generate({
       loader: req.loader,
       mcVersion: req.mcVersion,
-      modId: req.spec.modId,
-      spec: req.spec,
+      modId,
+      spec: req.spec as any,
       projectPath: '',
     });
     return { files: result.files, warnings: result.warnings };

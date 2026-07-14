@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useModStore } from '../store/mod-store.js';
 import { MC_VERSIONS } from '@mc-creator/shared';
 import type { Loader, McVersion } from '@mc-creator/shared';
+import type { GeneratorType } from '../../../shared/ipc-channels.js';
 import { SettingsPanel } from './SettingsPanel.js';
 
 export function TopBar() {
@@ -15,13 +16,16 @@ export function TopBar() {
         <label className="text-sm">类型:</label>
         <select
           value={generatorType}
-          onChange={(e) => setGeneratorType(e.target.value as 'mod' | 'datapack' | 'modpack')}
+          onChange={(e) => setGeneratorType(e.target.value as GeneratorType)}
           disabled={loading}
           className="rounded bg-zinc-800 px-2 py-1 text-sm"
         >
           <option value="mod">Mod</option>
           <option value="datapack">数据包</option>
           <option value="modpack">整合包</option>
+          <option value="server">服务器配置</option>
+          <option value="texture">材质包</option>
+          <option value="skin">皮肤</option>
         </select>
       </div>
       <div className="flex items-center gap-2">
