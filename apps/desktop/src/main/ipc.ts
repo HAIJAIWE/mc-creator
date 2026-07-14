@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
-import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider } from '@mc-creator/core';
+import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem } from '@mc-creator/core';
+import * as nodeFs from 'fs';
 import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
 import {
   IPC,
@@ -12,6 +13,8 @@ import {
   LOAD_MODEL_CONFIG,
   SAVE_MODEL_CONFIG,
   CHAT,
+  BUILD_WITH_FIX,
+  BuildWithFixRequest,
   type GenerateSpecRes,
   type GenerateFilesRes,
   type BuildRes,
@@ -80,6 +83,30 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       system: '你是 Minecraft mod 专家助手，帮助用户设计 mod。',
     });
     return { reply };
+  });
+
+  // 带修复循环的构建
+  ipcMain.handle(BUILD_WITH_FIX, async (_e, raw: unknown) => {
+    const req = BuildWithFixRequest.parse(raw);
+    const config = loadModelConfig();
+
+    const realFs = new Filesystem(nodeFs as any);
+    let fixer: BuildFixer;
+    if (config.apiKey) {
+      const { VercelAiProvider } = await import('@mc-creator/core');
+      fixer = new BuildFixer(realFs, new VercelAiProvider(config));
+    } else {
+      fixer = new BuildFixer(realFs, new MockProvider(''));
+    }
+
+    const result = await fixer.buildWithFix(req.projectPath);
+    return {
+      success: result.success,
+      attempts: result.attempts,
+      jarPath: result.finalResult.jarPath,
+      log: result.finalResult.log,
+      fixLog: result.fixLog,
+    };
   });
 }
 

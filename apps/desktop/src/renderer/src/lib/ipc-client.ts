@@ -1,4 +1,4 @@
-import type { GenerateSpecRes, GenerateFilesRes, BuildRes } from '../../../shared/ipc-channels.js';
+import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes } from '../../../shared/ipc-channels.js';
 
 /** 封装 window.mcApi，提供类型安全调用 */
 export const ipcClient = {
@@ -12,4 +12,6 @@ export const ipcClient = {
   saveModelConfig: (config: { name: string; modelId: string; baseURL: string; apiKey: string }) =>
     window.mcApi.saveModelConfig(config),
   chat: (message: string) => window.mcApi.chat(message),
+  buildWithFix: (projectPath: string): Promise<BuildWithFixRes> =>
+    window.mcApi.buildWithFix(projectPath),
 };

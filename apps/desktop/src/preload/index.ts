@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT } from '../shared/ipc-channels.js';
+import { IPC, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, BUILD_WITH_FIX } from '../shared/ipc-channels.js';
 
 const api = {
   generateSpec: (description: string) => ipcRenderer.invoke(IPC.GENERATE_SPEC, { description }),
@@ -9,6 +9,7 @@ const api = {
   loadModelConfig: () => ipcRenderer.invoke(LOAD_MODEL_CONFIG),
   saveModelConfig: (config: unknown) => ipcRenderer.invoke(SAVE_MODEL_CONFIG, config),
   chat: (message: string) => ipcRenderer.invoke(CHAT, { message }),
+  buildWithFix: (projectPath: string) => ipcRenderer.invoke(BUILD_WITH_FIX, { projectPath }),
 };
 
 try {

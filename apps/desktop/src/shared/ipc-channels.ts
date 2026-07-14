@@ -64,3 +64,18 @@ export const ChatResponse = z.object({ reply: z.string() });
 
 export type ChatReq = z.infer<typeof ChatRequest>;
 export type ChatRes = z.infer<typeof ChatResponse>;
+
+// === 带修复的构建 ===
+export const BUILD_WITH_FIX = 'mod:buildWithFix';
+
+export const BuildWithFixRequest = z.object({ projectPath: z.string().min(1) });
+export const BuildWithFixResponse = z.object({
+  success: z.boolean(),
+  attempts: z.number(),
+  jarPath: z.string().nullable(),
+  log: z.string(),
+  fixLog: z.array(z.string()),
+});
+
+export type BuildWithFixReq = z.infer<typeof BuildWithFixRequest>;
+export type BuildWithFixRes = z.infer<typeof BuildWithFixResponse>;
