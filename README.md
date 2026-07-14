@@ -1,29 +1,36 @@
 # MC Creator
 
-AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代码、数据包、整合包、服务器配置、材质包和皮肤，并通过内置构建链编译成 `.jar`。
+AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代码、数据包、整合包、服务器配置、材质包、皮肤和资源包，并通过内置构建链编译成 `.jar`，支持项目管理与一键部署。
 
 ## 功能特性
 
-支持 **6 种生成器类型**，覆盖 Minecraft 内容创作的主要场景：
+支持 **7 种生成器类型**，覆盖 Minecraft 内容创作的主要场景：
 
 | 类型 | 说明 | 产物 |
 |------|------|------|
-| **Mod** | Fabric / NeoForge 模组源码 | 完整 Gradle 项目 + `.jar` |
+| **Mod** | Fabric / NeoForge 模组源码 | 完整 Gradle 项目 + `.jar` + `_meta.json` 元数据 |
 | **数据包** | 原版数据包（配方 / 标签 / 函数 / 进度 / 战利品 / 谓词） | `pack.mcmeta` + `data/<ns>/` |
-| **整合包** | Modrinth / CurseForge 格式 | `modrinth.index.json` 或 `manifest.json` + overrides |
-| **服务器配置** | 服务端配置包 | `server.properties` / `eula.txt` / 启动脚本 / `ops.json` / `whitelist.json` / `mods/` |
+| **整合包** | Modrinth / CurseForge 格式 | `modrinth.index.json` 或 `manifest.json` + overrides + server-overrides |
+| **服务器配置** | 服务端配置包 + 一键部署脚本 | `server.properties` / `eula.txt` / 启动脚本 / `ops.json` / `whitelist.json` / `mods/` + `deploy/`（systemd / Docker / backup） |
 | **材质包** | 资源包（纯色 / 渐变 / 棋盘格 PNG） | `pack.mcmeta` + `assets/<modId>/textures/` |
 | **皮肤** | 64×64 玩家皮肤（classic / slim 模型） | `<playerName>.png` + 可选 `preview.png` |
+| **资源包** | 贴图覆盖 / 模型 / 字体 / 音效 / 语言 | `pack.mcmeta` + `assets/<ns>/textures/` + `models/` + `font/` + `sounds/` + `lang/` |
 
 ### 核心能力
 
 - **Spec-first 工作流**：自然语言描述 → AI 生成结构化 Spec → 用户审阅 → 生成代码 → 编译
+- **Spec 编辑器**：生成 Spec 后可直接在 Monaco 编辑器中修改 JSON 再生成代码
 - **Loader Adapter 抽象**：同一 ModSpec 按 Fabric / NeoForge 产出不同源码
+- **AI prompt 按类型优化**：每种生成器有独立的 schema 约束提示，提升 Spec 质量
 - **AI 模型接入**：基于 Vercel AI SDK，兼容 OpenAI 接口（云端 / 本地模型均可）
-- **流式输出**：AI 回复逐字显示
+- **模型预设**：内置 OpenAI / DeepSeek / 通义千问 / 智谱 GLM / Ollama / LM Studio 六种预设
+- **流式输出**：AI 回复逐字显示 + 构建日志实时流式输出
 - **构建修复循环**：Gradle 构建失败 → 解析错误 → AI 修复源码 → 重新构建（最多 3 次）
-- **PNG 预览**：材质 / 皮肤生成后直接在应用内预览
-- **导出 zip**：一键打包所有生成文件
+- **构建日志高亮**：error 红色 / warning 黄色，自动提取 jar 路径
+- **PNG 预览**：材质 / 皮肤生成后直接在应用内预览（棋盘格透明背景）
+- **导出 zip**：一键打包所有生成文件（PNG 自动解码为二进制）
+- **项目管理**：Dashboard 视图，项目持久化到本地，支持保存 / 加载 / 删除
+- **服务器一键部署**：生成 systemd service / Dockerfile / docker-compose.yml / 自动备份脚本
 
 ## 技术栈
 
@@ -146,6 +153,7 @@ pnpm --filter @mc-creator/desktop build
 - 服务器配置
 - 材质包
 - 皮肤
+- 资源包
 
 ### 3. 选择 Loader 和 MC 版本
 
@@ -297,12 +305,12 @@ runGradleBuild
 
 ## 测试覆盖
 
-当前共 **120+ 个测试**通过：
+当前共 **153 个测试**通过：
 
 | 包 | 测试文件 | 测试用例 |
 |---|---|---|
-| `@mc-creator/core` | 18 | 111 |
-| `@mc-creator/desktop` | 3 | 9 |
+| `@mc-creator/core` | 19 | 138 |
+| `@mc-creator/desktop` | 4 | 15 |
 
 ## 路线图
 
@@ -320,14 +328,22 @@ runGradleBuild
 - ✅ P10：完善现有 spec 字段（向后兼容扩展）
 - ✅ P11：CodePreview PNG 预览
 - ✅ P12：导出 zip 功能
+- ✅ P13：项目文档 README
+- ✅ P14：资源包生成器（模型 / 音效 / 字体 / 贴图覆盖 / 语言）
+- ✅ P15：多项目管理 + Dashboard（项目持久化 / 保存 / 加载 / 删除）
+- ✅ P16：AI prompt 按类型优化（每种生成器独立 schema 约束提示）
+- ✅ P17：服务器一键部署脚本（systemd / Docker / docker-compose / 自动备份）
+- ✅ P18：本地模型预设（OpenAI / DeepSeek / 通义千问 / 智谱 GLM / Ollama / LM Studio）
+- ✅ P19：Spec 编辑器（Monaco 编辑器内修改 JSON 再生成代码）
+- ✅ P20：构建面板流式输出与错误高亮（Gradle 日志逐行染色 + 自动提取 jar 路径）
 
 ### 未来可能
 
-- 资源包生成器（独立于材质包，支持模型 / 音效 / 字体）
-- 服务器一键部署脚本
-- 多 Mod 项目管理
-- Spec 模板库
-- 在线素材市场接入
+- Spec 模板库（常见 Mod 类型一键起手）
+- 在线素材市场接入（Modrinth / CurseForge 资源直链下载）
+- 多 Mod 项目管理增强（依赖图 / 版本对比 / 导入导出）
+- 协作编辑（多端同步 Spec / 评论）
+- 更多 MC 版本与 Loader（Quilt / Legacy Fabric）
 
 ## 许可证
 
