@@ -37,6 +37,26 @@ export class Filesystem {
     }
   }
 
+  async snapshot(root: string): Promise<Record<string, string>> {
+    const snap: Record<string, string> = {};
+    const walk = (dir: string) => {
+      for (const entry of this.fs.readdirSync(dir)) {
+        const full = `${dir}/${entry}`.replace('//', '/');
+        const stat = this.fs.statSync(full);
+        if (stat.isDirectory()) walk(full);
+        else snap[full] = this.readFile(full);
+      }
+    };
+    if (this.exists(root)) walk(root);
+    return snap;
+  }
+
+  async restore(snap: Record<string, string>): Promise<void> {
+    for (const [path, content] of Object.entries(snap)) {
+      await this.writeFile(path, content);
+    }
+  }
+
   private dirname(p: string): string {
     const i = p.lastIndexOf('/');
     return i <= 0 ? '/' : p.slice(0, i);

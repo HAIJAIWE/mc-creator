@@ -33,4 +33,13 @@ describe('Filesystem', () => {
     expect(diff.added).toContain('lineX');
     expect(diff.removed).toContain('line2');
   });
+
+  it('快照后可回滚到之前状态', async () => {
+    await dfs.writeFile('/proj/a.txt', 'v1');
+    const snap = await dfs.snapshot('/proj');
+    await dfs.writeFile('/proj/a.txt', 'v2');
+    expect(dfs.readFile('/proj/a.txt')).toBe('v2');
+    await dfs.restore(snap);
+    expect(dfs.readFile('/proj/a.txt')).toBe('v1');
+  });
 });
