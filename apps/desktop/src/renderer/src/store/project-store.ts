@@ -76,8 +76,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       };
       await ipcClient.saveProject(project);
       await get().loadProjects();
+      set({ loading: false });
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
+      // P23-2：re-throw 让调用方（ProjectSaveDialog）能感知错误并显示给用户
+      throw e;
     }
   },
 

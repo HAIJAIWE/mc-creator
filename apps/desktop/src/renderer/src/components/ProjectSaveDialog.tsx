@@ -30,10 +30,12 @@ export function ProjectSaveDialog({ onClose }: Props) {
 
   const [name, setName] = useState(() => computeDefaultName(generatorType, spec));
   const [saving, setSaving] = useState(false);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
+    setErrMsg(null);
     try {
       await saveCurrentAsProject(name.trim(), {
         generatorType,
@@ -44,6 +46,9 @@ export function ProjectSaveDialog({ onClose }: Props) {
         files,
       });
       onClose();
+    } catch (e) {
+      // P23-2：保存失败时显示错误，不关闭对话框，让用户能重试
+      setErrMsg((e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -78,6 +83,11 @@ export function ProjectSaveDialog({ onClose }: Props) {
               placeholder="输入项目名称"
             />
           </div>
+          {errMsg && (
+            <div className="rounded border border-red-800 bg-red-950/60 px-3 py-2 text-sm text-red-300">
+              保存失败：{errMsg}
+            </div>
+          )}
         </div>
         <div className="mt-4 flex items-center gap-3">
           <button

@@ -30,20 +30,33 @@ export function AiChat() {
       return;
     }
 
-    ipcClient.chatStream(text, (delta, done) => {
+    try {
+      await ipcClient.chatStream(text, (delta, done) => {
+        setMessages((m) => {
+          const next = [...m];
+          const last = next[next.length - 1];
+          if (last.role === 'assistant') {
+            next[next.length - 1] = { role: 'assistant', text: last.text + delta };
+          }
+          return next;
+        });
+        if (done) {
+          setSending(false);
+          bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    } catch (e) {
+      // P23-1：invoke 失败时给用户可见反馈，避免永久卡在「思考中…」
       setMessages((m) => {
         const next = [...m];
         const last = next[next.length - 1];
-        if (last.role === 'assistant') {
-          next[next.length - 1] = { role: 'assistant', text: last.text + delta };
+        if (last.role === 'assistant' && last.text === '') {
+          next[next.length - 1] = { role: 'assistant', text: `发送失败：${(e as Error).message}` };
         }
         return next;
       });
-      if (done) {
-        setSending(false);
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }
-    });
+      setSending(false);
+    }
   };
 
   return (
