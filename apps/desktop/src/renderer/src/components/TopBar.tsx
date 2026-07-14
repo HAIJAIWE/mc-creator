@@ -32,6 +32,7 @@ export function TopBar({ onBackToDashboard, onSaveProject, canSaveProject }: Top
           <option value="server">服务器配置</option>
           <option value="texture">材质包</option>
           <option value="skin">皮肤</option>
+          <option value="resource_pack">资源包</option>
         </select>
       </div>
       <div className="flex items-center gap-2">

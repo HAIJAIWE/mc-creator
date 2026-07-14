@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { ModSpec } from '@mc-creator/shared';
 
-/** 生成器类型联合（mod/datapack/modpack/server/texture/skin） */
-export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'texture', 'skin'] as const;
+/** 生成器类型联合（mod/datapack/modpack/server/texture/skin/resource_pack） */
+export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'texture', 'skin', 'resource_pack'] as const;
 export type GeneratorType = typeof GENERATOR_TYPES[number];
 
 /** IPC 通道名常量 */

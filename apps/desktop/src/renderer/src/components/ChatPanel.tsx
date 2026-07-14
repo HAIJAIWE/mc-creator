@@ -45,7 +45,9 @@ export function ChatPanel() {
     ? '描述你想要的服务器配置（如：20 人生存服，难度 normal，开启白名单）'
     : generatorType === 'texture'
     ? '描述你想要的材质（如：16x16 红色方块材质，蓝色工具材质）'
-    : '描述你想要的皮肤（如：classic 模型，蓝头发白衣服）';
+    : generatorType === 'skin'
+    ? '描述你想要的皮肤（如：classic 模型，蓝头发白衣服）'
+    : '描述你想要的资源包（如：覆盖石头为红色，添加自定义字体和音效）';
 
   return (
     <div className="flex flex-col gap-3 border-b border-zinc-800 p-4">

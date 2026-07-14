@@ -77,6 +77,11 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
         gen = new SkinGenerator();
         break;
       }
+      case 'resource_pack': {
+        const { ResourcePackGenerator } = await import('@mc-creator/core');
+        gen = new ResourcePackGenerator();
+        break;
+      }
       default:
         gen = new ModGenerator();
     }
