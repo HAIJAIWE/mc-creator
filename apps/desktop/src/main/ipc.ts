@@ -1,10 +1,17 @@
 import { ipcMain } from 'electron';
-import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider } from '@mc-creator/core';
+import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider } from '@mc-creator/core';
+import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
 import {
   IPC,
   GenerateSpecRequest,
   GenerateFilesRequest,
   BuildRequest,
+  SaveModelConfigRequest,
+  ModelConfigResponse,
+  ChatRequest,
+  LOAD_MODEL_CONFIG,
+  SAVE_MODEL_CONFIG,
+  CHAT,
   type GenerateSpecRes,
   type GenerateFilesRes,
   type BuildRes,
@@ -44,10 +51,48 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const result = await runGradleBuild(req.projectPath);
     return { success: result.success, jarPath: result.jarPath, log: result.log };
   });
+
+  // 模型配置
+  ipcMain.handle(LOAD_MODEL_CONFIG, async () => {
+    const config = loadModelConfig();
+    return ModelConfigResponse.parse(config);
+  });
+
+  ipcMain.handle(SAVE_MODEL_CONFIG, async (_e, raw: unknown) => {
+    const req = SaveModelConfigRequest.parse(raw);
+    saveModelConfig(req as ModelConfigFull);
+    return { ok: true };
+  });
+
+  // AI 聊天
+  let chatProvider: VercelAiProvider | null = null;
+
+  ipcMain.handle(CHAT, async (_e, raw: unknown) => {
+    const req = ChatRequest.parse(raw);
+    const config = loadModelConfig();
+    if (!config.apiKey) {
+      return { reply: '请先在设置中配置 API Key。' };
+    }
+    if (!chatProvider || chatProvider.id !== config.modelId) {
+      chatProvider = new VercelAiProvider(config);
+    }
+    const reply = await chatProvider.complete(req.message, {
+      system: '你是 Minecraft mod 专家助手，帮助用户设计 mod。',
+    });
+    return { reply };
+  });
 }
 
-/** 默认编排器工厂（用 MockProvider，后续接真实模型） */
+/** 默认编排器工厂（优先用配置的真实模型，否则 fallback Mock） */
 export function createDefaultOrchestrator(): Orchestrator {
+  try {
+    const config = loadModelConfig();
+    if (config.apiKey) {
+      return new Orchestrator(new VercelAiProvider(config));
+    }
+  } catch {
+    // 配置读取失败，fallback
+  }
   return new Orchestrator(new MockProvider(JSON.stringify({
     modId: 'demo',
     version: '1.0.0',

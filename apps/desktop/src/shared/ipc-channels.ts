@@ -35,3 +35,32 @@ export type GenerateFilesReq = z.infer<typeof GenerateFilesRequest>;
 export type GenerateFilesRes = z.infer<typeof GenerateFilesResponse>;
 export type BuildReq = z.infer<typeof BuildRequest>;
 export type BuildRes = z.infer<typeof BuildResponse>;
+
+// === 模型配置 ===
+export const LOAD_MODEL_CONFIG = 'model:loadConfig';
+export const SAVE_MODEL_CONFIG = 'model:saveConfig';
+
+export const SaveModelConfigRequest = z.object({
+  name: z.string(),
+  modelId: z.string().min(1),
+  baseURL: z.string().min(1),
+  apiKey: z.string(),
+});
+export const ModelConfigResponse = z.object({
+  name: z.string(),
+  modelId: z.string(),
+  baseURL: z.string(),
+  apiKey: z.string(),
+});
+
+export type SaveModelConfigReq = z.infer<typeof SaveModelConfigRequest>;
+export type ModelConfigRes = z.infer<typeof ModelConfigResponse>;
+
+// === AI 聊天 ===
+export const CHAT = 'ai:chat';
+
+export const ChatRequest = z.object({ message: z.string().min(1) });
+export const ChatResponse = z.object({ reply: z.string() });
+
+export type ChatReq = z.infer<typeof ChatRequest>;
+export type ChatRes = z.infer<typeof ChatResponse>;
