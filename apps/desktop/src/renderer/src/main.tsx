@@ -1,2 +1,9 @@
-// 占位入口，Task 6-8 填充真实 React 应用
-export {};
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.js';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
