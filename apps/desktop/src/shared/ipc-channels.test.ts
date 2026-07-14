@@ -17,6 +17,19 @@ describe('IPC schema 校验', () => {
     expect(GenerateFilesRequest.safeParse({ ...valid, loader: 'forge' }).success).toBe(false);
   });
 
+  it('GenerateFilesRequest 默认 generatorType 为 mod', () => {
+    const valid = {
+      loader: 'fabric',
+      mcVersion: '1.21.11',
+      spec: { modId: 'demo', version: '1.0.0', name: 'Demo', description: '', items: [], blocks: [] },
+    };
+    const result = GenerateFilesRequest.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.generatorType).toBe('mod');
+    }
+  });
+
   it('BuildRequest 校验路径非空', () => {
     expect(BuildRequest.safeParse({ projectPath: '/proj' }).success).toBe(true);
     expect(BuildRequest.safeParse({ projectPath: '' }).success).toBe(false);

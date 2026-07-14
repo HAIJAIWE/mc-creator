@@ -4,7 +4,7 @@ import { ErrorBanner } from './ErrorBanner.js';
 
 export function ChatPanel() {
   const {
-    description, setDescription, loader, mcVersion,
+    description, setDescription, loader, mcVersion, generatorType,
     spec, setSpec, setFiles, setLoading, setError, loading, error,
   } = useModStore();
 
@@ -26,7 +26,7 @@ export function ChatPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await ipcClient.generateFiles({ loader, mcVersion, spec });
+      const res = await ipcClient.generateFiles({ loader, mcVersion, spec, generatorType });
       setFiles(res.files);
     } catch (e) {
       setError((e as Error).message);
@@ -35,12 +35,18 @@ export function ChatPanel() {
     }
   };
 
+  const placeholder = generatorType === 'mod'
+    ? '描述你想要的 mod（如：做一个添加红宝石工具的 mod）'
+    : generatorType === 'datapack'
+    ? '描述你想要的数据包（如：添加一个钻石换铁的配方）'
+    : '描述你想要的整合包（如：性能优化整合包，含 Sodium + Iris）';
+
   return (
     <div className="flex flex-col gap-3 border-b border-zinc-800 p-4">
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="描述你想要的 mod（如：做一个添加红宝石工具的 mod）"
+        placeholder={placeholder}
         className="h-24 rounded border border-zinc-700 bg-zinc-900 p-2 text-sm text-zinc-100"
         disabled={loading}
       />

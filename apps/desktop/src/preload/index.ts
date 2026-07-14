@@ -3,7 +3,7 @@ import { IPC, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STRE
 
 const api = {
   generateSpec: (description: string) => ipcRenderer.invoke(IPC.GENERATE_SPEC, { description }),
-  generateFiles: (req: { loader: string; mcVersion: string; spec: unknown }) =>
+  generateFiles: (req: { loader: string; mcVersion: string; spec: unknown; generatorType: 'mod' | 'datapack' | 'modpack' }) =>
     ipcRenderer.invoke(IPC.GENERATE_FILES, req),
   build: (projectPath: string) => ipcRenderer.invoke(IPC.BUILD, { projectPath }),
   loadModelConfig: () => ipcRenderer.invoke(LOAD_MODEL_CONFIG),

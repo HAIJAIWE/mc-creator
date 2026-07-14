@@ -16,6 +16,7 @@ export const GenerateFilesRequest = z.object({
   loader: z.enum(['fabric', 'neoforge']),
   mcVersion: z.string(),
   spec: ModSpec,
+  generatorType: z.enum(['mod', 'datapack', 'modpack']).default('mod'),
 });
 export const GenerateFilesResponse = z.object({
   files: z.array(z.object({ path: z.string(), content: z.string() })),

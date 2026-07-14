@@ -37,7 +37,21 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
 
   ipcMain.handle(IPC.GENERATE_FILES, async (_e, raw: unknown): Promise<GenerateFilesRes> => {
     const req = GenerateFilesRequest.parse(raw);
-    const gen = new ModGenerator();
+    let gen;
+    switch (req.generatorType) {
+      case 'datapack': {
+        const { DatapackGenerator } = await import('@mc-creator/core');
+        gen = new DatapackGenerator();
+        break;
+      }
+      case 'modpack': {
+        const { ModpackGenerator } = await import('@mc-creator/core');
+        gen = new ModpackGenerator();
+        break;
+      }
+      default:
+        gen = new ModGenerator();
+    }
     const result = await gen.generate({
       loader: req.loader,
       mcVersion: req.mcVersion,
