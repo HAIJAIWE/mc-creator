@@ -55,7 +55,7 @@ importers:
         specifier: ^10.4.0
         version: 10.5.2(postcss@8.5.19)
       electron:
-        specifier: ^31.0.0
+        specifier: ^31.7.7
         version: 31.7.7
       electron-vite:
         specifier: ^2.3.0
