@@ -48,3 +48,35 @@ describe('FabricAdapter 元数据与构建脚本', () => {
     expect(gp!.content).toContain('maven_group=com.example.ruby_tools');
   });
 });
+
+describe('FabricAdapter Java 入口与注册代码', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate(CTX);
+  const paths = files.map((f) => f.path);
+
+  it('生成 ModInitializer 主类', () => {
+    const main = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java');
+    expect(main).toBeDefined();
+    expect(main!.content).toContain('package com.example.ruby_tools;');
+    expect(main!.content).toContain('implements ModInitializer');
+    expect(main!.content).toContain('onInitialize()');
+    expect(main!.content).toContain('ModItems.initialize()');
+    expect(main!.content).toContain('ModBlocks.initialize()');
+  });
+
+  it('生成 ModItems（Registry.register + 每个物品）', () => {
+    const items = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java');
+    expect(items).toBeDefined();
+    expect(items!.content).toContain('Registry.register');
+    expect(items!.content).toContain('RUBY');
+    expect(items!.content).toContain('"ruby"');
+  });
+
+  it('生成 ModBlocks（Registry.register + 每个方块）', () => {
+    const blocks = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java');
+    expect(blocks).toBeDefined();
+    expect(blocks!.content).toContain('Registry.register');
+    expect(blocks!.content).toContain('RUBY_BLOCK');
+    expect(blocks!.content).toContain('"ruby_block"');
+  });
+});
