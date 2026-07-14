@@ -305,12 +305,13 @@ runGradleBuild
 
 ## 测试覆盖
 
-当前共 **153 个测试**通过：
+当前共 **175 个测试**通过：
 
 | 包 | 测试文件 | 测试用例 |
 |---|---|---|
-| `@mc-creator/core` | 19 | 138 |
-| `@mc-creator/desktop` | 4 | 15 |
+| `@mc-creator/shared` | 1 | 6 |
+| `@mc-creator/core` | 21 | 153 |
+| `@mc-creator/desktop` | 4 | 16 |
 
 ## 路线图
 
@@ -336,14 +337,19 @@ runGradleBuild
 - ✅ P18：本地模型预设（OpenAI / DeepSeek / 通义千问 / 智谱 GLM / Ollama / LM Studio）
 - ✅ P19：Spec 编辑器（Monaco 编辑器内修改 JSON 再生成代码）
 - ✅ P20：构建面板流式输出与错误高亮（Gradle 日志逐行染色 + 自动提取 jar 路径）
+- ✅ P21：README 路线图与使用指南同步（资源包补入使用指南、测试覆盖数修正）
+- ✅ P22：优化现有功能（构建路径硬编码修复 + UI 一致性 + Dashboard 删除确认 + buildStream await）
+- ✅ P23：错误处理打磨（AiChat 卡死风险 + 项目保存失败静默）
+- ✅ P24：Spec 模板库（7 种生成器类型 27 个预置模板 + TemplatePicker UI）
+- ✅ P25：Modrinth API 接入（搜索/版本获取 IPC + ModrinthSearchPanel UI + 整合包流程集成）
+- ✅ P26：Quilt Loader 支持（Loader 类型扩展 + QuiltAdapter 复用 Fabric 适配器 + UI 选项）
 
 ### 未来可能
 
-- Spec 模板库（常见 Mod 类型一键起手）
-- 在线素材市场接入（Modrinth / CurseForge 资源直链下载）
 - 多 Mod 项目管理增强（依赖图 / 版本对比 / 导入导出）
 - 协作编辑（多端同步 Spec / 评论）
-- 更多 MC 版本与 Loader（Quilt / Legacy Fabric）
+- Legacy Fabric 支持
+- CurseForge 资源接入
 
 ## 许可证
 
