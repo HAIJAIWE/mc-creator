@@ -6,6 +6,7 @@ interface ModState {
   loader: Loader;
   mcVersion: McVersion;
   description: string;
+  generatorType: 'mod' | 'datapack' | 'modpack';
   // 产出
   spec: ModSpec | null;
   files: FileNode[];
@@ -21,6 +22,7 @@ interface ModState {
 
   setLoader: (l: Loader) => void;
   setMcVersion: (v: McVersion) => void;
+  setGeneratorType: (t: 'mod' | 'datapack' | 'modpack') => void;
   setDescription: (d: string) => void;
   setSpec: (s: ModSpec | null) => void;
   setFiles: (f: FileNode[]) => void;
@@ -34,6 +36,7 @@ export const useModStore = create<ModState>((set) => ({
   loader: 'fabric',
   mcVersion: '1.21.11',
   description: '',
+  generatorType: 'mod',
   spec: null,
   files: [],
   selectedFile: null,
@@ -47,6 +50,7 @@ export const useModStore = create<ModState>((set) => ({
 
   setLoader: (l) => set({ loader: l }),
   setMcVersion: (v) => set({ mcVersion: v }),
+  setGeneratorType: (t) => set({ generatorType: t }),
   setDescription: (d) => set({ description: d }),
   setSpec: (s) => set({ spec: s }),
   setFiles: (f) => set({ files: f, selectedFile: f[0]?.path ?? null }),

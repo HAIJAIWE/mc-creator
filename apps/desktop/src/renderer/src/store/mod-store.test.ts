@@ -8,6 +8,7 @@ describe('mod-store', () => {
       loader: 'fabric',
       mcVersion: '1.21.11',
       description: '',
+      generatorType: 'mod',
       spec: null,
       files: [],
       selectedFile: null,
