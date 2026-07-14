@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useModStore } from '../store/mod-store.js';
 import { MC_VERSIONS } from '@mc-creator/shared';
 import type { Loader, McVersion } from '@mc-creator/shared';
+import { SettingsPanel } from './SettingsPanel.js';
 
 export function TopBar() {
   const { loader, mcVersion, setLoader, setMcVersion, loading } = useModStore();
+  const [showSettings, setShowSettings] = useState(false);
 
   return (
     <header className="flex items-center gap-4 border-b border-zinc-700 bg-zinc-900 px-4 py-2 text-zinc-100">
@@ -33,6 +36,10 @@ export function TopBar() {
           ))}
         </select>
       </div>
+      <button onClick={() => setShowSettings(true)} className="ml-auto text-sm text-zinc-400 hover:text-white">
+        设置
+      </button>
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
     </header>
   );
 }

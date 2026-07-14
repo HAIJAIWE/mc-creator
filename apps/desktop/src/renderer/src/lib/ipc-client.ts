@@ -8,4 +8,8 @@ export const ipcClient = {
     window.mcApi.generateFiles(req),
   build: (projectPath: string): Promise<BuildRes> =>
     window.mcApi.build(projectPath),
+  loadModelConfig: () => window.mcApi.loadModelConfig(),
+  saveModelConfig: (config: { name: string; modelId: string; baseURL: string; apiKey: string }) =>
+    window.mcApi.saveModelConfig(config),
+  chat: (message: string) => window.mcApi.chat(message),
 };
