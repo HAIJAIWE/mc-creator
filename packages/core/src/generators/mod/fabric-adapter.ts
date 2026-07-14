@@ -147,14 +147,14 @@ public class ${mainCls} implements ModInitializer {
     const regs = spec.items
       .map(
         (it) =>
-          `        ${it.id.toUpperCase()} = Registry.register(Registries.ITEM, Identifier.of(MOD_ID, "${it.id}"), new Item(new Item.Settings()));`,
+          `        ${it.id.toUpperCase()} = Registry.register(Registries.ITEM, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${it.id}"), new Item(new Item.Settings()));`,
       )
       .join('\n');
     const content = `package ${pkg};
 
 import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
+import net.minecraft.core.Registry;
 import net.minecraft.util.Identifier;
 
 public class ModItems {
@@ -177,15 +177,15 @@ ${regs}
       .join('\n');
     const regs = spec.blocks
       .map((b) => {
-        const settings = `new Block.Settings().strength(${b.hardness}f)`;
-        return `        ${b.id.toUpperCase()} = Registry.register(Registries.BLOCK, Identifier.of(MOD_ID, "${b.id}"), new Block(${settings}));`;
+        const settings = `Block.Properties.of().strength(${b.hardness}f)`;
+        return `        ${b.id.toUpperCase()} = Registry.register(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${b.id}"), new Block(${settings}));`;
       })
       .join('\n');
     const content = `package ${pkg};
 
 import net.minecraft.block.Block;
 import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
+import net.minecraft.core.Registry;
 import net.minecraft.util.Identifier;
 
 public class ModBlocks {
