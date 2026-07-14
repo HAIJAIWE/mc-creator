@@ -27,6 +27,8 @@ export class FabricAdapter implements LoaderAdapter {
       this.mainClass(spec, pkg, mainCls),
       this.modItemsJava(spec, pkg, mainCls),
       this.modBlocksJava(spec, pkg, mainCls),
+      this.langJson(spec),
+      ...this.itemModels(spec),
     ];
   }
 
@@ -198,6 +200,27 @@ ${regs}
       path: `src/main/java/${packagePath(spec.modId)}/ModBlocks.java`,
       content,
     };
+  }
+
+  private langJson(spec: ModSpecLike): FileNode {
+    const entries: Record<string, string> = {};
+    for (const it of spec.items) entries[`item.${spec.modId}.${it.id}`] = it.name;
+    for (const b of spec.blocks) entries[`block.${spec.modId}.${b.id}`] = b.name;
+    return {
+      path: `src/main/resources/assets/${spec.modId}/lang/en_us.json`,
+      content: JSON.stringify(entries, null, 2),
+    };
+  }
+
+  private itemModels(spec: ModSpecLike): FileNode[] {
+    return spec.items.map((it) => ({
+      path: `src/main/resources/assets/${spec.modId}/models/item/${it.id}.json`,
+      content: JSON.stringify(
+        { parent: 'minecraft:item/generated', textures: { layer0: `${spec.modId}:item/${it.id}` } },
+        null,
+        2,
+      ),
+    }));
   }
 }
 

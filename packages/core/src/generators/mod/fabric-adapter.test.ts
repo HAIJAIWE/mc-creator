@@ -80,3 +80,23 @@ describe('FabricAdapter Java 入口与注册代码', () => {
     expect(blocks!.content).toContain('"ruby_block"');
   });
 });
+
+describe('FabricAdapter 资源文件', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate(CTX);
+
+  it('生成 en_us.json 含物品与方块翻译键', () => {
+    const lang = files.find((f) => f.path === 'src/main/resources/assets/ruby_tools/lang/en_us.json');
+    expect(lang).toBeDefined();
+    const json = JSON.parse(lang!.content);
+    expect(json['item.ruby_tools.ruby']).toBe('Ruby');
+    expect(json['block.ruby_tools.ruby_block']).toBe('Ruby Block');
+  });
+
+  it('生成物品模型 JSON', () => {
+    const model = files.find((f) => f.path === 'src/main/resources/assets/ruby_tools/models/item/ruby.json');
+    expect(model).toBeDefined();
+    const json = JSON.parse(model!.content);
+    expect(json.parent).toBe('minecraft:item/generated');
+  });
+});
