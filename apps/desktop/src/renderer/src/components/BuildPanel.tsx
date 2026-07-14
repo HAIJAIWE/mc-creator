@@ -1,5 +1,6 @@
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
+import { ErrorBanner } from './ErrorBanner.js';
 
 export function BuildPanel() {
   const {
@@ -36,7 +37,7 @@ export function BuildPanel() {
         {buildSuccess === false && <span className="text-sm text-red-400">编译失败</span>}
         {jarPath && <span className="text-xs text-zinc-400">产物：{jarPath}</span>}
       </div>
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
       {fixLog.length > 0 && (
         <div className="mb-2 space-y-1">
           <div className="text-xs font-semibold text-zinc-400">修复过程</div>

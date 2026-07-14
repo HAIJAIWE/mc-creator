@@ -1,5 +1,6 @@
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
+import { ErrorBanner } from './ErrorBanner.js';
 
 export function ChatPanel() {
   const {
@@ -59,7 +60,7 @@ export function ChatPanel() {
           生成代码
         </button>
       </div>
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
       {spec && (
         <div className="rounded border border-zinc-800 bg-zinc-900 p-2">
           <div className="mb-1 text-xs text-zinc-400">ModSpec（审阅后点「生成代码」）</div>
