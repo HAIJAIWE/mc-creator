@@ -43,3 +43,33 @@ describe('NeoForgeAdapter 元数据与构建脚本', () => {
     expect(gp!.content).toContain('mc_version=1.21.11');
   });
 });
+
+describe('NeoForgeAdapter Java 入口与注册代码', () => {
+  const adapter = new NeoForgeAdapter();
+  const files = adapter.translate(CTX);
+
+  it('生成 @Mod 主类', () => {
+    const main = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java');
+    expect(main).toBeDefined();
+    expect(main!.content).toContain('package com.example.ruby_tools;');
+    expect(main!.content).toContain('@Mod("ruby_tools")');
+    expect(main!.content).toContain('IEventBus');
+    expect(main!.content).toContain('ModItems.register(modEventBus)');
+    expect(main!.content).toContain('ModBlocks.register(modEventBus)');
+  });
+
+  it('生成 ModItems（DeferredRegister + 每个物品）', () => {
+    const items = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java');
+    expect(items).toBeDefined();
+    expect(items!.content).toContain('DeferredRegister');
+    expect(items!.content).toContain('RUBY');
+    expect(items!.content).toContain('registerSimpleItem("ruby"');
+  });
+
+  it('生成 ModBlocks（DeferredRegister + 每个方块）', () => {
+    const blocks = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java');
+    expect(blocks).toBeDefined();
+    expect(blocks!.content).toContain('DeferredRegister');
+    expect(blocks!.content).toContain('RUBY_BLOCK');
+  });
+});

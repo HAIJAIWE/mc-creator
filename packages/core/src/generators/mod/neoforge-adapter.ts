@@ -20,7 +20,90 @@ export class NeoForgeAdapter implements LoaderAdapter {
       this.buildGradle(spec, mcVersion),
       this.settingsGradle(),
       this.gradleProperties(spec, mcVersion),
+      this.mainClass(spec, pkg, mainCls),
+      this.modItemsJava(spec, pkg, mainCls),
+      this.modBlocksJava(spec, pkg, mainCls),
     ];
+  }
+
+  private mainClass(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
+    const content = `package ${pkg};
+
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.common.Mod;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Mod("${spec.modId}")
+public class ${mainCls} {
+    public static final String MOD_ID = "${spec.modId}";
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+    public ${mainCls}(IEventBus modEventBus) {
+        ModItems.register(modEventBus);
+        ModBlocks.register(modEventBus);
+        LOGGER.info("Initializing ${spec.name}");
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/${mainCls}.java`,
+      content,
+    };
+  }
+
+  private modItemsJava(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
+    const fields = spec.items
+      .map((it) => `    public static final DeferredItem<Item> ${it.id.toUpperCase()} = ITEMS.registerSimpleItem("${it.id}");`)
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.world.item.Item;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredItem;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+public class ModItems {
+    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(${mainCls}.MOD_ID);
+
+${fields}
+
+    public static void register(IEventBus modEventBus) {
+        ITEMS.register(modEventBus);
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModItems.java`,
+      content,
+    };
+  }
+
+  private modBlocksJava(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
+    const fields = spec.blocks
+      .map((b) => `    public static final DeferredBlock<Block> ${b.id.toUpperCase()} = BLOCKS.registerSimpleBlock("${b.id}");`)
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.world.level.block.Block;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredBlock;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+public class ModBlocks {
+    public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(${mainCls}.MOD_ID);
+
+${fields}
+
+    public static void register(IEventBus modEventBus) {
+        BLOCKS.register(modEventBus);
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModBlocks.java`,
+      content,
+    };
   }
 
   private modsToml(spec: ModSpecLike, mcVersion: string): FileNode {
