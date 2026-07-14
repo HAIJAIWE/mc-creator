@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import Editor from '@monaco-editor/react';
+import type { ModEntry } from '@mc-creator/shared';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
 import { TemplatePicker } from './TemplatePicker.js';
+import { ModrinthSearchPanel } from './ModrinthSearchPanel.js';
 
 export function ChatPanel() {
   const {
@@ -17,6 +19,8 @@ export function ChatPanel() {
   const [specError, setSpecError] = useState<string | null>(null);
   // 模板选择器显隐
   const [showTemplates, setShowTemplates] = useState(false);
+  // P25：Modrinth 搜索面板显隐
+  const [showModrinthSearch, setShowModrinthSearch] = useState(false);
 
   const generateSpec = async () => {
     setLoading(true);
@@ -81,6 +85,38 @@ export function ChatPanel() {
     }
   };
 
+  // P25：从 Modrinth 搜索面板选中 mod → 追加到 spec.mods
+  const handleModrinthPick = (mod: ModEntry) => {
+    // 优先用编辑器当前内容（用户可能已编辑），回退到 store spec
+    let currentSpec: Record<string, unknown> | null = null;
+    if (editorText) {
+      try {
+        currentSpec = JSON.parse(editorText) as Record<string, unknown>;
+      } catch {
+        setError('当前 Spec JSON 解析失败，无法添加 mod');
+        return;
+      }
+    } else if (spec) {
+      currentSpec = spec as Record<string, unknown>;
+    }
+
+    if (!currentSpec) {
+      setError('请先生成 Spec 再添加 mod');
+      return;
+    }
+
+    // 追加到 mods 数组（向后兼容：mods 可能不存在）
+    const mods = Array.isArray(currentSpec.mods) ? [...(currentSpec.mods as ModEntry[])] : [];
+    mods.push(mod);
+    const updatedSpec = { ...currentSpec, mods };
+    const text = JSON.stringify(updatedSpec, null, 2);
+    setEditorText(text);
+    setSpec(updatedSpec as any);
+    setOriginalSpec(text);
+    setSpecError(null);
+    setShowModrinthSearch(false);
+  };
+
   const placeholder = generatorType === 'mod'
     ? '描述你想要的 mod（如：做一个添加红宝石工具的 mod）'
     : generatorType === 'datapack'
@@ -139,6 +175,16 @@ export function ChatPanel() {
         >
           📋 模板
         </button>
+        {generatorType === 'modpack' && (
+          <button
+            onClick={() => setShowModrinthSearch(true)}
+            disabled={loading}
+            className="flex items-center gap-1.5 rounded bg-zinc-700 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
+            title="搜索 Modrinth 上的 mod 并添加到整合包"
+          >
+            🔍 搜索 Modrinth
+          </button>
+        )}
       </div>
       {showTemplates && (
         <TemplatePicker
@@ -148,6 +194,14 @@ export function ChatPanel() {
             setDescription(template.description);
             setShowTemplates(false);
           }}
+        />
+      )}
+      {showModrinthSearch && (
+        <ModrinthSearchPanel
+          loader={loader}
+          mcVersion={mcVersion}
+          onClose={() => setShowModrinthSearch(false)}
+          onPick={handleModrinthPick}
         />
       )}
       {error && <ErrorBanner message={error} onClose={() => setError(null)} />}

@@ -161,3 +161,50 @@ export const ProjectSchema = z.object({
   updatedAt: z.string(),
 });
 export type Project = z.infer<typeof ProjectSchema>;
+
+// === Modrinth 搜索（P25） ===
+export const MODRINTH_SEARCH = 'modrinth:search';
+export const MODRINTH_VERSIONS = 'modrinth:versions';
+
+export const ModrinthSearchRequest = z.object({
+  query: z.string(),
+  loader: z.string().optional(),
+  mcVersion: z.string().optional(),
+  limit: z.number().optional().default(20),
+});
+export const ModrinthSearchResponse = z.object({
+  hits: z.array(z.object({
+    project_id: z.string(),
+    slug: z.string(),
+    title: z.string(),
+    description: z.string(),
+    icon_url: z.string().nullable(),
+    downloads: z.number(),
+    categories: z.array(z.string()),
+  })),
+});
+
+export const ModrinthVersionsRequest = z.object({
+  projectId: z.string(),
+  loader: z.string().optional(),
+  mcVersion: z.string().optional(),
+});
+export const ModrinthVersionsResponse = z.object({
+  versions: z.array(z.object({
+    id: z.string(),
+    project_id: z.string(),
+    version_number: z.string(),
+    name: z.string(),
+    files: z.array(z.object({
+      url: z.string(),
+      filename: z.string(),
+      primary: z.boolean(),
+      size: z.number(),
+    })),
+  })),
+});
+
+export type ModrinthSearchReq = z.infer<typeof ModrinthSearchRequest>;
+export type ModrinthSearchRes = z.infer<typeof ModrinthSearchResponse>;
+export type ModrinthVersionsReq = z.infer<typeof ModrinthVersionsRequest>;
+export type ModrinthVersionsRes = z.infer<typeof ModrinthVersionsResponse>;

@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import JSZip from 'jszip';
 import { z } from 'zod';
-import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem } from '@mc-creator/core';
+import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem, ModrinthApiClient } from '@mc-creator/core';
 import * as nodeFs from 'fs';
 import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
 import { loadProjects, saveProject, deleteProject, getProject } from './project-store.js';
@@ -36,12 +36,18 @@ import {
   SAVE_PROJECT,
   DELETE_PROJECT,
   ProjectSchema,
+  MODRINTH_SEARCH,
+  MODRINTH_VERSIONS,
+  ModrinthSearchRequest,
+  ModrinthVersionsRequest,
   type GenerateSpecRes,
   type GenerateFilesRes,
   type BuildRes,
   type ExportZipRes,
   type PrepareBuildDirRes,
   type Project,
+  type ModrinthSearchRes,
+  type ModrinthVersionsRes,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -285,6 +291,28 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const { id } = z.object({ id: z.string() }).parse(raw);
     deleteProject(id);
     return { ok: true };
+  });
+
+  // === Modrinth 搜索（P25）：主进程转发 API 调用，避免渲染进程 CORS ===
+  const modrinthClient = new ModrinthApiClient();
+
+  ipcMain.handle(MODRINTH_SEARCH, async (_e, raw: unknown): Promise<ModrinthSearchRes> => {
+    const req = ModrinthSearchRequest.parse(raw);
+    const hits = await modrinthClient.search(req.query, {
+      loader: req.loader,
+      mcVersion: req.mcVersion,
+      limit: req.limit,
+    });
+    return { hits };
+  });
+
+  ipcMain.handle(MODRINTH_VERSIONS, async (_e, raw: unknown): Promise<ModrinthVersionsRes> => {
+    const req = ModrinthVersionsRequest.parse(raw);
+    const versions = await modrinthClient.getVersions(req.projectId, {
+      loader: req.loader,
+      mcVersion: req.mcVersion,
+    });
+    return { versions };
   });
 }
 
