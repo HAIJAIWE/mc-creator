@@ -12,6 +12,9 @@ export const IPC = {
   BUILD: 'mod:build',
 } as const;
 
+/** 导出 zip IPC 通道 */
+export const EXPORT_ZIP = 'mod:exportZip';
+
 /** 请求/响应 schema（zod 校验，规格 §7.2 类型化 IPC） */
 export const GenerateSpecRequest = z.object({ description: z.string().min(1) });
 export const GenerateSpecResponse = z.object({ spec: ModSpec, raw: z.string() });
@@ -93,3 +96,17 @@ export const BuildWithFixResponse = z.object({
 
 export type BuildWithFixReq = z.infer<typeof BuildWithFixRequest>;
 export type BuildWithFixRes = z.infer<typeof BuildWithFixResponse>;
+
+// === 导出 zip ===
+export const ExportZipRequest = z.object({
+  files: z.array(z.object({ path: z.string(), content: z.string() })),
+  defaultName: z.string().default('export.zip'),
+});
+export const ExportZipResponse = z.object({
+  ok: z.boolean(),
+  canceled: z.boolean(),
+  savedPath: z.string().nullable(),
+});
+
+export type ExportZipReq = z.infer<typeof ExportZipRequest>;
+export type ExportZipRes = z.infer<typeof ExportZipResponse>;

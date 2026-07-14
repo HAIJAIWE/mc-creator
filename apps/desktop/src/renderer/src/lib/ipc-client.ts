@@ -1,4 +1,4 @@
-import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, GeneratorType } from '../../../shared/ipc-channels.js';
+import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, GeneratorType } from '../../../shared/ipc-channels.js';
 
 /** 封装 window.mcApi，提供类型安全调用 */
 export const ipcClient = {
@@ -16,4 +16,6 @@ export const ipcClient = {
     window.mcApi.chatStream(message, onChunk),
   buildWithFix: (projectPath: string): Promise<BuildWithFixRes> =>
     window.mcApi.buildWithFix(projectPath),
+  exportZip: (req: { files: { path: string; content: string }[]; defaultName: string }): Promise<ExportZipRes> =>
+    window.mcApi.exportZip(req),
 };

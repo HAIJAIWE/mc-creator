@@ -1,9 +1,12 @@
-import { ipcMain } from 'electron';
+import { ipcMain, dialog } from 'electron';
+import { writeFile } from 'node:fs/promises';
+import JSZip from 'jszip';
 import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem } from '@mc-creator/core';
 import * as nodeFs from 'fs';
 import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
 import {
   IPC,
+  EXPORT_ZIP,
   GenerateSpecRequest,
   GenerateFilesRequest,
   BuildRequest,
@@ -11,6 +14,7 @@ import {
   ModelConfigResponse,
   ChatRequest,
   ChatStreamRequest,
+  ExportZipRequest,
   LOAD_MODEL_CONFIG,
   SAVE_MODEL_CONFIG,
   CHAT,
@@ -21,6 +25,7 @@ import {
   type GenerateSpecRes,
   type GenerateFilesRes,
   type BuildRes,
+  type ExportZipRes,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -162,6 +167,30 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       log: result.finalResult.log,
       fixLog: result.fixLog,
     };
+  });
+
+  // 导出 zip
+  ipcMain.handle(EXPORT_ZIP, async (_e, raw: unknown): Promise<ExportZipRes> => {
+    const req = ExportZipRequest.parse(raw);
+    const result = await dialog.showSaveDialog({
+      defaultPath: req.defaultName,
+      filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return { ok: false, canceled: true, savedPath: null };
+    }
+    const zip = new JSZip();
+    for (const f of req.files) {
+      if (f.path.endsWith('.png')) {
+        // PNG 的 content 是 base64 字符串，写入 zip 时需 decode 为二进制
+        zip.file(f.path, Buffer.from(f.content, 'base64'));
+      } else {
+        zip.file(f.path, f.content);
+      }
+    }
+    const buf = await zip.generateAsync({ type: 'nodebuffer' });
+    await writeFile(result.filePath, buf);
+    return { ok: true, canceled: false, savedPath: result.filePath };
   });
 }
 

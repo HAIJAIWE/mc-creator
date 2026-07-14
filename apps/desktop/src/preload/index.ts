@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, type GeneratorType } from '../shared/ipc-channels.js';
+import { IPC, EXPORT_ZIP, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, type GeneratorType } from '../shared/ipc-channels.js';
 
 const api = {
   generateSpec: (description: string) => ipcRenderer.invoke(IPC.GENERATE_SPEC, { description }),
@@ -17,6 +17,8 @@ const api = {
     });
   },
   buildWithFix: (projectPath: string) => ipcRenderer.invoke(BUILD_WITH_FIX, { projectPath }),
+  exportZip: (req: { files: { path: string; content: string }[]; defaultName: string }) =>
+    ipcRenderer.invoke(EXPORT_ZIP, req),
 };
 
 try {
