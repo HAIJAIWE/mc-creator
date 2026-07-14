@@ -16,6 +16,8 @@ interface ModState {
   jarPath: string | null;
   loading: boolean;
   error: string | null;
+  fixLog: string[];
+  setFixLog: (logs: string[]) => void;
 
   setLoader: (l: Loader) => void;
   setMcVersion: (v: McVersion) => void;
@@ -40,6 +42,8 @@ export const useModStore = create<ModState>((set) => ({
   jarPath: null,
   loading: false,
   error: null,
+  fixLog: [],
+  setFixLog: (logs) => set({ fixLog: logs }),
 
   setLoader: (l) => set({ loader: l }),
   setMcVersion: (v) => set({ mcVersion: v }),
