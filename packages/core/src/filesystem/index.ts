@@ -1,4 +1,4 @@
-import type { FS } from 'memfs';
+import type { IFs } from 'memfs';
 
 export interface Diff {
   added: string[];
@@ -10,12 +10,12 @@ export interface Diff {
  * 使用注入的 memfs（生产用 node fs，测试用 memfs）。
  */
 export class Filesystem {
-  constructor(private fs: FS) {}
+  constructor(private fs: IFs) {}
 
   async writeFile(path: string, content: string): Promise<void> {
     const tmp = `${path}.${process.pid}.tmp`;
     await this.fs.promises.mkdir(this.dirname(path), { recursive: true });
-    await this.fs.promises.writeFile(tmp, content, 'utf8');
+    await this.fs.promises.writeFile(tmp, content, { encoding: 'utf8' });
     await this.fs.promises.rename(tmp, path);
   }
 

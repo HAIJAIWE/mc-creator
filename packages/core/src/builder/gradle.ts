@@ -22,5 +22,5 @@ export async function runGradleBuild(
 async function defaultRun(cmd: string, args: string[], opts: any) {
   const e = await import('execa');
   const r = await e.execa(cmd, args, { ...opts, reject: false });
-  return { stdout: r.stdout.toString(), stderr: r.stderr.toString(), exitCode: r.exitCode ?? 0 };
+  return { stdout: (r.stdout ?? '').toString(), stderr: (r.stderr ?? '').toString(), exitCode: r.exitCode ?? 0 };
 }

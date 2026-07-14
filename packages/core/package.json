@@ -15,6 +15,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "memfs": "^4.9.0",
     "vitest": "^2.0.0"
   }
