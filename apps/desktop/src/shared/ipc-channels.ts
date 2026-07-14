@@ -110,3 +110,23 @@ export const ExportZipResponse = z.object({
 
 export type ExportZipReq = z.infer<typeof ExportZipRequest>;
 export type ExportZipRes = z.infer<typeof ExportZipResponse>;
+
+// === 项目管理 ===
+export const LIST_PROJECTS = 'project:list';
+export const GET_PROJECT = 'project:get';
+export const SAVE_PROJECT = 'project:save';
+export const DELETE_PROJECT = 'project:delete';
+
+export const ProjectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  generatorType: z.enum(GENERATOR_TYPES),
+  loader: z.enum(['fabric', 'neoforge']),
+  mcVersion: z.string(),
+  description: z.string(),
+  spec: z.record(z.unknown()),
+  files: z.array(z.object({ path: z.string(), content: z.string() })),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Project = z.infer<typeof ProjectSchema>;

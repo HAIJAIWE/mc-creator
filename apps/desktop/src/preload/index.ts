@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, EXPORT_ZIP, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, type GeneratorType } from '../shared/ipc-channels.js';
+import { IPC, EXPORT_ZIP, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, LIST_PROJECTS, GET_PROJECT, SAVE_PROJECT, DELETE_PROJECT, type GeneratorType } from '../shared/ipc-channels.js';
 
 const api = {
   generateSpec: (description: string) => ipcRenderer.invoke(IPC.GENERATE_SPEC, { description }),
@@ -19,6 +19,10 @@ const api = {
   buildWithFix: (projectPath: string) => ipcRenderer.invoke(BUILD_WITH_FIX, { projectPath }),
   exportZip: (req: { files: { path: string; content: string }[]; defaultName: string }) =>
     ipcRenderer.invoke(EXPORT_ZIP, req),
+  listProjects: () => ipcRenderer.invoke(LIST_PROJECTS),
+  getProject: (id: string) => ipcRenderer.invoke(GET_PROJECT, { id }),
+  saveProject: (project: unknown) => ipcRenderer.invoke(SAVE_PROJECT, project),
+  deleteProject: (id: string) => ipcRenderer.invoke(DELETE_PROJECT, { id }),
 };
 
 try {

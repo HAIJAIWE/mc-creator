@@ -5,7 +5,13 @@ import type { Loader, McVersion } from '@mc-creator/shared';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
 import { SettingsPanel } from './SettingsPanel.js';
 
-export function TopBar() {
+interface TopBarProps {
+  onBackToDashboard?: () => void;
+  onSaveProject?: () => void;
+  canSaveProject?: boolean;
+}
+
+export function TopBar({ onBackToDashboard, onSaveProject, canSaveProject }: TopBarProps) {
   const { loader, mcVersion, setLoader, setMcVersion, loading, generatorType, setGeneratorType } = useModStore();
   const [showSettings, setShowSettings] = useState(false);
 
@@ -53,9 +59,27 @@ export function TopBar() {
           ))}
         </select>
       </div>
-      <button onClick={() => setShowSettings(true)} className="ml-auto text-sm text-zinc-400 hover:text-white">
-        设置
-      </button>
+      <div className="ml-auto flex items-center gap-3">
+        {onBackToDashboard && (
+          <button
+            onClick={onBackToDashboard}
+            className="text-sm text-zinc-400 hover:text-white"
+          >
+            ← Dashboard
+          </button>
+        )}
+        {onSaveProject && canSaveProject && (
+          <button
+            onClick={onSaveProject}
+            className="text-sm text-zinc-400 hover:text-white"
+          >
+            保存项目
+          </button>
+        )}
+        <button onClick={() => setShowSettings(true)} className="text-sm text-zinc-400 hover:text-white">
+          设置
+        </button>
+      </div>
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
     </header>
   );

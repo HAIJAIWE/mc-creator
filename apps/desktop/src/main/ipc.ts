@@ -1,9 +1,11 @@
 import { ipcMain, dialog } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import JSZip from 'jszip';
+import { z } from 'zod';
 import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem } from '@mc-creator/core';
 import * as nodeFs from 'fs';
 import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
+import { loadProjects, saveProject, deleteProject, getProject } from './project-store.js';
 import {
   IPC,
   EXPORT_ZIP,
@@ -22,10 +24,16 @@ import {
   CHAT_STREAM_CHUNK,
   BUILD_WITH_FIX,
   BuildWithFixRequest,
+  LIST_PROJECTS,
+  GET_PROJECT,
+  SAVE_PROJECT,
+  DELETE_PROJECT,
+  ProjectSchema,
   type GenerateSpecRes,
   type GenerateFilesRes,
   type BuildRes,
   type ExportZipRes,
+  type Project,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -191,6 +199,28 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const buf = await zip.generateAsync({ type: 'nodebuffer' });
     await writeFile(result.filePath, buf);
     return { ok: true, canceled: false, savedPath: result.filePath };
+  });
+
+  // 项目管理
+  ipcMain.handle(LIST_PROJECTS, async () => {
+    return loadProjects();
+  });
+
+  ipcMain.handle(GET_PROJECT, async (_e, raw: unknown): Promise<Project | null> => {
+    const { id } = z.object({ id: z.string() }).parse(raw);
+    return getProject(id);
+  });
+
+  ipcMain.handle(SAVE_PROJECT, async (_e, raw: unknown) => {
+    const project = ProjectSchema.parse(raw);
+    saveProject(project);
+    return { ok: true };
+  });
+
+  ipcMain.handle(DELETE_PROJECT, async (_e, raw: unknown) => {
+    const { id } = z.object({ id: z.string() }).parse(raw);
+    deleteProject(id);
+    return { ok: true };
   });
 }
 
