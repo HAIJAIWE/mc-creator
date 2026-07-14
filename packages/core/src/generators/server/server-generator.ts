@@ -27,6 +27,10 @@ export class ServerGenerator implements Generator {
     files.push(this.generateModlist(spec));
     files.push(this.generateReadme(spec));
 
+    // P17：部署脚本生成
+    const deployFiles = this.generateDeployFiles(spec);
+    files.push(...deployFiles);
+
     return {
       files,
       warnings: [],
@@ -148,5 +152,133 @@ export class ServerGenerator implements Generator {
       path: 'README.txt',
       content: `服务器配置说明\n========================\n服务器名: ${spec.serverName}\nMC 版本: ${spec.mcVersion}\n端口: ${spec.port}\n\n请将本目录下所有文件放到服务器目录中，然后运行 start.bat (Windows) 或 start.sh (Unix) 启动服务器。\n注意：首次启动前请确认 eula.txt 中已同意 EULA。\n`,
     };
+  }
+
+  /** P17：根据 deployTarget 和 backupInterval 生成部署脚本 */
+  private generateDeployFiles(spec: ServerSpecType): FileNode[] {
+    const files: FileNode[] = [];
+    const needSystemd = spec.deployTarget === 'systemd' || spec.deployTarget === 'both';
+    const needDocker = spec.deployTarget === 'docker' || spec.deployTarget === 'both';
+
+    if (needSystemd) {
+      files.push(this.generateSystemdService(spec));
+      files.push(this.generateInstallSystemdSh(spec));
+    }
+    if (needDocker) {
+      files.push(this.generateDockerfile(spec));
+      files.push(this.generateDockerCompose(spec));
+      files.push(this.generateBuildDockerSh(spec));
+    }
+    if (spec.backupInterval > 0) {
+      files.push(this.generateBackupSh(spec));
+      files.push(this.generateBackupCron(spec));
+    }
+    return files;
+  }
+
+  /** deploy/minecraft.service — systemd unit 文件 */
+  private generateSystemdService(spec: ServerSpecType): FileNode {
+    const restart = spec.restartOnCrash ? 'on-failure' : 'no';
+    const content = `[Unit]
+Description=Minecraft Server (${spec.serverName})
+After=network.target
+
+[Service]
+Type=simple
+User=${spec.serviceUser}
+WorkingDirectory=${spec.serviceDir}
+ExecStart=${spec.javaPath} -Xmx${spec.maxMemory} -Xms${spec.startMemory} -jar ${spec.jarName} nogui
+Restart=${restart}
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+`;
+    return { path: 'deploy/minecraft.service', content };
+  }
+
+  /** deploy/install-systemd.sh — systemd 安装脚本 */
+  private generateInstallSystemdSh(spec: ServerSpecType): FileNode {
+    const content = `#!/bin/bash
+set -e
+# 创建用户
+useradd -r -m -d ${spec.serviceDir} ${spec.serviceUser} || true
+# 创建目录
+mkdir -p ${spec.serviceDir}
+# 复制文件
+cp -r ./* ${spec.serviceDir}/
+# 设置权限
+chown -R ${spec.serviceUser}:${spec.serviceUser} ${spec.serviceDir}
+# 安装 service
+cp deploy/minecraft.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable minecraft
+echo "安装完成。运行: systemctl start minecraft"
+`;
+    return { path: 'deploy/install-systemd.sh', content };
+  }
+
+  /** deploy/Dockerfile */
+  private generateDockerfile(spec: ServerSpecType): FileNode {
+    const content = `FROM eclipse-temurin:21-jre
+WORKDIR /server
+COPY . .
+EXPOSE ${spec.port}
+ENV JAVA_OPTS="-Xmx${spec.maxMemory} -Xms${spec.startMemory}"
+CMD ["sh", "-c", "java $JAVA_OPTS -jar ${spec.jarName} nogui"]
+`;
+    return { path: 'deploy/Dockerfile', content };
+  }
+
+  /** deploy/docker-compose.yml */
+  private generateDockerCompose(spec: ServerSpecType): FileNode {
+    const restart = spec.restartOnCrash ? 'unless-stopped' : 'no';
+    const content = `version: '3.8'
+services:
+  minecraft:
+    build: ..
+    container_name: ${spec.serverName}
+    ports:
+      - "${spec.port}:${spec.port}"
+    volumes:
+      - ./data:/server
+    restart: ${restart}
+    mem_limit: ${spec.maxRamPercent}%
+    environment:
+      - EULA=true
+`;
+    return { path: 'deploy/docker-compose.yml', content };
+  }
+
+  /** deploy/build-docker.sh — Docker 构建启动脚本 */
+  private generateBuildDockerSh(spec: ServerSpecType): FileNode {
+    const content = `#!/bin/bash
+set -e
+docker build -t minecraft-${spec.serverName} -f deploy/Dockerfile .
+docker compose -f deploy/docker-compose.yml up -d
+echo "Docker 部署完成。查看日志: docker compose -f deploy/docker-compose.yml logs -f"
+`;
+    return { path: 'deploy/build-docker.sh', content };
+  }
+
+  /** deploy/backup.sh — 备份脚本 */
+  private generateBackupSh(spec: ServerSpecType): FileNode {
+    const src = spec.serviceDir || '.';
+    const content = `#!/bin/bash
+BACKUP_DIR="/backups/$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+cp -r ${src}/* "$BACKUP_DIR/"
+# 保留最近 7 个备份
+ls -dt /backups/* | tail -n +8 | xargs rm -rf
+echo "备份完成: $BACKUP_DIR"
+`;
+    return { path: 'deploy/backup.sh', content };
+  }
+
+  /** deploy/backup-cron — cron 定时任务 */
+  private generateBackupCron(spec: ServerSpecType): FileNode {
+    const content = `0 */${spec.backupInterval} * * * ${spec.serviceUser} /path/to/deploy/backup.sh >> /var/log/minecraft-backup.log 2>&1
+`;
+    return { path: 'deploy/backup-cron', content };
   }
 }
