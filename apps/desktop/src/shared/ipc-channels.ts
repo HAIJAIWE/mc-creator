@@ -44,6 +44,19 @@ export const BuildResponse = z.object({
   log: z.string(),
 });
 
+// === 流式构建（P20） ===
+export const BUILD_STREAM = 'mod:buildStream';
+export const BUILD_STREAM_CHUNK = 'mod:buildStream:chunk';
+export const BuildStreamRequest = z.object({ projectPath: z.string().min(1) });
+export const BuildStreamChunk = z.object({
+  type: z.enum(['stdout', 'stderr', 'exit']),
+  text: z.string(),
+  done: z.boolean(),
+  exitCode: z.number().nullable().optional(),
+});
+export type BuildStreamReq = z.infer<typeof BuildStreamRequest>;
+export type BuildStreamChunkT = z.infer<typeof BuildStreamChunk>;
+
 export type GenerateSpecReq = z.infer<typeof GenerateSpecRequest>;
 export type GenerateSpecRes = z.infer<typeof GenerateSpecResponse>;
 export type GenerateFilesReq = z.infer<typeof GenerateFilesRequest>;

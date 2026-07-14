@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, EXPORT_ZIP, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, LIST_PROJECTS, GET_PROJECT, SAVE_PROJECT, DELETE_PROJECT, type GeneratorType } from '../shared/ipc-channels.js';
+import { IPC, EXPORT_ZIP, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, BUILD_STREAM, BUILD_STREAM_CHUNK, LIST_PROJECTS, GET_PROJECT, SAVE_PROJECT, DELETE_PROJECT, type GeneratorType, type BuildStreamChunkT } from '../shared/ipc-channels.js';
 
 const api = {
   generateSpec: (description: string, generatorType: GeneratorType) =>
@@ -18,6 +18,16 @@ const api = {
     });
   },
   buildWithFix: (projectPath: string) => ipcRenderer.invoke(BUILD_WITH_FIX, { projectPath }),
+  buildStream: (
+    projectPath: string,
+    onChunk: (chunk: BuildStreamChunkT) => void,
+  ) => {
+    const handler = (_e: unknown, data: BuildStreamChunkT) => onChunk(data);
+    ipcRenderer.on(BUILD_STREAM_CHUNK, handler);
+    ipcRenderer.invoke(BUILD_STREAM, { projectPath }).then(() => {
+      ipcRenderer.removeListener(BUILD_STREAM_CHUNK, handler);
+    });
+  },
   exportZip: (req: { files: { path: string; content: string }[]; defaultName: string }) =>
     ipcRenderer.invoke(EXPORT_ZIP, req),
   listProjects: () => ipcRenderer.invoke(LIST_PROJECTS),

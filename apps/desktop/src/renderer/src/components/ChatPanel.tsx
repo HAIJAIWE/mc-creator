@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import Editor from '@monaco-editor/react';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
@@ -8,12 +10,21 @@ export function ChatPanel() {
     spec, setSpec, setFiles, setLoading, setError, loading, error,
   } = useModStore();
 
+  // P19：编辑器文本、原始 spec（用于重置）、解析错误
+  const [editorText, setEditorText] = useState('');
+  const [originalSpec, setOriginalSpec] = useState('');
+  const [specError, setSpecError] = useState<string | null>(null);
+
   const generateSpec = async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await ipcClient.generateSpec(description, generatorType);
+      const text = JSON.stringify(res.spec, null, 2);
       setSpec(res.spec as any);
+      setEditorText(text);
+      setOriginalSpec(text);
+      setSpecError(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -22,16 +33,48 @@ export function ChatPanel() {
   };
 
   const generateFiles = async () => {
-    if (!spec) return;
+    // P19：用当前编辑器内容（而非原始 spec）
+    if (!editorText) return;
+    let parsedSpec: unknown;
+    try {
+      parsedSpec = JSON.parse(editorText);
+      setSpecError(null);
+    } catch (e) {
+      setSpecError((e as Error).message);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const res = await ipcClient.generateFiles({ loader, mcVersion, spec, generatorType });
+      const res = await ipcClient.generateFiles({ loader, mcVersion, spec: parsedSpec, generatorType });
       setFiles(res.files);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditorChange = (value: string | undefined) => {
+    const v = value ?? '';
+    setEditorText(v);
+    try {
+      const parsed = JSON.parse(v);
+      setSpec(parsed as any);
+      setSpecError(null);
+    } catch (e) {
+      // JSON 解析失败：不更新 store.spec，仅显示错误
+      setSpecError((e as Error).message);
+    }
+  };
+
+  const resetSpec = () => {
+    setEditorText(originalSpec);
+    try {
+      setSpec(JSON.parse(originalSpec) as any);
+      setSpecError(null);
+    } catch {
+      // 原始 spec 解析失败时忽略
     }
   };
 
@@ -88,11 +131,27 @@ export function ChatPanel() {
       </div>
       {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
       {spec && (
-        <div className="rounded border border-zinc-800 bg-zinc-900 p-2">
-          <div className="mb-1 text-xs text-zinc-400">ModSpec（审阅后点「生成代码」）</div>
-          <pre className="max-h-48 overflow-auto text-xs text-zinc-300">
-            {JSON.stringify(spec, null, 2)}
-          </pre>
+        <div className={`rounded border bg-zinc-900 p-2 ${specError ? 'border-red-500' : 'border-zinc-800'}`}>
+          <div className="mb-1 flex items-center justify-between">
+            <div className="text-xs text-zinc-400">Spec（可编辑，修改后点生成代码）</div>
+            <button
+              onClick={resetSpec}
+              className="rounded bg-zinc-700 px-2 py-0.5 text-xs text-zinc-200 hover:bg-zinc-600"
+            >
+              重置
+            </button>
+          </div>
+          <Editor
+            height="200px"
+            language="json"
+            theme="vs-dark"
+            value={editorText}
+            onChange={handleEditorChange}
+            options={{ fontSize: 12, minimap: { enabled: false }, scrollBeyondLastLine: false, automaticLayout: true }}
+          />
+          {specError && (
+            <div className="mt-1 text-xs text-red-400">JSON 解析错误：{specError}</div>
+          )}
         </div>
       )}
     </div>

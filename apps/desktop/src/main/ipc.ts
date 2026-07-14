@@ -1,5 +1,6 @@
 import { ipcMain, dialog } from 'electron';
 import { writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import JSZip from 'jszip';
 import { z } from 'zod';
 import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem } from '@mc-creator/core';
@@ -24,6 +25,9 @@ import {
   CHAT_STREAM_CHUNK,
   BUILD_WITH_FIX,
   BuildWithFixRequest,
+  BUILD_STREAM,
+  BUILD_STREAM_CHUNK,
+  BuildStreamRequest,
   LIST_PROJECTS,
   GET_PROJECT,
   SAVE_PROJECT,
@@ -181,6 +185,38 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       log: result.finalResult.log,
       fixLog: result.fixLog,
     };
+  });
+
+  // 流式构建（P20）：spawn gradlew，逐行推送 stdout/stderr
+  ipcMain.handle(BUILD_STREAM, async (e, raw: unknown) => {
+    const req = BuildStreamRequest.parse(raw);
+    const cwd = req.projectPath;
+    // Windows 用 gradlew.bat，Unix 用 ./gradlew
+    const cmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+    const child = spawn(cmd, ['build'], { cwd, shell: true });
+
+    child.stdout?.on('data', (data) => {
+      e.sender.send(BUILD_STREAM_CHUNK, { type: 'stdout', text: data.toString(), done: false });
+    });
+    child.stderr?.on('data', (data) => {
+      e.sender.send(BUILD_STREAM_CHUNK, { type: 'stderr', text: data.toString(), done: false });
+    });
+    child.on('close', (code) => {
+      e.sender.send(BUILD_STREAM_CHUNK, {
+        type: 'exit',
+        text: `进程退出，code=${code}`,
+        done: true,
+        exitCode: code,
+      });
+    });
+    child.on('error', (err) => {
+      e.sender.send(BUILD_STREAM_CHUNK, {
+        type: 'stderr',
+        text: `进程启动失败：${err.message}`,
+        done: true,
+        exitCode: -1,
+      });
+    });
   });
 
   // 导出 zip
