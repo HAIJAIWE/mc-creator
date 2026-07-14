@@ -53,6 +53,16 @@ export const ServerSpec = z.object({
   eula: z.boolean().default(true),
   startMemory: z.string().default('2G'),
   maxMemory: z.string().default('4G'),
+  // P17：部署脚本配置
+  deployTarget: z.enum(['none', 'systemd', 'docker', 'both']).default('none'),
+  javaPath: z.string().default('java'),
+  jarUrl: z.string().default(''),
+  jarName: z.string().default('server.jar'),
+  backupInterval: z.number().int().min(0).default(0),
+  restartOnCrash: z.boolean().default(true),
+  maxRamPercent: z.number().int().min(1).max(100).default(80),
+  serviceUser: z.string().default('minecraft'),
+  serviceDir: z.string().default('/opt/minecraft'),
 });
 
 export type ServerModEntry = z.infer<typeof ServerModEntry>;
