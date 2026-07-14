@@ -4,3 +4,4 @@ export * from './datapack-spec.js';
 export * from './modpack-spec.js';
 export * from './server-spec.js';
 export * from './texture-spec.js';
+export * from './resource-pack-spec.js';
