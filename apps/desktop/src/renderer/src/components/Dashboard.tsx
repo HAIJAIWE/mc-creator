@@ -72,7 +72,11 @@ export function Dashboard() {
                     打开
                   </button>
                   <button
-                    onClick={() => deleteProject(p.id)}
+                    onClick={() => {
+                      if (window.confirm(`确定删除项目「${p.name}」？此操作不可撤销。`)) {
+                        deleteProject(p.id);
+                      }
+                    }}
                     className="rounded bg-red-700 px-3 py-1 text-xs text-white hover:bg-red-600"
                   >
                     删除

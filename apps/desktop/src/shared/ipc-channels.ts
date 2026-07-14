@@ -129,6 +129,19 @@ export const ExportZipResponse = z.object({
 export type ExportZipReq = z.infer<typeof ExportZipRequest>;
 export type ExportZipRes = z.infer<typeof ExportZipResponse>;
 
+// === 准备构建目录（P22-4：构建前把内存中的 files 写入临时目录，避免硬编码路径） ===
+export const PREPARE_BUILD_DIR = 'mod:prepareBuildDir';
+
+export const PrepareBuildDirRequest = z.object({
+  files: z.array(z.object({ path: z.string(), content: z.string() })),
+});
+export const PrepareBuildDirResponse = z.object({
+  projectPath: z.string(),
+});
+
+export type PrepareBuildDirReq = z.infer<typeof PrepareBuildDirRequest>;
+export type PrepareBuildDirRes = z.infer<typeof PrepareBuildDirResponse>;
+
 // === 项目管理 ===
 export const LIST_PROJECTS = 'project:list';
 export const GET_PROJECT = 'project:get';

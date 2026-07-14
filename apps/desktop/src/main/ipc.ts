@@ -1,6 +1,7 @@
-import { ipcMain, dialog } from 'electron';
-import { writeFile } from 'node:fs/promises';
+import { ipcMain, dialog, app } from 'electron';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { dirname, join } from 'node:path';
 import JSZip from 'jszip';
 import { z } from 'zod';
 import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem } from '@mc-creator/core';
@@ -10,6 +11,7 @@ import { loadProjects, saveProject, deleteProject, getProject } from './project-
 import {
   IPC,
   EXPORT_ZIP,
+  PREPARE_BUILD_DIR,
   GenerateSpecRequest,
   GenerateFilesRequest,
   BuildRequest,
@@ -18,6 +20,7 @@ import {
   ChatRequest,
   ChatStreamRequest,
   ExportZipRequest,
+  PrepareBuildDirRequest,
   LOAD_MODEL_CONFIG,
   SAVE_MODEL_CONFIG,
   CHAT,
@@ -37,6 +40,7 @@ import {
   type GenerateFilesRes,
   type BuildRes,
   type ExportZipRes,
+  type PrepareBuildDirRes,
   type Project,
 } from '../shared/ipc-channels.js';
 
@@ -241,6 +245,24 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const buf = await zip.generateAsync({ type: 'nodebuffer' });
     await writeFile(result.filePath, buf);
     return { ok: true, canceled: false, savedPath: result.filePath };
+  });
+
+  // 准备构建目录（P22-4）：把内存中的 files 写入临时目录，返回绝对路径供后续 BUILD/BUILD_STREAM/BUILD_WITH_FIX 使用
+  ipcMain.handle(PREPARE_BUILD_DIR, async (_e, raw: unknown): Promise<PrepareBuildDirRes> => {
+    const req = PrepareBuildDirRequest.parse(raw);
+    const projectPath = join(app.getPath('temp'), `mc-creator-build-${Date.now()}`);
+    await mkdir(projectPath, { recursive: true });
+    for (const f of req.files) {
+      const abs = join(projectPath, f.path);
+      await mkdir(dirname(abs), { recursive: true });
+      if (f.path.endsWith('.png')) {
+        // PNG 的 content 是 base64 字符串，写入时 decode 为二进制
+        await writeFile(abs, Buffer.from(f.content, 'base64'));
+      } else {
+        await writeFile(abs, f.content, 'utf-8');
+      }
+    }
+    return { projectPath };
   });
 
   // 项目管理

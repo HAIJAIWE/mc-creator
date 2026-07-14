@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GenerateSpecRequest, GenerateFilesRequest, BuildRequest } from './ipc-channels.js';
+import { GenerateSpecRequest, GenerateFilesRequest, BuildRequest, PrepareBuildDirRequest } from './ipc-channels.js';
 
 describe('IPC schema 校验', () => {
   it('GenerateSpecRequest 校验描述非空', () => {
@@ -33,5 +33,12 @@ describe('IPC schema 校验', () => {
   it('BuildRequest 校验路径非空', () => {
     expect(BuildRequest.safeParse({ projectPath: '/proj' }).success).toBe(true);
     expect(BuildRequest.safeParse({ projectPath: '' }).success).toBe(false);
+  });
+
+  it('PrepareBuildDirRequest 校验 files 非空数组', () => {
+    expect(PrepareBuildDirRequest.safeParse({ files: [{ path: 'a.txt', content: 'hi' }] }).success).toBe(true);
+    expect(PrepareBuildDirRequest.safeParse({ files: [] }).success).toBe(true);
+    expect(PrepareBuildDirRequest.safeParse({ files: [{ path: 'a.txt' }] }).success).toBe(false);
+    expect(PrepareBuildDirRequest.safeParse({}).success).toBe(false);
   });
 });

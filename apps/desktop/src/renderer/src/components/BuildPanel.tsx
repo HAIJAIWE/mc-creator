@@ -4,8 +4,6 @@ import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
 import type { BuildStreamChunkT } from '../../../shared/ipc-channels.js';
 
-const PROJECT_PATH = '/tmp/mc-mod';
-
 /** 从日志中提取 jar 路径（匹配 build/libs/*.jar） */
 function extractJarPath(log: string): string | null {
   const match = log.match(/build\/libs\/[^\s"']*\.jar/);
@@ -45,7 +43,9 @@ export function BuildPanel() {
     setError(null);
     setFixLog([]);
     try {
-      const res = await ipcClient.buildWithFix(PROJECT_PATH) as any;
+      // P22-4：先把内存中的 files 写入临时目录，再用该路径构建（避免硬编码 /tmp/mc-mod）
+      const { projectPath } = await ipcClient.prepareBuildDir(files);
+      const res = await ipcClient.buildWithFix(projectPath) as any;
       setBuildResult({ success: res.success, log: res.log, jarPath: res.jarPath });
       setFixLog(res.fixLog ?? []);
       setBuildCount((c) => c + 1);
@@ -56,7 +56,7 @@ export function BuildPanel() {
     }
   };
 
-  const buildStream = () => {
+  const buildStream = async () => {
     setStreamBuilding(true);
     setStreamSuccess(null);
     setStreamJarPath(null);
@@ -80,7 +80,10 @@ export function BuildPanel() {
     };
 
     try {
-      ipcClient.buildStream(PROJECT_PATH, onChunk);
+      // P22-4：先把内存中的 files 写入临时目录，再启动流式构建
+      const { projectPath } = await ipcClient.prepareBuildDir(files);
+      // P22-3：await Promise 以捕获 invoke 失败
+      await ipcClient.buildStream(projectPath, onChunk);
     } catch (e) {
       setStreamBuilding(false);
       setStreamSuccess(false);
@@ -153,12 +156,12 @@ export function BuildPanel() {
         </div>
       )}
       {streamLog ? (
-        <div className="max-h-40 overflow-auto rounded bg-black p-2 text-xs font-mono">
+        <div className="max-h-40 overflow-auto rounded bg-zinc-950 p-2 text-xs font-mono">
           {renderLog(streamLog)}
         </div>
       ) : (
         buildLog && (
-          <pre className="max-h-40 overflow-auto rounded bg-black p-2 text-xs text-zinc-300">{buildLog}</pre>
+          <pre className="max-h-40 overflow-auto rounded bg-zinc-950 p-2 text-xs text-zinc-300">{buildLog}</pre>
         )
       )}
     </div>
