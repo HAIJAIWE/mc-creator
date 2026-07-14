@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { IPC, EXPORT_ZIP, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, LIST_PROJECTS, GET_PROJECT, SAVE_PROJECT, DELETE_PROJECT, type GeneratorType } from '../shared/ipc-channels.js';
 
 const api = {
-  generateSpec: (description: string) => ipcRenderer.invoke(IPC.GENERATE_SPEC, { description }),
+  generateSpec: (description: string, generatorType: GeneratorType) =>
+    ipcRenderer.invoke(IPC.GENERATE_SPEC, { description, generatorType }),
   generateFiles: (req: { loader: string; mcVersion: string; spec: unknown; generatorType: GeneratorType }) =>
     ipcRenderer.invoke(IPC.GENERATE_FILES, req),
   build: (projectPath: string) => ipcRenderer.invoke(IPC.BUILD, { projectPath }),

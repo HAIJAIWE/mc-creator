@@ -44,8 +44,9 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
   ipcMain.handle(IPC.GENERATE_SPEC, async (_e, raw: unknown): Promise<GenerateSpecRes> => {
     const req = GenerateSpecRequest.parse(raw);
     const orchestrator = getOrchestrator();
-    const spec = await orchestrator.generateModSpec(req.description);
-    return { spec, raw: JSON.stringify(spec, null, 2) };
+    // P16：按 generatorType 调用对应 prompt + schema 校验
+    const spec = await orchestrator.generateSpecByType(req.description, req.generatorType);
+    return { spec: spec as Record<string, unknown>, raw: JSON.stringify(spec, null, 2) };
   });
 
   ipcMain.handle(IPC.GENERATE_FILES, async (_e, raw: unknown): Promise<GenerateFilesRes> => {

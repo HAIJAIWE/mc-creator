@@ -2,8 +2,8 @@ import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, Expo
 
 /** 封装 window.mcApi，提供类型安全调用 */
 export const ipcClient = {
-  generateSpec: (description: string): Promise<GenerateSpecRes> =>
-    window.mcApi.generateSpec(description),
+  generateSpec: (description: string, generatorType: GeneratorType): Promise<GenerateSpecRes> =>
+    window.mcApi.generateSpec(description, generatorType),
   generateFiles: (req: { loader: string; mcVersion: string; spec: unknown; generatorType: GeneratorType }): Promise<GenerateFilesRes> =>
     window.mcApi.generateFiles(req),
   build: (projectPath: string): Promise<BuildRes> =>

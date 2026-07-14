@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { ModSpec } from '@mc-creator/shared';
 
 /** 生成器类型联合（mod/datapack/modpack/server/texture/skin/resource_pack） */
 export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'texture', 'skin', 'resource_pack'] as const;
@@ -16,8 +15,14 @@ export const IPC = {
 export const EXPORT_ZIP = 'mod:exportZip';
 
 /** 请求/响应 schema（zod 校验，规格 §7.2 类型化 IPC） */
-export const GenerateSpecRequest = z.object({ description: z.string().min(1) });
-export const GenerateSpecResponse = z.object({ spec: ModSpec, raw: z.string() });
+export const GenerateSpecRequest = z.object({
+  description: z.string().min(1),
+  generatorType: z.enum(GENERATOR_TYPES).default('mod'),
+});
+export const GenerateSpecResponse = z.object({
+  spec: z.record(z.unknown()),
+  raw: z.string(),
+});
 
 export const GenerateFilesRequest = z.object({
   loader: z.enum(['fabric', 'neoforge']),

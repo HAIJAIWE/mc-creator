@@ -12,8 +12,8 @@ export function ChatPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await ipcClient.generateSpec(description);
-      setSpec(res.spec);
+      const res = await ipcClient.generateSpec(description, generatorType);
+      setSpec(res.spec as any);
     } catch (e) {
       setError((e as Error).message);
     } finally {

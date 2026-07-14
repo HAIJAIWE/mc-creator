@@ -6,6 +6,24 @@ interface Props {
   onClose: () => void;
 }
 
+/** 模型预设（P18：一键填充 Base URL + Model ID） */
+interface Preset {
+  name: string;
+  baseURL: string;
+  modelId: string;
+  apiKeyPlaceholder?: string;
+  local?: boolean;
+}
+
+const PRESETS: Preset[] = [
+  { name: 'OpenAI', baseURL: 'https://api.openai.com/v1', modelId: 'gpt-4o-mini', apiKeyPlaceholder: 'sk-...' },
+  { name: 'DeepSeek', baseURL: 'https://api.deepseek.com/v1', modelId: 'deepseek-chat', apiKeyPlaceholder: 'sk-...' },
+  { name: '通义千问', baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', modelId: 'qwen-plus', apiKeyPlaceholder: 'sk-...' },
+  { name: '智谱 GLM', baseURL: 'https://open.bigmodel.cn/api/paas/v4', modelId: 'glm-4-flash', apiKeyPlaceholder: '...' },
+  { name: 'Ollama (本地)', baseURL: 'http://localhost:11434/v1', modelId: 'qwen2.5:7b', local: true },
+  { name: 'LM Studio (本地)', baseURL: 'http://localhost:1234/v1', modelId: 'local-model', local: true },
+];
+
 export function SettingsPanel({ onClose }: Props) {
   const { name, modelId, baseURL, apiKey, setConfig } = useModelConfigStore();
   const [form, setForm] = useState({ name, modelId, baseURL, apiKey });
@@ -28,12 +46,35 @@ export function SettingsPanel({ onClose }: Props) {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  /** 应用预设：填充 name/baseURL/modelId，apiKey 留空让用户填 */
+  const applyPreset = (p: Preset) => {
+    setForm((prev) => ({ ...prev, name: p.name, baseURL: p.baseURL, modelId: p.modelId }));
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="w-[480px] rounded-lg border border-zinc-700 bg-zinc-900 p-6 text-zinc-100">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">模型配置</h2>
           <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
+        </div>
+
+        {/* P18：预设按钮 */}
+        <div className="mb-4">
+          <div className="mb-2 text-xs text-zinc-400">快速预设（点击填充）：</div>
+          <div className="flex flex-wrap gap-2">
+            {PRESETS.map((p) => (
+              <button
+                key={p.name}
+                onClick={() => applyPreset(p)}
+                className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:border-blue-500 hover:text-white"
+                title={p.local ? `本地模型，需先安装 ${p.name.split(' ')[0]}` : `云端：${p.baseURL}`}
+              >
+                {p.local && <span className="mr-1 text-green-400">●</span>}
+                {p.name}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-3">
