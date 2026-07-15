@@ -347,6 +347,10 @@ runGradleBuild
 - ✅ P28：项目导入/导出（Project 打包 zip 备份/迁移/分享，导入生成新 id 避免覆盖）
 - ✅ P29：CurseForge API 接入（搜索/文件获取 IPC + CurseForgeSearchPanel + SettingsPanel API key 配置）
 - ✅ P30：现有功能走查打磨（Dashboard 导入/导出 loading 状态 + ChatPanel 提取公共 pickModToSpec）
+- ✅ P31：lucide-react 专业图标库（11 个组件 emoji/SVG 替换为专业图标，统一视觉风格）
+- ✅ P32：Toast 通知系统（ToastProvider + useToast，4 种类型 success/error/warning/info，替换 window.alert）
+- ✅ P33：Dashboard 视觉增强（统计栏：总项目数/总文件数/各类型分布 + 卡片缩略图：类型图标/描述/文件数）
+- ✅ P34：可拖拽分割条（Splitter 组件，三栏布局宽度可调：左栏 160-480px / 右栏 200-600px）
 
 ### 未来可能
 
