@@ -8,6 +8,8 @@ export function Dashboard() {
   const loadProjects = useProjectStore((s) => s.loadProjects);
   const loadProject = useProjectStore((s) => s.loadProject);
   const deleteProject = useProjectStore((s) => s.deleteProject);
+  const exportProject = useProjectStore((s) => s.exportProject);
+  const importProject = useProjectStore((s) => s.importProject);
   const setView = useProjectStore((s) => s.setView);
 
   useEffect(() => {
@@ -31,16 +33,46 @@ export function Dashboard() {
     setView('editor');
   };
 
+  const handleImport = async () => {
+    const res = await importProject();
+    if (res.success) {
+      window.alert('导入成功');
+    } else if (res.error && res.error !== '已取消') {
+      window.alert(`导入失败：${res.error}`);
+    }
+    // 用户取消（error='已取消'）不提示
+  };
+
+  const handleExport = async (p: { id: string; name: string }) => {
+    const project = projects.find((x) => x.id === p.id);
+    if (!project) return;
+    const res = await exportProject(project);
+    if (res.ok && res.savedPath) {
+      window.alert(`已导出到 ${res.savedPath}`);
+    } else if (!res.ok && !res.canceled) {
+      window.alert('导出失败');
+    }
+    // 用户取消（canceled=true）不提示
+  };
+
   return (
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
       <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-6 py-4">
         <h1 className="text-xl font-bold">项目仪表盘</h1>
-        <button
-          onClick={handleNew}
-          className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-500"
-        >
-          + 新建项目
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleNew}
+            className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-500"
+          >
+            + 新建项目
+          </button>
+          <button
+            onClick={handleImport}
+            className="rounded bg-zinc-700 px-4 py-1.5 text-sm text-white hover:bg-zinc-600"
+          >
+            📥 导入项目
+          </button>
+        </div>
       </header>
       <main className="flex-1 overflow-y-auto p-6">
         {loading && projects.length === 0 ? (
@@ -70,6 +102,12 @@ export function Dashboard() {
                     className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500"
                   >
                     打开
+                  </button>
+                  <button
+                    onClick={() => handleExport(p)}
+                    className="rounded bg-zinc-700 px-3 py-1 text-xs text-white hover:bg-zinc-600"
+                  >
+                    📤 导出
                   </button>
                   <button
                     onClick={() => {

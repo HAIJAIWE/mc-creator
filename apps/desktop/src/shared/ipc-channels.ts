@@ -162,6 +162,28 @@ export const ProjectSchema = z.object({
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
+// === 项目导入/导出（P28） ===
+export const EXPORT_PROJECT = 'project:export';
+export const IMPORT_PROJECT = 'project:import';
+
+export const ExportProjectRequest = z.object({
+  project: ProjectSchema, // 完整 Project 对象
+});
+export const ExportProjectResponse = z.object({
+  ok: z.boolean(),
+  canceled: z.boolean(),
+  savedPath: z.string().nullable(),
+});
+
+export const ImportProjectResponse = z.object({
+  project: ProjectSchema.nullable(), // 导入成功返回新 Project，失败返回 null
+  error: z.string().nullable().optional(),
+});
+
+export type ExportProjectReq = z.infer<typeof ExportProjectRequest>;
+export type ExportProjectRes = z.infer<typeof ExportProjectResponse>;
+export type ImportProjectRes = z.infer<typeof ImportProjectResponse>;
+
 // === Modrinth 搜索（P25） ===
 export const MODRINTH_SEARCH = 'modrinth:search';
 export const MODRINTH_VERSIONS = 'modrinth:versions';

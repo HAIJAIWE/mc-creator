@@ -1,4 +1,4 @@
-import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, PrepareBuildDirRes, GeneratorType, Project, BuildStreamChunkT, ModrinthSearchRes, ModrinthVersionsRes } from '../../../shared/ipc-channels.js';
+import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, PrepareBuildDirRes, ExportProjectRes, ImportProjectRes, GeneratorType, Project, BuildStreamChunkT, ModrinthSearchRes, ModrinthVersionsRes } from '../../../shared/ipc-channels.js';
 
 /** 封装 window.mcApi，提供类型安全调用 */
 export const ipcClient = {
@@ -26,6 +26,8 @@ export const ipcClient = {
   getProject: (id: string): Promise<Project | null> => window.mcApi.getProject(id),
   saveProject: (project: Project): Promise<{ ok: true }> => window.mcApi.saveProject(project),
   deleteProject: (id: string): Promise<{ ok: true }> => window.mcApi.deleteProject(id),
+  exportProject: (project: Project): Promise<ExportProjectRes> => window.mcApi.exportProject(project),
+  importProject: (): Promise<ImportProjectRes> => window.mcApi.importProject(),
   modrinthSearch: (req: { query: string; loader?: string; mcVersion?: string; limit?: number }): Promise<ModrinthSearchRes> =>
     window.mcApi.modrinthSearch(req),
   modrinthVersions: (req: { projectId: string; loader?: string; mcVersion?: string }): Promise<ModrinthVersionsRes> =>

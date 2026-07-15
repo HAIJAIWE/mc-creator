@@ -25,6 +25,8 @@ interface ProjectState {
   saveCurrentAsProject: (name: string, data: SaveProjectData) => Promise<void>;
   loadProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
+  exportProject: (project: Project) => Promise<{ ok: boolean; canceled: boolean; savedPath: string | null }>;
+  importProject: () => Promise<{ success: boolean; error?: string }>;
   setView: (v: 'dashboard' | 'editor') => void;
   backToDashboard: () => void;
 }
@@ -113,6 +115,37 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       await get().loadProjects();
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
+    }
+  },
+
+  exportProject: async (project) => {
+    try {
+      const res = await ipcClient.exportProject(project);
+      return { ok: res.ok, canceled: res.canceled, savedPath: res.savedPath };
+    } catch (e) {
+      set({ error: (e as Error).message });
+      return { ok: false, canceled: false, savedPath: null };
+    }
+  },
+
+  importProject: async () => {
+    try {
+      const res = await ipcClient.importProject();
+      if (res.project) {
+        // 导入成功 → 刷新项目列表
+        await get().loadProjects();
+        return { success: true };
+      }
+      if (res.error) {
+        set({ error: res.error });
+        return { success: false, error: res.error };
+      }
+      // 用户取消（project 为 null 且 error 为 null）
+      return { success: false, error: '已取消' };
+    } catch (e) {
+      const msg = (e as Error).message;
+      set({ error: msg });
+      return { success: false, error: msg };
     }
   },
 

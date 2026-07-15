@@ -1,6 +1,7 @@
 import { ipcMain, dialog, app } from 'electron';
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import JSZip from 'jszip';
 import { z } from 'zod';
@@ -12,6 +13,8 @@ import {
   IPC,
   EXPORT_ZIP,
   PREPARE_BUILD_DIR,
+  EXPORT_PROJECT,
+  IMPORT_PROJECT,
   GenerateSpecRequest,
   GenerateFilesRequest,
   BuildRequest,
@@ -21,6 +24,8 @@ import {
   ChatStreamRequest,
   ExportZipRequest,
   PrepareBuildDirRequest,
+  ExportProjectRequest,
+  ProjectSchema,
   LOAD_MODEL_CONFIG,
   SAVE_MODEL_CONFIG,
   CHAT,
@@ -35,7 +40,6 @@ import {
   GET_PROJECT,
   SAVE_PROJECT,
   DELETE_PROJECT,
-  ProjectSchema,
   MODRINTH_SEARCH,
   MODRINTH_VERSIONS,
   ModrinthSearchRequest,
@@ -45,6 +49,8 @@ import {
   type BuildRes,
   type ExportZipRes,
   type PrepareBuildDirRes,
+  type ExportProjectRes,
+  type ImportProjectRes,
   type Project,
   type ModrinthSearchRes,
   type ModrinthVersionsRes,
@@ -291,6 +297,57 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const { id } = z.object({ id: z.string() }).parse(raw);
     deleteProject(id);
     return { ok: true };
+  });
+
+  // === 项目导出（P28）：把整个 Project 序列化为 project.json 打包成 zip ===
+  ipcMain.handle(EXPORT_PROJECT, async (_e, raw: unknown): Promise<ExportProjectRes> => {
+    const req = ExportProjectRequest.parse(raw);
+    const project = req.project;
+    const result = await dialog.showSaveDialog({
+      defaultPath: `${project.name}.mcproject.zip`,
+      filters: [{ name: 'MC Project', extensions: ['zip'] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return { ok: false, canceled: true, savedPath: null };
+    }
+    const zip = new JSZip();
+    zip.file('project.json', JSON.stringify(project, null, 2));
+    const buf = await zip.generateAsync({ type: 'nodebuffer' });
+    await writeFile(result.filePath, buf);
+    return { ok: true, canceled: false, savedPath: result.filePath };
+  });
+
+  // === 项目导入（P28）：解压 zip → 解析 project.json → 校验 → 生成新 id 保存 ===
+  ipcMain.handle(IMPORT_PROJECT, async (): Promise<ImportProjectRes> => {
+    try {
+      const openResult = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [{ name: 'MC Project', extensions: ['zip'] }],
+      });
+      if (openResult.canceled || openResult.filePaths.length === 0) {
+        return { project: null, error: null };
+      }
+      const buf = await readFile(openResult.filePaths[0]);
+      const zip = await JSZip.loadAsync(buf);
+      const projectFile = zip.file('project.json');
+      if (!projectFile) {
+        return { project: null, error: 'zip 内未找到 project.json' };
+      }
+      const jsonStr = await projectFile.async('string');
+      const parsed = ProjectSchema.parse(JSON.parse(jsonStr));
+      // 生成新 id + 更新时间戳，避免覆盖原项目
+      const now = new Date().toISOString();
+      const newProject: Project = {
+        ...parsed,
+        id: randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      saveProject(newProject);
+      return { project: newProject, error: null };
+    } catch (e) {
+      return { project: null, error: (e as Error).message };
+    }
   });
 
   // === Modrinth 搜索（P25）：主进程转发 API 调用，避免渲染进程 CORS ===
