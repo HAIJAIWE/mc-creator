@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { TEMPLATES_BY_TYPE, type SpecTemplate, type GeneratorType } from '@mc-creator/shared';
+import { X } from 'lucide-react';
 
 interface Props {
   generatorType: GeneratorType;
@@ -49,7 +50,7 @@ export function TemplatePicker({ generatorType, onPick, onClose }: Props) {
             className="text-zinc-400 hover:text-white"
             aria-label="关闭"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
 

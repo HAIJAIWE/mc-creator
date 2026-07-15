@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ArrowLeft, Settings, Save } from 'lucide-react';
 import { useModStore } from '../store/mod-store.js';
 import { MC_VERSIONS } from '@mc-creator/shared';
 import type { Loader, McVersion } from '@mc-creator/shared';
@@ -66,21 +67,21 @@ export function TopBar({ onBackToDashboard, onSaveProject, canSaveProject }: Top
         {onBackToDashboard && (
           <button
             onClick={onBackToDashboard}
-            className="text-sm text-zinc-400 hover:text-white"
+            className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white"
           >
-            ← Dashboard
+            <ArrowLeft className="h-4 w-4" /> Dashboard
           </button>
         )}
         {onSaveProject && canSaveProject && (
           <button
             onClick={onSaveProject}
-            className="text-sm text-zinc-400 hover:text-white"
+            className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white"
           >
-            保存项目
+            <Save className="h-4 w-4" /> 保存项目
           </button>
         )}
-        <button onClick={() => setShowSettings(true)} className="text-sm text-zinc-400 hover:text-white">
-          设置
+        <button onClick={() => setShowSettings(true)} className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white">
+          <Settings className="h-4 w-4" /> 设置
         </button>
       </div>
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}

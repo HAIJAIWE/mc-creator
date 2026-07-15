@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { ipcClient } from '../lib/ipc-client.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
+import { Send } from 'lucide-react';
 
 interface Msg { role: 'user' | 'assistant'; text: string }
 
@@ -90,9 +91,9 @@ export function AiChat() {
         <button
           onClick={send}
           disabled={sending || !input.trim()}
-          className="rounded bg-blue-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1 text-xs text-white disabled:opacity-50"
         >
-          {sending ? '…' : '发送'}
+          {sending ? '…' : <><Send className="h-3 w-3" /> 发送</>}
         </button>
       </div>
     </div>

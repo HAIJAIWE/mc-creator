@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
+import { X } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
@@ -67,7 +68,7 @@ export function ProjectSaveDialog({ onClose }: Props) {
       <div className="w-[420px] rounded-lg border border-zinc-700 bg-zinc-900 p-6 text-zinc-100">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">保存项目</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         <div className="space-y-3">
           <div>

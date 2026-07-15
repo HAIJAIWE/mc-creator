@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ModEntry } from '@mc-creator/shared';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
+import { Search, X, Loader2, ArrowLeft, Download } from 'lucide-react';
 
 interface Props {
   /** 选中 mod 后回调（mod 结构匹配 ModpackSpec.mods 的 ModEntry） */
@@ -126,8 +127,8 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
       >
         {/* 标题栏 */}
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-bold">
-            🔍 搜索 CurseForge
+          <h2 className="flex items-center gap-1.5 text-base font-bold">
+            <Search className="h-4 w-4" /> 搜索 CurseForge
             {(loader || mcVersion) && (
               <span className="ml-2 text-xs font-normal text-zinc-400">
                 （{loader ?? '任意 loader'} / {mcVersion ?? '任意版本'}）
@@ -139,7 +140,7 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
             className="text-zinc-400 hover:text-white"
             aria-label="关闭"
           >
-            ✕
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -162,10 +163,7 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
             className="flex items-center gap-1.5 rounded bg-orange-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
           >
             {loading && (
-              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+              <Loader2 className="h-3 w-3 animate-spin" />
             )}
             搜索
           </button>
@@ -188,7 +186,7 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                   }}
                   className="rounded bg-zinc-700 px-2 py-0.5 text-xs text-zinc-200 hover:bg-zinc-600"
                 >
-                  ← 返回结果列表
+                  <ArrowLeft className="h-3 w-3" /> 返回结果列表
                 </button>
                 <span className="text-xs text-zinc-400">选择文件：{selectedHit.name}</span>
               </div>
@@ -263,7 +261,7 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                           <div className="flex items-center justify-between gap-2">
                             <span className="truncate text-sm font-medium text-zinc-100">{hit.name}</span>
                             <span className="flex-shrink-0 text-xs text-zinc-400">
-                              ↓ {formatDownloads(hit.downloadCount)}
+                              <Download className="h-3 w-3" /> {formatDownloads(hit.downloadCount)}
                             </span>
                           </div>
                           <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">{hit.summary}</p>

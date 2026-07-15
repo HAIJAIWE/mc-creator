@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
 import type { Project } from '../../../shared/ipc-channels.js';
+import { Plus, FolderInput, FolderOutput } from 'lucide-react';
 
 export function Dashboard() {
   const projects = useProjectStore((s) => s.projects);
@@ -74,16 +75,16 @@ export function Dashboard() {
         <div className="flex gap-2">
           <button
             onClick={handleNew}
-            className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-500"
+            className="flex items-center gap-1.5 rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-500"
           >
-            + 新建项目
+            <Plus className="h-4 w-4" /> 新建项目
           </button>
           <button
             onClick={handleImport}
             disabled={importing}
-            className="rounded bg-zinc-700 px-4 py-1.5 text-sm text-white hover:bg-zinc-600 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded bg-zinc-700 px-4 py-1.5 text-sm text-white hover:bg-zinc-600 disabled:opacity-50"
           >
-            {importing ? '导入中…' : '📥 导入项目'}
+            {importing ? '导入中…' : <><FolderInput className="h-4 w-4" /> 导入项目</>}
           </button>
         </div>
       </header>
@@ -119,9 +120,9 @@ export function Dashboard() {
                   <button
                     onClick={() => handleExport(p)}
                     disabled={exportingId === p.id}
-                    className="rounded bg-zinc-700 px-3 py-1 text-xs text-white hover:bg-zinc-600 disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded bg-zinc-700 px-3 py-1 text-xs text-white hover:bg-zinc-600 disabled:opacity-50"
                   >
-                    {exportingId === p.id ? '导出中…' : '📤 导出'}
+                    {exportingId === p.id ? '导出中…' : <><FolderOutput className="h-4 w-4" /> 导出</>}
                   </button>
                   <button
                     onClick={() => {

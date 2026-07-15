@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useModelConfigStore } from '../store/model-config-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
+import { X, Circle } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
@@ -71,7 +72,7 @@ export function SettingsPanel({ onClose }: Props) {
       <div className="w-[480px] rounded-lg border border-zinc-700 bg-zinc-900 p-6 text-zinc-100">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">模型配置</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
 
         {/* P18：预设按钮 */}
@@ -85,7 +86,7 @@ export function SettingsPanel({ onClose }: Props) {
                 className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:border-blue-500 hover:text-white"
                 title={p.local ? `本地模型，需先安装 ${p.name.split(' ')[0]}` : `云端：${p.baseURL}`}
               >
-                {p.local && <span className="mr-1 text-green-400">●</span>}
+                {p.local && <span className="mr-1 text-green-400"><Circle className="h-3 w-3 fill-current" /></span>}
                 {p.name}
               </button>
             ))}
