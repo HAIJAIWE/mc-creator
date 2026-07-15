@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
+import type { Project } from '../../../shared/ipc-channels.js';
 
 export function Dashboard() {
   const projects = useProjectStore((s) => s.projects);
@@ -11,6 +12,9 @@ export function Dashboard() {
   const exportProject = useProjectStore((s) => s.exportProject);
   const importProject = useProjectStore((s) => s.importProject);
   const setView = useProjectStore((s) => s.setView);
+  // P30：导入/导出进行中状态（按钮 disabled + 视觉反馈）
+  const [importing, setImporting] = useState(false);
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadProjects();
@@ -34,25 +38,33 @@ export function Dashboard() {
   };
 
   const handleImport = async () => {
-    const res = await importProject();
-    if (res.success) {
-      window.alert('导入成功');
-    } else if (res.error && res.error !== '已取消') {
-      window.alert(`导入失败：${res.error}`);
+    setImporting(true);
+    try {
+      const res = await importProject();
+      if (res.success) {
+        window.alert('导入成功');
+      } else if (res.error && res.error !== '已取消') {
+        window.alert(`导入失败：${res.error}`);
+      }
+      // 用户取消（error='已取消'）不提示
+    } finally {
+      setImporting(false);
     }
-    // 用户取消（error='已取消'）不提示
   };
 
-  const handleExport = async (p: { id: string; name: string }) => {
-    const project = projects.find((x) => x.id === p.id);
-    if (!project) return;
-    const res = await exportProject(project);
-    if (res.ok && res.savedPath) {
-      window.alert(`已导出到 ${res.savedPath}`);
-    } else if (!res.ok && !res.canceled) {
-      window.alert('导出失败');
+  const handleExport = async (p: Project) => {
+    setExportingId(p.id);
+    try {
+      const res = await exportProject(p);
+      if (res.ok && res.savedPath) {
+        window.alert(`已导出到 ${res.savedPath}`);
+      } else if (!res.ok && !res.canceled) {
+        window.alert('导出失败');
+      }
+      // 用户取消（canceled=true）不提示
+    } finally {
+      setExportingId(null);
     }
-    // 用户取消（canceled=true）不提示
   };
 
   return (
@@ -68,9 +80,10 @@ export function Dashboard() {
           </button>
           <button
             onClick={handleImport}
-            className="rounded bg-zinc-700 px-4 py-1.5 text-sm text-white hover:bg-zinc-600"
+            disabled={importing}
+            className="rounded bg-zinc-700 px-4 py-1.5 text-sm text-white hover:bg-zinc-600 disabled:opacity-50"
           >
-            📥 导入项目
+            {importing ? '导入中…' : '📥 导入项目'}
           </button>
         </div>
       </header>
@@ -105,9 +118,10 @@ export function Dashboard() {
                   </button>
                   <button
                     onClick={() => handleExport(p)}
-                    className="rounded bg-zinc-700 px-3 py-1 text-xs text-white hover:bg-zinc-600"
+                    disabled={exportingId === p.id}
+                    className="rounded bg-zinc-700 px-3 py-1 text-xs text-white hover:bg-zinc-600 disabled:opacity-50"
                   >
-                    📤 导出
+                    {exportingId === p.id ? '导出中…' : '📤 导出'}
                   </button>
                   <button
                     onClick={() => {

@@ -88,8 +88,8 @@ export function ChatPanel() {
     }
   };
 
-  // P25：从 Modrinth 搜索面板选中 mod → 追加到 spec.mods
-  const handleModrinthPick = (mod: ModEntry) => {
+  // P25/P29：从搜索面板选中 mod → 追加到 spec.mods（Modrinth 与 CurseForge 共用）
+  const pickModToSpec = (mod: ModEntry, closePanel: () => void) => {
     // 优先用编辑器当前内容（用户可能已编辑），回退到 store spec
     let currentSpec: Record<string, unknown> | null = null;
     if (editorText) {
@@ -117,38 +117,11 @@ export function ChatPanel() {
     setSpec(updatedSpec as any);
     setOriginalSpec(text);
     setSpecError(null);
-    setShowModrinthSearch(false);
+    closePanel();
   };
 
-  // P29：从 CurseForge 搜索面板选中 mod → 追加到 spec.mods（逻辑同 Modrinth，关闭 CurseForge 面板）
-  const handleCurseForgePick = (mod: ModEntry) => {
-    let currentSpec: Record<string, unknown> | null = null;
-    if (editorText) {
-      try {
-        currentSpec = JSON.parse(editorText) as Record<string, unknown>;
-      } catch {
-        setError('当前 Spec JSON 解析失败，无法添加 mod');
-        return;
-      }
-    } else if (spec) {
-      currentSpec = spec as Record<string, unknown>;
-    }
-
-    if (!currentSpec) {
-      setError('请先生成 Spec 再添加 mod');
-      return;
-    }
-
-    const mods = Array.isArray(currentSpec.mods) ? [...(currentSpec.mods as ModEntry[])] : [];
-    mods.push(mod);
-    const updatedSpec = { ...currentSpec, mods };
-    const text = JSON.stringify(updatedSpec, null, 2);
-    setEditorText(text);
-    setSpec(updatedSpec as any);
-    setOriginalSpec(text);
-    setSpecError(null);
-    setShowCurseForgeSearch(false);
-  };
+  const handleModrinthPick = (mod: ModEntry) => pickModToSpec(mod, () => setShowModrinthSearch(false));
+  const handleCurseForgePick = (mod: ModEntry) => pickModToSpec(mod, () => setShowCurseForgeSearch(false));
 
   const placeholder = generatorType === 'mod'
     ? '描述你想要的 mod（如：做一个添加红宝石工具的 mod）'
