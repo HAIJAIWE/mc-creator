@@ -305,13 +305,13 @@ runGradleBuild
 
 ## 测试覆盖
 
-当前共 **175 个测试**通过：
+当前共 **197 个测试**通过：
 
 | 包 | 测试文件 | 测试用例 |
 |---|---|---|
 | `@mc-creator/shared` | 1 | 6 |
-| `@mc-creator/core` | 21 | 153 |
-| `@mc-creator/desktop` | 4 | 16 |
+| `@mc-creator/core` | 23 | 169 |
+| `@mc-creator/desktop` | 4 | 22 |
 
 ## 路线图
 
@@ -343,13 +343,15 @@ runGradleBuild
 - ✅ P24：Spec 模板库（7 种生成器类型 27 个预置模板 + TemplatePicker UI）
 - ✅ P25：Modrinth API 接入（搜索/版本获取 IPC + ModrinthSearchPanel UI + 整合包流程集成）
 - ✅ P26：Quilt Loader 支持（Loader 类型扩展 + QuiltAdapter 复用 Fabric 适配器 + UI 选项）
+- ✅ P27：Legacy Fabric Loader 支持（LegacyFabricAdapter extends FabricAdapter，旧版 fabric-loom 0.5 + Yarn mappings + Java 8）
+- ✅ P28：项目导入/导出（Project 打包 zip 备份/迁移/分享，导入生成新 id 避免覆盖）
+- ✅ P29：CurseForge API 接入（搜索/文件获取 IPC + CurseForgeSearchPanel + SettingsPanel API key 配置）
+- ✅ P30：现有功能走查打磨（Dashboard 导入/导出 loading 状态 + ChatPanel 提取公共 pickModToSpec）
 
 ### 未来可能
 
-- 多 Mod 项目管理增强（依赖图 / 版本对比 / 导入导出）
+- 多 Mod 项目管理增强（依赖图 / 版本对比）
 - 协作编辑（多端同步 Spec / 评论）
-- Legacy Fabric 支持
-- CurseForge 资源接入
 
 ## 许可证
 
