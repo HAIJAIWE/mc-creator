@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
+import { useToast } from './ToastProvider.js';
 import type { Project } from '../../../shared/ipc-channels.js';
 import { Plus, FolderInput, FolderOutput } from 'lucide-react';
 
@@ -13,6 +14,7 @@ export function Dashboard() {
   const exportProject = useProjectStore((s) => s.exportProject);
   const importProject = useProjectStore((s) => s.importProject);
   const setView = useProjectStore((s) => s.setView);
+  const toast = useToast();
   // P30：导入/导出进行中状态（按钮 disabled + 视觉反馈）
   const [importing, setImporting] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
@@ -43,9 +45,9 @@ export function Dashboard() {
     try {
       const res = await importProject();
       if (res.success) {
-        window.alert('导入成功');
+        toast.success('导入成功');
       } else if (res.error && res.error !== '已取消') {
-        window.alert(`导入失败：${res.error}`);
+        toast.error(`导入失败：${res.error}`);
       }
       // 用户取消（error='已取消'）不提示
     } finally {
@@ -58,9 +60,9 @@ export function Dashboard() {
     try {
       const res = await exportProject(p);
       if (res.ok && res.savedPath) {
-        window.alert(`已导出到 ${res.savedPath}`);
+        toast.success(`已导出到 ${res.savedPath}`);
       } else if (!res.ok && !res.canceled) {
-        window.alert('导出失败');
+        toast.error('导出失败');
       }
       // 用户取消（canceled=true）不提示
     } finally {
