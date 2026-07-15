@@ -5,9 +5,10 @@ import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import JSZip from 'jszip';
 import { z } from 'zod';
-import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem, ModrinthApiClient } from '@mc-creator/core';
+import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem, ModrinthApiClient, CurseForgeApiClient } from '@mc-creator/core';
 import * as nodeFs from 'fs';
 import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
+import { loadCurseForgeConfig, saveCurseForgeConfig } from './curseforge-config.js';
 import { loadProjects, saveProject, deleteProject, getProject } from './project-store.js';
 import {
   IPC,
@@ -44,6 +45,13 @@ import {
   MODRINTH_VERSIONS,
   ModrinthSearchRequest,
   ModrinthVersionsRequest,
+  CURSEFORGE_SEARCH,
+  CURSEFORGE_FILES,
+  LOAD_CURSEFORGE_CONFIG,
+  SAVE_CURSEFORGE_CONFIG,
+  CurseForgeSearchRequest,
+  CurseForgeFilesRequest,
+  CurseForgeConfigSchema,
   type GenerateSpecRes,
   type GenerateFilesRes,
   type BuildRes,
@@ -54,6 +62,8 @@ import {
   type Project,
   type ModrinthSearchRes,
   type ModrinthVersionsRes,
+  type CurseForgeSearchRes,
+  type CurseForgeFilesRes,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -370,6 +380,41 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       mcVersion: req.mcVersion,
     });
     return { versions };
+  });
+
+  // === CurseForge 搜索（P29：与 P25 Modrinth 共同构成资源市场，需 API key） ===
+  // 每次调用从 config 读 apiKey → new CurseForgeApiClient；apiKey 为空时 client 内部抛错透传给渲染进程
+  ipcMain.handle(LOAD_CURSEFORGE_CONFIG, async () => {
+    return loadCurseForgeConfig();
+  });
+
+  ipcMain.handle(SAVE_CURSEFORGE_CONFIG, async (_e, raw: unknown) => {
+    const req = CurseForgeConfigSchema.parse(raw);
+    saveCurseForgeConfig(req);
+    return { ok: true };
+  });
+
+  ipcMain.handle(CURSEFORGE_SEARCH, async (_e, raw: unknown): Promise<CurseForgeSearchRes> => {
+    const req = CurseForgeSearchRequest.parse(raw);
+    const { apiKey } = loadCurseForgeConfig();
+    const client = new CurseForgeApiClient(apiKey);
+    const hits = await client.search(req.query, {
+      loader: req.loader,
+      mcVersion: req.mcVersion,
+      limit: req.limit,
+    });
+    return { hits };
+  });
+
+  ipcMain.handle(CURSEFORGE_FILES, async (_e, raw: unknown): Promise<CurseForgeFilesRes> => {
+    const req = CurseForgeFilesRequest.parse(raw);
+    const { apiKey } = loadCurseForgeConfig();
+    const client = new CurseForgeApiClient(apiKey);
+    const files = await client.getFiles(req.modId, {
+      loader: req.loader,
+      mcVersion: req.mcVersion,
+    });
+    return { files };
   });
 }
 

@@ -1,4 +1,4 @@
-import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, PrepareBuildDirRes, ExportProjectRes, ImportProjectRes, GeneratorType, Project, BuildStreamChunkT, ModrinthSearchRes, ModrinthVersionsRes } from '../../../shared/ipc-channels.js';
+import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, PrepareBuildDirRes, ExportProjectRes, ImportProjectRes, GeneratorType, Project, BuildStreamChunkT, ModrinthSearchRes, ModrinthVersionsRes, CurseForgeSearchRes, CurseForgeFilesRes, CurseForgeConfig } from '../../../shared/ipc-channels.js';
 
 /** 封装 window.mcApi，提供类型安全调用 */
 export const ipcClient = {
@@ -32,4 +32,11 @@ export const ipcClient = {
     window.mcApi.modrinthSearch(req),
   modrinthVersions: (req: { projectId: string; loader?: string; mcVersion?: string }): Promise<ModrinthVersionsRes> =>
     window.mcApi.modrinthVersions(req),
+  curseforgeSearch: (req: { query: string; loader?: string; mcVersion?: string; limit?: number }): Promise<CurseForgeSearchRes> =>
+    window.mcApi.curseforgeSearch(req),
+  curseforgeFiles: (req: { modId: number; loader?: string; mcVersion?: string }): Promise<CurseForgeFilesRes> =>
+    window.mcApi.curseforgeFiles(req),
+  loadCurseForgeConfig: (): Promise<CurseForgeConfig> => window.mcApi.loadCurseForgeConfig(),
+  saveCurseForgeConfig: (config: CurseForgeConfig): Promise<{ ok: true }> =>
+    window.mcApi.saveCurseForgeConfig(config),
 };

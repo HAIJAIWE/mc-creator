@@ -7,6 +7,11 @@ import {
   ExportProjectRequest,
   ExportProjectResponse,
   ImportProjectResponse,
+  CurseForgeSearchRequest,
+  CurseForgeSearchResponse,
+  CurseForgeFilesRequest,
+  CurseForgeFilesResponse,
+  CurseForgeConfigSchema,
 } from './ipc-channels.js';
 
 /** 构造一个最小有效 Project（ProjectSchema 已有完整字段） */
@@ -102,5 +107,87 @@ describe('IPC schema 校验', () => {
     ).toBe(true);
     // 缺 project 字段时拒绝
     expect(ImportProjectResponse.safeParse({ error: null }).success).toBe(false);
+  });
+
+  // === P29 CurseForge schema ===
+  it('CurseForgeSearchRequest/Response 校验', () => {
+    // Request：query 必填，loader/mcVersion/limit 可选
+    expect(CurseForgeSearchRequest.safeParse({ query: 'sodium' }).success).toBe(true);
+    expect(
+      CurseForgeSearchRequest.safeParse({
+        query: 'sodium',
+        loader: 'fabric',
+        mcVersion: '1.21.1',
+        limit: 5,
+      }).success,
+    ).toBe(true);
+    // query 缺失拒绝
+    expect(CurseForgeSearchRequest.safeParse({ loader: 'fabric' }).success).toBe(false);
+    // limit 默认 20
+    const withDefault = CurseForgeSearchRequest.safeParse({ query: 'x' });
+    expect(withDefault.success).toBe(true);
+    if (withDefault.success) expect(withDefault.data.limit).toBe(20);
+
+    // Response：hits 数组
+    expect(
+      CurseForgeSearchResponse.safeParse({ hits: [] }).success,
+    ).toBe(true);
+    expect(
+      CurseForgeSearchResponse.safeParse({
+        hits: [
+          {
+            id: 1,
+            name: 'JEI',
+            summary: 's',
+            logoUrl: null,
+            downloadCount: 10,
+            categories: ['Utility'],
+          },
+        ],
+      }).success,
+    ).toBe(true);
+    // hits 缺失拒绝
+    expect(CurseForgeSearchResponse.safeParse({}).success).toBe(false);
+  });
+
+  it('CurseForgeFilesRequest/Response 校验', () => {
+    // Request：modId 必填
+    expect(CurseForgeFilesRequest.safeParse({ modId: 123 }).success).toBe(true);
+    expect(
+      CurseForgeFilesRequest.safeParse({ modId: 123, loader: 'fabric', mcVersion: '1.21.1' })
+        .success,
+    ).toBe(true);
+    // modId 缺失或非数字拒绝
+    expect(CurseForgeFilesRequest.safeParse({}).success).toBe(false);
+    expect(CurseForgeFilesRequest.safeParse({ modId: 'abc' }).success).toBe(false);
+
+    // Response：files 数组
+    expect(CurseForgeFilesResponse.safeParse({ files: [] }).success).toBe(true);
+    expect(
+      CurseForgeFilesResponse.safeParse({
+        files: [
+          {
+            id: 1,
+            displayName: 'v1',
+            fileName: 'a.jar',
+            fileLength: 1024,
+            downloadUrl: 'https://example.com/a.jar',
+            gameVersions: ['1.21.1'],
+            modLoaderNames: ['Fabric'],
+          },
+        ],
+      }).success,
+    ).toBe(true);
+    // files 缺失拒绝
+    expect(CurseForgeFilesResponse.safeParse({}).success).toBe(false);
+  });
+
+  it('CurseForgeConfigSchema 校验 apiKey 字符串', () => {
+    expect(CurseForgeConfigSchema.safeParse({ apiKey: 'xxx-yyy' }).success).toBe(true);
+    expect(CurseForgeConfigSchema.safeParse({ apiKey: '' }).success).toBe(true);
+    // apiKey 缺失拒绝
+    expect(CurseForgeConfigSchema.safeParse({}).success).toBe(false);
+    // apiKey 非字符串拒绝
+    expect(CurseForgeConfigSchema.safeParse({ apiKey: 123 }).success).toBe(false);
   });
 });

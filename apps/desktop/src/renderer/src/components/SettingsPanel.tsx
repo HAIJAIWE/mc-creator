@@ -30,11 +30,18 @@ export function SettingsPanel({ onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // P29：CurseForge API key（独立配置，不与 AI config 混）
+  const [cfApiKey, setCfApiKey] = useState('');
+  const [cfSaving, setCfSaving] = useState(false);
+  const [cfSaved, setCfSaved] = useState(false);
+
   useEffect(() => {
     ipcClient.loadModelConfig().then((c: any) => {
       setConfig(c);
       setForm(c);
     });
+    // P29：加载 CurseForge 配置
+    ipcClient.loadCurseForgeConfig().then((c) => setCfApiKey(c.apiKey));
   }, [setConfig]);
 
   const save = async () => {
@@ -44,6 +51,14 @@ export function SettingsPanel({ onClose }: Props) {
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const saveCfConfig = async () => {
+    setCfSaving(true);
+    await ipcClient.saveCurseForgeConfig({ apiKey: cfApiKey });
+    setCfSaving(false);
+    setCfSaved(true);
+    setTimeout(() => setCfSaved(false), 2000);
   };
 
   /** 应用预设：填充 name/baseURL/modelId，apiKey 留空让用户填 */
@@ -126,6 +141,42 @@ export function SettingsPanel({ onClose }: Props) {
             {saving ? '保存中…' : '保存'}
           </button>
           {saved && <span className="text-sm text-green-400">已保存</span>}
+        </div>
+
+        {/* P29：CurseForge API key（独立保存，不与 AI config 混） */}
+        <div className="mt-6 border-t border-zinc-800 pt-4">
+          <h3 className="mb-2 text-sm font-bold text-zinc-100">CurseForge 配置</h3>
+          <div>
+            <label className="text-xs text-zinc-400">
+              CurseForge API Key（去{' '}
+              <a
+                href="https://console.curseforge.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-400 hover:underline"
+              >
+                console.curseforge.com
+              </a>{' '}
+              免费申请）
+            </label>
+            <input
+              type="password"
+              value={cfApiKey}
+              onChange={(e) => setCfApiKey(e.target.value)}
+              className="mt-1 w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm"
+              placeholder="$2a$10$..."
+            />
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={saveCfConfig}
+              disabled={cfSaving}
+              className="rounded bg-orange-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+            >
+              {cfSaving ? '保存中…' : '保存 CurseForge 配置'}
+            </button>
+            {cfSaved && <span className="text-sm text-green-400">已保存</span>}
+          </div>
         </div>
       </div>
     </div>

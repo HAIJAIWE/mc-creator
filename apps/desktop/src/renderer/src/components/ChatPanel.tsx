@@ -6,6 +6,7 @@ import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
 import { TemplatePicker } from './TemplatePicker.js';
 import { ModrinthSearchPanel } from './ModrinthSearchPanel.js';
+import { CurseForgeSearchPanel } from './CurseForgeSearchPanel.js';
 
 export function ChatPanel() {
   const {
@@ -21,6 +22,8 @@ export function ChatPanel() {
   const [showTemplates, setShowTemplates] = useState(false);
   // P25：Modrinth 搜索面板显隐
   const [showModrinthSearch, setShowModrinthSearch] = useState(false);
+  // P29：CurseForge 搜索面板显隐
+  const [showCurseForgeSearch, setShowCurseForgeSearch] = useState(false);
 
   const generateSpec = async () => {
     setLoading(true);
@@ -117,6 +120,36 @@ export function ChatPanel() {
     setShowModrinthSearch(false);
   };
 
+  // P29：从 CurseForge 搜索面板选中 mod → 追加到 spec.mods（逻辑同 Modrinth，关闭 CurseForge 面板）
+  const handleCurseForgePick = (mod: ModEntry) => {
+    let currentSpec: Record<string, unknown> | null = null;
+    if (editorText) {
+      try {
+        currentSpec = JSON.parse(editorText) as Record<string, unknown>;
+      } catch {
+        setError('当前 Spec JSON 解析失败，无法添加 mod');
+        return;
+      }
+    } else if (spec) {
+      currentSpec = spec as Record<string, unknown>;
+    }
+
+    if (!currentSpec) {
+      setError('请先生成 Spec 再添加 mod');
+      return;
+    }
+
+    const mods = Array.isArray(currentSpec.mods) ? [...(currentSpec.mods as ModEntry[])] : [];
+    mods.push(mod);
+    const updatedSpec = { ...currentSpec, mods };
+    const text = JSON.stringify(updatedSpec, null, 2);
+    setEditorText(text);
+    setSpec(updatedSpec as any);
+    setOriginalSpec(text);
+    setSpecError(null);
+    setShowCurseForgeSearch(false);
+  };
+
   const placeholder = generatorType === 'mod'
     ? '描述你想要的 mod（如：做一个添加红宝石工具的 mod）'
     : generatorType === 'datapack'
@@ -185,6 +218,16 @@ export function ChatPanel() {
             🔍 搜索 Modrinth
           </button>
         )}
+        {generatorType === 'modpack' && (
+          <button
+            onClick={() => setShowCurseForgeSearch(true)}
+            disabled={loading}
+            className="flex items-center gap-1.5 rounded bg-zinc-700 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
+            title="搜索 CurseForge 上的 mod 并添加到整合包（需在设置中配置 API Key）"
+          >
+            🔍 搜索 CurseForge
+          </button>
+        )}
       </div>
       {showTemplates && (
         <TemplatePicker
@@ -202,6 +245,14 @@ export function ChatPanel() {
           mcVersion={mcVersion}
           onClose={() => setShowModrinthSearch(false)}
           onPick={handleModrinthPick}
+        />
+      )}
+      {showCurseForgeSearch && (
+        <CurseForgeSearchPanel
+          loader={loader}
+          mcVersion={mcVersion}
+          onClose={() => setShowCurseForgeSearch(false)}
+          onPick={handleCurseForgePick}
         />
       )}
       {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
