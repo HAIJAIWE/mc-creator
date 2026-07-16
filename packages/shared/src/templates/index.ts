@@ -9,7 +9,7 @@ import { MOD_TEMPLATES } from './mod-templates.js';
 import { DATAPACK_TEMPLATES } from './datapack-templates.js';
 import { MODPACK_TEMPLATES } from './modpack-templates.js';
 import { SERVER_TEMPLATES } from './server-templates.js';
-import { TEXTURE_TEMPLATES } from './texture-templates.js';
+import { LAUNCHER_TEMPLATES } from './launcher-templates.js';
 import { SKIN_TEMPLATES } from './skin-templates.js';
 import { RESOURCE_PACK_TEMPLATES } from './resource-pack-templates.js';
 
@@ -18,7 +18,7 @@ export * from './mod-templates.js';
 export * from './datapack-templates.js';
 export * from './modpack-templates.js';
 export * from './server-templates.js';
-export * from './texture-templates.js';
+export * from './launcher-templates.js';
 export * from './skin-templates.js';
 export * from './resource-pack-templates.js';
 
@@ -35,7 +35,7 @@ export const TEMPLATES_BY_TYPE: Record<GeneratorType, SpecTemplate[]> = {
   datapack: DATAPACK_TEMPLATES,
   modpack: MODPACK_TEMPLATES,
   server: SERVER_TEMPLATES,
-  texture: TEXTURE_TEMPLATES,
+  launcher: LAUNCHER_TEMPLATES,
   skin: SKIN_TEMPLATES,
   resource_pack: RESOURCE_PACK_TEMPLATES,
 };

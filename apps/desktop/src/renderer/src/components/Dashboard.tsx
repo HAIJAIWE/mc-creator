@@ -13,9 +13,9 @@ const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
   datapack: { scope: 'pixel', name: 'database' },
   modpack: { scope: 'pixel', name: 'box' },
   server: { scope: 'pixel', name: 'server' },
-  texture: { scope: 'pixel', name: 'image' },
-  skin: { scope: 'pixel', name: 'user' },
   resource_pack: { scope: 'pixel', name: 'folder' },
+  skin: { scope: 'pixel', name: 'user' },
+  launcher: { scope: 'pixel', name: 'rocket' },
 };
 
 const TYPE_LABEL: Record<GeneratorType, string> = {
@@ -23,9 +23,9 @@ const TYPE_LABEL: Record<GeneratorType, string> = {
   datapack: '数据包',
   modpack: '整合包',
   server: '服务器',
-  texture: '材质',
-  skin: '皮肤',
   resource_pack: '资源包',
+  skin: '皮肤',
+  launcher: '启动器',
 };
 
 const TYPE_DESC: Record<GeneratorType, string> = {
@@ -33,9 +33,9 @@ const TYPE_DESC: Record<GeneratorType, string> = {
   datapack: '创建自定义数据包',
   modpack: '创建整合包配置',
   server: '创建服务器配置',
-  texture: '创建材质包',
-  skin: '创建玩家皮肤',
   resource_pack: '创建资源包',
+  skin: '创建玩家皮肤',
+  launcher: '创建启动器配置',
 };
 
 const LOADER_LABEL: Record<string, string> = {

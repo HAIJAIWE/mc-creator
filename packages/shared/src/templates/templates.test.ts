@@ -5,7 +5,7 @@ import {
   DATAPACK_TEMPLATES,
   MODPACK_TEMPLATES,
   SERVER_TEMPLATES,
-  TEXTURE_TEMPLATES,
+  LAUNCHER_TEMPLATES,
   SKIN_TEMPLATES,
   RESOURCE_PACK_TEMPLATES,
 } from './index.js';
@@ -17,7 +17,7 @@ const ALL_TYPES: GeneratorType[] = [
   'datapack',
   'modpack',
   'server',
-  'texture',
+  'launcher',
   'skin',
   'resource_pack',
 ];
@@ -71,7 +71,7 @@ describe('TEMPLATES_BY_TYPE', () => {
       ...DATAPACK_TEMPLATES,
       ...MODPACK_TEMPLATES,
       ...SERVER_TEMPLATES,
-      ...TEXTURE_TEMPLATES,
+      ...LAUNCHER_TEMPLATES,
       ...SKIN_TEMPLATES,
       ...RESOURCE_PACK_TEMPLATES,
     ];

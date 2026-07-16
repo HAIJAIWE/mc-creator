@@ -31,6 +31,6 @@ export type GeneratorType =
   | 'datapack'
   | 'modpack'
   | 'server'
-  | 'texture'
+  | 'resource_pack'
   | 'skin'
-  | 'resource_pack';
+  | 'launcher';

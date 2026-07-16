@@ -3,9 +3,9 @@ import {
   DatapackSpec,
   ModpackSpec,
   ServerSpec,
-  TextureSpec,
   SkinSpec,
   ResourcePackSpec,
+  LauncherSpec,
   type ModSpec as ModSpecType,
 } from '@mc-creator/shared';
 import type { ModelProvider } from '../model-provider/types.js';
@@ -14,7 +14,7 @@ import type { ZodTypeAny } from 'zod';
 const MAX_RETRIES = 3;
 
 /** 生成器类型 → 对应 schema 与 prompt 描述（与 desktop 层 GENERATOR_TYPES 对齐） */
-export type SpecType = 'mod' | 'datapack' | 'modpack' | 'server' | 'texture' | 'skin' | 'resource_pack';
+export type SpecType = 'mod' | 'datapack' | 'modpack' | 'server' | 'resource_pack' | 'skin' | 'launcher';
 
 interface SpecConfig {
   schema: ZodTypeAny;
@@ -93,15 +93,19 @@ Schema 字段：
 - restartOnCrash: 崩溃自动重启
 只输出 JSON，不要解释。`,
   },
-  texture: {
-    schema: TextureSpec,
-    prompt: `你是 Minecraft 材质包规格生成器。根据描述生成 TextureSpec JSON。
+  resource_pack: {
+    schema: ResourcePackSpec,
+    prompt: `你是 Minecraft 资源包规格生成器。根据描述生成 ResourcePackSpec JSON。
 Schema 字段：
-- packName: 材质包名
+- packName: 资源包名
 - packDescription: 描述
 - packFormat: 数字（1.21.x 用 34）
-- modId: 小写下划线
-- textures[]: 材质列表（id, type block/item/armor/entity/gui/particle, color #RRGGBB, width, height, gradientTo?, checkerboard?）
+- namespace: 小写下划线（默认 minecraft）
+- fonts[]: 字体（id, char, texture, width, height, advance, ascent）
+- sounds[]: 音效（id, event, volume 0-1, pitch 0-2, stream）
+- textureOverrides[]: 贴图覆盖（path, color #RRGGBB, width, height, gradientTo?, checkerboard?）
+- models[]: 模型覆盖（path, json, autoCubeAll, textureName）
+- langEnUs / langZhCn: 语言覆盖（键值对对象）
 颜色用 #RRGGBB 格式。只输出 JSON，不要解释。`,
   },
   skin: {
@@ -118,20 +122,27 @@ Schema 字段：
 - generatePreview: 是否生成预览图
 颜色用 #RRGGBB 格式。只输出 JSON，不要解释。`,
   },
-  resource_pack: {
-    schema: ResourcePackSpec,
-    prompt: `你是 Minecraft 资源包规格生成器。根据描述生成 ResourcePackSpec JSON。
+  launcher: {
+    schema: LauncherSpec,
+    prompt: `你是 Minecraft 启动器配置规格生成器。根据描述生成 LauncherSpec JSON。
 Schema 字段：
-- packName: 资源包名
-- packDescription: 描述
-- packFormat: 数字（1.21.x 用 34）
-- namespace: 小写下划线（默认 minecraft）
-- fonts[]: 字体（id, char, texture, width, height, advance, ascent）
-- sounds[]: 音效（id, event, volume 0-1, pitch 0-2, stream）
-- textureOverrides[]: 贴图覆盖（path, color #RRGGBB, width, height, gradientTo?, checkerboard?）
-- models[]: 模型覆盖（path, json, autoCubeAll, textureName）
-- langEnUs / langZhCn: 语言覆盖（键值对对象）
-颜色用 #RRGGBB 格式。只输出 JSON，不要解释。`,
+- launcherName: 启动器名
+- launcherType: official/pcl2/hmcl（默认 official）
+- profileName: 配置名（默认 default）
+- mcVersion: MC 版本
+- loader: fabric/neoforge/quilt/legacy_fabric/vanilla（默认 vanilla）
+- javaPath: Java 路径（默认空）
+- jvmArgs: JVM 参数（默认 -Xmx2G -Xms1G）
+- memoryMin: 最小内存 MB（默认 1024）
+- memoryMax: 最大内存 MB（默认 2048）
+- accountType: offline/microsoft（默认 offline）
+- username: 用户名（默认 Player）
+- uuid: UUID（默认空）
+- serverAutorun: 服务器自动加入地址（默认空）
+- fullscreen: 是否全屏（默认 false）
+- resolutionWidth: 分辨率宽（默认 854）
+- resolutionHeight: 分辨率高（默认 480）
+只输出 JSON，不要解释。`,
   },
 };
 

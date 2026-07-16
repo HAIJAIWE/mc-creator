@@ -1,50 +1,36 @@
 import { useState, useRef } from 'react';
+import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import Editor from '@monaco-editor/react';
-import { Loader2, Send, LayoutTemplate, FolderOpen } from 'lucide-react';
-import type { ModEntry } from '@mc-creator/shared';
-import { MC_VERSIONS } from '@mc-creator/shared';
-import type { GeneratorType, BuildStreamChunkT } from '../../../shared/ipc-channels.js';
+import { Loader2, Send, LayoutTemplate } from 'lucide-react';
+import type { ModEntry, ModSpec } from '@mc-creator/shared';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
-import { useProjectStore } from '../store/project-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
 import { TemplatePicker } from './TemplatePicker.js';
 import { ModrinthSearchPanel } from './ModrinthSearchPanel.js';
 import { CurseForgeSearchPanel } from './CurseForgeSearchPanel.js';
-import { McMark } from './McMark.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
 
 interface Msg { role: 'user' | 'assistant'; text: string }
 
-function extractJarPath(log: string): string | null {
-  const match = log.match(/build\/libs\/[^\s"']*\.jar/);
-  return match ? match[0] : null;
-}
-
-function renderLog(log: string) {
-  return log.split('\n').map((line, i) => {
-    const isError = /error:|ERROR|FAILED/i.test(line);
-    const isWarn = /warning:|WARN/i.test(line);
-    const color = isError ? 'text-mc-redstone' : isWarn ? 'text-mc-gold' : 'text-mc-dim';
-    return (
-      <div key={i} className={`${color} leading-relaxed`}>
-        {line || ' '}
-      </div>
-    );
-  });
-}
-
 export function AgentPanel() {
+  // P3 性能：shallow 选择器避免无关字段变化触发重渲染
   const {
     description, setDescription, loader, mcVersion, generatorType,
     spec, setSpec, setFiles, setLoading, setError, loading, error,
-    files, buildLog, buildSuccess, jarPath, fixLog,
-    setBuildResult, setFixLog, setLoader, setMcVersion, setGeneratorType,
-  } = useModStore();
+  } = useModStore(
+    (s) => ({
+      description: s.description, setDescription: s.setDescription,
+      loader: s.loader, mcVersion: s.mcVersion, generatorType: s.generatorType,
+      spec: s.spec, setSpec: s.setSpec, setFiles: s.setFiles,
+      setLoading: s.setLoading, setError: s.setError,
+      loading: s.loading, error: s.error,
+    }),
+    shallow,
+  );
   const { apiKey } = useModelConfigStore();
-  const { projects, loadProjects, loadProject, importProject, saveCurrentAsProject, currentProjectId } = useProjectStore();
 
   const [editorText, setEditorText] = useState('');
   const [originalSpec, setOriginalSpec] = useState('');
@@ -54,75 +40,6 @@ export function AgentPanel() {
   const [showModrinthSearch, setShowModrinthSearch] = useState(false);
   const [showCurseForgeSearch, setShowCurseForgeSearch] = useState(false);
 
-  const [showProjectMenu, setShowProjectMenu] = useState(false);
-  const [importing, setImporting] = useState(false);
-
-  const TYPE_LABELS: Record<GeneratorType, string> = {
-    mod: 'Mod',
-    datapack: '数据包',
-    modpack: '整合包',
-    server: '服务器',
-    texture: '材质',
-    skin: '皮肤',
-    resource_pack: '资源包',
-  };
-
-  const currentProject = projects.find((p) => p.id === currentProjectId);
-
-  const handleLoadProjects = async () => {
-    await loadProjects();
-    setShowProjectMenu(true);
-  };
-
-  const handleSelectProject = async (id: string) => {
-    await loadProject(id);
-    setShowProjectMenu(false);
-  };
-
-  const handleImport = async () => {
-    setImporting(true);
-    try {
-      await importProject();
-      await loadProjects();
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const handleNew = () => {
-    useModStore.setState({
-      description: '',
-      spec: null,
-      files: [],
-      selectedFile: null,
-      buildLog: '',
-      buildSuccess: null,
-      jarPath: null,
-      fixLog: [],
-      error: null,
-      loading: false,
-      generatorType: 'mod',
-    });
-    setShowProjectMenu(false);
-  };
-
-  const handleSave = async () => {
-    if (!spec || files.length === 0) return;
-    try {
-      const name = currentProject?.name || `project-${Date.now()}`;
-      await saveCurrentAsProject(name, {
-        generatorType,
-        loader,
-        mcVersion,
-        description,
-        spec,
-        files,
-      });
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
   const [messages, setMessages] = useState<Msg[]>([
     { role: 'assistant', text: '你好！描述你想要的 mod，我来帮你生成。' },
   ]);
@@ -130,17 +47,9 @@ export function AgentPanel() {
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const [streamLog, setStreamLog] = useState('');
-  const [streamBuilding, setStreamBuilding] = useState(false);
-  const [streamSuccess, setStreamSuccess] = useState<boolean | null>(null);
-  const [streamJarPath, setStreamJarPath] = useState<string | null>(null);
-  const [buildCount, setBuildCount] = useState(0);
-  const streamLogRef = useRef('');
-
   const [expandedSections, setExpandedSections] = useState({
     description: true,
     spec: true,
-    build: true,
     chat: true,
   });
 
@@ -154,7 +63,7 @@ export function AgentPanel() {
     try {
       const res = await ipcClient.generateSpec(description, generatorType);
       const text = JSON.stringify(res.spec, null, 2);
-      setSpec(res.spec as any);
+      setSpec(res.spec as unknown as ModSpec);
       setEditorText(text);
       setOriginalSpec(text);
       setSpecError(null);
@@ -192,7 +101,7 @@ export function AgentPanel() {
     setEditorText(v);
     try {
       const parsed = JSON.parse(v);
-      setSpec(parsed as any);
+      setSpec(parsed as unknown as ModSpec);
       setSpecError(null);
     } catch (e) {
       setSpecError((e as Error).message);
@@ -202,7 +111,7 @@ export function AgentPanel() {
   const resetSpec = () => {
     setEditorText(originalSpec);
     try {
-      setSpec(JSON.parse(originalSpec) as any);
+      setSpec(JSON.parse(originalSpec) as unknown as ModSpec);
       setSpecError(null);
     } catch {
     }
@@ -231,7 +140,7 @@ export function AgentPanel() {
     const updatedSpec = { ...currentSpec, mods };
     const text = JSON.stringify(updatedSpec, null, 2);
     setEditorText(text);
-    setSpec(updatedSpec as any);
+    setSpec(updatedSpec as unknown as ModSpec);
     setOriginalSpec(text);
     setSpecError(null);
     closePanel();
@@ -285,63 +194,6 @@ export function AgentPanel() {
     }
   };
 
-  const build = async () => {
-    setLoading(true);
-    setError(null);
-    setFixLog([]);
-    try {
-      const { projectPath } = await ipcClient.prepareBuildDir(files);
-      const res = await ipcClient.buildWithFix(projectPath) as any;
-      setBuildResult({ success: res.success, log: res.log, jarPath: res.jarPath });
-      setFixLog(res.fixLog ?? []);
-      setBuildCount((c) => c + 1);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const buildStream = async () => {
-    setStreamBuilding(true);
-    setStreamSuccess(null);
-    setStreamJarPath(null);
-    streamLogRef.current = '';
-    setStreamLog('');
-    setError(null);
-    setBuildCount((c) => c + 1);
-
-    const onChunk = (chunk: BuildStreamChunkT) => {
-      streamLogRef.current += chunk.text;
-      setStreamLog(streamLogRef.current);
-      if (chunk.done) {
-        setStreamBuilding(false);
-        const code = chunk.exitCode ?? -1;
-        const ok = code === 0;
-        setStreamSuccess(ok);
-        if (ok) {
-          setStreamJarPath(extractJarPath(streamLogRef.current));
-        }
-      }
-    };
-
-    try {
-      const { projectPath } = await ipcClient.prepareBuildDir(files);
-      await ipcClient.buildStream(projectPath, onChunk);
-    } catch (e) {
-      setStreamBuilding(false);
-      setStreamSuccess(false);
-      setError((e as Error).message);
-    }
-  };
-
-  const clearStreamLog = () => {
-    setStreamLog('');
-    streamLogRef.current = '';
-    setStreamSuccess(null);
-    setStreamJarPath(null);
-  };
-
   const placeholder = generatorType === 'mod'
     ? '描述你想要的 mod…'
     : generatorType === 'datapack'
@@ -350,119 +202,14 @@ export function AgentPanel() {
     ? '描述你想要的整合包…'
     : generatorType === 'server'
     ? '描述你想要的服务器配置…'
-    : generatorType === 'texture'
-    ? '描述你想要的材质…'
+    : generatorType === 'resource_pack'
+    ? '描述你想要的资源包…'
     : generatorType === 'skin'
     ? '描述你想要的皮肤…'
-    : '描述你想要的资源包…';
+    : '描述你想要的启动器配置…';
 
   return (
     <div className="flex h-full flex-col bg-mc-surface">
-      {/* 头部：品牌 + 项目菜单 */}
-      <div className="border-b border-mc-border">
-        <div className="flex items-center justify-between px-3 py-2">
-          <div className="flex items-center gap-2">
-            <McMark className="h-5 w-5 text-mc-accent" />
-            <span className="text-xs font-bold uppercase tracking-wider text-mc-dim">MC Creator</span>
-          </div>
-          <div className="relative">
-            <button
-              onClick={handleLoadProjects}
-              className="mc-btn-ghost !px-2 !py-1"
-            >
-              <McIcon scope="pixel" name="folder" size={12} />
-              <span className="max-w-16 truncate">{currentProject?.name || '项目'}</span>
-            </button>
-            {showProjectMenu && (
-              <div className="mc-pop absolute right-0 top-full mt-1 z-50 w-56 overflow-hidden animate-mc-panel-in">
-                <div className="flex items-center gap-2 border-b border-mc-border px-2 py-1.5">
-                  <McIcon scope="pixel" name="folder" size={12} />
-                  <span className="text-xs font-bold text-mc-dim">项目管理</span>
-                </div>
-                <div className="space-y-0.5 p-1">
-                  <button
-                    onClick={handleNew}
-                    className="flex w-full items-center gap-2 rounded-mc px-2 py-1.5 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text"
-                  >
-                    <FolderOpen className="h-3 w-3 text-mc-accent" />
-                    新建项目
-                  </button>
-                  <button
-                    onClick={handleImport}
-                    disabled={importing}
-                    className="flex w-full items-center gap-2 rounded-mc px-2 py-1.5 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text disabled:opacity-50"
-                  >
-                    <FolderOpen className="h-3 w-3 text-mc-gold" />
-                    {importing ? '导入中…' : '导入项目'}
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={!spec || files.length === 0}
-                    className="flex w-full items-center gap-2 rounded-mc px-2 py-1.5 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text disabled:opacity-50"
-                  >
-                    <McIcon scope="pixel" name="save" size={12} />
-                    保存项目
-                  </button>
-                </div>
-                {projects.length > 0 && (
-                  <div className="border-t border-mc-border">
-                    <div className="px-2 py-1 text-xs text-mc-mute">已有项目</div>
-                    <div className="max-h-32 overflow-y-auto">
-                      {projects.map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => handleSelectProject(p.id)}
-                          className={`flex w-full items-center gap-2 px-2 py-1 text-left text-xs transition-colors hover:bg-mc-surface-2 ${
-                            currentProjectId === p.id ? 'bg-mc-surface-2/60 text-mc-text' : 'text-mc-dim'
-                          }`}
-                        >
-                          <McIcon scope="pixel" name="folder" size={12} />
-                          <span className="truncate">{p.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        {/* 全局设置：类型 / Loader / 版本 */}
-        <div className="flex flex-wrap items-center gap-2 border-t border-mc-border px-3 py-1.5">
-          <select
-            value={generatorType}
-            onChange={(e) => setGeneratorType(e.target.value as GeneratorType)}
-            disabled={loading}
-            className="mc-select"
-          >
-            {Object.entries(TYPE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-          <select
-            value={loader}
-            onChange={(e) => setLoader(e.target.value as any)}
-            disabled={loading}
-            className="mc-select"
-          >
-            <option value="fabric">Fabric</option>
-            <option value="neoforge">NeoForge</option>
-            <option value="quilt">Quilt</option>
-            <option value="legacy_fabric">Legacy Fabric</option>
-          </select>
-          <select
-            value={mcVersion}
-            onChange={(e) => setMcVersion(e.target.value as any)}
-            disabled={loading}
-            className="mc-select"
-          >
-            {MC_VERSIONS.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
       <div className="flex-1 overflow-y-auto">
         {/* 描述输入 */}
         <div className="border-b border-mc-border">
@@ -596,80 +343,6 @@ export function AgentPanel() {
             )}
           </div>
         )}
-
-        {/* 构建 */}
-        <div className="border-b border-mc-border">
-          <button
-            onClick={() => toggleSection('build')}
-            className="mc-section-title flex w-full items-center justify-between transition-colors hover:bg-mc-surface-2/50"
-          >
-            <span>构建</span>
-            {expandedSections.build ? <McIcon scope="pixel" name="chevron-up" size={12} /> : <McIcon scope="pixel" name="chevron-down" size={12} />}
-          </button>
-          {expandedSections.build && (
-            <div className="space-y-3 p-3">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  onClick={build}
-                  disabled={loading || files.length === 0}
-                  className="mc-btn-primary"
-                >
-                  {loading ? '构建中…' : '编译'}
-                </button>
-                <button
-                  onClick={buildStream}
-                  disabled={streamBuilding || files.length === 0}
-                  className="mc-btn-primary"
-                >
-                  {streamBuilding ? '流式编译中…' : '流式编译'}
-                </button>
-                {(streamLog || buildLog) && (
-                  <button
-                    onClick={clearStreamLog}
-                    className="mc-btn-ghost !px-2.5"
-                  >
-                    清空
-                  </button>
-                )}
-                <span className="text-xs text-mc-mute">构建：{buildCount}</span>
-                {fixLog.length > 0 && (
-                  <span className="text-xs text-mc-accent">修复：{fixLog.length}</span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {buildSuccess === true && <span className="text-xs text-mc-accent">编译成功！</span>}
-                {buildSuccess === false && <span className="text-xs text-mc-redstone">编译失败</span>}
-                {jarPath && <span className="text-xs text-mc-dim">产物：{jarPath}</span>}
-                {streamSuccess === true && (
-                  <span className="text-xs text-mc-accent">构建成功！{streamJarPath && `产物：${streamJarPath}`}</span>
-                )}
-                {streamSuccess === false && (
-                  <span className="text-xs text-mc-redstone">构建失败，请查看日志</span>
-                )}
-              </div>
-
-              {fixLog.length > 0 && (
-                <div className="space-y-1 rounded-mc-lg bg-mc-bg p-2">
-                  <div className="text-xs font-bold text-mc-dim">修复过程</div>
-                  {fixLog.map((log, i) => (
-                    <div key={i} className="text-xs text-mc-mute">• {log}</div>
-                  ))}
-                </div>
-              )}
-
-              {streamLog ? (
-                <div className="max-h-32 overflow-auto rounded-mc-lg bg-mc-bg p-2 font-mono text-xs">
-                  {renderLog(streamLog)}
-                </div>
-              ) : (
-                buildLog && (
-                  <pre className="max-h-32 overflow-auto rounded-mc-lg bg-mc-bg p-2 text-xs text-mc-dim">{buildLog}</pre>
-                )
-              )}
-            </div>
-          )}
-        </div>
 
         {/* AI 助手 */}
         <div className="flex flex-col">
