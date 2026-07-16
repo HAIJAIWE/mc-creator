@@ -79,7 +79,7 @@ export const ResourcePackSpec = z.object({
   langZhCn: z.record(z.string(), z.string()).default({}),
 });
 
-// 注：Color 类型已由 ./texture-spec.js 导出，此处不重复导出以避免命名冲突。
+// 注：Color 类型已由 ./skin-spec.js 导出，此处不重复导出以避免命名冲突。
 export type SoundEntry = z.infer<typeof SoundEntry>;
 export type FontEntry = z.infer<typeof FontEntry>;
 export type TextureOverrideEntry = z.infer<typeof TextureOverrideEntry>;

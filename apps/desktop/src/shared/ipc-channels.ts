@@ -27,7 +27,7 @@ export const GenerateSpecResponse = z.object({
 export const GenerateFilesRequest = z.object({
   loader: z.enum(['fabric', 'neoforge', 'quilt', 'legacy_fabric']),
   mcVersion: z.string(),
-  // spec 可能是 ModSpec/ServerSpec/TextureSpec/SkinSpec 等，由各 Generator 内部用对应 schema.parse 校验
+  // spec 可能是 ModSpec/ServerSpec/SkinSpec 等，由各 Generator 内部用对应 schema.parse 校验
   spec: z.record(z.unknown()),
   modId: z.string().default(''),
   generatorType: z.enum(GENERATOR_TYPES).default('mod'),
