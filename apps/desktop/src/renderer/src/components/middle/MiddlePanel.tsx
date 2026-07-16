@@ -6,6 +6,7 @@ import { ServerPreviewPanel } from './ServerPreviewPanel.js';
 import { ModPreviewPanel } from './ModPreviewPanel.js';
 import { DatapackPreviewPanel } from './DatapackPreviewPanel.js';
 import { ModpackPreviewPanel } from './ModpackPreviewPanel.js';
+import { LauncherPreviewPanel } from './LauncherPreviewPanel.js';
 import { useModStore } from '../../store/mod-store.js';
 import type { GeneratorType } from '@mc-creator/shared';
 
@@ -13,7 +14,7 @@ type MiddleTab = 'preview' | 'code';
 
 /**
  * 中间面板调度器：顶部 tab 切换（预览/代码），预览 tab 按 generatorType 分发到对应面板。
- * 阶段 2 已实现 server/mod/datapack/modpack 面板，其余类型暂显示"开发中"占位。
+ * 阶段 3 已实现 server/mod/datapack/modpack/launcher 面板，其余类型暂显示"开发中"占位。
  */
 export function MiddlePanel() {
   const [activeTab, setActiveTab] = useState<MiddleTab>('preview');
@@ -29,9 +30,10 @@ export function MiddlePanel() {
         return <DatapackPreviewPanel />;
       case 'modpack':
         return <ModpackPreviewPanel />;
+      case 'launcher':
+        return <LauncherPreviewPanel />;
       case 'resource_pack':
       case 'skin':
-      case 'launcher':
         return <PlaceholderPanel type={generatorType} />;
       default:
         return <PlaceholderPanel type={generatorType} />;
