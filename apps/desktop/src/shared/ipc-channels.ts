@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-/** 生成器类型联合（mod/datapack/modpack/server/texture/skin/resource_pack） */
-export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'texture', 'skin', 'resource_pack'] as const;
+/** 生成器类型联合（mod/datapack/modpack/server/resource_pack/skin/launcher） */
+export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'resource_pack', 'skin', 'launcher'] as const;
 export type GeneratorType = typeof GENERATOR_TYPES[number];
 
 /** IPC 通道名常量 */
