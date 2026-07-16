@@ -14,6 +14,7 @@ import { SearchPanel } from './components/SearchPanel.js';
 import { PackagesPanel } from './components/PackagesPanel.js';
 import { GitPanel } from './components/GitPanel.js';
 import { BlockEditor } from './components/BlockEditor.js';
+import { BuildPanel } from './components/BuildPanel.js';
 import { useModStore } from './store/mod-store.js';
 
 type Activity = 'explorer' | 'search' | 'git' | 'packages' | 'learn' | 'settings' | 'items' | 'blocks';
@@ -100,6 +101,7 @@ export default function App() {
           <div className="flex-1 overflow-hidden">
             <CodePreview />
           </div>
+          <BuildPanel />
         </main>
 
         <Splitter onResize={handleRightResize} />
