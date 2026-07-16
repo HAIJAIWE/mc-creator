@@ -47,7 +47,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
   loading: false,
   error: null,
-  view: 'editor',
+  // P1 修复：默认进入 Dashboard 首屏，新建/打开项目后再切到 editor
+  view: 'dashboard',
   currentProjectId: null,
 
   loadProjects: async () => {
@@ -96,7 +97,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
       // 把项目数据填入 mod-store
       const mod = useModStore.getState();
-      mod.setGeneratorType(project.generatorType);
+      // P23-3 迁移：texture 已合并到 resource_pack（旧项目数据库可能存 'texture'，类型层面已不含，运行时仍可能出现）
+      const rawType = project.generatorType as string;
+      const migratedType: typeof project.generatorType = rawType === 'texture' ? 'resource_pack' : project.generatorType;
+      mod.setGeneratorType(migratedType);
       mod.setLoader(project.loader as Loader);
       mod.setMcVersion(project.mcVersion as McVersion);
       mod.setDescription(project.description);
