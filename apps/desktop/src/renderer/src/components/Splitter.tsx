@@ -46,7 +46,7 @@ export function Splitter({ onResize }: SplitterProps) {
   return (
     <div
       onMouseDown={handleMouseDown}
-      className="w-1 flex-shrink-0 cursor-col-resize bg-zinc-800 transition-colors hover:bg-blue-500"
+      className="w-1 flex-shrink-0 cursor-col-resize bg-mc-surface-2 transition-colors hover:bg-mc-accent"
     />
   );
 }

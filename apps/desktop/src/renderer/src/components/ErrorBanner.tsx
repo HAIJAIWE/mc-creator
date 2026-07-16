@@ -1,4 +1,5 @@
-import { AlertCircle, X } from 'lucide-react';
+import { McIcon } from '../assets/mc-ui/McIcon';
+
 
 interface Props {
   message: string;
@@ -7,11 +8,11 @@ interface Props {
 
 export function ErrorBanner({ message, onClose }: Props) {
   return (
-    <div className="flex items-center gap-2 rounded border border-red-800 bg-red-950/60 px-3 py-2 text-sm text-red-300">
-      <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-400" />
+    <div className="flex items-center gap-2 rounded-mc-lg border border-mc-redstone bg-mc-redstone/15 px-3 py-2 text-sm text-mc-redstone animate-mc-panel-in">
+      <McIcon scope="pixel" name="square-alert" size={16} className="flex-shrink-0" />
       <span className="flex-1">{message}</span>
       {onClose && (
-        <button onClick={onClose} className="text-red-400 hover:text-red-200"><X className="h-4 w-4" /></button>
+        <button onClick={onClose} className="text-mc-redstone hover:text-mc-text"><McIcon scope="pixel" name="close" size={16} /></button>
       )}
     </div>
   );

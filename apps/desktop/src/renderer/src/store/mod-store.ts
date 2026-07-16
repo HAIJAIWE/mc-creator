@@ -28,6 +28,7 @@ interface ModState {
   setSpec: (s: ModSpec | null) => void;
   setFiles: (f: FileNode[]) => void;
   selectFile: (p: string) => void;
+  closeFile: (p: string) => void;
   setBuildResult: (r: { success: boolean; log: string; jarPath: string | null }) => void;
   setLoading: (b: boolean) => void;
   setError: (e: string | null) => void;
@@ -56,6 +57,10 @@ export const useModStore = create<ModState>((set) => ({
   setSpec: (s) => set({ spec: s }),
   setFiles: (f) => set({ files: f, selectedFile: f[0]?.path ?? null }),
   selectFile: (p) => set({ selectedFile: p }),
+  closeFile: (p) => set((state) => ({
+    files: state.files.filter((f) => f.path !== p),
+    selectedFile: state.selectedFile === p ? state.files.find((f) => f.path !== p)?.path ?? null : state.selectedFile,
+  })),
   setBuildResult: (r) => set({ buildSuccess: r.success, buildLog: r.log, jarPath: r.jarPath }),
   setLoading: (b) => set({ loading: b }),
   setError: (e) => set({ error: e }),

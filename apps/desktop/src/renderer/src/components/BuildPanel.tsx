@@ -15,7 +15,7 @@ function renderLog(log: string) {
   return log.split('\n').map((line, i) => {
     const isError = /error:|ERROR|FAILED/i.test(line);
     const isWarn = /warning:|WARN/i.test(line);
-    const color = isError ? 'text-red-400' : isWarn ? 'text-yellow-400' : 'text-zinc-300';
+    const color = isError ? 'text-mc-redstone' : isWarn ? 'text-mc-gold' : 'text-mc-text';
     return (
       <div key={i} className={color}>
         {line || ' '}
@@ -99,69 +99,69 @@ export function BuildPanel() {
   };
 
   return (
-    <div className="border-t border-zinc-800 p-3">
+    <div className="border-t border-mc-border p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <button
           onClick={build}
           disabled={loading || files.length === 0}
-          className="rounded bg-orange-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="mc-btn-primary"
         >
           {loading ? '构建中…' : '编译 .jar'}
         </button>
         <button
           onClick={buildStream}
           disabled={streamBuilding || files.length === 0}
-          className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="mc-btn-primary"
         >
           {streamBuilding ? '流式编译中…' : '流式编译'}
         </button>
         {(streamLog || buildLog) && (
           <button
             onClick={clearStreamLog}
-            className="rounded bg-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-600"
+            className="mc-btn-ghost"
           >
             清空日志
           </button>
         )}
         {/* 构建历史 */}
-        <span className="text-xs text-zinc-500">构建次数：{buildCount}</span>
+        <span className="text-xs text-mc-text-dim">构建次数：{buildCount}</span>
         {fixLog.length > 0 && (
-          <span className="text-xs text-zinc-500">修复次数：{fixLog.length}</span>
+          <span className="text-xs text-mc-text-dim">修复次数：{fixLog.length}</span>
         )}
       </div>
 
       {/* 一次性构建结果提示 */}
-      {buildSuccess === true && <span className="text-sm text-green-400">编译成功！</span>}
-      {buildSuccess === false && <span className="text-sm text-red-400">编译失败</span>}
-      {jarPath && <span className="text-xs text-zinc-400">产物：{jarPath}</span>}
+      {buildSuccess === true && <span className="text-sm text-mc-accent">编译成功！</span>}
+      {buildSuccess === false && <span className="text-sm text-mc-redstone">编译失败</span>}
+      {jarPath && <span className="text-xs text-mc-text-dim">产物：{jarPath}</span>}
 
       {/* 流式构建结果提示 */}
       {streamSuccess === true && (
-        <div className="mb-2 text-sm text-green-400">
+        <div className="mb-2 text-sm text-mc-accent">
           构建成功！
-          {streamJarPath && <span className="ml-2 text-xs text-zinc-400">产物：{streamJarPath}</span>}
+          {streamJarPath && <span className="ml-2 text-xs text-mc-text-dim">产物：{streamJarPath}</span>}
         </div>
       )}
       {streamSuccess === false && (
-        <div className="mb-2 text-sm text-red-400">构建失败，请查看日志中标记为红色的错误行</div>
+        <div className="mb-2 text-sm text-mc-redstone">构建失败，请查看日志中标记为红色的错误行</div>
       )}
 
       {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
       {fixLog.length > 0 && (
         <div className="mb-2 space-y-1">
-          <div className="text-xs font-semibold text-zinc-400">修复过程</div>
+          <div className="text-xs font-semibold text-mc-text-dim">修复过程</div>
           {fixLog.map((log, i) => (
-            <div key={i} className="text-xs text-zinc-500">• {log}</div>
+            <div key={i} className="text-xs text-mc-text-dim">• {log}</div>
           ))}
         </div>
       )}
       {streamLog ? (
-        <div className="max-h-40 overflow-auto rounded bg-zinc-950 p-2 text-xs font-mono">
+        <div className="mc-card max-h-40 overflow-auto p-2 text-xs font-mono">
           {renderLog(streamLog)}
         </div>
       ) : (
         buildLog && (
-          <pre className="max-h-40 overflow-auto rounded bg-zinc-950 p-2 text-xs text-zinc-300">{buildLog}</pre>
+          <pre className="mc-card max-h-40 overflow-auto p-2 text-xs font-mono text-mc-text">{buildLog}</pre>
         )
       )}
     </div>

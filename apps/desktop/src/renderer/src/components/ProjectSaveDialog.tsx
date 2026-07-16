@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
+import { McIcon } from '../assets/mc-ui/McIcon';
 import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
-import { X } from 'lucide-react';
+
 
 interface Props {
   onClose: () => void;
 }
 
-/** 计算预填名：<generatorType>-<modId 或 serverName 或 packName> */
 function computeDefaultName(generatorType: GeneratorType, spec: unknown): string {
   const s = (spec ?? {}) as Record<string, unknown>;
   let suffix = '';
@@ -48,7 +48,6 @@ export function ProjectSaveDialog({ onClose }: Props) {
       });
       onClose();
     } catch (e) {
-      // P23-2：保存失败时显示错误，不关闭对话框，让用户能重试
       setErrMsg((e as Error).message);
     } finally {
       setSaving(false);
@@ -64,15 +63,15 @@ export function ProjectSaveDialog({ onClose }: Props) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-[420px] rounded-lg border border-zinc-700 bg-zinc-900 p-6 text-zinc-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-[420px] max-w-full rounded-mc-lg border border-mc-border-strong bg-mc-surface p-6 text-mc-text shadow-mc-pop animate-mc-dialog-in">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">保存项目</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white"><X className="h-4 w-4" /></button>
+          <h2 className="font-display text-lg font-bold">保存项目</h2>
+          <button onClick={onClose} className="text-mc-mute transition-colors hover:text-mc-text" aria-label="关闭"><McIcon scope="pixel" name="close" size={16} /></button>
         </div>
         <div className="space-y-3">
           <div>
-            <label className="text-sm text-zinc-400">项目名称</label>
+            <label className="text-sm text-mc-dim">项目名称</label>
             <input
               autoFocus
               value={name}
@@ -80,22 +79,18 @@ export function ProjectSaveDialog({ onClose }: Props) {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSave();
               }}
-              className="mt-1 w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm"
+              className="mc-input"
               placeholder="输入项目名称"
             />
           </div>
           {errMsg && (
-            <div className="rounded border border-red-800 bg-red-950/60 px-3 py-2 text-sm text-red-300">
+            <div className="rounded-mc-lg border border-mc-redstone bg-mc-redstone/15 px-3 py-2 text-sm text-mc-redstone">
               保存失败：{errMsg}
             </div>
           )}
         </div>
         <div className="mt-4 flex items-center gap-3">
-          <button
-            onClick={handleSave}
-            disabled={saving || !name.trim()}
-            className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
-          >
+          <button onClick={handleSave} disabled={saving || !name.trim()} className="mc-btn-primary">
             {saving ? '保存中…' : '保存'}
           </button>
         </div>

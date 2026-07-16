@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Loader2 } from 'lucide-react';
+import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import type { FileNode } from '@mc-creator/shared';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
+import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
 
-/** 从 PNG base64 content 解析 IHDR 中的 width/height（big-endian） */
 function parsePngSize(content: string): { width: number; height: number } | null {
   try {
     const binary = atob(content);
@@ -26,35 +27,45 @@ function PngPreview({ file }: { file: FileNode }) {
   const dataUrl = `data:image/png;base64,${file.content}`;
   return (
     <div className="flex-1 overflow-auto p-4">
-      <div className="mb-2 text-xs font-semibold text-zinc-400">PNG 预览</div>
+      <div className="mb-3 flex items-center gap-2">
+        <McIcon scope="pixel" name="image" size={16} className="text-mc-mute" />
+        <span className="text-xs font-bold uppercase tracking-wider text-mc-dim">PNG 预览</span>
+      </div>
       <div className="flex flex-col items-center gap-3">
         <div
           style={{
             backgroundImage:
-              'linear-gradient(45deg, #555 25%, transparent 25%), linear-gradient(-45deg, #555 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #555 75%), linear-gradient(-45deg, transparent 75%, #555 75%)',
+              'linear-gradient(45deg, #3a352a 25%, transparent 25%), linear-gradient(-45deg, #3a352a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #3a352a 75%), linear-gradient(-45deg, transparent 75%, #3a352a 75%)',
             backgroundSize: '16px 16px',
             backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
-            backgroundColor: '#333',
+            backgroundColor: '#242118',
           }}
-          className="inline-block rounded"
+          className="inline-block rounded-mc-lg p-4"
         >
           <img
             src={dataUrl}
             alt={file.path}
-            style={{ maxWidth: 512, maxHeight: 512 }}
-            className="block"
+            style={{ maxWidth: 512, maxHeight: 480 }}
+            className="block rounded-mc"
           />
         </div>
-        <div className="break-all text-center text-xs text-zinc-500">
-          {file.path}
-          {size && <span className="ml-2 text-zinc-400">（{size.width}×{size.height}）</span>}
+        <div className="flex items-center gap-2 text-xs text-mc-mute">
+          <span className="break-all">{file.path}</span>
+          {size && <span className="text-mc-dim">• {size.width}×{size.height}</span>}
         </div>
       </div>
     </div>
   );
 }
 
-/** 根据 generatorType + spec 计算导出 zip 的默认文件名 */
+function getFileIcon(path: string): string {
+  if (path.endsWith('.json')) return 'file-text';
+  if (path.endsWith('.java')) return 'terminal';
+  if (path.endsWith('.gradle') || path.endsWith('.toml') || path.endsWith('.properties')) return 'terminal';
+  if (path.endsWith('.png')) return 'image';
+  return 'file';
+}
+
 function computeDefaultName(generatorType: GeneratorType, spec: unknown): string {
   const s = (spec ?? {}) as Record<string, unknown>;
   let name = 'export';
@@ -75,6 +86,7 @@ export function CodePreview() {
 
   const file = files.find((f) => f.path === selectedFile);
   const isPng = selectedFile?.endsWith('.png') ?? false;
+  const fileIconName = file ? getFileIcon(file.path) : 'file';
 
   const handleExport = async () => {
     if (files.length === 0) return;
@@ -86,7 +98,6 @@ export function CodePreview() {
       if (res.ok && res.savedPath) {
         setExportMsg({ type: 'success', text: `已导出到：${res.savedPath}` });
       }
-      // 用户取消时不报错
     } catch (e) {
       setExportMsg({ type: 'error', text: (e as Error).message });
     } finally {
@@ -104,37 +115,55 @@ export function CodePreview() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-1.5">
-        <button
-          onClick={handleExport}
-          disabled={exporting || files.length === 0}
-          className="flex items-center gap-1.5 rounded bg-purple-600 px-3 py-1 text-xs text-white disabled:opacity-50"
-        >
-          {exporting && (
-            <Loader2 className="h-3 w-3 animate-spin" />
+      <div className="flex items-center justify-between border-b border-mc-border bg-mc-surface px-3 py-1.5">
+        <div className="flex items-center gap-2">
+          {file ? (
+            <>
+              <McIcon scope="pixel" name={fileIconName} size={16} className="text-mc-mute" />
+              <span className="max-w-md truncate text-xs text-mc-dim">{file.path}</span>
+            </>
+          ) : (
+            <span className="text-xs text-mc-mute">选择文件预览代码</span>
           )}
-          导出 zip
-        </button>
-        {exportMsg?.type === 'success' && (
-          <span className="truncate text-xs text-green-400">{exportMsg.text}</span>
-        )}
-        {exportMsg?.type === 'error' && (
-          <span className="truncate text-xs text-red-400">{exportMsg.text}</span>
-        )}
+        </div>
+        <div className="flex items-center gap-2">
+          {exportMsg?.type === 'success' && (
+            <span className="max-w-xs truncate text-xs text-mc-accent">{exportMsg.text}</span>
+          )}
+          {exportMsg?.type === 'error' && (
+            <span className="max-w-xs truncate text-xs text-mc-redstone">{exportMsg.text}</span>
+          )}
+          <button
+            onClick={handleExport}
+            disabled={exporting || files.length === 0}
+            className="mc-btn-primary"
+          >
+            {exporting && <Loader2 className="h-3 w-3 animate-spin" />}
+            <McIcon scope="pixel" name="download" size={12} />
+            导出 zip
+          </button>
+        </div>
       </div>
       {!file ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-zinc-600">选择文件预览代码</div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-mc-bg">
+          <div className="flex h-16 w-16 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
+            <McIcon scope="pixel" name="terminal" size={32} className="text-mc-mute" />
+          </div>
+          <div className="text-sm font-medium text-mc-dim">选择文件预览代码</div>
+          <div className="text-xs text-mc-mute">点击左侧文件树中的文件</div>
+        </div>
       ) : isPng ? (
         <PngPreview file={file} />
       ) : (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden bg-mc-bg">
           <Editor
             height="100%"
             path={file.path}
             language={lang}
+            theme={MC_MONACO_THEME}
+            onMount={defineMcMonacoTheme}
             value={file.content}
-            theme="vs-dark"
-            options={{ readOnly: true, fontSize: 13, minimap: { enabled: false } }}
+            options={{ ...mcEditorOptions, readOnly: true }}
           />
         </div>
       )}

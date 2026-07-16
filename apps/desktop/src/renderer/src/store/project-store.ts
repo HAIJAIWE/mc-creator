@@ -47,7 +47,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
   loading: false,
   error: null,
-  view: 'dashboard',
+  view: 'editor',
   currentProjectId: null,
 
   loadProjects: async () => {

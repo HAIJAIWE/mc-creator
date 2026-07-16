@@ -62,36 +62,36 @@ export function AiChat() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-zinc-800 p-2 text-xs font-semibold text-zinc-400">AI 助手</div>
+      <div className="mc-section-title">AI 助手</div>
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {messages.map((m, i) => (
-          <div key={i} className={`rounded p-2 text-xs whitespace-pre-wrap ${
-            m.role === 'user' ? 'bg-blue-900/40' : 'bg-zinc-800'
+          <div key={i} className={`rounded-mc-lg border p-2 text-xs whitespace-pre-wrap ${
+            m.role === 'user' ? 'bg-mc-accent/20 border-mc-accent/30' : 'bg-mc-surface-2 border-mc-border'
           }`}>
             {m.text}
             {m.role === 'assistant' && sending && i === messages.length - 1 && m.text === '' && (
-              <span className="animate-pulse text-zinc-500">思考中…</span>
+              <span className="animate-pulse text-mc-text-dim">思考中…</span>
             )}
             {m.role === 'assistant' && sending && i === messages.length - 1 && m.text !== '' && (
-              <span className="inline-block w-1 h-3 bg-zinc-400 animate-pulse ml-0.5" />
+              <span className="inline-block w-1 h-3 bg-mc-surface-3 animate-pulse ml-0.5" />
             )}
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
-      <div className="flex gap-2 border-t border-zinc-800 p-2">
+      <div className="flex gap-2 border-t border-mc-border p-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
           placeholder={apiKey ? '输入消息…' : '请先配置 API Key'}
-          className="flex-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-100"
+          className="mc-input flex-1 text-xs"
           disabled={sending}
         />
         <button
           onClick={send}
           disabled={sending || !input.trim()}
-          className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+          className="mc-btn-primary"
         >
           {sending ? '…' : <><Send className="h-3 w-3" /> 发送</>}
         </button>

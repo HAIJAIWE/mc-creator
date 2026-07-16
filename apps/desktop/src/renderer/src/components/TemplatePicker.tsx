@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
+import { McIcon } from '../assets/mc-ui/McIcon';
 import { TEMPLATES_BY_TYPE, type SpecTemplate, type GeneratorType } from '@mc-creator/shared';
-import { X } from 'lucide-react';
+
 
 interface Props {
   generatorType: GeneratorType;
@@ -14,7 +15,7 @@ interface Props {
  * - 从 @mc-creator/shared 导入 TEMPLATES_BY_TYPE
  * - 按 generatorType 显示对应模板列表
  * - 点击模板 → 调 onPick → 关闭
- * - 深色主题：bg-zinc-900 + border-zinc-700 + text-zinc-100，字体最小 text-xs(12px)
+ * - 深色主题：bg-mc-surface + border-mc-border-strong + text-mc-text，字体最小 text-xs(12px)
  * - 模态框居中，背景 bg-black/60 遮罩
  */
 export function TemplatePicker({ generatorType, onPick, onClose }: Props) {
@@ -35,27 +36,27 @@ export function TemplatePicker({ generatorType, onPick, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-[520px] max-w-[90vw] max-h-[80vh] overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 p-4 text-zinc-100"
+        className="w-[520px] max-w-[90vw] max-h-[80vh] overflow-y-auto rounded-mc-lg border border-mc-border-strong bg-mc-surface shadow-mc-pop p-4 text-mc-text animate-mc-dialog-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-bold">
             选择模板
-            <span className="ml-2 text-xs font-normal text-zinc-400">
+            <span className="ml-2 text-xs font-normal text-mc-text-dim">
               （{generatorType}）
             </span>
           </h2>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-white"
+            className="text-mc-text-dim hover:text-mc-text"
             aria-label="关闭"
           >
-            <X className="h-4 w-4" />
+            <McIcon scope="pixel" name="close" size={16} />
           </button>
         </div>
 
         {templates.length === 0 ? (
-          <div className="py-8 text-center text-xs text-zinc-500">
+          <div className="py-8 text-center text-xs text-mc-text-dim">
             暂无可用模板
           </div>
         ) : (
@@ -64,17 +65,17 @@ export function TemplatePicker({ generatorType, onPick, onClose }: Props) {
               <li key={t.id}>
                 <button
                   onClick={() => onPick(t)}
-                  className="w-full rounded border border-zinc-700 bg-zinc-800/60 p-3 text-left transition hover:border-blue-500 hover:bg-zinc-800"
+                  className="mc-card w-full p-3 text-left hover:border-mc-accent transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     {t.icon && (
                       <span className="text-base">{t.icon}</span>
                     )}
-                    <span className="text-sm font-medium text-zinc-100">
+                    <span className="text-sm font-medium text-mc-text">
                       {t.title}
                     </span>
                   </div>
-                  <p className="mt-1 line-clamp-3 text-xs text-zinc-400">
+                  <p className="mt-1 line-clamp-3 text-xs text-mc-text-dim">
                     {t.description}
                   </p>
                 </button>
@@ -83,7 +84,7 @@ export function TemplatePicker({ generatorType, onPick, onClose }: Props) {
           </ul>
         )}
 
-        <div className="mt-3 text-right text-xs text-zinc-500">
+        <div className="mt-3 text-right text-xs text-mc-text-dim">
           点击模板将填充到描述框
         </div>
       </div>

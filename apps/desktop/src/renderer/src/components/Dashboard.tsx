@@ -3,33 +3,21 @@ import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
 import { useToast } from './ToastProvider.js';
 import type { Project, GeneratorType } from '../../../shared/ipc-channels.js';
-import {
-  Plus,
-  FolderInput,
-  FolderOutput,
-  Package,
-  Database,
-  Layers,
-  Server,
-  Image,
-  User,
-  FolderArchive,
-  FileText,
-  type LucideIcon,
-} from 'lucide-react';
+import { GENERATOR_TYPES } from '../../../shared/ipc-channels.js';
+import { FolderInput, FolderOutput } from 'lucide-react';
+import { McMark } from './McMark.js';
+import { McIcon } from '../assets/mc-ui/McIcon';
 
-/** 类型 → 图标映射 */
-const TYPE_ICON: Record<GeneratorType, LucideIcon> = {
-  mod: Package,
-  datapack: Database,
-  modpack: Layers,
-  server: Server,
-  texture: Image,
-  skin: User,
-  resource_pack: FolderArchive,
+const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
+  mod: { scope: 'pixel', name: 'package' },
+  datapack: { scope: 'pixel', name: 'database' },
+  modpack: { scope: 'pixel', name: 'box' },
+  server: { scope: 'pixel', name: 'server' },
+  texture: { scope: 'pixel', name: 'image' },
+  skin: { scope: 'pixel', name: 'user' },
+  resource_pack: { scope: 'pixel', name: 'folder' },
 };
 
-/** 类型 → 中文标签 */
 const TYPE_LABEL: Record<GeneratorType, string> = {
   mod: 'Mod',
   datapack: '数据包',
@@ -40,7 +28,16 @@ const TYPE_LABEL: Record<GeneratorType, string> = {
   resource_pack: '资源包',
 };
 
-/** Loader → 标签 */
+const TYPE_DESC: Record<GeneratorType, string> = {
+  mod: '创建 Fabric/NeoForge 模组',
+  datapack: '创建自定义数据包',
+  modpack: '创建整合包配置',
+  server: '创建服务器配置',
+  texture: '创建材质包',
+  skin: '创建玩家皮肤',
+  resource_pack: '创建资源包',
+};
+
 const LOADER_LABEL: Record<string, string> = {
   fabric: 'Fabric',
   neoforge: 'NeoForge',
@@ -65,7 +62,6 @@ export function Dashboard() {
     loadProjects();
   }, [loadProjects]);
 
-  /** P33：统计各类型项目数 */
   const typeStats = useMemo(() => {
     const counts = new Map<GeneratorType, number>();
     for (const p of projects) {
@@ -76,13 +72,12 @@ export function Dashboard() {
       .sort((a, b) => b.count - a.count);
   }, [projects]);
 
-  /** 总文件数 */
   const totalFiles = useMemo(
     () => projects.reduce((sum, p) => sum + p.files.length, 0),
     [projects],
   );
 
-  const handleNew = () => {
+  const handleNew = (type?: GeneratorType) => {
     useModStore.setState({
       description: '',
       spec: null,
@@ -94,6 +89,7 @@ export function Dashboard() {
       fixLog: [],
       error: null,
       loading: false,
+      generatorType: type ?? 'mod',
     });
     setView('editor');
   };
@@ -127,49 +123,55 @@ export function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
-      {/* 顶栏 */}
-      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-6 py-4">
-        <h1 className="text-xl font-bold">项目仪表盘</h1>
+    <div className="flex h-screen flex-col bg-mc-bg text-mc-text font-sans">
+      {/* 顶部草绿细条 */}
+      <div className="h-[3px] w-full bg-mc-accent shadow-[0_1px_0_0_rgb(0_0_0/0.4)]" />
+
+      <header className="flex items-center justify-between border-b border-mc-border bg-mc-surface px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
+            <McMark className="h-6 w-6 text-mc-accent" />
+          </div>
+          <div>
+            <h1 className="font-display text-xl font-bold tracking-tight">MC Creator</h1>
+            <div className="text-xs text-mc-mute">AI 驱动的 Minecraft 内容创作工具</div>
+          </div>
+        </div>
         <div className="flex gap-2">
           <button
-            onClick={handleNew}
-            className="flex items-center gap-1.5 rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-500"
+            onClick={() => handleNew()}
+            className="mc-btn-primary"
           >
-            <Plus className="h-4 w-4" /> 新建项目
+            <McIcon scope="pixel" name="plus" size={16} /> 新建项目
           </button>
           <button
             onClick={handleImport}
             disabled={importing}
-            className="flex items-center gap-1.5 rounded bg-zinc-700 px-4 py-1.5 text-sm text-white hover:bg-zinc-600 disabled:opacity-50"
+            className="mc-btn-ghost"
           >
             {importing ? '导入中…' : <><FolderInput className="h-4 w-4" /> 导入项目</>}
           </button>
         </div>
       </header>
 
-      {/* P33：统计栏 */}
       {projects.length > 0 && (
-        <div className="flex items-center gap-4 border-b border-zinc-800 bg-zinc-900/50 px-6 py-3">
+        <div className="flex items-center gap-4 border-b border-mc-border bg-mc-surface/60 px-6 py-3">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-zinc-100">{projects.length}</span>
-            <span className="text-xs text-zinc-400">个项目</span>
+            <span className="font-display text-2xl font-bold text-mc-text">{projects.length}</span>
+            <span className="text-xs text-mc-mute">个项目</span>
           </div>
-          <div className="h-6 w-px bg-zinc-700" />
+          <div className="h-6 w-px bg-mc-border" />
           <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-zinc-100">{totalFiles}</span>
-            <span className="text-xs text-zinc-400">个文件</span>
+            <span className="font-display text-2xl font-bold text-mc-text">{totalFiles}</span>
+            <span className="text-xs text-mc-mute">个文件</span>
           </div>
-          <div className="h-6 w-px bg-zinc-700" />
+          <div className="h-6 w-px bg-mc-border" />
           <div className="flex flex-wrap gap-1.5">
             {typeStats.map(({ type, count }) => {
-              const Icon = TYPE_ICON[type];
+              const icon = TYPE_ICON[type];
               return (
-                <span
-                  key={type}
-                  className="flex items-center gap-1 rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300"
-                >
-                  <Icon className="h-3 w-3" />
+                <span key={type} className="mc-tag">
+                  <McIcon scope={icon.scope} name={icon.name} size={12} />
                   {TYPE_LABEL[type]}: {count}
                 </span>
               );
@@ -180,83 +182,102 @@ export function Dashboard() {
 
       <main className="flex-1 overflow-y-auto p-6">
         {loading && projects.length === 0 ? (
-          <div className="text-sm text-zinc-500">加载中…</div>
+          <div className="flex h-full items-center justify-center text-sm text-mc-mute">加载中…</div>
         ) : projects.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-zinc-500">
-            <Package className="mb-4 h-16 w-16 opacity-30" />
-            <div className="text-lg">还没有项目，点击新建开始创作</div>
+          <div className="mx-auto max-w-4xl">
+            <div className="mb-8 text-center">
+              <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
+                <McMark className="h-9 w-9 text-mc-accent" />
+              </div>
+              <h2 className="mb-2 font-display text-xl font-bold">选择你要创建的内容类型</h2>
+              <p className="text-sm text-mc-mute">让 AI 帮你生成 Mod、数据包、整合包等 Minecraft 内容</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+              {(GENERATOR_TYPES as readonly GeneratorType[]).map((type) => {
+                const icon = TYPE_ICON[type];
+                return (
+                  <button
+                    key={type}
+                    onClick={() => handleNew(type)}
+                    className="mc-card group flex flex-col items-center gap-3 p-5 transition-colors hover:border-mc-accent"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-mc-lg bg-mc-surface-3 transition-colors group-hover:bg-mc-accent/20">
+                      <McIcon scope={icon.scope} name={icon.name} size={24} />
+                    </div>
+                    <div className="text-sm font-medium text-mc-text">{TYPE_LABEL[type]}</div>
+                    <div className="text-center text-xs text-mc-mute">{TYPE_DESC[type]}</div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((p) => {
-              const TypeIcon = TYPE_ICON[p.generatorType] ?? Package;
-              return (
-                <div
-                  key={p.id}
-                  className="flex flex-col rounded-lg border border-zinc-800 bg-zinc-800/50 p-4 transition hover:border-zinc-600"
-                >
-                  {/* 顶部：类型图标 + 名称 */}
-                  <div className="mb-3 flex items-start gap-3">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-700/50">
-                      <TypeIcon className="h-5 w-5 text-blue-400" />
+          <div>
+            <div className="mb-6">
+              <h2 className="mb-2 font-display text-lg font-bold">我的项目</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {projects.map((p) => {
+                  const icon = TYPE_ICON[p.generatorType];
+                  return (
+                    <div
+                      key={p.id}
+                      className="mc-card flex flex-col p-4 transition-colors hover:border-mc-accent"
+                    >
+                      <div className="mb-3 flex items-start gap-3">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-mc-lg bg-mc-surface-3">
+                          <McIcon scope={icon.scope} name={icon.name} size={20} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-base font-semibold text-mc-text">{p.name}</div>
+                          <div className="text-xs text-mc-mute">{TYPE_LABEL[p.generatorType]}</div>
+                        </div>
+                      </div>
+                      {p.description && (
+                        <p className="mb-3 line-clamp-2 text-xs text-mc-dim">{p.description}</p>
+                      )}
+                      <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs text-mc-mute">
+                        <span className="mc-tag">{LOADER_LABEL[p.loader] ?? p.loader}</span>
+                        <span>·</span>
+                        <span>{p.mcVersion}</span>
+                        <span>·</span>
+                        <span className="flex items-center gap-0.5">
+                          <McIcon scope="pixel" name="file-text" size={12} />
+                          {p.files.length}
+                        </span>
+                      </div>
+                      <div className="mb-3 text-xs text-mc-mute">
+                        更新于 {new Date(p.updatedAt).toLocaleDateString()}
+                      </div>
+                      <div className="mt-auto flex gap-2">
+                        <button
+                          onClick={() => loadProject(p.id)}
+                          className="mc-btn-primary"
+                        >
+                          打开
+                        </button>
+                        <button
+                          onClick={() => handleExport(p)}
+                          disabled={exportingId === p.id}
+                          className="mc-btn-ghost"
+                        >
+                          {exportingId === p.id ? '导出中…' : <><FolderOutput className="h-4 w-4" /> 导出</>}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`确定删除项目「${p.name}」？此操作不可撤销。`)) {
+                              deleteProject(p.id);
+                            }
+                          }}
+                          className="mc-btn-danger"
+                        >
+                          删除
+                        </button>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-base font-semibold">{p.name}</div>
-                      <div className="text-xs text-zinc-400">{TYPE_LABEL[p.generatorType]}</div>
-                    </div>
-                  </div>
-
-                  {/* 描述 */}
-                  {p.description && (
-                    <p className="mb-3 line-clamp-2 text-xs text-zinc-400">{p.description}</p>
-                  )}
-
-                  {/* 元信息 */}
-                  <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
-                    <span className="rounded bg-zinc-700/50 px-1.5 py-0.5">{LOADER_LABEL[p.loader] ?? p.loader}</span>
-                    <span>·</span>
-                    <span>{p.mcVersion}</span>
-                    <span>·</span>
-                    <span className="flex items-center gap-0.5">
-                      <FileText className="h-3 w-3" />
-                      {p.files.length}
-                    </span>
-                  </div>
-
-                  {/* 时间 */}
-                  <div className="mb-3 text-xs text-zinc-500">
-                    更新于 {new Date(p.updatedAt).toLocaleDateString()}
-                  </div>
-
-                  {/* 操作按钮 */}
-                  <div className="mt-auto flex gap-2">
-                    <button
-                      onClick={() => loadProject(p.id)}
-                      className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500"
-                    >
-                      打开
-                    </button>
-                    <button
-                      onClick={() => handleExport(p)}
-                      disabled={exportingId === p.id}
-                      className="flex items-center gap-1.5 rounded bg-zinc-700 px-3 py-1 text-xs text-white hover:bg-zinc-600 disabled:opacity-50"
-                    >
-                      {exportingId === p.id ? '导出中…' : <><FolderOutput className="h-4 w-4" /> 导出</>}
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`确定删除项目「${p.name}」？此操作不可撤销。`)) {
-                          deleteProject(p.id);
-                        }
-                      }}
-                      className="rounded bg-red-700 px-3 py-1 text-xs text-white hover:bg-red-600"
-                    >
-                      删除
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </main>

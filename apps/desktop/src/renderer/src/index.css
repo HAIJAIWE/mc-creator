@@ -2,14 +2,241 @@
 @tailwind components;
 @tailwind utilities;
 
-body { margin: 0; font-family: system-ui, sans-serif; }
-
-/* P32: Toast 滑入动画 */
-@keyframes toast-slide-in {
-  from { opacity: 0; transform: translateX(100%); }
-  to { opacity: 1; transform: translateX(0); }
+/* ============================================================
+   MC Creator — Craft 字体（MC 像素风，OFL 开源可商用）
+   - Pixelify Sans：标题/品牌字（display），OFL-1.1
+   - VT323：代码区等宽像素字（mono 后备），OFL-1.1
+- Monocraft：最正宗 MC 代码字体（OFL-1.1），已内置于
+  src/assets/fonts/Monocraft.ttf；缺失时回退 VT323 像素等宽。
+   ============================================================ */
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('./assets/fonts/pixelify-sans-latin-400-normal.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('./assets/fonts/pixelify-sans-latin-500-normal.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('./assets/fonts/pixelify-sans-latin-600-normal.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('./assets/fonts/pixelify-sans-latin-700-normal.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'VT323';
+  src: url('./assets/fonts/vt323-latin-400-normal.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+/* Monocraft：最正宗 MC 代码字体（OFL-1.1）。把 Monocraft.ttf 放进
+   src/assets/fonts/ 即自动生效；文件缺失时回退到 VT323 像素等宽。 */
+@font-face {
+  font-family: 'Monocraft';
+  src: url('./assets/fonts/Monocraft.ttf') format('truetype');
+  font-weight: 400 700; font-style: normal; font-display: swap;
 }
 
-.toast-slide-in {
-  animation: toast-slide-in 0.25s ease-out;
+/* ============================================================
+   MC Creator — Craft 设计系统
+   单一事实来源：所有颜色/字体/圆角/动效都来自 :root 变量。
+   LayoutConfig 的主题切换会改写 --mc-accent* 等变量实时换肤。
+   ============================================================ */
+:root {
+  /* 中性：暖石/泥土灰阶（带极轻绿调，区别于通用 blue-zinc） */
+  --mc-bg: 20 19 15;            /* #14130F 近黑暖底 */
+  --mc-surface: 28 26 21;       /* #1C1A15 面板 */
+  --mc-surface-2: 36 33 24;     /* #242118 凸起面 */
+  --mc-surface-3: 46 42 32;     /* #2E2A20 hover 面 */
+  --mc-border: 58 53 42;        /* #3A352A 分割线 */
+  --mc-border-strong: 74 68 53; /* #4A4435 强边框 */
+
+  /* 文字：骨白/羊皮纸 */
+  --mc-text: 236 232 218;       /* #ECE8DA 主文字 */
+  --mc-text-dim: 182 176 152;   /* #B6B098 次文字（对比度 ~5.8:1） */
+  --mc-text-mute: 138 132 105;  /* #8A8469 装饰/提示（~3.6:1） */
+
+  /* 品牌强调：草绿（creeper green） */
+  --mc-accent: 106 176 76;       /* #6AB04C */
+  --mc-accent-bright: 139 195 74;/* #8BC34A */
+  --mc-accent-deep: 78 138 55;   /* #4E8A37 */
+
+  /* 语义色 */
+  --mc-gold: 217 164 65;         /* #D9A441 经验金（警告） */
+  --mc-gold-deep: 183 132 45;    /* #B7842D */
+  --mc-redstone: 217 83 79;      /* #D9534F 红石红（错误） */
+  --mc-redstone-deep: 178 60 56; /* #B23C38 */
+
+  /* 形状：方块感（小圆角） */
+  --mc-radius: 3px;
+  --mc-radius-lg: 6px;
+
+  /* 动效：指数缓出，干脆不回弹 */
+  --mc-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 立体方块按钮：顶部高光 + 左侧高光 + 底部暗边 + 外投影，模拟 Minecraft 凸起方块 */
+  --mc-bevel-top: inset 0 1px 0 0 rgb(255 255 255 / 0.28);
+  --mc-bevel-left: inset 1px 0 0 0 rgb(255 255 255 / 0.12);
+  --mc-bevel-bottom: inset 0 -2px 0 0 rgb(0 0 0 / 0.32);
+  --mc-lift: 0 2px 0 0 rgb(0 0 0 / 0.45);
+  --mc-shadow-block: var(--mc-bevel-top), var(--mc-bevel-left), var(--mc-bevel-bottom), var(--mc-lift);
+  --mc-shadow-block-active: inset 0 2px 3px 0 rgb(0 0 0 / 0.38);
+  --mc-shadow-pop: 0 14px 34px -10px rgb(0 0 0 / 0.65);
+  /* 面板/卡片顶面 sheen：让平面有「受光」的立体感 */
+  --mc-sheen: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+
+  /* 字体（MC 像素风；Pixelify Sans / VT323 为 OFL 开源，Monocraft 留本地接入） */
+  --mc-font-display: 'Pixelify Sans', "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mc-font-body: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mc-font-mono: 'Monocraft', 'VT323', 'Courier New', Consolas, monospace;
+}
+
+/* 极淡的像素方块底纹：让背景有「Minecraft」气息而不喧宾夺主 */
+body {
+  margin: 0;
+  font-family: var(--mc-font-body);
+  color: rgb(var(--mc-text));
+  background-color: rgb(var(--mc-bg));
+  background-image:
+    linear-gradient(rgb(var(--mc-accent) / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--mc-accent) / 0.025) 1px, transparent 1px);
+  background-size: 22px 22px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgb(var(--mc-accent) / 0.35);
+  color: rgb(var(--mc-text));
+}
+
+/* 滚动条：细、低调、方块感 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--mc-border-strong)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--mc-border-strong));
+  border: 2px solid rgb(var(--mc-bg));
+  border-radius: 0;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--mc-accent) / 0.6);
+}
+
+@layer components {
+  /* ---- 输入 ---- */
+  .mc-input {
+    @apply w-full rounded-mc-lg border border-mc-border bg-mc-surface-2 px-3 py-1.5 text-sm text-mc-text;
+    @apply placeholder:text-mc-mute transition-colors;
+    @apply focus:border-mc-accent focus:outline-none focus:ring-1 focus:ring-mc-accent;
+  }
+  .mc-select {
+    @apply rounded-mc-lg border border-mc-border bg-mc-surface-2 px-2 py-1 text-xs text-mc-text;
+    @apply focus:border-mc-accent focus:outline-none transition-colors;
+  }
+
+  /* ---- 按钮（Minecraft 凸起方块：顶面受光 + 底面暗边 + 按下塌陷） ---- */
+  .mc-btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-mc-lg px-3 py-1.5 text-xs font-bold;
+    color: #0e0d0a;
+    background: rgb(var(--mc-accent));
+    box-shadow: var(--mc-shadow-block);
+    font-family: var(--mc-font-display);
+    transition: background-color 0.18s var(--mc-ease), transform 0.06s var(--mc-ease), box-shadow 0.06s var(--mc-ease);
+  }
+  .mc-btn-primary:hover:not(:disabled) {
+    background: rgb(var(--mc-accent-bright));
+    box-shadow: var(--mc-bevel-top), var(--mc-bevel-left), var(--mc-bevel-bottom), 0 2px 0 0 rgb(0 0 0 / 0.45);
+  }
+  .mc-btn-primary:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: var(--mc-shadow-block-active);
+  }
+  .mc-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: var(--mc-bevel-top), var(--mc-bevel-bottom); }
+
+  .mc-btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-mc-lg px-3 py-1.5 text-xs font-medium text-mc-dim;
+    @apply border border-mc-border bg-transparent transition-colors;
+    font-family: var(--mc-font-display);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.05), inset 0 -1px 0 0 rgb(0 0 0 / 0.25);
+  }
+  .mc-btn-ghost:hover:not(:disabled) {
+    @apply bg-mc-surface-2 text-mc-text;
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.10), inset 0 -1px 0 0 rgb(0 0 0 / 0.28);
+  }
+  .mc-btn-ghost:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: inset 0 1px 2px 0 rgb(0 0 0 / 0.30);
+  }
+  .mc-btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .mc-btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-mc-lg px-3 py-1.5 text-xs font-bold text-white;
+    background: rgb(var(--mc-redstone));
+    box-shadow: var(--mc-shadow-block);
+    font-family: var(--mc-font-display);
+    transition: background-color 0.18s var(--mc-ease), transform 0.06s var(--mc-ease), box-shadow 0.06s var(--mc-ease);
+  }
+  .mc-btn-danger:hover:not(:disabled) {
+    background: rgb(var(--mc-redstone-deep));
+    box-shadow: var(--mc-bevel-top), var(--mc-bevel-left), var(--mc-bevel-bottom), 0 2px 0 0 rgb(0 0 0 / 0.45);
+  }
+  .mc-btn-danger:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: var(--mc-shadow-block-active);
+  }
+  .mc-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: var(--mc-bevel-top), var(--mc-bevel-bottom); }
+
+  /* ---- 容器（拉开层次：顶面受光 sheen + 强边框） ---- */
+  .mc-panel {
+    @apply bg-mc-surface;
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+  }
+  .mc-card {
+    @apply rounded-mc-lg border border-mc-border-strong bg-mc-surface-2 transition-colors;
+    box-shadow: var(--mc-sheen), 0 1px 0 0 rgb(0 0 0 / 0.30);
+  }
+  .mc-divider { @apply border-mc-border; }
+  .mc-pop {
+    @apply rounded-mc-lg border border-mc-border-strong bg-mc-surface shadow-mc-pop;
+    box-shadow: var(--mc-sheen), var(--mc-shadow-pop);
+  }
+
+  /* ---- 徽标/标签 ---- */
+  .mc-badge {
+    @apply inline-flex items-center gap-1 rounded-mc-lg px-2 py-0.5 text-xs font-medium;
+    background: rgb(var(--mc-accent) / 0.18);
+    color: rgb(var(--mc-accent-bright));
+  }
+  .mc-tag {
+    @apply inline-flex items-center rounded-mc-lg px-1.5 py-0.5 text-xs text-mc-dim;
+    font-family: var(--mc-font-display);
+    background: rgb(var(--mc-surface-3));
+  }
+  .mc-section-title {
+    @apply px-3 py-2 text-xs font-bold uppercase tracking-wider text-mc-dim;
+    font-family: var(--mc-font-display);
+    border-bottom: 1px solid rgb(var(--mc-border) / 0.65);
+    box-shadow: var(--mc-sheen);
+  }
+
+  /* 活动栏的草绿激活指示条 */
+  .mc-active-bar {
+    @apply absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r bg-mc-accent;
+  }
+}
+
+/* 选区/焦点可见性（a11y） */
+:focus-visible {
+  outline: 2px solid rgb(var(--mc-accent));
+  outline-offset: 1px;
 }

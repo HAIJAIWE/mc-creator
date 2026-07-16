@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { McIcon } from '../assets/mc-ui/McIcon';
 import type { ModEntry } from '@mc-creator/shared';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
-import { Search, X, Loader2, ArrowLeft, Download } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface Props {
   /** 选中 mod 后回调（mod 结构匹配 ModpackSpec.mods 的 ModEntry） */
@@ -53,7 +54,7 @@ function formatSize(bytes: number): string {
  * - 搜索框 + 搜索按钮
  * - 结果列表：icon + title + description + downloads + categories
  * - 点击结果 → 获取版本列表 → 选中版本后回调 onPick(ModEntry)
- * - 深色主题：bg-zinc-900 / border-zinc-700 / text-zinc-100，字体最小 text-xs(12px)
+ * - 深色主题：bg-mc-surface / border-mc-border-strong / text-mc-text，字体最小 text-xs(12px)
  * - loading / error / empty 状态完整覆盖
  */
 export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Props) {
@@ -124,25 +125,25 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-[640px] max-w-[92vw] flex-col rounded-lg border border-zinc-700 bg-zinc-900 p-4 text-zinc-100"
+        className="flex max-h-[85vh] w-[640px] max-w-[92vw] flex-col rounded-mc-lg border border-mc-border-strong bg-mc-surface shadow-mc-pop p-4 text-mc-text animate-mc-dialog-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题栏 */}
         <div className="mb-3 flex items-center justify-between">
           <h2 className="flex items-center gap-1.5 text-base font-bold">
-            <Search className="h-4 w-4" /> 搜索 Modrinth
+            <McIcon scope="pixel" name="search" size={16} /> 搜索 Modrinth
             {(loader || mcVersion) && (
-              <span className="ml-2 text-xs font-normal text-zinc-400">
+              <span className="ml-2 text-xs font-normal text-mc-text-dim">
                 （{loader ?? '任意 loader'} / {mcVersion ?? '任意版本'}）
               </span>
             )}
           </h2>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-white"
+            className="text-mc-text-dim hover:text-mc-text"
             aria-label="关闭"
           >
-            <X className="h-4 w-4" />
+            <McIcon scope="pixel" name="close" size={16} />
           </button>
         </div>
 
@@ -156,13 +157,13 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
               if (e.key === 'Enter') doSearch();
             }}
             placeholder="输入 mod 名称（如 Sodium）"
-            className="flex-1 rounded border border-zinc-700 bg-zinc-800 p-2 text-sm text-zinc-100 placeholder:text-zinc-500"
+            className="mc-input flex-1"
             disabled={loading}
           />
           <button
             onClick={doSearch}
             disabled={loading || !query.trim()}
-            className="flex items-center gap-1.5 rounded bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+            className="mc-btn-primary"
           >
             {loading && (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -186,19 +187,19 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
                     setVersions([]);
                     setVersionsError(null);
                   }}
-                  className="rounded bg-zinc-700 px-2 py-0.5 text-xs text-zinc-200 hover:bg-zinc-600"
+                  className="mc-btn-ghost"
                 >
-                  <ArrowLeft className="h-3 w-3" /> 返回结果列表
+                  <McIcon scope="pixel" name="arrow-left" size={12} /> 返回结果列表
                 </button>
-                <span className="text-xs text-zinc-400">选择版本：{selectedHit.title}</span>
+                <span className="text-xs text-mc-text-dim">选择版本：{selectedHit.title}</span>
               </div>
               {versionsError && (
                 <div className="mb-2"><ErrorBanner message={versionsError} onClose={() => setVersionsError(null)} /></div>
               )}
               {versionsLoading ? (
-                <div className="py-8 text-center text-xs text-zinc-500">加载版本中…</div>
+                <div className="py-8 text-center text-xs text-mc-text-dim">加载版本中…</div>
               ) : versions.length === 0 ? (
-                <div className="py-8 text-center text-xs text-zinc-500">
+                <div className="py-8 text-center text-xs text-mc-text-dim">
                   没有匹配的版本{loader || mcVersion ? `（${loader ?? ''} ${mcVersion ?? ''}）` : ''}
                 </div>
               ) : (
@@ -209,16 +210,16 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
                       <li key={v.id}>
                         <button
                           onClick={() => pickVersion(selectedHit, v)}
-                          className="w-full rounded border border-zinc-700 bg-zinc-800/60 p-2.5 text-left transition hover:border-blue-500 hover:bg-zinc-800"
+                          className="mc-card w-full p-2.5 text-left hover:border-mc-accent transition-colors"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-zinc-100">{v.name}</span>
-                            <span className="text-xs text-zinc-400">{v.version_number}</span>
+                            <span className="text-sm font-medium text-mc-text">{v.name}</span>
+                            <span className="text-xs text-mc-text-dim">{v.version_number}</span>
                           </div>
                           {file && (
-                            <div className="mt-1 text-xs text-zinc-500">
+                            <div className="mt-1 text-xs text-mc-text-dim">
                               {file.filename} · {formatSize(file.size)}
-                              {file.primary && <span className="ml-1 text-blue-400">主文件</span>}
+                              {file.primary && <span className="ml-1 text-mc-accent">主文件</span>}
                             </div>
                           )}
                         </button>
@@ -232,14 +233,14 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
             /* 搜索结果列表 */
             <>
               {loading ? (
-                <div className="py-8 text-center text-xs text-zinc-500">搜索中…</div>
+                <div className="py-8 text-center text-xs text-mc-text-dim">搜索中…</div>
               ) : hits.length === 0 ? (
                 hasSearched ? (
-                  <div className="py-8 text-center text-xs text-zinc-500">
+                  <div className="py-8 text-center text-xs text-mc-text-dim">
                     没有找到匹配的 mod
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-xs text-zinc-500">
+                  <div className="py-8 text-center text-xs text-mc-text-dim">
                     输入关键词开始搜索 Modrinth 上的 mod
                   </div>
                 )
@@ -249,7 +250,7 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
                     <li key={hit.project_id}>
                       <button
                         onClick={() => loadVersions(hit)}
-                        className="flex w-full items-start gap-3 rounded border border-zinc-700 bg-zinc-800/60 p-2.5 text-left transition hover:border-blue-500 hover:bg-zinc-800"
+                        className="flex w-full items-start gap-3 rounded border border-mc-border-strong bg-mc-surface-2/60 p-2.5 text-left transition hover:border-mc-accent hover:bg-mc-surface-2"
                       >
                         {hit.icon_url ? (
                           <img
@@ -258,24 +259,24 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
                             className="h-10 w-10 flex-shrink-0 rounded"
                           />
                         ) : (
-                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-zinc-700 text-xs text-zinc-400">
+                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-mc-surface-3 text-xs text-mc-text-dim">
                             无图
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-medium text-zinc-100">{hit.title}</span>
-                            <span className="flex-shrink-0 text-xs text-zinc-400">
-                              <Download className="h-3 w-3" /> {formatDownloads(hit.downloads)}
+                            <span className="truncate text-sm font-medium text-mc-text">{hit.title}</span>
+                            <span className="flex-shrink-0 text-xs text-mc-text-dim">
+                              <McIcon scope="pixel" name="download" size={12} /> {formatDownloads(hit.downloads)}
                             </span>
                           </div>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">{hit.description}</p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-mc-text-dim">{hit.description}</p>
                           {hit.categories.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {hit.categories.slice(0, 5).map((c) => (
                                 <span
                                   key={c}
-                                  className="rounded bg-zinc-700 px-1.5 py-0.5 text-xs text-zinc-300"
+                                  className="mc-tag"
                                 >
                                   {c}
                                 </span>
@@ -292,7 +293,7 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
           )}
         </div>
 
-        <div className="mt-3 text-right text-xs text-zinc-500">
+        <div className="mt-3 text-right text-xs text-mc-text-dim">
           {selectedHit ? '选择版本后将添加到整合包' : '点击结果选择版本'}
         </div>
       </div>

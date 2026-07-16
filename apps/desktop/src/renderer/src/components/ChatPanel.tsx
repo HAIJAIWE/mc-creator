@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { McIcon } from '../assets/mc-ui/McIcon';
 import Editor from '@monaco-editor/react';
-import { Loader2, Search, LayoutTemplate } from 'lucide-react';
+import { Loader2, LayoutTemplate } from 'lucide-react';
 import type { ModEntry } from '@mc-creator/shared';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
@@ -8,6 +9,7 @@ import { ErrorBanner } from './ErrorBanner.js';
 import { TemplatePicker } from './TemplatePicker.js';
 import { ModrinthSearchPanel } from './ModrinthSearchPanel.js';
 import { CurseForgeSearchPanel } from './CurseForgeSearchPanel.js';
+import { MC_MONACO_THEME, defineMcMonacoTheme, mcEditorOptions } from '../lib/monaco-theme.js';
 
 export function ChatPanel() {
   const {
@@ -139,19 +141,19 @@ export function ChatPanel() {
     : '描述你想要的资源包（如：覆盖石头为红色，添加自定义字体和音效）';
 
   return (
-    <div className="flex flex-col gap-3 border-b border-zinc-800 p-4">
+    <div className="flex flex-col gap-3 border-b border-mc-border p-4">
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder={placeholder}
-        className="h-24 rounded border border-zinc-700 bg-zinc-900 p-2 text-sm text-zinc-100"
+        className="mc-input h-24 resize-none"
         disabled={loading}
       />
       <div className="flex gap-2">
         <button
           onClick={generateSpec}
           disabled={loading || !description}
-          className="flex items-center gap-2 rounded bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="mc-btn-primary"
         >
           {loading && (
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -161,7 +163,7 @@ export function ChatPanel() {
         <button
           onClick={generateFiles}
           disabled={loading || !spec}
-          className="flex items-center gap-2 rounded bg-green-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="mc-btn-primary"
         >
           {loading && (
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -171,7 +173,7 @@ export function ChatPanel() {
         <button
           onClick={() => setShowTemplates(true)}
           disabled={loading}
-          className="flex items-center gap-1.5 rounded bg-zinc-700 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
+          className="mc-btn-ghost"
           title="从模板库选择一个预填描述"
         >
           <LayoutTemplate className="h-4 w-4" /> 模板
@@ -180,20 +182,20 @@ export function ChatPanel() {
           <button
             onClick={() => setShowModrinthSearch(true)}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded bg-zinc-700 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
+            className="mc-btn-ghost"
             title="搜索 Modrinth 上的 mod 并添加到整合包"
           >
-            <Search className="h-4 w-4" /> 搜索 Modrinth
+            <McIcon scope="pixel" name="search" size={16} /> 搜索 Modrinth
           </button>
         )}
         {generatorType === 'modpack' && (
           <button
             onClick={() => setShowCurseForgeSearch(true)}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded bg-zinc-700 px-3 py-1.5 text-sm text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
+            className="mc-btn-ghost"
             title="搜索 CurseForge 上的 mod 并添加到整合包（需在设置中配置 API Key）"
           >
-            <Search className="h-4 w-4" /> 搜索 CurseForge
+            <McIcon scope="pixel" name="search" size={16} /> 搜索 CurseForge
           </button>
         )}
       </div>
@@ -225,12 +227,12 @@ export function ChatPanel() {
       )}
       {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
       {spec && (
-        <div className={`rounded border bg-zinc-900 p-2 ${specError ? 'border-red-500' : 'border-zinc-800'}`}>
+        <div className={`rounded border bg-mc-surface p-2 ${specError ? 'border-mc-redstone' : 'border-mc-border'}`}>
           <div className="mb-1 flex items-center justify-between">
-            <div className="text-xs text-zinc-400">Spec（可编辑，修改后点生成代码）</div>
+            <div className="text-xs text-mc-text-dim">Spec（可编辑，修改后点生成代码）</div>
             <button
               onClick={resetSpec}
-              className="rounded bg-zinc-700 px-2 py-0.5 text-xs text-zinc-200 hover:bg-zinc-600"
+              className="mc-btn-ghost"
             >
               重置
             </button>
@@ -238,13 +240,14 @@ export function ChatPanel() {
           <Editor
             height="200px"
             language="json"
-            theme="vs-dark"
+            theme={MC_MONACO_THEME}
+            onMount={defineMcMonacoTheme}
             value={editorText}
             onChange={handleEditorChange}
-            options={{ fontSize: 12, minimap: { enabled: false }, scrollBeyondLastLine: false, automaticLayout: true }}
+            options={mcEditorOptions}
           />
           {specError && (
-            <div className="mt-1 text-xs text-red-400">JSON 解析错误：{specError}</div>
+            <div className="mt-1 text-xs text-mc-redstone">JSON 解析错误：{specError}</div>
           )}
         </div>
       )}
