@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, EXPORT_ZIP, PREPARE_BUILD_DIR, EXPORT_PROJECT, IMPORT_PROJECT, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, BUILD_STREAM, BUILD_STREAM_CHUNK, LIST_PROJECTS, GET_PROJECT, SAVE_PROJECT, DELETE_PROJECT, MODRINTH_SEARCH, MODRINTH_VERSIONS, CURSEFORGE_SEARCH, CURSEFORGE_FILES, LOAD_CURSEFORGE_CONFIG, SAVE_CURSEFORGE_CONFIG, GIT_CHOOSE_REPO, GIT_STATUS, GIT_LOG, GIT_COMMIT, GIT_PULL, GIT_PUSH, type GeneratorType, type BuildStreamChunkT } from '../shared/ipc-channels.js';
+import { IPC, EXPORT_ZIP, PREPARE_BUILD_DIR, EXPORT_PROJECT, IMPORT_PROJECT, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, BUILD_STREAM, BUILD_STREAM_CHUNK, LIST_PROJECTS, GET_PROJECT, SAVE_PROJECT, DELETE_PROJECT, MODRINTH_SEARCH, MODRINTH_VERSIONS, CURSEFORGE_SEARCH, CURSEFORGE_FILES, LOAD_CURSEFORGE_CONFIG, SAVE_CURSEFORGE_CONFIG, GIT_CHOOSE_REPO, GIT_STATUS, GIT_LOG, GIT_COMMIT, GIT_PULL, GIT_PUSH, LOCATE_MC, MC_CHOOSE_DIR, INSTALL_MOD, LAUNCH_MC, type GeneratorType, type BuildStreamChunkT } from '../shared/ipc-channels.js';
 
 const api = {
   generateSpec: (description: string, generatorType: GeneratorType) =>
@@ -57,6 +57,11 @@ const api = {
     ipcRenderer.invoke(GIT_COMMIT, { repoPath, message, all }),
   gitPull: (repoPath: string) => ipcRenderer.invoke(GIT_PULL, { repoPath }),
   gitPush: (repoPath: string) => ipcRenderer.invoke(GIT_PUSH, { repoPath }),
+  // Minecraft 启动器（离线）
+  locateMc: () => ipcRenderer.invoke(LOCATE_MC),
+  chooseMcDir: () => ipcRenderer.invoke(MC_CHOOSE_DIR),
+  installMod: (jarPath: string, mcDir?: string) => ipcRenderer.invoke(INSTALL_MOD, { jarPath, mcDir }),
+  launchMc: (mcDir?: string) => ipcRenderer.invoke(LAUNCH_MC, { mcDir }),
 };
 
 try {

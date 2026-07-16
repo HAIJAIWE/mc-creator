@@ -1,4 +1,4 @@
-import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, PrepareBuildDirRes, ExportProjectRes, ImportProjectRes, GeneratorType, Project, BuildStreamChunkT, ModrinthSearchRes, ModrinthVersionsRes, CurseForgeSearchRes, CurseForgeFilesRes, CurseForgeConfig, GitChooseRepoRes, GitStatusRes, GitLogRes, GitCommitRes, GitSyncRes } from '../../../shared/ipc-channels.js';
+import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, PrepareBuildDirRes, ExportProjectRes, ImportProjectRes, GeneratorType, Project, BuildStreamChunkT, ModrinthSearchRes, ModrinthVersionsRes, CurseForgeSearchRes, CurseForgeFilesRes, CurseForgeConfig, GitChooseRepoRes, GitStatusRes, GitLogRes, GitCommitRes, GitSyncRes, LocateMcRes, McChooseDirRes, InstallModRes, LaunchMcRes } from '../../../shared/ipc-channels.js';
 
 /** 封装 window.mcApi，提供类型安全调用 */
 export const ipcClient = {
@@ -47,4 +47,10 @@ export const ipcClient = {
     window.mcApi.gitCommit(repoPath, message, all),
   gitPull: (repoPath: string): Promise<GitSyncRes> => window.mcApi.gitPull(repoPath),
   gitPush: (repoPath: string): Promise<GitSyncRes> => window.mcApi.gitPush(repoPath),
+  // Minecraft 启动器（离线）
+  locateMc: (): Promise<LocateMcRes> => window.mcApi.locateMc(),
+  chooseMcDir: (): Promise<McChooseDirRes> => window.mcApi.chooseMcDir(),
+  installMod: (jarPath: string, mcDir?: string): Promise<InstallModRes> =>
+    window.mcApi.installMod(jarPath, mcDir),
+  launchMc: (mcDir?: string): Promise<LaunchMcRes> => window.mcApi.launchMc(mcDir),
 };

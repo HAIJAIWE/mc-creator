@@ -1,8 +1,8 @@
 import { ipcMain, dialog, app } from 'electron';
-import { writeFile, mkdir, readFile } from 'node:fs/promises';
+import { writeFile, mkdir, readFile, copyFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { dirname, join } from 'node:path';
+import { dirname, join, basename } from 'node:path';
 import JSZip from 'jszip';
 import { z } from 'zod';
 import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem, ModrinthApiClient, CurseForgeApiClient } from '@mc-creator/core';
@@ -86,6 +86,20 @@ import {
   type ModrinthVersionsRes,
   type CurseForgeSearchRes,
   type CurseForgeFilesRes,
+  LOCATE_MC,
+  MC_CHOOSE_DIR,
+  INSTALL_MOD,
+  LAUNCH_MC,
+  LocateMcResponse,
+  McChooseDirResponse,
+  InstallModRequest,
+  InstallModResponse,
+  LaunchMcRequest,
+  LaunchMcResponse,
+  type LocateMcRes,
+  type McChooseDirRes,
+  type InstallModRes,
+  type LaunchMcRes,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -545,6 +559,71 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const { repoPath } = GitPushRequest.parse(raw);
     const { code, stdout, stderr } = await runGit(['push'], repoPath);
     return { ok: code === 0, stdout, error: code === 0 ? null : stderr || '推送失败（可能无 upstream 或需先拉取）' };
+  });
+
+  // === Minecraft 启动器（A 切片：离线账号，无需微软 OAuth）===
+  const detectMinecraft = (): { mcDir: string | null; modsDir: string | null; launcherExe: string | null } => {
+    const appData = app.getPath('appData');
+    let mcDir: string | null = null;
+    const defaultMc = join(appData, '.minecraft');
+    if (nodeFs.existsSync(defaultMc)) mcDir = defaultMc;
+    // launcher_profiles.json 可能覆盖 gameDir
+    if (mcDir) {
+      const profPath = join(mcDir, 'launcher_profiles.json');
+      if (nodeFs.existsSync(profPath)) {
+        try {
+          const prof = JSON.parse(nodeFs.readFileSync(profPath, 'utf-8'));
+          if (typeof prof.gameDir === 'string') mcDir = prof.gameDir;
+        } catch { /* 忽略损坏的 JSON */ }
+      }
+    }
+    const modsDir = mcDir ? join(mcDir, 'mods') : null;
+    const pf = process.env.ProgramFiles;
+    const pf86 = process.env['ProgramFiles(x86)'];
+    const launcherCandidates = [
+      pf86 && join(pf86, 'Minecraft Launcher', 'MinecraftLauncher.exe'),
+      pf && join(pf, 'Minecraft Launcher', 'MinecraftLauncher.exe'),
+      'C:\\Program Files (x86)\\Minecraft Launcher\\MinecraftLauncher.exe',
+      'C:\\Program Files\\Minecraft Launcher\\MinecraftLauncher.exe',
+    ].filter(Boolean) as string[];
+    let launcherExe: string | null = null;
+    for (const l of launcherCandidates) {
+      if (nodeFs.existsSync(l)) { launcherExe = l; break; }
+    }
+    return { mcDir, modsDir, launcherExe };
+  };
+
+  ipcMain.handle(LOCATE_MC, (): LocateMcRes => {
+    const { mcDir, modsDir, launcherExe } = detectMinecraft();
+    return { found: !!mcDir, mcDir, modsDir, launcherExe, error: mcDir ? null : '未检测到 .minecraft 目录，请手动选择' };
+  });
+
+  ipcMain.handle(MC_CHOOSE_DIR, async (): Promise<McChooseDirRes> => {
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+    if (result.canceled || result.filePaths.length === 0) return { path: null };
+    return { path: result.filePaths[0] };
+  });
+
+  ipcMain.handle(INSTALL_MOD, async (_e, raw: unknown): Promise<InstallModRes> => {
+    const { jarPath, mcDir: mcDirOpt } = InstallModRequest.parse(raw);
+    const mcDir = mcDirOpt ?? detectMinecraft().mcDir;
+    if (!mcDir) return { ok: false, modsDir: null, error: '未找到 .minecraft 目录，请先手动选择' };
+    const modsDir = join(mcDir, 'mods');
+    await mkdir(modsDir, { recursive: true });
+    const dest = join(modsDir, basename(jarPath));
+    await copyFile(jarPath, dest);
+    return { ok: true, modsDir, error: null };
+  });
+
+  ipcMain.handle(LAUNCH_MC, async (_e, raw: unknown): Promise<LaunchMcRes> => {
+    const { mcDir: _mcDirOpt } = LaunchMcRequest.parse(raw);
+    const { launcherExe } = detectMinecraft();
+    if (!launcherExe) {
+      return { ok: false, method: null, error: '未找到官方启动器（MinecraftLauncher.exe）。离线账号仍需官方启动器进游戏，请先安装 Minecraft。' };
+    }
+    // 离线账号：直接拉起官方启动器，由其离线档案进入游戏，无需微软 token
+    spawn(launcherExe, [], { detached: true, stdio: 'ignore' }).unref();
+    return { ok: true, method: 'launcher', error: null };
   });
 }
 

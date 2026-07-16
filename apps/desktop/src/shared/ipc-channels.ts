@@ -359,3 +359,42 @@ export const GitSyncResponse = z.object({
 export type GitPullReq = z.infer<typeof GitPullRequest>;
 export type GitPushReq = z.infer<typeof GitPushRequest>;
 export type GitSyncRes = z.infer<typeof GitSyncResponse>;
+
+// === Minecraft 启动器（A 切片：离线账号，无需微软 OAuth）===
+export const LOCATE_MC = 'mc:locate';
+export const MC_CHOOSE_DIR = 'mc:chooseDir';
+export const INSTALL_MOD = 'mc:installMod';
+export const LAUNCH_MC = 'mc:launch';
+
+export const LocateMcResponse = z.object({
+  found: z.boolean(),
+  mcDir: z.string().nullable(),
+  modsDir: z.string().nullable(),
+  launcherExe: z.string().nullable(),
+  error: z.string().nullable().optional(),
+});
+export type LocateMcRes = z.infer<typeof LocateMcResponse>;
+
+export const McChooseDirResponse = z.object({ path: z.string().nullable() });
+export type McChooseDirRes = z.infer<typeof McChooseDirResponse>;
+
+export const InstallModRequest = z.object({
+  jarPath: z.string().min(1),
+  mcDir: z.string().optional(),
+});
+export const InstallModResponse = z.object({
+  ok: z.boolean(),
+  modsDir: z.string().nullable(),
+  error: z.string().nullable().optional(),
+});
+export type InstallModReq = z.infer<typeof InstallModRequest>;
+export type InstallModRes = z.infer<typeof InstallModResponse>;
+
+export const LaunchMcRequest = z.object({ mcDir: z.string().optional() });
+export const LaunchMcResponse = z.object({
+  ok: z.boolean(),
+  method: z.string().nullable(),
+  error: z.string().nullable().optional(),
+});
+export type LaunchMcReq = z.infer<typeof LaunchMcRequest>;
+export type LaunchMcRes = z.infer<typeof LaunchMcResponse>;
