@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, EXPORT_ZIP, PREPARE_BUILD_DIR, EXPORT_PROJECT, IMPORT_PROJECT, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, BUILD_STREAM, BUILD_STREAM_CHUNK, LIST_PROJECTS, GET_PROJECT, SAVE_PROJECT, DELETE_PROJECT, MODRINTH_SEARCH, MODRINTH_VERSIONS, CURSEFORGE_SEARCH, CURSEFORGE_FILES, LOAD_CURSEFORGE_CONFIG, SAVE_CURSEFORGE_CONFIG, type GeneratorType, type BuildStreamChunkT } from '../shared/ipc-channels.js';
+import { IPC, EXPORT_ZIP, PREPARE_BUILD_DIR, EXPORT_PROJECT, IMPORT_PROJECT, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, BUILD_STREAM, BUILD_STREAM_CHUNK, LIST_PROJECTS, GET_PROJECT, SAVE_PROJECT, DELETE_PROJECT, MODRINTH_SEARCH, MODRINTH_VERSIONS, CURSEFORGE_SEARCH, CURSEFORGE_FILES, LOAD_CURSEFORGE_CONFIG, SAVE_CURSEFORGE_CONFIG, GIT_CHOOSE_REPO, GIT_STATUS, GIT_LOG, GIT_COMMIT, GIT_PULL, GIT_PUSH, type GeneratorType, type BuildStreamChunkT } from '../shared/ipc-channels.js';
 
 const api = {
   generateSpec: (description: string, generatorType: GeneratorType) =>
@@ -49,6 +49,14 @@ const api = {
   loadCurseForgeConfig: () => ipcRenderer.invoke(LOAD_CURSEFORGE_CONFIG),
   saveCurseForgeConfig: (config: { apiKey: string }) =>
     ipcRenderer.invoke(SAVE_CURSEFORGE_CONFIG, config),
+  // 源代码管理
+  gitChooseRepo: () => ipcRenderer.invoke(GIT_CHOOSE_REPO),
+  gitStatus: (repoPath: string) => ipcRenderer.invoke(GIT_STATUS, { repoPath }),
+  gitLog: (repoPath: string, limit: number) => ipcRenderer.invoke(GIT_LOG, { repoPath, limit }),
+  gitCommit: (repoPath: string, message: string, all: boolean) =>
+    ipcRenderer.invoke(GIT_COMMIT, { repoPath, message, all }),
+  gitPull: (repoPath: string) => ipcRenderer.invoke(GIT_PULL, { repoPath }),
+  gitPush: (repoPath: string) => ipcRenderer.invoke(GIT_PUSH, { repoPath }),
 };
 
 try {

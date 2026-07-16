@@ -52,6 +52,28 @@ import {
   CurseForgeSearchRequest,
   CurseForgeFilesRequest,
   CurseForgeConfigSchema,
+  GIT_CHOOSE_REPO,
+  GIT_STATUS,
+  GIT_LOG,
+  GIT_COMMIT,
+  GIT_PULL,
+  GIT_PUSH,
+  GitChooseRepoResponse,
+  GitStatusRequest,
+  GitStatusResponse,
+  GitFileStatus,
+  GitLogRequest,
+  GitLogResponse,
+  GitCommitRequest,
+  GitCommitResponse,
+  GitPullRequest,
+  GitPushRequest,
+  GitSyncResponse,
+  type GitChooseRepoRes,
+  type GitStatusRes,
+  type GitLogRes,
+  type GitCommitRes,
+  type GitSyncRes,
   type GenerateSpecRes,
   type GenerateFilesRes,
   type BuildRes,
@@ -415,6 +437,114 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       mcVersion: req.mcVersion,
     });
     return { files };
+  });
+
+  // === 源代码管理（Git 桥接）：主进程跑 git，渲染进程只展示 ===
+  const runGit = (args: string[], cwd: string) =>
+    new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
+      const child = spawn('git', args, { cwd });
+      let stdout = '';
+      let stderr = '';
+      child.stdout?.on('data', (d) => (stdout += d.toString()));
+      child.stderr?.on('data', (d) => (stderr += d.toString()));
+      child.on('error', (err) => {
+        stderr += err.message;
+        resolve({ code: -1, stdout, stderr });
+      });
+      child.on('close', (code) => resolve({ code: code ?? -1, stdout, stderr }));
+    });
+
+  // 解析 `git status --porcelain -b` 输出（## 分支行 + 两字母状态码文件行）
+  const parseGitStatus = (raw: string) => {
+    let branch: string | null = null;
+    let upstream: string | null = null;
+    let ahead = 0;
+    let behind = 0;
+    const files: { x: string; y: string; path: string; origPath?: string }[] = [];
+    for (const line of raw.split('\n')) {
+      if (!line) continue;
+      if (line.startsWith('## ')) {
+        const rest = line.slice(3);
+        const a = rest.match(/ahead (\d+)/);
+        const b = rest.match(/behind (\d+)/);
+        if (a) ahead = Number(a[1]);
+        if (b) behind = Number(b[1]);
+        const branchPart = rest.split('...')[0].replace(/\s*\(.*\)\s*$/, '').trim();
+        branch = branchPart || null;
+        const up = rest.split('...')[1];
+        if (up) upstream = up.split(/\s/)[0].replace(/\[.*\]/, '').trim() || null;
+        continue;
+      }
+      const x = line[0];
+      const y = line[1];
+      let path = line.slice(3);
+      let origPath: string | undefined;
+      const arrow = path.indexOf(' -> ');
+      if (arrow >= 0) {
+        origPath = path.slice(0, arrow);
+        path = path.slice(arrow + 4);
+      }
+      files.push({ x, y, path, origPath });
+    }
+    return { branch, upstream, ahead, behind, files, clean: files.length === 0 };
+  };
+
+  ipcMain.handle(GIT_CHOOSE_REPO, async (): Promise<GitChooseRepoRes> => {
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+    if (result.canceled || result.filePaths.length === 0) return { path: null };
+    return { path: result.filePaths[0] };
+  });
+
+  ipcMain.handle(GIT_STATUS, async (_e, raw: unknown): Promise<GitStatusRes> => {
+    const { repoPath } = GitStatusRequest.parse(raw);
+    const { code, stdout, stderr } = await runGit(['status', '--porcelain', '-b'], repoPath);
+    if (code !== 0) {
+      return { ok: false, branch: null, upstream: null, ahead: 0, behind: 0, clean: true, files: [], error: stderr || '无法读取仓库状态（可能不是 git 仓库或 git 未安装）' };
+    }
+    return { ok: true, ...parseGitStatus(stdout), error: null };
+  });
+
+  ipcMain.handle(GIT_LOG, async (_e, raw: unknown): Promise<GitLogRes> => {
+    const { repoPath, limit } = GitLogRequest.parse(raw);
+    const { code, stdout, stderr } = await runGit(
+      ['log', `-n${limit}`, '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad', '--date=short'],
+      repoPath,
+    );
+    if (code !== 0) {
+      return { ok: false, commits: [], error: stderr || '无法读取提交历史' };
+    }
+    const commits = stdout
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [hash, shortHash, message, author, date] = line.split('\x1f');
+        return { hash, shortHash, message, author, date };
+      });
+    return { ok: true, commits, error: null };
+  });
+
+  ipcMain.handle(GIT_COMMIT, async (_e, raw: unknown): Promise<GitCommitRes> => {
+    const { repoPath, message, all } = GitCommitRequest.parse(raw);
+    if (all) {
+      const add = await runGit(['add', '-A'], repoPath);
+      if (add.code !== 0) return { ok: false, error: add.stderr || 'git add 失败' };
+    }
+    const { code, stderr } = await runGit(['commit', '-m', message], repoPath);
+    if (code !== 0) return { ok: false, error: stderr || '提交失败（可能无改动）' };
+    const head = await runGit(['rev-parse', 'HEAD'], repoPath);
+    return { ok: true, hash: head.code === 0 ? head.stdout.trim() : null, error: null };
+  });
+
+  ipcMain.handle(GIT_PULL, async (_e, raw: unknown): Promise<GitSyncRes> => {
+    const { repoPath } = GitPullRequest.parse(raw);
+    const { code, stdout, stderr } = await runGit(['pull'], repoPath);
+    return { ok: code === 0, stdout, error: code === 0 ? null : stderr || '拉取失败' };
+  });
+
+  ipcMain.handle(GIT_PUSH, async (_e, raw: unknown): Promise<GitSyncRes> => {
+    const { repoPath } = GitPushRequest.parse(raw);
+    const { code, stdout, stderr } = await runGit(['push'], repoPath);
+    return { ok: code === 0, stdout, error: code === 0 ? null : stderr || '推送失败（可能无 upstream 或需先拉取）' };
   });
 }
 

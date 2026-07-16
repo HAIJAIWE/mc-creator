@@ -1,4 +1,4 @@
-import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, PrepareBuildDirRes, ExportProjectRes, ImportProjectRes, GeneratorType, Project, BuildStreamChunkT, ModrinthSearchRes, ModrinthVersionsRes, CurseForgeSearchRes, CurseForgeFilesRes, CurseForgeConfig } from '../../../shared/ipc-channels.js';
+import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, PrepareBuildDirRes, ExportProjectRes, ImportProjectRes, GeneratorType, Project, BuildStreamChunkT, ModrinthSearchRes, ModrinthVersionsRes, CurseForgeSearchRes, CurseForgeFilesRes, CurseForgeConfig, GitChooseRepoRes, GitStatusRes, GitLogRes, GitCommitRes, GitSyncRes } from '../../../shared/ipc-channels.js';
 
 /** 封装 window.mcApi，提供类型安全调用 */
 export const ipcClient = {
@@ -39,4 +39,12 @@ export const ipcClient = {
   loadCurseForgeConfig: (): Promise<CurseForgeConfig> => window.mcApi.loadCurseForgeConfig(),
   saveCurseForgeConfig: (config: CurseForgeConfig): Promise<{ ok: true }> =>
     window.mcApi.saveCurseForgeConfig(config),
+  // 源代码管理
+  gitChooseRepo: (): Promise<GitChooseRepoRes> => window.mcApi.gitChooseRepo(),
+  gitStatus: (repoPath: string): Promise<GitStatusRes> => window.mcApi.gitStatus(repoPath),
+  gitLog: (repoPath: string, limit: number): Promise<GitLogRes> => window.mcApi.gitLog(repoPath, limit),
+  gitCommit: (repoPath: string, message: string, all: boolean): Promise<GitCommitRes> =>
+    window.mcApi.gitCommit(repoPath, message, all),
+  gitPull: (repoPath: string): Promise<GitSyncRes> => window.mcApi.gitPull(repoPath),
+  gitPush: (repoPath: string): Promise<GitSyncRes> => window.mcApi.gitPush(repoPath),
 };
