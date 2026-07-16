@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ModSpec, Loader, McVersion, FileNode } from '@mc-creator/shared';
+import { ModSpec, type Loader, type McVersion, type FileNode, type ItemSpec } from '@mc-creator/shared';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
 
 interface ModState {
@@ -32,6 +32,9 @@ interface ModState {
   setBuildResult: (r: { success: boolean; log: string; jarPath: string | null }) => void;
   setLoading: (b: boolean) => void;
   setError: (e: string | null) => void;
+  // 方块 / 物品编辑器
+  addItem: (item: ItemSpec) => void;
+  removeItem: (id: string) => void;
 }
 
 export const useModStore = create<ModState>((set) => ({
@@ -64,4 +67,15 @@ export const useModStore = create<ModState>((set) => ({
   setBuildResult: (r) => set({ buildSuccess: r.success, buildLog: r.log, jarPath: r.jarPath }),
   setLoading: (b) => set({ loading: b }),
   setError: (e) => set({ error: e }),
+  addItem: (item) =>
+    set((state) => {
+      const base = state.spec ?? ModSpec.parse({ modId: 'mc_creator', name: 'My Mod' });
+      const items = [...base.items.filter((i) => i.id !== item.id), item];
+      return { spec: { ...base, items } };
+    }),
+  removeItem: (id) =>
+    set((state) => {
+      if (!state.spec) return {};
+      return { spec: { ...state.spec, items: state.spec.items.filter((i) => i.id !== id) } };
+    }),
 }));

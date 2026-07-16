@@ -1,33 +1,44 @@
 import { useState } from 'react';
+import { Plus, X, Copy } from 'lucide-react';
 import { listAssets, type McAssetScope } from '../assets/mc-ui/mc-ui';
 import { McIcon } from '../assets/mc-ui/McIcon';
+import { useModStore } from '../store/mod-store.js';
+import type { ItemSpec } from '@mc-creator/shared';
 
 const SCOPES: McAssetScope[] = ['mob', 'game', 'pixel'];
 const STACKS = [1, 16, 64];
-const RARITIES = ['common', 'uncommon', 'rare', 'epic'];
-const TOOLS = ['pickaxe', 'axe', 'shovel', 'sword', 'hand'];
+const RARITIES = ['common', 'uncommon', 'rare', 'epic'] as const;
 
-/** 方块 / 物品属性编辑器：选素材 → 配属性 → 导出 MC 风格 JSON。 */
+/** 由素材名生成合法的 ItemSpec.id（小写下划线，匹配 ^[a-z0-9_]+$） */
+function toItemId(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'item';
+}
+
+/** 方块 / 物品属性编辑器：选素材 → 配属性 → 写入 mod-store.spec.items。 */
 export function BlockEditor() {
   const [scope, setScope] = useState<McAssetScope>('game');
   const [selected, setSelected] = useState('stone-block');
   const [displayName, setDisplayName] = useState('');
   const [maxStack, setMaxStack] = useState(64);
-  const [rarity, setRarity] = useState('common');
-  const [tool, setTool] = useState('pickaxe');
+  const [rarity, setRarity] = useState<(typeof RARITIES)[number]>('common');
+
+  const addItem = useModStore((s) => s.addItem);
+  const removeItem = useModStore((s) => s.removeItem);
+  const items = useModStore((s) => s.spec?.items ?? []);
 
   const names = listAssets(scope);
-  const json = JSON.stringify(
-    {
-      id: `${scope}:${selected}`,
-      displayName: displayName || selected,
-      maxStackSize: maxStack,
-      rarity,
-      requiredTool: tool,
-    },
-    null,
-    2,
-  );
+
+  const buildItem = (): ItemSpec => ({
+    id: toItemId(selected),
+    name: displayName || selected,
+    maxStackSize: maxStack,
+    rarity,
+    maxDamage: 0,
+    fuelTick: 0,
+    lore: '',
+  });
+
+  const json = JSON.stringify(buildItem(), null, 2);
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
@@ -96,7 +107,7 @@ export function BlockEditor() {
               <select
                 className="mc-select w-full"
                 value={rarity}
-                onChange={(e) => setRarity(e.target.value)}
+                onChange={(e) => setRarity(e.target.value as (typeof RARITIES)[number])}
               >
                 {RARITIES.map((v) => (
                   <option key={v} value={v}>
@@ -106,27 +117,48 @@ export function BlockEditor() {
               </select>
             </div>
           </div>
-          <div>
-            <label className="mb-0.5 block text-xs text-mc-dim">所需工具</label>
-            <select className="mc-select w-full" value={tool} onChange={(e) => setTool(e.target.value)}>
-              {TOOLS.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
-        {/* 导出 */}
+        {/* 写入 mod-store */}
+        <div className="flex items-center gap-2">
+          <button className="mc-btn" onClick={() => addItem(buildItem())}>
+            <Plus size={14} /> 添加到 Mod
+          </button>
+          <span className="text-xs text-mc-dim">已加入 {items.length} 个物品</span>
+        </div>
+
+        {/* 已加入列表 */}
+        {items.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-xs text-mc-dim">已加入物品</div>
+            <ul className="mc-card max-h-32 space-y-1 overflow-auto p-2">
+              {items.map((it) => (
+                <li key={it.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate text-mc-text">
+                    {it.name} <span className="text-mc-mute">({it.id})</span>
+                  </span>
+                  <button
+                    className="mc-btn-ghost !px-1.5 !py-0.5"
+                    onClick={() => removeItem(it.id)}
+                    title="移除"
+                  >
+                    <X size={12} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 预览 */}
         <div>
-          <div className="mb-1 text-xs text-mc-dim">生成 JSON</div>
+          <div className="mb-1 text-xs text-mc-dim">生成 ItemSpec JSON</div>
           <pre className="mc-card max-h-48 overflow-auto p-2 text-xs text-mc-text">{json}</pre>
           <button
             className="mc-btn-ghost mt-1"
             onClick={() => navigator.clipboard?.writeText(json)}
           >
-            <McIcon scope="pixel" name="copy" size={14} /> 复制
+            <Copy size={14} /> 复制
           </button>
         </div>
       </div>
