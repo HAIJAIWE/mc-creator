@@ -3,6 +3,7 @@ import { writeFile, mkdir, readFile, copyFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, basename } from 'node:path';
+import { homedir } from 'node:os';
 import JSZip from 'jszip';
 import { z } from 'zod';
 import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem, ModrinthApiClient, CurseForgeApiClient } from '@mc-creator/core';
@@ -562,7 +563,13 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
   });
 
   // === Minecraft 启动器（A 切片：离线账号，无需微软 OAuth）===
-  const detectMinecraft = (): { mcDir: string | null; modsDir: string | null; launcherExe: string | null } => {
+  type LauncherKind = 'official' | 'pcl2' | 'hmcl';
+  const detectMinecraft = (): {
+    mcDir: string | null;
+    modsDir: string | null;
+    launcherExe: string | null;
+    launcher: LauncherKind | null;
+  } => {
     const appData = app.getPath('appData');
     let mcDir: string | null = null;
     const defaultMc = join(appData, '.minecraft');
@@ -578,24 +585,49 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       }
     }
     const modsDir = mcDir ? join(mcDir, 'mods') : null;
+
+    const home = homedir();
     const pf = process.env.ProgramFiles;
     const pf86 = process.env['ProgramFiles(x86)'];
-    const launcherCandidates = [
-      pf86 && join(pf86, 'Minecraft Launcher', 'MinecraftLauncher.exe'),
-      pf && join(pf, 'Minecraft Launcher', 'MinecraftLauncher.exe'),
-      'C:\\Program Files (x86)\\Minecraft Launcher\\MinecraftLauncher.exe',
-      'C:\\Program Files\\Minecraft Launcher\\MinecraftLauncher.exe',
-    ].filter(Boolean) as string[];
-    let launcherExe: string | null = null;
-    for (const l of launcherCandidates) {
-      if (nodeFs.existsSync(l)) { launcherExe = l; break; }
+    // 用户常见放置便携启动器（PCL2/HMCL 为绿色 exe，无固定安装路径）的目录
+    const scanDirs = [home, join(home, 'Desktop'), join(home, 'Downloads'), 'D:\\', 'C:\\']
+      .filter((d) => nodeFs.existsSync(d));
+
+    const candidates: { kind: LauncherKind; paths: string[] }[] = [
+      {
+        kind: 'official',
+        paths: [
+          pf86 && join(pf86, 'Minecraft Launcher', 'MinecraftLauncher.exe'),
+          pf && join(pf, 'Minecraft Launcher', 'MinecraftLauncher.exe'),
+          'C:\\Program Files (x86)\\Minecraft Launcher\\MinecraftLauncher.exe',
+          'C:\\Program Files\\Minecraft Launcher\\MinecraftLauncher.exe',
+        ].filter(Boolean) as string[],
+      },
+      { kind: 'pcl2', paths: scanDirs.map((d) => join(d, 'PCL2.exe')) },
+      {
+        kind: 'hmcl',
+        paths: scanDirs.flatMap((d) => {
+          try {
+            return nodeFs
+              .readdirSync(d)
+              .filter((f) => /^HMCL.*\.exe$/i.test(f))
+              .map((f) => join(d, f));
+          } catch { return []; }
+        }),
+      },
+    ];
+
+    for (const group of candidates) {
+      for (const p of group.paths) {
+        if (nodeFs.existsSync(p)) return { mcDir, modsDir, launcherExe: p, launcher: group.kind };
+      }
     }
-    return { mcDir, modsDir, launcherExe };
+    return { mcDir, modsDir, launcherExe: null, launcher: null };
   };
 
   ipcMain.handle(LOCATE_MC, (): LocateMcRes => {
-    const { mcDir, modsDir, launcherExe } = detectMinecraft();
-    return { found: !!mcDir, mcDir, modsDir, launcherExe, error: mcDir ? null : '未检测到 .minecraft 目录，请手动选择' };
+    const { mcDir, modsDir, launcherExe, launcher } = detectMinecraft();
+    return { found: !!mcDir, mcDir, modsDir, launcherExe, launcher, error: mcDir ? null : '未检测到 .minecraft 目录，请手动选择' };
   });
 
   ipcMain.handle(MC_CHOOSE_DIR, async (): Promise<McChooseDirRes> => {
@@ -617,13 +649,18 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
 
   ipcMain.handle(LAUNCH_MC, async (_e, raw: unknown): Promise<LaunchMcRes> => {
     const { mcDir: _mcDirOpt } = LaunchMcRequest.parse(raw);
-    const { launcherExe } = detectMinecraft();
+    const { launcherExe, launcher } = detectMinecraft();
     if (!launcherExe) {
-      return { ok: false, method: null, error: '未找到官方启动器（MinecraftLauncher.exe）。离线账号仍需官方启动器进游戏，请先安装 Minecraft。' };
+      return {
+        ok: false,
+        method: null,
+        launcher: null,
+        error: '未找到任何启动器（官方 / PCL2 / HMCL）。请安装其一，或点「手动选择 .minecraft」后用自己的启动器打开游戏。',
+      };
     }
-    // 离线账号：直接拉起官方启动器，由其离线档案进入游戏，无需微软 token
+    // 离线账号：直接拉起检测到的启动器，由其离线档案进入游戏，无需微软 token
     spawn(launcherExe, [], { detached: true, stdio: 'ignore' }).unref();
-    return { ok: true, method: 'launcher', error: null };
+    return { ok: true, method: 'launcher', launcher, error: null };
   });
 }
 

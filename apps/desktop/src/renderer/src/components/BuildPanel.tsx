@@ -10,6 +10,13 @@ function extractJarPath(log: string): string | null {
   return match ? match[0] : null;
 }
 
+/** 启动器种类 → 中文标签 */
+const LAUNCHER_LABEL: Record<string, string> = {
+  official: '官方启动器',
+  pcl2: 'PCL2',
+  hmcl: 'HMCL',
+};
+
 /** 逐行渲染日志：错误红色、警告黄色、其他默认 */
 function renderLog(log: string) {
   return log.split('\n').map((line, i) => {
@@ -134,7 +141,7 @@ export function BuildPanel() {
     const res = await ipcClient.chooseMcDir();
     if (res.path) {
       setMcDirOverride(res.path);
-      setMcInfo({ found: true, mcDir: res.path, modsDir: `${res.path}/mods`, launcherExe: null, error: null });
+      setMcInfo({ found: true, mcDir: res.path, modsDir: `${res.path}/mods`, launcherExe: null, launcher: null, error: null });
       setDeployErr(null);
     }
   };
@@ -151,7 +158,7 @@ export function BuildPanel() {
     setDeploying(true); setLaunchMsg(null); setDeployErr(null);
     try {
       const res = await ipcClient.launchMc(mcDirOverride ?? mcInfo?.mcDir ?? undefined);
-      if (res.ok) setLaunchMsg('已拉起官方启动器，用离线档案进游戏即可');
+      if (res.ok) setLaunchMsg(`已拉起${res.launcher ? (LAUNCHER_LABEL[res.launcher] ?? '启动器') : '启动器'}，用离线档案进游戏即可`);
       else setDeployErr(res.error ?? '启动失败');
     } catch (e) { setDeployErr((e as Error).message); } finally { setDeploying(false); }
   };
@@ -229,7 +236,9 @@ export function BuildPanel() {
           {mcInfo?.found && (
             <div className="text-xs text-mc-text-dim">
               .minecraft：{mcDirOverride ?? mcInfo.mcDir} ｜ mods：{mcInfo.modsDir ?? '—'}
-              {mcInfo.launcherExe ? ' ｜ 启动器已找到' : ' ｜ 未找到官方启动器'}
+              {mcInfo.launcher
+                ? ` ｜ 启动器：${LAUNCHER_LABEL[mcInfo.launcher] ?? '已找到'}`
+                : ' ｜ 未找到启动器（可手动选择 .minecraft 后用你自己的启动器）'}
             </div>
           )}
           {deployMsg && <div className="text-xs text-mc-gold">{deployMsg}</div>}

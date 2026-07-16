@@ -371,6 +371,7 @@ export const LocateMcResponse = z.object({
   mcDir: z.string().nullable(),
   modsDir: z.string().nullable(),
   launcherExe: z.string().nullable(),
+  launcher: z.enum(['official', 'pcl2', 'hmcl']).nullable(),
   error: z.string().nullable().optional(),
 });
 export type LocateMcRes = z.infer<typeof LocateMcResponse>;
@@ -394,6 +395,7 @@ export const LaunchMcRequest = z.object({ mcDir: z.string().optional() });
 export const LaunchMcResponse = z.object({
   ok: z.boolean(),
   method: z.string().nullable(),
+  launcher: z.enum(['official', 'pcl2', 'hmcl']).nullable(),
   error: z.string().nullable().optional(),
 });
 export type LaunchMcReq = z.infer<typeof LaunchMcRequest>;
