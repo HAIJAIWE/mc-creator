@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react';
 import { ActivityBar } from './components/ActivityBar.js';
 import { FileTree } from './components/FileTree.js';
-import { TabBar } from './components/TabBar.js';
-import { CodePreview } from './components/CodePreview.js';
+import { MiddlePanel } from './components/middle/MiddlePanel.js';
 import { AgentPanel } from './components/AgentPanel.js';
-import { LayoutLearner } from './components/LayoutLearner.js';
-import { LayoutConfig } from './components/LayoutConfig.js';
+import { TopToolbar } from './components/TopToolbar.js';
+import { SettingsPanel } from './components/SettingsPanel.js';
 import { ProjectSaveDialog } from './components/ProjectSaveDialog.js';
 import { TaskCompleteDialog } from './components/TaskCompleteDialog.js';
 import { Splitter } from './components/Splitter.js';
@@ -15,25 +14,14 @@ import { PackagesPanel } from './components/PackagesPanel.js';
 import { GitPanel } from './components/GitPanel.js';
 import { BlockEditor } from './components/BlockEditor.js';
 import { BuildPanel } from './components/BuildPanel.js';
-import { useModStore } from './store/mod-store.js';
+import { Dashboard } from './components/Dashboard.js';
+import { useProjectStore } from './store/project-store.js';
 
-type Activity = 'explorer' | 'search' | 'git' | 'packages' | 'learn' | 'settings' | 'items' | 'blocks';
+type Activity = 'explorer' | 'search' | 'git' | 'packages' | 'settings' | 'items' | 'blocks';
 
-/** 尚未实现的面板：做成有设计感的「敬请期待」，而非一片空白文字 */
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center animate-mc-panel-in">
-      <div className="flex h-12 w-12 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
-        <span className="text-lg font-bold text-mc-mute">?</span>
-      </div>
-      <div className="text-xs font-medium text-mc-dim">{label}</div>
-      <div className="text-xs text-mc-mute">敬请期待</div>
-    </div>
-  );
-}
-
-export default function App() {
-  const files = useModStore((s) => s.files);
+/** 工作台视图（三栏布局） */
+function Workbench() {
+  const backToDashboard = useProjectStore((s) => s.backToDashboard);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showTaskComplete, setShowTaskComplete] = useState(false);
   const [activeActivity, setActiveActivity] = useState<Activity>('explorer');
@@ -59,15 +47,13 @@ export default function App() {
         return <GitPanel />;
       case 'packages':
         return <PackagesPanel />;
-      case 'learn':
-        return <LayoutLearner />;
       case 'items':
         return <ItemRecipeEditor />;
       case 'blocks':
         return <BlockEditor />;
       case 'settings':
         return (
-          <LayoutConfig
+          <SettingsPanel
             leftWidth={leftWidth}
             rightWidth={rightWidth}
             onLeftWidthChange={setLeftWidth}
@@ -84,8 +70,11 @@ export default function App() {
       {/* 顶部草绿细条：品牌识别线 */}
       <div className="h-[3px] w-full bg-mc-accent shadow-[0_1px_0_0_rgb(0_0_0/0.4)]" />
 
+      {/* 顶部工具栏：项目菜单 + 全局设置 + API 状态 */}
+      <TopToolbar onOpenSettings={() => setActiveActivity('settings')} />
+
       <div className="flex flex-1 overflow-hidden">
-        <ActivityBar active={activeActivity} onChange={setActiveActivity} />
+        <ActivityBar active={activeActivity} onChange={setActiveActivity} onHome={backToDashboard} />
 
         <aside
           style={{ width: leftWidth }}
@@ -97,10 +86,7 @@ export default function App() {
         <Splitter onResize={handleLeftResize} />
 
         <main className="flex flex-1 flex-col overflow-hidden">
-          <TabBar />
-          <div className="flex-1 overflow-hidden">
-            <CodePreview />
-          </div>
+          <MiddlePanel />
           <BuildPanel />
         </main>
 
@@ -125,4 +111,11 @@ export default function App() {
       />
     </div>
   );
+}
+
+export default function App() {
+  // P1 修复：按 view 状态切换 Dashboard 首屏与工作台
+  const view = useProjectStore((s) => s.view);
+  if (view === 'dashboard') return <Dashboard />;
+  return <Workbench />;
 }
