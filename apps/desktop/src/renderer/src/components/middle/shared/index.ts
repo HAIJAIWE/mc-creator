@@ -3,3 +3,4 @@ export type { Column } from './DataTable.js';
 export { PanelHeader } from './PanelHeader.js';
 export { SearchInput } from './SearchInput.js';
 export { EmptyState } from './EmptyState.js';
+export { FieldGroup, TextField, NumberField, SelectField, ToggleField } from './FormField.js';
