@@ -7,6 +7,8 @@ import { ModPreviewPanel } from './ModPreviewPanel.js';
 import { DatapackPreviewPanel } from './DatapackPreviewPanel.js';
 import { ModpackPreviewPanel } from './ModpackPreviewPanel.js';
 import { LauncherPreviewPanel } from './LauncherPreviewPanel.js';
+import { ResourcePackPreviewPanel } from './ResourcePackPreviewPanel.js';
+import { SkinPreviewPanel } from './SkinPreviewPanel.js';
 import { useModStore } from '../../store/mod-store.js';
 import type { GeneratorType } from '@mc-creator/shared';
 
@@ -14,7 +16,7 @@ type MiddleTab = 'preview' | 'code';
 
 /**
  * 中间面板调度器：顶部 tab 切换（预览/代码），预览 tab 按 generatorType 分发到对应面板。
- * 阶段 3 已实现 server/mod/datapack/modpack/launcher 面板，其余类型暂显示"开发中"占位。
+ * 阶段 4 已实现全部 7 种类型（server/mod/datapack/modpack/resource_pack/skin/launcher）。
  */
 export function MiddlePanel() {
   const [activeTab, setActiveTab] = useState<MiddleTab>('preview');
@@ -33,8 +35,9 @@ export function MiddlePanel() {
       case 'launcher':
         return <LauncherPreviewPanel />;
       case 'resource_pack':
+        return <ResourcePackPreviewPanel />;
       case 'skin':
-        return <PlaceholderPanel type={generatorType} />;
+        return <SkinPreviewPanel />;
       default:
         return <PlaceholderPanel type={generatorType} />;
     }
@@ -85,7 +88,7 @@ export function MiddlePanel() {
   );
 }
 
-/** 占位面板：阶段 2-4 实现其他类型时移除 */
+/** 占位面板：default 分支兜底，正常不会触发 */
 function PlaceholderPanel({ type }: { type: GeneratorType }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-mc-bg">
