@@ -26,18 +26,21 @@ export function SkinPreviewPanel() {
   // 2D 视图背景色切换
   const [bgColor, setBgColor] = useState<'#1a1a1a' | '#3a3a3a' | '#ffffff'>('#1a1a1a');
 
+  // 从 files 找皮肤 PNG（路径是 ${playerName}.png）
+  // 注意：useMemo 必须在 early return 之前调用，否则 hooks 数量会随 spec 变化
+  const skinUrl = useMemo(() => {
+    if (!spec) return null;
+    const skinSpec = spec as unknown as SkinSpec;
+    const file = files.find((f) => f.path === `${skinSpec.playerName}.png`);
+    if (!file) return null;
+    return `data:image/png;base64,${file.content}`;
+  }, [files, spec]);
+
   if (!spec) {
     return <EmptyState icon="box" title="尚未生成皮肤 Spec" hint="在右侧 AgentPanel 描述你想要的皮肤，生成 Spec 后即可预览" />;
   }
 
   const skin = spec as unknown as SkinSpec;
-
-  // 从 files 找皮肤 PNG（路径是 ${playerName}.png）
-  const skinUrl = useMemo(() => {
-    const file = files.find((f) => f.path === `${skin.playerName}.png`);
-    if (!file) return null;
-    return `data:image/png;base64,${file.content}`;
-  }, [files, skin.playerName]);
 
   const updateField = <K extends keyof SkinSpec>(key: K, value: SkinSpec[K]) => {
     const updated = { ...skin, [key]: value };

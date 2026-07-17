@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 /** 表单分组容器 */
 export function FieldGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -12,10 +14,12 @@ export function FieldGroup({ title, children }: { title: string; children: React
 
 /** 文本输入字段 */
 export function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const id = useId();
   return (
     <div className="flex items-center gap-3">
-      <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
+      <label htmlFor={id} className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
       <input
+        id={id}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -25,17 +29,32 @@ export function TextField({ label, value, onChange }: { label: string; value: st
   );
 }
 
-/** 数字输入字段 */
+/** 数字输入字段（clamp 到 [min, max]，允许清空回退到 min） */
 export function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
+  const id = useId();
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '' || raw === '-') {
+      onChange(min);
+      return;
+    }
+    const num = parseInt(raw, 10);
+    if (Number.isNaN(num)) {
+      onChange(min);
+      return;
+    }
+    onChange(Math.max(min, Math.min(max, num)));
+  };
   return (
     <div className="flex items-center gap-3">
-      <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
+      <label htmlFor={id} className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
       <input
+        id={id}
         type="number"
         value={value}
         min={min}
         max={max}
-        onChange={(e) => onChange(parseInt(e.target.value) || min)}
+        onChange={handleChange}
         className="mc-input w-24 !py-1 !text-xs"
       />
     </div>
@@ -44,10 +63,12 @@ export function NumberField({ label, value, min, max, onChange }: { label: strin
 
 /** 下拉选择字段 */
 export function SelectField({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }) {
+  const id = useId();
   return (
     <div className="flex items-center gap-3">
-      <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
+      <label htmlFor={id} className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="mc-select flex-1 !py-1 !text-xs"
@@ -62,10 +83,16 @@ export function SelectField({ label, value, options, onChange }: { label: string
 
 /** 开关字段 */
 export function ToggleField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  const id = useId();
   return (
     <div className="flex items-center gap-3">
-      <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
+      <label htmlFor={id} className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
       <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={value}
+        aria-label={label}
         onClick={() => onChange(!value)}
         className={`relative h-5 w-9 rounded-full transition-colors ${value ? 'bg-mc-accent' : 'bg-mc-surface-3'}`}
       >
