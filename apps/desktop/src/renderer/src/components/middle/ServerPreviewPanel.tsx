@@ -1,7 +1,7 @@
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { useModStore } from '../../store/mod-store.js';
-import { FieldGroup, TextField, NumberField, SelectField, ToggleField } from './shared/index.js';
+import { EmptyState, FieldGroup, TextField, NumberField, SelectField, ToggleField } from './shared/index.js';
 import type { ServerSpec } from '@mc-creator/shared';
 
 /**
@@ -15,15 +15,7 @@ export function ServerPreviewPanel() {
   );
 
   if (!spec) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-mc-bg">
-        <div className="flex h-16 w-16 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
-          <McIcon scope="pixel" name="server" size={32} className="text-mc-mute" />
-        </div>
-        <div className="text-sm font-medium text-mc-dim">尚未生成 Server Spec</div>
-        <div className="text-xs text-mc-mute">在右侧 AgentPanel 描述你想要的服务器，生成 Spec 后即可预览</div>
-      </div>
-    );
+    return <EmptyState icon="server" title="尚未生成 Server Spec" hint="在右侧 AgentPanel 描述你想要的服务器，生成 Spec 后即可预览" />;
   }
 
   const server = spec as unknown as ServerSpec;

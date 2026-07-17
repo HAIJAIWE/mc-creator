@@ -46,8 +46,11 @@ export function MiddlePanel() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Tab 切换栏 */}
-      <div className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1">
+      <div role="tablist" aria-label="中间面板视图切换" className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1">
         <button
+          role="tab"
+          aria-selected={activeTab === 'preview'}
+          tabIndex={activeTab === 'preview' ? 0 : -1}
           onClick={() => setActiveTab('preview')}
           className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
             activeTab === 'preview'
@@ -59,6 +62,9 @@ export function MiddlePanel() {
           预览
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'code'}
+          tabIndex={activeTab === 'code' ? 0 : -1}
           onClick={() => setActiveTab('code')}
           className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
             activeTab === 'code'

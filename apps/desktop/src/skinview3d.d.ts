@@ -15,11 +15,18 @@ declare module 'skinview3d' {
     model?: 'classic' | 'slim';
   }
 
+  /** 动画基类 */
+  export abstract class SkinViewerAnimation {
+    speed: number;
+    paused: boolean;
+    progress: number;
+  }
+
   export class SkinViewer {
     constructor(options: SkinViewerOptions);
     autoRotate: boolean;
     autoRotateSpeed: number;
-    animation: unknown;
+    animation: SkinViewerAnimation | null;
     loadSkin(url: string, options?: { model?: 'classic' | 'slim' }): void;
     loadCape(url: string): void;
     resetCape(): void;
@@ -30,26 +37,10 @@ declare module 'skinview3d' {
     rendered: boolean;
   }
 
-  export class WalkingAnimation {
-    speed: number;
-    paused: boolean;
-    progress: number;
-  }
-
-  export class IdleAnimation {
-    speed: number;
-    paused: boolean;
-  }
-
-  export class RunningAnimation {
-    speed: number;
-    paused: boolean;
-  }
-
-  export class FlyingAnimation {
-    speed: number;
-    paused: boolean;
-  }
+  export class WalkingAnimation extends SkinViewerAnimation {}
+  export class IdleAnimation extends SkinViewerAnimation {}
+  export class RunningAnimation extends SkinViewerAnimation {}
+  export class FlyingAnimation extends SkinViewerAnimation {}
 
   export type ModelType = 'classic' | 'slim';
 }

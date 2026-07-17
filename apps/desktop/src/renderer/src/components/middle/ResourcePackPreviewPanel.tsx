@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
 import { DataTable, PanelHeader, SearchInput, EmptyState } from './shared/index.js';
@@ -28,6 +28,12 @@ export function ResourcePackPreviewPanel() {
   );
   const [tab, setTab] = useState<Tab>('textures');
 
+  const fileMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const f of files) m.set(f.path, f.content);
+    return m;
+  }, [files]);
+
   if (!spec) {
     return <EmptyState icon="box" title="尚未生成资源包 Spec" hint="在右侧 AgentPanel 描述你想要的资源包，生成 Spec 后即可预览" />;
   }
@@ -48,10 +54,13 @@ export function ResourcePackPreviewPanel() {
       />
 
       {/* Tab 切换栏 */}
-      <div className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1">
+      <div role="tablist" aria-label="资源包分类" className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1">
         {TABS.map((t) => (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            tabIndex={tab === t.id ? 0 : -1}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
               tab === t.id
@@ -67,8 +76,8 @@ export function ResourcePackPreviewPanel() {
 
       {/* Tab 内容 */}
       <div className="flex-1 overflow-y-auto">
-        {tab === 'textures' && <TexturesTab pack={pack} files={files} />}
-        {tab === 'sounds' && <SoundsTab pack={pack} files={files} />}
+        {tab === 'textures' && <TexturesTab pack={pack} fileMap={fileMap} />}
+        {tab === 'sounds' && <SoundsTab pack={pack} fileMap={fileMap} />}
         {tab === 'models' && <ModelsTab pack={pack} />}
         {tab === 'lang' && <LangTab pack={pack} />}
       </div>
@@ -83,11 +92,11 @@ export function ResourcePackPreviewPanel() {
 
 // ===== Textures tab =====
 
-function TexturesTab({ pack, files }: { pack: ResourcePackSpecType; files: { path: string; content: string }[] }) {
+function TexturesTab({ pack, fileMap }: { pack: ResourcePackSpecType; fileMap: Map<string, string> }) {
   const dataUrl = (entry: TextureOverrideEntry): string | null => {
-    const file = files.find((f) => f.path === `assets/minecraft/textures/${entry.path}.png`);
-    if (!file) return null;
-    return `data:image/png;base64,${file.content}`;
+    const content = fileMap.get(`assets/minecraft/textures/${entry.path}.png`);
+    if (!content) return null;
+    return `data:image/png;base64,${content}`;
   };
 
   if (pack.textureOverrides.length === 0) {
@@ -120,7 +129,7 @@ function TexturesTab({ pack, files }: { pack: ResourcePackSpecType; files: { pat
 
 // ===== Sounds tab =====
 
-function SoundsTab({ pack, files }: { pack: ResourcePackSpecType; files: { path: string; content: string }[] }) {
+function SoundsTab({ pack, fileMap }: { pack: ResourcePackSpecType; fileMap: Map<string, string> }) {
   if (pack.sounds.length === 0) {
     return <div className="px-3 py-6 text-center text-xs text-mc-mute">暂无音效</div>;
   }
@@ -128,28 +137,42 @@ function SoundsTab({ pack, files }: { pack: ResourcePackSpecType; files: { path:
   return (
     <div className="flex flex-col gap-1 p-3">
       {pack.sounds.map((entry, idx) => (
-        <SoundRow key={`${entry.id}-${idx}`} entry={entry} pack={pack} files={files} />
+        <SoundRow key={`${entry.id}-${idx}`} entry={entry} pack={pack} fileMap={fileMap} />
       ))}
     </div>
   );
 }
 
-function SoundRow({ entry, pack, files }: { entry: SoundEntry; pack: ResourcePackSpecType; files: { path: string; content: string }[] }) {
+function SoundRow({ entry, pack, fileMap }: { entry: SoundEntry; pack: ResourcePackSpecType; fileMap: Map<string, string> }) {
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [duration, setDuration] = useState<string>('—');
   const [playing, setPlaying] = useState(false);
 
   const audioUrl = useMemo(() => {
-    const file = files.find((f) => f.path === `assets/${pack.namespace}/sounds/${entry.id}.ogg`);
-    if (!file || !file.content) return null;
-    return `data:audio/ogg;base64,${file.content}`;
-  }, [files, pack.namespace, entry.id]);
+    const content = fileMap.get(`assets/${pack.namespace}/sounds/${entry.id}.ogg`);
+    if (!content) return null;
+    return `data:audio/ogg;base64,${content}`;
+  }, [fileMap, pack.namespace, entry.id]);
+
+  // audioUrl 变化时重置 UI 状态
+  useEffect(() => {
+    setPlaying(false);
+    setDuration('—');
+  }, [audioUrl]);
+
+  // 组件卸载时停止播放
+  useEffect(() => {
+    return () => {
+      audio?.pause();
+    };
+  }, [audio]);
 
   const togglePlay = () => {
     if (!audio) return;
     if (audio.paused) {
-      audio.play();
-      setPlaying(true);
+      audio.play()
+        .then(() => setPlaying(true))
+        .catch(() => setPlaying(false));
     } else {
       audio.pause();
       setPlaying(false);

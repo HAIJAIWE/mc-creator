@@ -3,8 +3,16 @@ import { shallow } from 'zustand/shallow';
 import { SkinViewer, WalkingAnimation } from 'skinview3d';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { useModStore } from '../../store/mod-store.js';
-import { EmptyState, FieldGroup } from './shared/index.js';
+import { EmptyState, FieldGroup, TextField, SelectField } from './shared/index.js';
 import type { SkinSpec } from '@mc-creator/shared';
+
+/** 标准 Minecraft 皮肤 UV 坐标（基于 64x64 像素图），模块级常量 */
+const BASE_SKIN_REGIONS = [
+  { x: 8, y: 8, w: 8, h: 8, label: '头', color: 'rgba(224, 172, 105, 0.4)' },
+  { x: 20, y: 20, w: 8, h: 12, label: '身体', color: 'rgba(25, 166, 255, 0.4)' },
+  { x: 44, y: 20, w: 4, h: 12, label: '右臂', color: 'rgba(49, 39, 24, 0.5)' },
+  { x: 36, y: 52, w: 4, h: 12, label: '右腿', color: 'rgba(60, 42, 30, 0.5)' },
+] as const;
 
 /**
  * Skin 预览面板：
@@ -112,26 +120,20 @@ export function SkinPreviewPanel() {
       {/* Footer：颜色与字段编辑表单 */}
       <div className="max-h-64 overflow-y-auto border-t border-mc-border p-4">
         <FieldGroup title="基本">
-          <div className="flex items-center gap-3">
-            <label className="w-28 shrink-0 text-xs text-mc-dim">玩家名</label>
-            <input
-              type="text"
-              value={skin.playerName}
-              onChange={(e) => updateField('playerName', e.target.value)}
-              className="mc-input flex-1 !py-1 !text-xs"
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="w-28 shrink-0 text-xs text-mc-dim">模型</label>
-            <select
-              value={skin.model}
-              onChange={(e) => updateField('model', e.target.value as SkinSpec['model'])}
-              className="mc-select flex-1 !py-1 !text-xs"
-            >
-              <option value="classic">Classic (Steve)</option>
-              <option value="slim">Slim (Alex)</option>
-            </select>
-          </div>
+          <TextField
+            label="玩家名"
+            value={skin.playerName}
+            onChange={(v) => updateField('playerName', v)}
+          />
+          <SelectField
+            label="模型"
+            value={skin.model}
+            options={[
+              { value: 'classic', label: 'Classic (Steve)' },
+              { value: 'slim', label: 'Slim (Alex)' },
+            ]}
+            onChange={(v) => updateField('model', v as SkinSpec['model'])}
+          />
         </FieldGroup>
 
         <div className="mt-4">
@@ -202,17 +204,10 @@ interface Skin2DOverlayProps {
 
 /** 2D 皮肤 PNG + 半透明色块标注身体部位（基于 64x64 标准 UV 布局） */
 function Skin2DOverlay({ skinUrl, model }: Skin2DOverlayProps) {
-  // 标准 Minecraft 皮肤 UV 坐标（基于 64x64 像素图）
-  const regions: Array<{ x: number; y: number; w: number; h: number; label: string; color: string }> = [
-    { x: 8, y: 8, w: 8, h: 8, label: '头', color: 'rgba(224, 172, 105, 0.4)' },
-    { x: 20, y: 20, w: 8, h: 12, label: '身体', color: 'rgba(25, 166, 255, 0.4)' },
-    { x: 44, y: 20, w: 4, h: 12, label: '右臂', color: 'rgba(49, 39, 24, 0.5)' },
-    { x: 36, y: 52, w: 4, h: 12, label: '右腿', color: 'rgba(60, 42, 30, 0.5)' },
-  ];
-  // slim 模型手臂宽度为 3 而非 4
-  if (model === 'slim') {
-    regions[2].w = 3;
-  }
+  const regions = useMemo(
+    () => BASE_SKIN_REGIONS.map((r, i) => (i === 2 && model === 'slim' ? { ...r, w: 3 } : r)),
+    [model],
+  );
 
   // 显示尺寸：每个像素放大 3 倍（64x64 → 192x192）
   const scale = 3;
