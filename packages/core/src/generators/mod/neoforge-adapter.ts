@@ -182,7 +182,7 @@ description = "${spec.description}"
     return { path: 'src/main/resources/META-INF/mods.toml', content };
   }
 
-  private buildGradle(spec: ModSpecLike, mcVersion: string): FileNode {
+  private buildGradle(spec: ModSpecLike, _mcVersion: string): FileNode {
     const content = `plugins {
     id 'net.neoforged.moddev' version '1.0.21'
 }

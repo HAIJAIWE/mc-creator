@@ -57,7 +57,6 @@ describe('FabricAdapter 元数据与构建脚本', () => {
 describe('FabricAdapter Java 入口与注册代码', () => {
   const adapter = new FabricAdapter();
   const files = adapter.translate(CTX);
-  const paths = files.map((f) => f.path);
 
   it('生成 ModInitializer 主类', () => {
     const main = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java');

@@ -65,7 +65,7 @@ export class QuiltAdapter extends FabricAdapter {
   }
 
   /** 生成 build.gradle（用 org.quiltmc.loom 代替 fabric-loom，依赖改 quilt 系列） */
-  private quiltBuildGradle(spec: ModSpec, mcVersion: string): FileNode {
+  private quiltBuildGradle(_spec: ModSpec, _mcVersion: string): FileNode {
     const content = `plugins {
     id 'org.quiltmc.loom' version '1.7-SNAPSHOT'
     id 'java'

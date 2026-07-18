@@ -92,7 +92,7 @@ export class FabricAdapter implements LoaderAdapter {
     };
   }
 
-  private buildGradle(spec: ModSpecLike, mcVersion: string): FileNode {
+  private buildGradle(_spec: ModSpecLike, _mcVersion: string): FileNode {
     const content = `plugins {
     id 'fabric-loom' version '1.7-SNAPSHOT'
     id 'java'
@@ -176,7 +176,7 @@ public class ${mainCls} implements ModInitializer {
     };
   }
 
-  private modItemsJava(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
+  private modItemsJava(spec: ModSpecLike, pkg: string, _mainCls: string): FileNode {
     const fields = spec.items
       .map((it) => `    public static Item ${it.id.toUpperCase()};`)
       .join('\n');
@@ -207,7 +207,7 @@ ${regs}
     };
   }
 
-  private modBlocksJava(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
+  private modBlocksJava(spec: ModSpecLike, pkg: string, _mainCls: string): FileNode {
     const fields = spec.blocks
       .map((b) => `    public static Block ${b.id.toUpperCase()};`)
       .join('\n');

@@ -38,7 +38,7 @@ export class LegacyFabricAdapter extends FabricAdapter {
   }
 
   /** 生成 build.gradle（旧版 fabric-loom 0.5-SNAPSHOT + Yarn mappings + Java 1.8） */
-  private legacyBuildGradle(spec: ModSpec, mcVersion: string): FileNode {
+  private legacyBuildGradle(_spec: ModSpec, _mcVersion: string): FileNode {
     const content = `plugins {
     id 'fabric-loom' version '0.5-SNAPSHOT'
     id 'java'

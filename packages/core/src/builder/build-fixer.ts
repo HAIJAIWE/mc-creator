@@ -2,8 +2,17 @@ import type { ModelProvider } from '../model-provider/types.js';
 import { runGradleBuild, type BuildResult } from './gradle.js';
 import { parseGradleErrors, type BuildError } from './log-parser.js';
 import type { Filesystem } from '../filesystem/index.js';
+import { resolve, relative } from 'node:path';
 
 const MAX_FIX_ATTEMPTS = 3;
+
+/** 校验 target 解析后仍位于 base 目录内，防止 AI 输出的路径穿越（如 ../../etc/passwd）。 */
+function assertWithin(base: string, target: string): void {
+  const rel = relative(resolve(base), resolve(base, target));
+  if (rel.startsWith('..')) {
+    throw new Error(`非法路径：${target} 逃逸出受控目录 ${base}`);
+  }
+}
 
 /** 修复循环结果 */
 export interface FixResult {
@@ -75,10 +84,12 @@ ${descriptions}
       const content = blocks[i + 1]?.trim() ?? '';
       const fullPath = `${projectPath}/${filePath}`;
       try {
+        // P0 安全：校验 AI 输出的 filePath 未逃逸出 projectPath
+        assertWithin(projectPath, filePath);
         await this.fs.writeFile(fullPath, content);
         fixedCount++;
       } catch {
-        // 跳过无法写入的文件
+        // 跳过无法写入或非法路径的文件
       }
     }
 
