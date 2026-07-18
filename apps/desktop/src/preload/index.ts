@@ -12,7 +12,11 @@ import {
   CHAT_STREAM_CHUNK,
   EXPLAIN_CODE,
   EXPLAIN_CODE_CHUNK,
+  COMPARE_MODELS,
+  COMPARE_MODELS_CHUNK,
   BUILD_WITH_FIX,
+  AI_FIX_SUGGEST,
+  AI_FIX_SUGGEST_CHUNK,
   BUILD_STREAM,
   BUILD_STREAM_CHUNK,
   LIST_PROJECTS,
@@ -77,6 +81,37 @@ const api = {
     ipcRenderer.on(EXPLAIN_CODE_CHUNK, handler);
     ipcRenderer.invoke(EXPLAIN_CODE, { fileName, code, generatorType }).finally(() => {
       ipcRenderer.removeListener(EXPLAIN_CODE_CHUNK, handler);
+    });
+  },
+  compareModels: (
+    req: {
+      description: string;
+      generatorType: string;
+      models: { name: string; modelId: string; baseURL: string; apiKey: string }[];
+    },
+    onChunk: (data: { modelName: string; delta: string; done: boolean }) => void,
+  ) => {
+    const handler = (_e: unknown, data: { modelName: string; delta: string; done: boolean }) => {
+      onChunk(data);
+      if (data.done) ipcRenderer.removeListener(COMPARE_MODELS_CHUNK, handler);
+    };
+    ipcRenderer.on(COMPARE_MODELS_CHUNK, handler);
+    ipcRenderer.invoke(COMPARE_MODELS, req).finally(() => {
+      ipcRenderer.removeListener(COMPARE_MODELS_CHUNK, handler);
+    });
+  },
+  fixSuggest: (
+    buildLog: string,
+    files: { path: string; content: string }[],
+    onChunk: (delta: string, done: boolean) => void,
+  ) => {
+    const handler = (_e: unknown, data: { delta: string; done: boolean }) => {
+      onChunk(data.delta, data.done);
+      if (data.done) ipcRenderer.removeListener(AI_FIX_SUGGEST_CHUNK, handler);
+    };
+    ipcRenderer.on(AI_FIX_SUGGEST_CHUNK, handler);
+    ipcRenderer.invoke(AI_FIX_SUGGEST, { buildLog, files }).finally(() => {
+      ipcRenderer.removeListener(AI_FIX_SUGGEST_CHUNK, handler);
     });
   },
   buildWithFix: (projectPath: string) => ipcRenderer.invoke(BUILD_WITH_FIX, { projectPath }),

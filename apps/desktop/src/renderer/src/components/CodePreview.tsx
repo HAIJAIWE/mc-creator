@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import Editor from '@monaco-editor/react';
-import { Loader2, Sparkles, X } from 'lucide-react';
+import Editor, { DiffEditor } from '@monaco-editor/react';
+import { GitCompare, Loader2, Sparkles, X } from 'lucide-react';
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModStore } from '../store/mod-store.js';
@@ -87,9 +87,10 @@ function computeDefaultName(generatorType: GeneratorType, spec: unknown): string
 
 export function CodePreview() {
   // P3 性能：shallow 选择器避免 buildLog 流式更新触发重渲染
-  const { files, selectedFile, generatorType, spec } = useModStore(
+  const { files, previousFiles, selectedFile, generatorType, spec } = useModStore(
     (s) => ({
       files: s.files,
+      previousFiles: s.previousFiles,
       selectedFile: s.selectedFile,
       generatorType: s.generatorType,
       spec: s.spec,
@@ -104,6 +105,8 @@ export function CodePreview() {
   const [isExplaining, setIsExplaining] = useState(false);
   const [explanation, setExplanation] = useState('');
   const [showExplanation, setShowExplanation] = useState(false);
+  // 差异对比：显示 DiffEditor
+  const [showDiff, setShowDiff] = useState(false);
 
   // P3 性能：仅 files/selectedFile 变化时重算 file，避免每次渲染都 O(n) find
   const file = useMemo(() => files.find((f) => f.path === selectedFile), [files, selectedFile]);
@@ -111,6 +114,9 @@ export function CodePreview() {
   const fileIconName = file ? getFileIcon(file.path) : 'file';
   // 仅文本文件且非空时才允许解释（PNG 走预览，空文件无内容可解释）
   const canExplain = !!file && !isPng && file.content.length > 0;
+  // 差异对比：仅当有 previousFiles 且当前文件不是 PNG 时可用
+  const canDiff = !!file && !isPng && previousFiles.length > 0;
+  const originalContent = previousFiles.find((f) => f.path === selectedFile)?.content ?? '';
 
   const handleExport = async () => {
     if (files.length === 0) return;
@@ -185,7 +191,17 @@ export function CodePreview() {
           {exportMsg?.type === 'error' && (
             <span className="max-w-xs truncate text-xs text-mc-redstone">{exportMsg.text}</span>
           )}
-          {canExplain && (
+          {canDiff && (
+            <button
+              onClick={() => setShowDiff((v) => !v)}
+              className={showDiff ? 'mc-btn-primary' : 'mc-btn-ghost'}
+              title="对比当前文件与上一版本的差异"
+            >
+              <GitCompare className="h-3 w-3" />
+              差异对比
+            </button>
+          )}
+          {canExplain && !showDiff && (
             <button
               onClick={handleExplain}
               disabled={isExplaining}
@@ -227,17 +243,34 @@ export function CodePreview() {
             className="min-h-0 overflow-hidden"
             style={{ flex: showExplanation ? '3 1 0%' : '1 1 0%' }}
           >
-            <Editor
-              height="100%"
-              path={file.path}
-              language={lang}
-              theme={MC_MONACO_THEME}
-              onMount={defineMcMonacoTheme}
-              value={file.content}
-              options={{ ...mcEditorOptions, readOnly: true }}
-            />
+            {showDiff ? (
+              <DiffEditor
+                height="100%"
+                language={lang}
+                theme={MC_MONACO_THEME}
+                original={originalContent}
+                modified={file.content}
+                options={{
+                  readOnly: true,
+                  renderSideBySide: true,
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  minimap: { enabled: false },
+                }}
+              />
+            ) : (
+              <Editor
+                height="100%"
+                path={file.path}
+                language={lang}
+                theme={MC_MONACO_THEME}
+                onMount={defineMcMonacoTheme}
+                value={file.content}
+                options={{ ...mcEditorOptions, readOnly: true }}
+              />
+            )}
           </div>
-          {showExplanation && (
+          {showExplanation && !showDiff && (
             <div
               className="flex min-h-0 flex-col border-t border-mc-border bg-mc-surface"
               style={{ flex: '2 1 0%' }}

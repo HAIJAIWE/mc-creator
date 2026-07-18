@@ -8,6 +8,7 @@ import {
   LauncherSpec,
   KubejsSpec,
   CraftTweakerSpec,
+  BehaviorPackSpec,
   type ModSpec as ModSpecType,
 } from '@mc-creator/shared';
 import type { ModelProvider } from '../model-provider/types.js';
@@ -25,7 +26,8 @@ export type SpecType =
   | 'skin'
   | 'launcher'
   | 'kubejs'
-  | 'crafttweaker';
+  | 'crafttweaker'
+  | 'behavior_pack';
 
 interface SpecConfig {
   schema: ZodTypeAny;
@@ -190,6 +192,23 @@ Schema 字段：
 注意：CraftTweaker 使用 ZenScript 语法（不是 JavaScript），物品引用用 <minecraft:diamond> 形式。
 不要包含 registry 字段（CraftTweaker 注册表语法复杂，暂不支持）。
 handler 字段是 ZenScript 代码字符串（不带 function 包裹），会被嵌入到事件回调函数体中。
+只输出 JSON，不要解释。`,
+  },
+  behavior_pack: {
+    schema: BehaviorPackSpec,
+    prompt: `你是 Minecraft 基岩版行为包规格生成器。根据描述生成 BehaviorPackSpec JSON。
+Schema 字段：
+- packId: 小写下划线 ^[a-z0-9_]+$
+- packName: 显示名
+- description: 描述
+- packFormat: 数字（基岩版默认 2）
+- mcVersion: 版本数组 [1,0,0]
+- header: 包头信息（name, description, uuid, version, min_engine_version）
+- dependencies[]: 依赖包（uuid, version）
+- entities[]: 实体行为（identifier 如 namespace:entity_id, components{} 组件, events{} 事件, description_groups[]）
+- recipes[]: 配方（identifier 如 namespace:recipe_id, type shaped_crafting/shapeless_crafting/furnace, result, count, pattern[], key{}, items[]）
+- lootTables[]: 战利品表（path 如 entities/zombie, pools[]{rolls, entries[]{type, name, weight, count}}）
+identifier 使用 namespace:id 格式。components 使用基岩版组件名如 minecraft:health、minecraft:attack_damage 等。
 只输出 JSON，不要解释。`,
   },
 };

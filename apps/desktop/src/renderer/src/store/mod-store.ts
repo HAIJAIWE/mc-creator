@@ -18,6 +18,7 @@ interface ModState {
   // 产出
   spec: ModSpec | null;
   files: FileNode[];
+  previousFiles: FileNode[];
   selectedFile: string | null;
   // 构建
   buildLog: string;
@@ -39,6 +40,7 @@ interface ModState {
   setBuildResult: (r: { success: boolean; log: string; jarPath: string | null }) => void;
   setLoading: (b: boolean) => void;
   setError: (e: string | null) => void;
+  clearPreviousFiles: () => void;
   // 方块 / 物品编辑器
   addItem: (item: ItemSpec) => void;
   removeItem: (id: string) => void;
@@ -51,6 +53,7 @@ export const useModStore = create<ModState>((set, get) => ({
   generatorType: 'mod',
   spec: null,
   files: [],
+  previousFiles: [],
   selectedFile: null,
   buildLog: '',
   buildSuccess: null,
@@ -76,7 +79,12 @@ export const useModStore = create<ModState>((set, get) => ({
       });
     }
   },
-  setFiles: (f) => set({ files: f, selectedFile: f[0]?.path ?? null }),
+  setFiles: (f) =>
+    set((state) => ({
+      previousFiles: state.files.length > 0 ? [...state.files] : state.previousFiles,
+      files: f,
+      selectedFile: f[0]?.path ?? null,
+    })),
   selectFile: (p) => set({ selectedFile: p }),
   closeFile: (p) =>
     set((state) => ({
@@ -89,6 +97,7 @@ export const useModStore = create<ModState>((set, get) => ({
   setBuildResult: (r) => set({ buildSuccess: r.success, buildLog: r.log, jarPath: r.jarPath }),
   setLoading: (b) => set({ loading: b }),
   setError: (e) => set({ error: e }),
+  clearPreviousFiles: () => set({ previousFiles: [] }),
   addItem: (item) =>
     set((state) => {
       const base = state.spec ?? ModSpec.parse({ modId: 'mc_creator', name: 'My Mod' });

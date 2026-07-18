@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { shallow } from 'zustand/shallow';
+import { Wrench, X, Loader2 } from 'lucide-react';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
@@ -61,6 +62,12 @@ export function BuildPanel() {
   const [deployErr, setDeployErr] = useState<string | null>(null);
   const [launchMsg, setLaunchMsg] = useState<string | null>(null);
 
+  // AI 修复建议状态
+  const [showFixSuggest, setShowFixSuggest] = useState(false);
+  const [fixSuggestion, setFixSuggestion] = useState('');
+  const [isFixSuggesting, setIsFixSuggesting] = useState(false);
+  const fixSuggestionRef = useRef('');
+
   const toAbs = (root: string, p: string | null): string | null =>
     !p ? null : p.includes(':') || p.startsWith('/') ? p : `${root}/${p}`;
 
@@ -68,6 +75,8 @@ export function BuildPanel() {
     setLoading(true);
     setError(null);
     setFixLog([]);
+    setShowFixSuggest(false);
+    setFixSuggestion('');
     try {
       // P22-4：先把内存中的 files 写入临时目录，再用该路径构建（避免硬编码 /tmp/mc-mod）
       const { projectPath } = await ipcClient.prepareBuildDir(files);
@@ -123,6 +132,36 @@ export function BuildPanel() {
     }
   };
 
+  const handleFixSuggest = () => {
+    const log = streamLog || buildLog;
+    if (!log) return;
+    setShowFixSuggest(true);
+    setFixSuggestion('');
+    fixSuggestionRef.current = '';
+    setIsFixSuggesting(true);
+
+    // 只取前 5 个主要文件，内容截断到 2000 字符
+    const filesPreview = files.slice(0, 5).map((f) => ({
+      path: f.path,
+      content: f.content.slice(0, 2000),
+    }));
+
+    ipcClient.fixSuggest(log, filesPreview, (delta: string, done: boolean) => {
+      fixSuggestionRef.current += delta;
+      setFixSuggestion(fixSuggestionRef.current);
+      if (done) {
+        setIsFixSuggesting(false);
+      }
+    });
+  };
+
+  const closeFixSuggest = () => {
+    setShowFixSuggest(false);
+    setFixSuggestion('');
+    fixSuggestionRef.current = '';
+    setIsFixSuggesting(false);
+  };
+
   const clearStreamLog = () => {
     setStreamLog('');
     streamLogRef.current = '';
@@ -134,6 +173,7 @@ export function BuildPanel() {
     setDeployMsg(null);
     setDeployErr(null);
     setLaunchMsg(null);
+    closeFixSuggest();
   };
 
   const detectMc = async () => {
@@ -223,7 +263,21 @@ export function BuildPanel() {
 
       {/* 一次性构建结果提示 */}
       {buildSuccess === true && <span className="text-sm text-mc-accent">编译成功！</span>}
-      {buildSuccess === false && <span className="text-sm text-mc-redstone">编译失败</span>}
+      {buildSuccess === false && (
+        <span className="text-sm text-mc-redstone">
+          编译失败
+          {!showFixSuggest && (
+            <button
+              onClick={handleFixSuggest}
+              disabled={isFixSuggesting}
+              className="ml-2 inline-flex items-center gap-1 text-xs text-mc-gold hover:underline"
+            >
+              <Wrench className="h-3 w-3" />
+              AI 诊断修复
+            </button>
+          )}
+        </span>
+      )}
       {jarPath && <span className="text-xs text-mc-text-dim">产物：{jarPath}</span>}
 
       {/* 流式构建结果提示 */}
@@ -238,6 +292,55 @@ export function BuildPanel() {
       {streamSuccess === false && (
         <div className="mb-2 text-sm text-mc-redstone">
           构建失败，请查看日志中标记为红色的错误行
+          {!showFixSuggest && (
+            <button
+              onClick={handleFixSuggest}
+              disabled={isFixSuggesting}
+              className="ml-2 inline-flex items-center gap-1 text-xs text-mc-gold hover:underline"
+            >
+              <Wrench className="h-3 w-3" />
+              AI 诊断修复
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* AI 修复建议面板 */}
+      {showFixSuggest && (
+        <div className="mc-card mb-2 mt-2 overflow-hidden border border-mc-gold/30">
+          <div className="flex items-center justify-between border-b border-mc-border bg-mc-gold/10 px-3 py-1.5">
+            <span className="text-xs font-semibold text-mc-gold">AI 修复建议</span>
+            <button onClick={closeFixSuggest} className="text-mc-text-dim hover:text-mc-text">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="max-h-60 overflow-auto p-3 text-xs whitespace-pre-wrap text-mc-text">
+            {isFixSuggesting && !fixSuggestion && (
+              <span className="inline-flex items-center gap-1 text-mc-text-dim">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                AI 正在分析错误日志…
+              </span>
+            )}
+            {fixSuggestion}
+          </div>
+          <div className="flex items-center gap-2 border-t border-mc-border px-3 py-1.5">
+            <button
+              onClick={() => {
+                closeFixSuggest();
+                build();
+              }}
+              disabled={loading}
+              className="mc-btn-primary text-xs"
+            >
+              重新构建
+            </button>
+            {isFixSuggesting && (
+              <span className="inline-flex items-center gap-1 text-xs text-mc-text-dim">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                分析中…
+              </span>
+            )}
+          </div>
         </div>
       )}
 

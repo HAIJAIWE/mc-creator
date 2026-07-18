@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import Editor from '@monaco-editor/react';
-import { Loader2, Send, LayoutTemplate, History } from 'lucide-react';
+import { Loader2, Send, LayoutTemplate, History, GitCompare, Code2, FormInput } from 'lucide-react';
 import type { ModEntry, ModSpec } from '@mc-creator/shared';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
@@ -13,6 +13,8 @@ import { TemplatePicker } from './TemplatePicker.js';
 import { ModrinthSearchPanel } from './ModrinthSearchPanel.js';
 import { CurseForgeSearchPanel } from './CurseForgeSearchPanel.js';
 import { SpecHistoryPanel } from './SpecHistoryPanel.js';
+import { ModelComparePanel } from './ModelComparePanel.js';
+import { SpecFormEditor } from './SpecFormEditor.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
 
 interface Msg {
@@ -63,6 +65,8 @@ export function AgentPanel() {
   const [showModrinthSearch, setShowModrinthSearch] = useState(false);
   const [showCurseForgeSearch, setShowCurseForgeSearch] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const [showFormEditor, setShowFormEditor] = useState(false);
 
   const [messages, setMessages] = useState<Msg[]>([
     { role: 'assistant', text: '你好！描述你想要的 mod，我来帮你生成。' },
@@ -312,6 +316,14 @@ export function AgentPanel() {
                     </span>
                   )}
                 </button>
+                <button
+                  onClick={() => setShowCompare(true)}
+                  disabled={loading}
+                  className="mc-btn-ghost !px-2.5"
+                  title="多模型对比"
+                >
+                  <GitCompare className="h-3 w-3" />
+                </button>
                 {generatorType === 'modpack' && (
                   <>
                     <button
@@ -383,7 +395,30 @@ export function AgentPanel() {
                 className={`rounded-b border-x border-b ${specError ? 'border-mc-redstone' : 'border-mc-border'} bg-mc-bg`}
               >
                 <div className="flex items-center justify-between border-b border-mc-border px-2 py-1.5">
-                  <div className="text-xs text-mc-mute">可编辑，修改后点生成代码</div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setShowFormEditor(false)}
+                      className={`flex items-center gap-1 rounded-mc px-1.5 py-0.5 text-xs transition-colors ${
+                        !showFormEditor
+                          ? 'bg-mc-accent/20 text-mc-accent-bright'
+                          : 'text-mc-dim hover:bg-mc-surface-2 hover:text-mc-text'
+                      }`}
+                    >
+                      <Code2 className="h-3 w-3" />
+                      文本
+                    </button>
+                    <button
+                      onClick={() => setShowFormEditor(true)}
+                      className={`flex items-center gap-1 rounded-mc px-1.5 py-0.5 text-xs transition-colors ${
+                        showFormEditor
+                          ? 'bg-mc-accent/20 text-mc-accent-bright'
+                          : 'text-mc-dim hover:bg-mc-surface-2 hover:text-mc-text'
+                      }`}
+                    >
+                      <FormInput className="h-3 w-3" />
+                      表单
+                    </button>
+                  </div>
                   <button
                     onClick={resetSpec}
                     className="rounded-mc bg-mc-surface-3 px-2 py-0.5 text-xs text-mc-dim transition-colors hover:bg-mc-border-strong"
@@ -391,19 +426,35 @@ export function AgentPanel() {
                     重置
                   </button>
                 </div>
-                <Editor
-                  height="140px"
-                  language="json"
-                  theme={MC_MONACO_THEME}
-                  onMount={defineMcMonacoTheme}
-                  value={editorText}
-                  onChange={handleEditorChange}
-                  options={{ ...mcEditorOptions, fontSize: 11 }}
-                />
-                {specError && (
-                  <div className="px-2 py-1 text-xs text-mc-redstone">
-                    JSON 解析错误：{specError}
+                {showFormEditor ? (
+                  <div className="max-h-[200px] overflow-y-auto p-2">
+                    <SpecFormEditor
+                      spec={spec as Record<string, unknown>}
+                      onChange={(updated) => {
+                        const text = JSON.stringify(updated, null, 2);
+                        setEditorText(text);
+                        setSpec(updated as unknown as ModSpec);
+                        setSpecError(null);
+                      }}
+                    />
                   </div>
+                ) : (
+                  <>
+                    <Editor
+                      height="140px"
+                      language="json"
+                      theme={MC_MONACO_THEME}
+                      onMount={defineMcMonacoTheme}
+                      value={editorText}
+                      onChange={handleEditorChange}
+                      options={{ ...mcEditorOptions, fontSize: 11 }}
+                    />
+                    {specError && (
+                      <div className="px-2 py-1 text-xs text-mc-redstone">
+                        JSON 解析错误：{specError}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -486,6 +537,23 @@ export function AgentPanel() {
           <SpecHistoryPanel
             onClose={() => setShowHistory(false)}
             onRollback={handleHistoryRollback}
+          />
+        </div>
+      )}
+
+      {/* 多模型对比浮层面板 */}
+      {showCompare && (
+        <div className="absolute inset-0 z-20 bg-mc-surface">
+          <ModelComparePanel
+            description={description}
+            generatorType={generatorType}
+            onClose={() => setShowCompare(false)}
+            onAdopt={(spec: unknown, specText: string) => {
+              setSpec(spec as unknown as ModSpec);
+              setEditorText(specText);
+              setOriginalSpec(specText);
+              setSpecError(null);
+            }}
           />
         </div>
       )}

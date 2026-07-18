@@ -35,4 +35,5 @@ export type GeneratorType =
   | 'skin'
   | 'launcher'
   | 'kubejs'
-  | 'crafttweaker';
+  | 'crafttweaker'
+  | 'behavior_pack';

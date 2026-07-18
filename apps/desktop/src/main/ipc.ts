@@ -17,6 +17,7 @@ import {
   ModrinthApiClient,
   CurseForgeApiClient,
   createDefaultRegistry,
+  type SpecType,
 } from '@mc-creator/core';
 import * as nodeFs from 'fs';
 import type { ModSpec } from '@mc-creator/shared';
@@ -48,9 +49,15 @@ import {
   CHAT_STREAM_CHUNK,
   EXPLAIN_CODE,
   EXPLAIN_CODE_CHUNK,
+  COMPARE_MODELS,
+  COMPARE_MODELS_CHUNK,
+  CompareModelsRequest,
   ExplainCodeRequest,
   BUILD_WITH_FIX,
   BuildWithFixRequest,
+  AI_FIX_SUGGEST,
+  AI_FIX_SUGGEST_CHUNK,
+  AiFixSuggestRequest,
   BUILD_STREAM,
   BUILD_STREAM_CHUNK,
   BuildStreamRequest,
@@ -240,6 +247,36 @@ ${req.code}
     }
   });
 
+  // 多模型对比
+  ipcMain.handle(COMPARE_MODELS, async (e, raw: unknown) => {
+    const req = CompareModelsRequest.parse(raw);
+
+    // 并行为每个模型生成 Spec
+    const promises = req.models.map(async (modelConfig) => {
+      const provider = new VercelAiProvider(modelConfig);
+      const orchestrator = new Orchestrator(provider);
+      try {
+        const spec = await orchestrator.generateSpecByType(
+          req.description,
+          req.generatorType as SpecType,
+        );
+        e.sender.send(COMPARE_MODELS_CHUNK, {
+          modelName: modelConfig.name,
+          delta: JSON.stringify(spec, null, 2),
+          done: true,
+        });
+      } catch (err) {
+        e.sender.send(COMPARE_MODELS_CHUNK, {
+          modelName: modelConfig.name,
+          delta: `错误：${(err as Error).message}`,
+          done: true,
+        });
+      }
+    });
+
+    await Promise.all(promises);
+  });
+
   // 带修复循环的构建
   ipcMain.handle(BUILD_WITH_FIX, async (_e, raw: unknown) => {
     const req = BuildWithFixRequest.parse(raw);
@@ -265,6 +302,53 @@ ${req.code}
       log: result.finalResult.log,
       fixLog: result.fixLog,
     };
+  });
+
+  // AI 修复建议（流式）
+  ipcMain.handle(AI_FIX_SUGGEST, async (e, raw: unknown) => {
+    const req = AiFixSuggestRequest.parse(raw);
+    const config = loadModelConfig();
+    if (!config.apiKey) {
+      e.sender.send(AI_FIX_SUGGEST_CHUNK, { delta: '请先在设置中配置 API Key。', done: true });
+      return;
+    }
+
+    const provider = new VercelAiProvider(config);
+
+    // 截断文件内容避免 prompt 过长（每个文件最多 2000 字符，取前 5 个）
+    const filesPreview = req.files
+      .slice(0, 5)
+      .map((f) => ({ path: f.path, content: f.content.slice(0, 2000) }));
+
+    const filesSection =
+      filesPreview.length > 0
+        ? `\n\n项目文件预览：\n\`\`\`\n${filesPreview.map((f) => `--- ${f.path} ---\n${f.content}`).join('\n\n')}\n\`\`\``
+        : '';
+
+    const prompt = `请分析以下 Minecraft 模组构建错误日志，给出修复建议。
+
+构建错误日志：
+\`\`\`
+${req.buildLog}
+\`\`\`${filesSection}
+
+请从以下几个方面分析：
+1. **错误原因**：分析日志中的错误信息，找出根本原因（如缺少依赖、语法错误、配置错误、API 不兼容等）
+2. **修复方案**：给出具体的修复步骤
+3. **修复代码**：如果可能，给出修复后的代码片段（用 diff 或 code block 格式标注修改处）
+
+用中文回答，使用 Markdown 格式。`;
+
+    try {
+      for await (const chunk of provider.stream(prompt, {
+        system:
+          '你是 Minecraft 模组开发专家，擅长诊断构建错误并提供修复方案。回答使用中文，简洁清晰，重点突出。',
+      })) {
+        e.sender.send(AI_FIX_SUGGEST_CHUNK, { delta: chunk.delta, done: chunk.done });
+      }
+    } catch (err) {
+      e.sender.send(AI_FIX_SUGGEST_CHUNK, { delta: `错误：${(err as Error).message}`, done: true });
+    }
   });
 
   // 流式构建（P20）：spawn gradlew，逐行推送 stdout/stderr

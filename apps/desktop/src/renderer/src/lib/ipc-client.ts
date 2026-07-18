@@ -49,6 +49,19 @@ export const ipcClient = {
     generatorType: string | undefined,
     onChunk: (delta: string, done: boolean) => void,
   ) => window.mcApi.explainCode(fileName, code, generatorType, onChunk),
+  compareModels: (
+    req: {
+      description: string;
+      generatorType: string;
+      models: { name: string; modelId: string; baseURL: string; apiKey: string }[];
+    },
+    onChunk: (data: { modelName: string; delta: string; done: boolean }) => void,
+  ) => window.mcApi.compareModels(req, onChunk),
+  fixSuggest: (
+    buildLog: string,
+    files: { path: string; content: string }[],
+    onChunk: (delta: string, done: boolean) => void,
+  ) => window.mcApi.fixSuggest(buildLog, files, onChunk),
   buildWithFix: (projectPath: string): Promise<BuildWithFixRes> =>
     window.mcApi.buildWithFix(projectPath),
   buildStream: (projectPath: string, onChunk: (chunk: BuildStreamChunkT) => void) =>

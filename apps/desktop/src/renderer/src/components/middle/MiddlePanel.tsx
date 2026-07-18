@@ -11,6 +11,7 @@ import { ResourcePackPreviewPanel } from './ResourcePackPreviewPanel.js';
 import { SkinPreviewPanel } from './SkinPreviewPanel.js';
 import { KubejsPreviewPanel } from './KubejsPreviewPanel.js';
 import { CraftTweakerPreviewPanel } from './CraftTweakerPreviewPanel.js';
+import { BehaviorPackPreviewPanel } from './BehaviorPackPreviewPanel.js';
 import { useModStore } from '../../store/mod-store.js';
 import type { GeneratorType } from '@mc-creator/shared';
 
@@ -44,6 +45,8 @@ export function MiddlePanel() {
         return <KubejsPreviewPanel />;
       case 'crafttweaker':
         return <CraftTweakerPreviewPanel />;
+      case 'behavior_pack':
+        return <BehaviorPackPreviewPanel />;
       default:
         return <PlaceholderPanel type={generatorType} />;
     }

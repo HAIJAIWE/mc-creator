@@ -24,6 +24,7 @@ const TYPE_LABELS: Record<GeneratorType, string> = {
   launcher: '启动器',
   kubejs: 'KubeJS',
   crafttweaker: 'CraftTweaker',
+  behavior_pack: '行为包',
 };
 
 export function TopToolbar({ onOpenSettings }: TopToolbarProps) {

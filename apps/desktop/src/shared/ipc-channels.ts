@@ -12,6 +12,7 @@ export const GENERATOR_TYPES = [
   'launcher',
   'kubejs',
   'crafttweaker',
+  'behavior_pack',
 ] as const;
 export type GeneratorType = (typeof GENERATOR_TYPES)[number];
 
@@ -121,6 +122,26 @@ export const ExplainCodeRequest = z.object({
   generatorType: z.string().optional(),
 });
 export type ExplainCodeReq = z.infer<typeof ExplainCodeRequest>;
+// === 多模型对比（流式） ===
+export const COMPARE_MODELS = 'ai:compareModels';
+export const COMPARE_MODELS_CHUNK = 'ai:compareModels:chunk';
+
+export const CompareModelsRequest = z.object({
+  description: z.string().min(1),
+  generatorType: z.string(),
+  models: z
+    .array(
+      z.object({
+        name: z.string(),
+        modelId: z.string().min(1),
+        baseURL: z.string().min(1),
+        apiKey: z.string(),
+      }),
+    )
+    .min(2)
+    .max(3),
+});
+export type CompareModelsReq = z.infer<typeof CompareModelsRequest>;
 
 // === 带修复的构建 ===
 export const BUILD_WITH_FIX = 'mod:buildWithFix';
@@ -137,6 +158,22 @@ export const BuildWithFixResponse = z.object({
 export type BuildWithFixReq = z.infer<typeof BuildWithFixRequest>;
 export type BuildWithFixRes = z.infer<typeof BuildWithFixResponse>;
 
+// === AI 修复建议（流式） ===
+export const AI_FIX_SUGGEST = 'ai:fixSuggest';
+export const AI_FIX_SUGGEST_CHUNK = 'ai:fixSuggest:chunk';
+
+export const AiFixSuggestRequest = z.object({
+  buildLog: z.string().min(1),
+  files: z
+    .array(
+      z.object({
+        path: z.string(),
+        content: z.string(),
+      }),
+    )
+    .default([]),
+});
+export type AiFixSuggestReq = z.infer<typeof AiFixSuggestRequest>;
 // === 导出 zip ===
 export const ExportZipRequest = z.object({
   files: z.array(z.object({ path: z.string(), content: z.string() })),

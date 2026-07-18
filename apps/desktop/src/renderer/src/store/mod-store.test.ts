@@ -11,6 +11,7 @@ describe('mod-store', () => {
       generatorType: 'mod',
       spec: null,
       files: [],
+      previousFiles: [],
       selectedFile: null,
       buildLog: '',
       buildSuccess: null,
@@ -38,5 +39,23 @@ describe('mod-store', () => {
       { path: 'b.txt', content: 'b' },
     ]);
     expect(useModStore.getState().selectedFile).toBe('a.txt');
+  });
+
+  it('setFiles 备份 previousFiles', () => {
+    const store = useModStore.getState();
+    store.setFiles([{ path: 'a.txt', content: 'a' }]);
+    store.setFiles([{ path: 'a.txt', content: 'a2' }]);
+    const s = useModStore.getState();
+    expect(s.files[0].content).toBe('a2');
+    expect(s.previousFiles[0].content).toBe('a');
+    expect(s.previousFiles[0].path).toBe('a.txt');
+  });
+
+  it('clearPreviousFiles 清空 previousFiles', () => {
+    const store = useModStore.getState();
+    store.setFiles([{ path: 'a.txt', content: 'a' }]);
+    store.setFiles([{ path: 'a.txt', content: 'a2' }]);
+    useModStore.getState().clearPreviousFiles();
+    expect(useModStore.getState().previousFiles).toEqual([]);
   });
 });
