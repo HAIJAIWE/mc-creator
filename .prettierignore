@@ -6,3 +6,12 @@ coverage
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+
+# 无 parser 的文件
+.nvmrc
+.env*
+*.log
+
+# 自动生成
+docs/superpowers/plans
+docs/superpowers/specs

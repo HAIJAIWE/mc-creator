@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 提问 / 讨论
+    url: https://github.com/USER/REPO/discussions
+    about: 使用 GitHub Discussions 提问或讨论想法（非 bug 或功能请求）
+  - name: 📖 文档
+    url: https://github.com/USER/REPO#readme
+    about: 阅读 README 了解项目功能和使用方法
+  - name: 🔒 安全漏洞
+    url: https://github.com/USER/REPO/security/policy
+    about: 请勿公开提 issue 报告安全漏洞，查看安全策略私下报告
