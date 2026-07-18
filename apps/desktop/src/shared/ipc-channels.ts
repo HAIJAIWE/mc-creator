@@ -11,6 +11,7 @@ export const GENERATOR_TYPES = [
   'skin',
   'launcher',
   'kubejs',
+  'crafttweaker',
 ] as const;
 export type GeneratorType = (typeof GENERATOR_TYPES)[number];
 

@@ -2,6 +2,7 @@ export * from './mod-spec.js';
 export * from './generator.js';
 export * from './datapack-spec.js';
 export * from './kubejs-spec.js';
+export * from './crafttweaker-spec.js';
 export * from './modpack-spec.js';
 export * from './server-spec.js';
 export * from './skin-spec.js';

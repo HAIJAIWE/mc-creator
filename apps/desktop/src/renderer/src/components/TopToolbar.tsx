@@ -23,6 +23,7 @@ const TYPE_LABELS: Record<GeneratorType, string> = {
   skin: '皮肤',
   launcher: '启动器',
   kubejs: 'KubeJS',
+  crafttweaker: 'CraftTweaker',
 };
 
 export function TopToolbar({ onOpenSettings }: TopToolbarProps) {

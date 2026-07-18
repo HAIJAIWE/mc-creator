@@ -9,6 +9,7 @@ import {
   SKIN_TEMPLATES,
   RESOURCE_PACK_TEMPLATES,
   KUBEJS_TEMPLATES,
+  CRAFTTWEAKER_TEMPLATES,
 } from './index.js';
 import type { SpecTemplate, GeneratorType } from './types.js';
 
@@ -22,6 +23,7 @@ const ALL_TYPES: GeneratorType[] = [
   'skin',
   'resource_pack',
   'kubejs',
+  'crafttweaker',
 ];
 
 describe('SpecTemplate 类型', () => {
@@ -39,7 +41,7 @@ describe('SpecTemplate 类型', () => {
 });
 
 describe('TEMPLATES_BY_TYPE', () => {
-  it('包含全部 8 种生成器类型', () => {
+  it('包含全部 9 种生成器类型', () => {
     for (const t of ALL_TYPES) {
       expect(TEMPLATES_BY_TYPE).toHaveProperty(t);
       expect(Array.isArray(TEMPLATES_BY_TYPE[t])).toBe(true);
@@ -76,6 +78,7 @@ describe('TEMPLATES_BY_TYPE', () => {
       ...SKIN_TEMPLATES,
       ...RESOURCE_PACK_TEMPLATES,
       ...KUBEJS_TEMPLATES,
+      ...CRAFTTWEAKER_TEMPLATES,
     ];
     for (const tpl of all) {
       expect(ids.has(tpl.id), `重复的模板 id: ${tpl.id}`).toBe(false);

@@ -45,14 +45,15 @@ describe('createDefaultRegistry 端到端', () => {
     'skin',
     'launcher',
     'kubejs',
+    'crafttweaker',
   ] as const;
 
-  it('注册了全部 8 种 generator', () => {
+  it('注册了全部 9 种 generator', () => {
     const registry = createDefaultRegistry();
     for (const type of EXPECTED_TYPES) {
       expect(registry.get(type), `generator "${type}" should be registered`).toBeDefined();
     }
-    expect(registry.list()).toHaveLength(8);
+    expect(registry.list()).toHaveLength(9);
   });
 
   it('launcher generator 端到端生成 8 个文件', async () => {

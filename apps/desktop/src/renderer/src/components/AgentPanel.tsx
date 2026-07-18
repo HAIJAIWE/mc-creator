@@ -2,15 +2,17 @@ import { useState, useRef } from 'react';
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import Editor from '@monaco-editor/react';
-import { Loader2, Send, LayoutTemplate } from 'lucide-react';
+import { Loader2, Send, LayoutTemplate, History } from 'lucide-react';
 import type { ModEntry, ModSpec } from '@mc-creator/shared';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
+import { useSpecHistoryStore } from '../store/spec-history-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
 import { TemplatePicker } from './TemplatePicker.js';
 import { ModrinthSearchPanel } from './ModrinthSearchPanel.js';
 import { CurseForgeSearchPanel } from './CurseForgeSearchPanel.js';
+import { SpecHistoryPanel } from './SpecHistoryPanel.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
 
 interface Msg {
@@ -51,6 +53,7 @@ export function AgentPanel() {
     shallow,
   );
   const { apiKey } = useModelConfigStore();
+  const historyCount = useSpecHistoryStore((s) => s.versions.length);
 
   const [editorText, setEditorText] = useState('');
   const [originalSpec, setOriginalSpec] = useState('');
@@ -59,6 +62,7 @@ export function AgentPanel() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showModrinthSearch, setShowModrinthSearch] = useState(false);
   const [showCurseForgeSearch, setShowCurseForgeSearch] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const [messages, setMessages] = useState<Msg[]>([
     { role: 'assistant', text: '你好！描述你想要的 mod，我来帮你生成。' },
@@ -177,6 +181,14 @@ export function AgentPanel() {
   const handleCurseForgePick = (mod: ModEntry) =>
     pickModToSpec(mod, () => setShowCurseForgeSearch(false));
 
+  /** 回滚到历史版本后，同步本地编辑器文本与基准 spec */
+  const handleHistoryRollback = (rolledBackSpec: unknown) => {
+    const text = JSON.stringify(rolledBackSpec, null, 2);
+    setEditorText(text);
+    setOriginalSpec(text);
+    setSpecError(null);
+  };
+
   const send = async () => {
     if (!input.trim() || sending) return;
     const text = input;
@@ -238,7 +250,7 @@ export function AgentPanel() {
                 : '描述你想要的启动器配置…';
 
   return (
-    <div className="flex h-full flex-col bg-mc-surface">
+    <div className="relative flex h-full flex-col bg-mc-surface">
       <div className="flex-1 overflow-y-auto">
         {/* 描述输入 */}
         <div className="border-b border-mc-border">
@@ -286,6 +298,19 @@ export function AgentPanel() {
                   title="从模板库选择"
                 >
                   <LayoutTemplate className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => setShowHistory(true)}
+                  disabled={loading}
+                  className="mc-btn-ghost !px-2.5 relative"
+                  title="Spec 版本历史"
+                >
+                  <History className="h-3 w-3" />
+                  {historyCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-mc-accent px-0.5 text-[10px] font-bold leading-none text-mc-bg">
+                      {historyCount > 99 ? '99+' : historyCount}
+                    </span>
+                  )}
                 </button>
                 {generatorType === 'modpack' && (
                   <>
@@ -454,6 +479,16 @@ export function AgentPanel() {
           )}
         </div>
       </div>
+
+      {/* Spec 版本历史浮层面板 */}
+      {showHistory && (
+        <div className="absolute inset-0 z-20 bg-mc-surface">
+          <SpecHistoryPanel
+            onClose={() => setShowHistory(false)}
+            onRollback={handleHistoryRollback}
+          />
+        </div>
+      )}
     </div>
   );
 }

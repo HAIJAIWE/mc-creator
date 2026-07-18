@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
 import { Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react';
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
@@ -10,6 +11,22 @@ interface TreeNode {
   path: string;
   children?: TreeNode[];
 }
+
+interface FlatNode {
+  node: TreeNode;
+  depth: number;
+  hasChildren: boolean;
+  isExpanded: boolean;
+}
+
+interface RowData {
+  flatNodes: FlatNode[];
+  selectedFile: string | null;
+  onToggle: (path: string) => void;
+  onSelect: (path: string) => void;
+}
+
+const ROW_HEIGHT = 22;
 
 function buildTree(files: { path: string; content: string }[]): TreeNode[] {
   const root: TreeNode = { name: '', type: 'folder', path: '', children: [] };
@@ -48,70 +65,88 @@ function getFileIcon(path: string): string {
   return 'file';
 }
 
-function TreeItem({
-  node,
-  selectedFile,
-  onSelect,
-  depth = 0,
-}: {
-  node: TreeNode;
-  selectedFile: string | null;
-  onSelect: (path: string) => void;
-  depth?: number;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const FolderIcon = node.type === 'folder' ? (expanded ? FolderOpen : Folder) : null;
-  const fileIconName = node.type === 'file' ? getFileIcon(node.path) : null;
+function collectFolderPaths(nodes: TreeNode[]): string[] {
+  const paths: string[] = [];
+  const walk = (ns: TreeNode[]) => {
+    for (const n of ns) {
+      if (n.type === 'folder' && n.children && n.children.length > 0) {
+        paths.push(n.path);
+        walk(n.children);
+      }
+    }
+  };
+  walk(nodes);
+  return paths;
+}
+
+// 将树扁平化为可见行数组；expandedSet === null 表示「全部展开」（默认），
+// 这样新生成的文件夹在用户主动折叠前始终展开，与原 useState(true) 行为一致
+function flattenTree(nodes: TreeNode[], expandedSet: Set<string> | null, depth = 0): FlatNode[] {
+  const result: FlatNode[] = [];
+  for (const node of nodes) {
+    const hasChildren = node.type === 'folder' && (node.children?.length ?? 0) > 0;
+    const isExpanded = expandedSet === null || expandedSet.has(node.path);
+    result.push({ node, depth, hasChildren, isExpanded });
+    if (hasChildren && isExpanded) {
+      result.push(...flattenTree(node.children ?? [], expandedSet, depth + 1));
+    }
+  }
+  return result;
+}
+
+// react-window 行渲染器：无状态，所有数据经 itemData 注入
+const Row = ({ index, style, data }: ListChildComponentProps<RowData>) => {
+  const { flatNodes, selectedFile, onToggle, onSelect } = data;
+  const { node, depth, hasChildren, isExpanded } = flatNodes[index];
+  const paddingLeft = depth * 12 + 8;
 
   if (node.type === 'folder') {
+    const FolderIcon = isExpanded ? FolderOpen : Folder;
     return (
-      <div>
+      <div style={style}>
         <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex w-full items-center gap-1 py-1 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2"
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          onClick={() => onToggle(node.path)}
+          className="flex h-full w-full items-center gap-1 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2"
+          style={{ paddingLeft }}
         >
-          {expanded ? (
-            <ChevronDown className="h-3 w-3 text-mc-mute" />
+          {hasChildren ? (
+            isExpanded ? (
+              <ChevronDown className="h-3 w-3 shrink-0 text-mc-mute" />
+            ) : (
+              <ChevronRight className="h-3 w-3 shrink-0 text-mc-mute" />
+            )
           ) : (
-            <ChevronRight className="h-3 w-3 text-mc-mute" />
+            <span className="inline-block h-3 w-3 shrink-0" />
           )}
-          {FolderIcon && <FolderIcon className="h-3 w-3 text-mc-accent" />}
+          <FolderIcon className="h-3 w-3 shrink-0 text-mc-accent" />
           <span className="truncate text-mc-text">{node.name}</span>
         </button>
-        {expanded && node.children && (
-          <div>
-            {node.children.map((child) => (
-              <TreeItem
-                key={child.path}
-                node={child}
-                selectedFile={selectedFile}
-                onSelect={onSelect}
-                depth={depth + 1}
-              />
-            ))}
-          </div>
-        )}
       </div>
     );
   }
-
   const isSelected = selectedFile === node.path;
   return (
-    <button
-      onClick={() => onSelect(node.path)}
-      className={`flex w-full items-center gap-1 border-l-2 py-0.5 pl-2 pr-2 text-left text-xs transition-colors ${
-        isSelected
-          ? 'border-mc-accent bg-mc-surface-3 text-mc-text'
-          : 'border-transparent text-mc-dim hover:bg-mc-surface-2 hover:text-mc-text'
-      }`}
-      style={{ paddingLeft: `${depth * 12 + 8}px` }}
-    >
-      <McIcon scope="pixel" name={fileIconName ?? 'file'} size={12} className="text-mc-mute" />
-      <span className="truncate">{node.name}</span>
-    </button>
+    <div style={style}>
+      <button
+        onClick={() => onSelect(node.path)}
+        className={`flex h-full w-full items-center gap-1 border-l-2 pr-2 text-left text-xs transition-colors ${
+          isSelected
+            ? 'border-mc-accent bg-mc-surface-3 text-mc-text'
+            : 'border-transparent text-mc-dim hover:bg-mc-surface-2 hover:text-mc-text'
+        }`}
+        style={{ paddingLeft }}
+      >
+        <McIcon
+          scope="pixel"
+          name={getFileIcon(node.path)}
+          size={12}
+          className="shrink-0 text-mc-mute"
+        />
+        <span className="truncate">{node.name}</span>
+      </button>
+    </div>
   );
-}
+};
 
 export function FileTree() {
   // P3 性能：用 shallow 选择器仅订阅 files/selectedFile/selectFile，避免 buildLog/loading 流式更新时重渲染
@@ -124,6 +159,48 @@ export function FileTree() {
   // 注意：useMemo 必须在 early return 之前调用，否则违反 React hooks 规则。
   const tree = useMemo(() => buildTree(files), [files]);
 
+  // 顶层 Set 统一管理展开状态，替代每个 TreeItem 各自的 useState(true)。
+  // null = 全部展开（默认），首次折叠时惰性生成 Set。
+  const [expandedSet, setExpandedSet] = useState<Set<string> | null>(null);
+
+  const toggleExpand = useCallback(
+    (path: string) => {
+      setExpandedSet((prev) => {
+        if (prev === null) {
+          const next = new Set(collectFolderPaths(tree));
+          next.delete(path);
+          return next;
+        }
+        const next = new Set(prev);
+        if (next.has(path)) next.delete(path);
+        else next.add(path);
+        return next;
+      });
+    },
+    [tree],
+  );
+
+  const flatNodes = useMemo(() => flattenTree(tree, expandedSet), [tree, expandedSet]);
+  // 测量列表容器高度：文件树处于 flex 布局中，高度由父级决定，需用 ResizeObserver 动态获取
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(400);
+
+  // 依赖 files.length：空状态时不渲染容器，文件出现后需要重新挂载 observer
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height;
+      if (h !== undefined && h > 0) setHeight(h);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [files.length]);
+
+  const rowData: RowData = useMemo(
+    () => ({ flatNodes, selectedFile, onToggle: toggleExpand, onSelect: selectFile }),
+    [flatNodes, selectedFile, toggleExpand, selectFile],
+  );
   if (files.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -138,12 +215,18 @@ export function FileTree() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="flex h-full flex-col">
       <div className="mc-section-title border-b border-mc-border">项目文件</div>
-      <div className="p-1">
-        {tree.map((node) => (
-          <TreeItem key={node.path} node={node} selectedFile={selectedFile} onSelect={selectFile} />
-        ))}
+      <div ref={containerRef} className="min-h-0 flex-1 px-1">
+        <List
+          height={height}
+          itemCount={flatNodes.length}
+          itemSize={ROW_HEIGHT}
+          width="100%"
+          itemData={rowData}
+        >
+          {Row}
+        </List>
       </div>
     </div>
   );

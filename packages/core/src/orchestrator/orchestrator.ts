@@ -7,6 +7,7 @@ import {
   ResourcePackSpec,
   LauncherSpec,
   KubejsSpec,
+  CraftTweakerSpec,
   type ModSpec as ModSpecType,
 } from '@mc-creator/shared';
 import type { ModelProvider } from '../model-provider/types.js';
@@ -16,7 +17,15 @@ const MAX_RETRIES = 3;
 
 /** 生成器类型 → 对应 schema 与 prompt 描述（与 desktop 层 GENERATOR_TYPES 对齐） */
 export type SpecType =
-  'mod' | 'datapack' | 'modpack' | 'server' | 'resource_pack' | 'skin' | 'launcher' | 'kubejs';
+  | 'mod'
+  | 'datapack'
+  | 'modpack'
+  | 'server'
+  | 'resource_pack'
+  | 'skin'
+  | 'launcher'
+  | 'kubejs'
+  | 'crafttweaker';
 
 interface SpecConfig {
   schema: ZodTypeAny;
@@ -162,6 +171,25 @@ Schema 字段：
 - lang: 语言对象，键为语言代码（en_us/zh_cn），值为键值对对象
 - registry[]: 自定义注册表（id, type item/block/sound/fluid, items[], blocks[], customCode）
 handler 字段是 JavaScript 代码字符串（不带 function 包裹），会被嵌入到事件回调中。
+只输出 JSON，不要解释。`,
+  },
+  crafttweaker: {
+    schema: CraftTweakerSpec,
+    prompt: `你是 Minecraft CraftTweaker 脚本规格生成器。根据描述生成 CraftTweakerSpec JSON（用于生成 ZenScript .zs 脚本）。
+Schema 字段：
+- packId: 小写下划线 ^[a-z0-9_]+$
+- packName: 显示名
+- description: 描述
+- packFormat: 数字（1.21.x 用 48）
+- mcVersion: MC 版本（默认 1.21.1）
+- recipes[]: 配方列表（id, type shaped/shapeless/smelting/stonecutting/custom, result 物品ID, count, pattern[] 如 ['III','III','III'], key{} 如 {I: ['minecraft:iron_ingot']}, ingredients[], customCode ZenScript 代码字符串）
+- tags[]: 标签列表（id, type item/block/entity_type/fluid, values[], replace 布尔）
+- events[]: 事件列表（id, type 如 player.logged_in/player.logged_out/block.right_click/block.break/entity.died/tick, target 可选, handler ZenScript 代码字符串）
+- tooltips[]: 工具提示列表（itemId 物品ID, lines[] 文本数组, advanced 布尔）
+- lang: 语言对象，键为语言代码（en_us/zh_cn），值为键值对对象
+注意：CraftTweaker 使用 ZenScript 语法（不是 JavaScript），物品引用用 <minecraft:diamond> 形式。
+不要包含 registry 字段（CraftTweaker 注册表语法复杂，暂不支持）。
+handler 字段是 ZenScript 代码字符串（不带 function 包裹），会被嵌入到事件回调函数体中。
 只输出 JSON，不要解释。`,
   },
 };

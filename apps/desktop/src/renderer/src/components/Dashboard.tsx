@@ -17,6 +17,7 @@ const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
   skin: { scope: 'pixel', name: 'user' },
   launcher: { scope: 'pixel', name: 'rocket' },
   kubejs: { scope: 'pixel', name: 'zap' },
+  crafttweaker: { scope: 'pixel', name: 'code' },
 };
 
 const TYPE_LABEL: Record<GeneratorType, string> = {
@@ -28,6 +29,7 @@ const TYPE_LABEL: Record<GeneratorType, string> = {
   skin: '皮肤',
   launcher: '启动器',
   kubejs: 'KubeJS',
+  crafttweaker: 'CraftTweaker',
 };
 
 const TYPE_DESC: Record<GeneratorType, string> = {
@@ -39,6 +41,7 @@ const TYPE_DESC: Record<GeneratorType, string> = {
   skin: '创建玩家皮肤',
   launcher: '创建启动器配置',
   kubejs: '创建 KubeJS 脚本',
+  crafttweaker: '创建 ZenScript 脚本',
 };
 
 const LOADER_LABEL: Record<string, string> = {

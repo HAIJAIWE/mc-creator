@@ -7,6 +7,7 @@ import {
   type ItemSpec,
 } from '@mc-creator/shared';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
+import { useSpecHistoryStore } from './spec-history-store.js';
 
 interface ModState {
   // 输入
@@ -43,7 +44,7 @@ interface ModState {
   removeItem: (id: string) => void;
 }
 
-export const useModStore = create<ModState>((set) => ({
+export const useModStore = create<ModState>((set, get) => ({
   loader: 'fabric',
   mcVersion: '1.21.11',
   description: '',
@@ -63,7 +64,18 @@ export const useModStore = create<ModState>((set) => ({
   setMcVersion: (v) => set({ mcVersion: v }),
   setGeneratorType: (t) => set({ generatorType: t }),
   setDescription: (d) => set({ description: d }),
-  setSpec: (s) => set({ spec: s }),
+  setSpec: (s) => {
+    set({ spec: s });
+    // 非 null 时记录到历史（用 getState 避免循环依赖；null 表示清空，不记录）
+    if (s !== null) {
+      const state = get();
+      useSpecHistoryStore.getState().pushVersion({
+        spec: s,
+        description: state.description,
+        generatorType: state.generatorType,
+      });
+    }
+  },
   setFiles: (f) => set({ files: f, selectedFile: f[0]?.path ?? null }),
   selectFile: (p) => set({ selectedFile: p }),
   closeFile: (p) =>

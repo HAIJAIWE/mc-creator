@@ -27,4 +27,12 @@ export interface SpecTemplate {
  * '@mc-creator/shared' 导入导致的循环依赖。
  */
 export type GeneratorType =
-  'mod' | 'datapack' | 'modpack' | 'server' | 'resource_pack' | 'skin' | 'launcher' | 'kubejs';
+  | 'mod'
+  | 'datapack'
+  | 'modpack'
+  | 'server'
+  | 'resource_pack'
+  | 'skin'
+  | 'launcher'
+  | 'kubejs'
+  | 'crafttweaker';
