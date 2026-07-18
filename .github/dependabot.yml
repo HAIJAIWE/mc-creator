@@ -1,0 +1,72 @@
+# Dependabot 自动依赖更新配置
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # npm 依赖（根 package.json + workspaces）
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    commit-message:
+      prefix: 'deps'
+      include: scope
+    labels:
+      - dependencies
+      - npm
+    groups:
+      # 类型定义包一起更新，减少 PR 数量
+      types:
+        patterns:
+          - '@types/*'
+          - '@eslint/js'
+          - 'typescript'
+          - 'typescript-eslint'
+      # ESLint 生态一起更新
+      eslint:
+        patterns:
+          - 'eslint'
+          - 'eslint-*'
+          - 'typescript-eslint'
+      # React 生态一起更新
+      react:
+        patterns:
+          - 'react'
+          - 'react-dom'
+          - '@types/react'
+          - '@types/react-dom'
+          - 'eslint-plugin-react-*'
+      # 测试相关一起更新
+      testing:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+          - 'jsdom'
+          - '@testing-library/*'
+    ignore:
+      # Electron 大版本升级需要人工验证，仅自动更新 patch/minor
+      - dependency-name: 'electron'
+        update-types:
+          - version-update:semver-major
+      # TypeScript 大版本升级可能引入新的类型检查错误，需人工验证
+      - dependency-name: 'typescript'
+        update-types:
+          - version-update:semver-major
+
+  # GitHub Actions 版本更新
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: 'ci'
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
