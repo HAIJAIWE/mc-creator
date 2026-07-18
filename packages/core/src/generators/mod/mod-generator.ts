@@ -16,7 +16,8 @@ export class ModGenerator implements Generator {
   readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt', 'legacy_fabric'];
   readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1'];
 
-  private readonly adapters: Record<Loader, LoaderAdapter> = {
+  // vanilla 没有 mod adapter（原版无 mod 加载器），故用 Partial。
+  private readonly adapters: Partial<Record<Loader, LoaderAdapter>> = {
     fabric: new FabricAdapter(),
     neoforge: new NeoForgeAdapter(),
     quilt: new QuiltAdapter(),
@@ -25,6 +26,9 @@ export class ModGenerator implements Generator {
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     const adapter = this.adapters[ctx.loader];
+    if (!adapter) {
+      throw new Error(`ModGenerator does not support loader: ${ctx.loader}`);
+    }
     const files = adapter.translate(ctx);
     return {
       files,

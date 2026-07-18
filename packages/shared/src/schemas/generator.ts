@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ModSpec } from './mod-spec.js';
+import { LOADERS } from '../types/loader.js';
 
 /** 文件树节点（生成产物） */
 export const FileNode = z.object({
@@ -9,7 +10,7 @@ export const FileNode = z.object({
 
 /** 生成器上下文（规格 §3.3） */
 export const GeneratorContext = z.object({
-  loader: z.enum(['fabric', 'neoforge', 'quilt', 'legacy_fabric']),
+  loader: z.enum(LOADERS),
   mcVersion: z.string(),
   modId: z.string(),
   spec: ModSpec,

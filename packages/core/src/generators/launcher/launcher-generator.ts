@@ -11,9 +11,8 @@ import type { LauncherSpec as LauncherSpecType } from '@mc-creator/shared';
  */
 export class LauncherGenerator implements Generator {
   readonly type = 'launcher';
-  // LauncherSpec 的 loader 枚举包含 'vanilla'，但全局 Loader 类型暂未纳入。
-  // 启动器不限定 loader，因此此处放宽为 5 种并用 as Loader[] 兼容接口签名。
-  readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'vanilla'] as Loader[];
+  // 启动器不限定 mod loader，故支持全部 5 种 loader（含 vanilla）。
+  readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'vanilla'];
   readonly versions: McVersion[] = ['1.21.1', '1.21.11'];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {

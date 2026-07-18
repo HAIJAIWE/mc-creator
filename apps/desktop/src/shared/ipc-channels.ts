@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LOADERS } from '@mc-creator/shared';
 
 /** 生成器类型联合（mod/datapack/modpack/server/resource_pack/skin/launcher） */
 export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'resource_pack', 'skin', 'launcher'] as const;
@@ -25,7 +26,7 @@ export const GenerateSpecResponse = z.object({
 });
 
 export const GenerateFilesRequest = z.object({
-  loader: z.enum(['fabric', 'neoforge', 'quilt', 'legacy_fabric']),
+  loader: z.enum(LOADERS),
   mcVersion: z.string(),
   // spec 可能是 ModSpec/ServerSpec/SkinSpec 等，由各 Generator 内部用对应 schema.parse 校验
   spec: z.record(z.unknown()),
@@ -152,7 +153,7 @@ export const ProjectSchema = z.object({
   id: z.string(),
   name: z.string(),
   generatorType: z.enum(GENERATOR_TYPES),
-  loader: z.enum(['fabric', 'neoforge', 'quilt', 'legacy_fabric']),
+  loader: z.enum(LOADERS),
   mcVersion: z.string(),
   description: z.string(),
   spec: z.record(z.unknown()),
