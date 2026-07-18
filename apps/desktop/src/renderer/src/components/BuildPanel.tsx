@@ -1,14 +1,10 @@
 import { useRef, useState } from 'react';
+import { shallow } from 'zustand/shallow';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
+import { extractJarPath, renderLog } from '../lib/build-utils.js';
 import type { BuildStreamChunkT, LocateMcRes } from '../../../shared/ipc-channels.js';
-
-/** 从日志中提取 jar 路径（匹配 build/libs/*.jar） */
-function extractJarPath(log: string): string | null {
-  const match = log.match(/build\/libs\/[^\s"']*\.jar/);
-  return match ? match[0] : null;
-}
 
 /** 启动器种类 → 中文标签 */
 const LAUNCHER_LABEL: Record<string, string> = {
@@ -17,25 +13,20 @@ const LAUNCHER_LABEL: Record<string, string> = {
   hmcl: 'HMCL',
 };
 
-/** 逐行渲染日志：错误红色、警告黄色、其他默认 */
-function renderLog(log: string) {
-  return log.split('\n').map((line, i) => {
-    const isError = /error:|ERROR|FAILED/i.test(line);
-    const isWarn = /warning:|WARN/i.test(line);
-    const color = isError ? 'text-mc-redstone' : isWarn ? 'text-mc-gold' : 'text-mc-text';
-    return (
-      <div key={i} className={color}>
-        {line || ' '}
-      </div>
-    );
-  });
-}
-
 export function BuildPanel() {
+  // P3 性能：shallow 选择器仅订阅所需字段，避免 description/spec/files 变化时重渲染
   const {
     files, buildLog, buildSuccess, jarPath, loading, fixLog,
     setBuildResult, setLoading, setError, error, setFixLog,
-  } = useModStore();
+  } = useModStore(
+    (s) => ({
+      files: s.files, buildLog: s.buildLog, buildSuccess: s.buildSuccess,
+      jarPath: s.jarPath, loading: s.loading, fixLog: s.fixLog,
+      setBuildResult: s.setBuildResult, setLoading: s.setLoading,
+      setError: s.setError, error: s.error, setFixLog: s.setFixLog,
+    }),
+    shallow,
+  );
 
   // P20：流式构建状态
   const [streamLog, setStreamLog] = useState('');
@@ -64,7 +55,7 @@ export function BuildPanel() {
     try {
       // P22-4：先把内存中的 files 写入临时目录，再用该路径构建（避免硬编码 /tmp/mc-mod）
       const { projectPath } = await ipcClient.prepareBuildDir(files);
-      const res = await ipcClient.buildWithFix(projectPath) as any;
+      const res = await ipcClient.buildWithFix(projectPath);
       setBuildResult({ success: res.success, log: res.log, jarPath: res.jarPath });
       setJarAbs(toAbs(projectPath, res.jarPath));
       setFixLog(res.fixLog ?? []);

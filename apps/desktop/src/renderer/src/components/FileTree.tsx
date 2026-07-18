@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react';
+import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModStore } from '../store/mod-store.js';
 
@@ -92,7 +93,11 @@ function TreeItem({ node, selectedFile, onSelect, depth = 0 }: { node: TreeNode;
 }
 
 export function FileTree() {
-  const { files, selectedFile, selectFile } = useModStore();
+  // P3 性能：用 shallow 选择器仅订阅 files/selectedFile/selectFile，避免 buildLog/loading 流式更新时重渲染
+  const { files, selectedFile, selectFile } = useModStore(
+    (s) => ({ files: s.files, selectedFile: s.selectedFile, selectFile: s.selectFile }),
+    shallow,
+  );
 
   if (files.length === 0) {
     return (
@@ -107,7 +112,8 @@ export function FileTree() {
     );
   }
 
-  const tree = buildTree(files);
+  // P3 性能：仅 files 变化时重建树，避免每次渲染都 O(n) 重建
+  const tree = useMemo(() => buildTree(files), [files]);
 
   return (
     <div className="h-full overflow-y-auto">

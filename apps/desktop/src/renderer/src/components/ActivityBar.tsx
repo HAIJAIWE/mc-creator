@@ -3,14 +3,16 @@ import { GitBranch } from 'lucide-react';
 import { McMark } from './McMark.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
 
-type Activity = 'explorer' | 'search' | 'git' | 'packages' | 'learn' | 'settings' | 'items' | 'blocks';
+type Activity = 'explorer' | 'search' | 'git' | 'packages' | 'settings' | 'items' | 'blocks';
 
 interface ActivityBarProps {
   active: Activity;
   onChange: (activity: Activity) => void;
+  /** 点击品牌标返回 Dashboard 首屏 */
+  onHome?: () => void;
 }
 
-export function ActivityBar({ active, onChange }: ActivityBarProps) {
+export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
   const [hovered, setHovered] = useState<string | null>(null);
 
   const activities: { id: Activity; icon: ReactNode; label: string }[] = [
@@ -18,7 +20,6 @@ export function ActivityBar({ active, onChange }: ActivityBarProps) {
     { id: 'search', icon: <McIcon scope="pixel" name="search" size={20} />, label: '搜索' },
     { id: 'git', icon: <GitBranch className="h-5 w-5" />, label: '源代码管理' },
     { id: 'packages', icon: <McIcon scope="pixel" name="package" size={20} />, label: '包管理' },
-    { id: 'learn', icon: <McIcon scope="pixel" name="star" size={20} />, label: '布局学习器' },
     { id: 'items', icon: <McIcon scope="pixel" name="box" size={20} />, label: '物品/配方' },
     { id: 'blocks', icon: <McIcon scope="game" name="block-house" size={20} />, label: '方块编辑' },
   ];
@@ -72,10 +73,14 @@ export function ActivityBar({ active, onChange }: ActivityBarProps) {
             </div>
           )}
         </button>
-        {/* 品牌方块标 */}
-        <div className="mt-1 flex h-10 w-10 items-center justify-center" title="MC Creator">
+        {/* 品牌方块标：点击返回 Dashboard 首屏 */}
+        <button
+          onClick={() => onHome?.()}
+          className="mt-1 flex h-10 w-10 items-center justify-center rounded-mc transition-colors hover:bg-mc-surface"
+          title="返回项目仪表盘"
+        >
           <McMark className="h-6 w-6 text-mc-accent" />
-        </div>
+        </button>
       </div>
     </div>
   );

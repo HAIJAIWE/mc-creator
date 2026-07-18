@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Editor from '@monaco-editor/react';
 import { Loader2 } from 'lucide-react';
+import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
@@ -80,11 +81,16 @@ function computeDefaultName(generatorType: GeneratorType, spec: unknown): string
 }
 
 export function CodePreview() {
-  const { files, selectedFile, generatorType, spec } = useModStore();
+  // P3 性能：shallow 选择器避免 buildLog 流式更新触发重渲染
+  const { files, selectedFile, generatorType, spec } = useModStore(
+    (s) => ({ files: s.files, selectedFile: s.selectedFile, generatorType: s.generatorType, spec: s.spec }),
+    shallow,
+  );
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const file = files.find((f) => f.path === selectedFile);
+  // P3 性能：仅 files/selectedFile 变化时重算 file，避免每次渲染都 O(n) find
+  const file = useMemo(() => files.find((f) => f.path === selectedFile), [files, selectedFile]);
   const isPng = selectedFile?.endsWith('.png') ?? false;
   const fileIconName = file ? getFileIcon(file.path) : 'file';
 
