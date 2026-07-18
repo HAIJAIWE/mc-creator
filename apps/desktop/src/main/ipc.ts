@@ -6,8 +6,10 @@ import { dirname, join, basename } from 'node:path';
 import { homedir } from 'node:os';
 import JSZip from 'jszip';
 import { z } from 'zod';
-import { Orchestrator, ModGenerator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem, ModrinthApiClient, CurseForgeApiClient } from '@mc-creator/core';
+import { Orchestrator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem, ModrinthApiClient, CurseForgeApiClient, createDefaultRegistry } from '@mc-creator/core';
 import * as nodeFs from 'fs';
+import type { ModSpec } from '@mc-creator/shared';
+import { assertWithin, parseGitStatus } from './ipc-utils.js';
 import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
 import { loadCurseForgeConfig, saveCurseForgeConfig } from './curseforge-config.js';
 import { loadProjects, saveProject, deleteProject, getProject } from './project-store.js';
@@ -59,17 +61,11 @@ import {
   GIT_COMMIT,
   GIT_PULL,
   GIT_PUSH,
-  GitChooseRepoResponse,
   GitStatusRequest,
-  GitStatusResponse,
-  GitFileStatus,
   GitLogRequest,
-  GitLogResponse,
   GitCommitRequest,
-  GitCommitResponse,
   GitPullRequest,
   GitPushRequest,
-  GitSyncResponse,
   type GitChooseRepoRes,
   type GitStatusRes,
   type GitLogRes,
@@ -91,12 +87,8 @@ import {
   MC_CHOOSE_DIR,
   INSTALL_MOD,
   LAUNCH_MC,
-  LocateMcResponse,
-  McChooseDirResponse,
   InstallModRequest,
-  InstallModResponse,
   LaunchMcRequest,
-  LaunchMcResponse,
   type LocateMcRes,
   type McChooseDirRes,
   type InstallModRes,
@@ -108,6 +100,9 @@ import {
  * 主进程调 core 引擎，结果经 zod 校验后返回渲染进程。
  */
 export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
+  // 生成器注册表（P1：替代 switch/case，新增生成器只需在 createDefaultRegistry 注册）
+  const generatorRegistry = createDefaultRegistry();
+
   ipcMain.handle(IPC.GENERATE_SPEC, async (_e, raw: unknown): Promise<GenerateSpecRes> => {
     const req = GenerateSpecRequest.parse(raw);
     const orchestrator = getOrchestrator();
@@ -118,40 +113,9 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
 
   ipcMain.handle(IPC.GENERATE_FILES, async (_e, raw: unknown): Promise<GenerateFilesRes> => {
     const req = GenerateFilesRequest.parse(raw);
-    let gen;
-    switch (req.generatorType) {
-      case 'datapack': {
-        const { DatapackGenerator } = await import('@mc-creator/core');
-        gen = new DatapackGenerator();
-        break;
-      }
-      case 'modpack': {
-        const { ModpackGenerator } = await import('@mc-creator/core');
-        gen = new ModpackGenerator();
-        break;
-      }
-      case 'server': {
-        const { ServerGenerator } = await import('@mc-creator/core');
-        gen = new ServerGenerator();
-        break;
-      }
-      case 'texture': {
-        const { TextureGenerator } = await import('@mc-creator/core');
-        gen = new TextureGenerator();
-        break;
-      }
-      case 'skin': {
-        const { SkinGenerator } = await import('@mc-creator/core');
-        gen = new SkinGenerator();
-        break;
-      }
-      case 'resource_pack': {
-        const { ResourcePackGenerator } = await import('@mc-creator/core');
-        gen = new ResourcePackGenerator();
-        break;
-      }
-      default:
-        gen = new ModGenerator();
+    const gen = generatorRegistry.get(req.generatorType);
+    if (!gen) {
+      return { files: [], warnings: [`不支持的生成器类型：${req.generatorType}`] };
     }
     // modId 可能从 spec 顶层或单独字段取
     const modId = req.modId || (req.spec as { modId?: string }).modId || 'mc_creator';
@@ -159,7 +123,7 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       loader: req.loader,
       mcVersion: req.mcVersion,
       modId,
-      spec: req.spec as any,
+      spec: req.spec as unknown as ModSpec,
       projectPath: '',
     });
     return { files: result.files, warnings: result.warnings };
@@ -231,7 +195,10 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const req = BuildWithFixRequest.parse(raw);
     const config = loadModelConfig();
 
-    const realFs = new Filesystem(nodeFs as any);
+    // P3 类型：node fs 与 memfs IFs 接口存在结构差异（memfs 自身扩展方法），
+    // 通过 unknown 中转，运行时 Filesystem 只调用两者都有的标准方法
+    type FsLike = ConstructorParameters<typeof Filesystem>[0];
+    const realFs = new Filesystem(nodeFs as unknown as FsLike);
     let fixer: BuildFixer;
     if (config.apiKey) {
       const { VercelAiProvider } = await import('@mc-creator/core');
@@ -254,9 +221,9 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
   ipcMain.handle(BUILD_STREAM, async (e, raw: unknown) => {
     const req = BuildStreamRequest.parse(raw);
     const cwd = req.projectPath;
-    // Windows 用 gradlew.bat，Unix 用 ./gradlew
+    // Windows 用 gradlew.bat，Unix 用 ./gradlew；避免 shell:true 降低命令注入风险
     const cmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
-    const child = spawn(cmd, ['build'], { cwd, shell: true });
+    const child = spawn(cmd, ['build'], { cwd });
 
     child.stdout?.on('data', (data) => {
       e.sender.send(BUILD_STREAM_CHUNK, { type: 'stdout', text: data.toString(), done: false });
@@ -312,6 +279,8 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const projectPath = join(app.getPath('temp'), `mc-creator-build-${Date.now()}`);
     await mkdir(projectPath, { recursive: true });
     for (const f of req.files) {
+      // P0 安全：校验 f.path 解析后仍位于 projectPath 内，防止 ../.. 逃逸写入任意文件
+      assertWithin(projectPath, f.path);
       const abs = join(projectPath, f.path);
       await mkdir(dirname(abs), { recursive: true });
       if (f.path.endsWith('.png')) {
@@ -469,40 +438,7 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       child.on('close', (code) => resolve({ code: code ?? -1, stdout, stderr }));
     });
 
-  // 解析 `git status --porcelain -b` 输出（## 分支行 + 两字母状态码文件行）
-  const parseGitStatus = (raw: string) => {
-    let branch: string | null = null;
-    let upstream: string | null = null;
-    let ahead = 0;
-    let behind = 0;
-    const files: { x: string; y: string; path: string; origPath?: string }[] = [];
-    for (const line of raw.split('\n')) {
-      if (!line) continue;
-      if (line.startsWith('## ')) {
-        const rest = line.slice(3);
-        const a = rest.match(/ahead (\d+)/);
-        const b = rest.match(/behind (\d+)/);
-        if (a) ahead = Number(a[1]);
-        if (b) behind = Number(b[1]);
-        const branchPart = rest.split('...')[0].replace(/\s*\(.*\)\s*$/, '').trim();
-        branch = branchPart || null;
-        const up = rest.split('...')[1];
-        if (up) upstream = up.split(/\s/)[0].replace(/\[.*\]/, '').trim() || null;
-        continue;
-      }
-      const x = line[0];
-      const y = line[1];
-      let path = line.slice(3);
-      let origPath: string | undefined;
-      const arrow = path.indexOf(' -> ');
-      if (arrow >= 0) {
-        origPath = path.slice(0, arrow);
-        path = path.slice(arrow + 4);
-      }
-      files.push({ x, y, path, origPath });
-    }
-    return { branch, upstream, ahead, behind, files, clean: files.length === 0 };
-  };
+  // parseGitStatus 已提取到模块级（见文件顶部），便于单测
 
   ipcMain.handle(GIT_CHOOSE_REPO, async (): Promise<GitChooseRepoRes> => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });

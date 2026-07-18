@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { encryptSecret, decryptSecret } from './secret-storage.js';
 
 /**
  * CurseForge 配置持久化（独立于 AI 模型配置，存 curseforge-config.json）。
@@ -22,7 +23,8 @@ export function loadCurseForgeConfig(): CurseForgeConfig {
   try {
     if (existsSync(configPath())) {
       const raw = readFileSync(configPath(), 'utf-8');
-      return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_CONFIG, ...parsed, apiKey: decryptSecret(parsed.apiKey ?? '') };
     }
   } catch {
     // 文件损坏，用默认
@@ -33,5 +35,6 @@ export function loadCurseForgeConfig(): CurseForgeConfig {
 export function saveCurseForgeConfig(config: CurseForgeConfig): void {
   const dir = app.getPath('userData');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(configPath(), JSON.stringify(config, null, 2), 'utf-8');
+  const persisted = { ...config, apiKey: encryptSecret(config.apiKey) };
+  writeFileSync(configPath(), JSON.stringify(persisted, null, 2), 'utf-8');
 }

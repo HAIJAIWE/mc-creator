@@ -2,6 +2,7 @@ import { app } from 'electron';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { AiModelConfig } from '@mc-creator/core';
+import { encryptSecret, decryptSecret } from './secret-storage.js';
 
 /** 模型配置持久化（用 JSON 文件存 app.getPath('userData')） */
 const CONFIG_FILE = 'model-config.json';
@@ -26,7 +27,8 @@ export function loadModelConfig(): ModelConfigFull {
   try {
     if (existsSync(configPath())) {
       const raw = readFileSync(configPath(), 'utf-8');
-      return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_CONFIG, ...parsed, apiKey: decryptSecret(parsed.apiKey ?? '') };
     }
   } catch {
     // 文件损坏，用默认
@@ -37,5 +39,7 @@ export function loadModelConfig(): ModelConfigFull {
 export function saveModelConfig(config: ModelConfigFull): void {
   const dir = app.getPath('userData');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(configPath(), JSON.stringify(config, null, 2), 'utf-8');
+  // 仅在持久化时加密 apiKey，内存中保持明文供运行时使用
+  const persisted = { ...config, apiKey: encryptSecret(config.apiKey) };
+  writeFileSync(configPath(), JSON.stringify(persisted, null, 2), 'utf-8');
 }

@@ -11,9 +11,14 @@ const api = {
   saveModelConfig: (config: unknown) => ipcRenderer.invoke(SAVE_MODEL_CONFIG, config),
   chat: (message: string) => ipcRenderer.invoke(CHAT, { message }),
   chatStream: (message: string, onChunk: (delta: string, done: boolean) => void) => {
-    const handler = (_e: unknown, data: { delta: string; done: boolean }) => onChunk(data.delta, data.done);
+    const handler = (_e: unknown, data: { delta: string; done: boolean }) => {
+      onChunk(data.delta, data.done);
+      // 收到 done 后立即移除监听，避免残留监听器接收后续流的 chunk
+      if (data.done) ipcRenderer.removeListener(CHAT_STREAM_CHUNK, handler);
+    };
     ipcRenderer.on(CHAT_STREAM_CHUNK, handler);
-    ipcRenderer.invoke(CHAT_STREAM, { message }).then(() => {
+    // P0 修复：invoke 失败时也要移除监听，否则内存泄漏
+    ipcRenderer.invoke(CHAT_STREAM, { message }).finally(() => {
       ipcRenderer.removeListener(CHAT_STREAM_CHUNK, handler);
     });
   },
@@ -22,9 +27,13 @@ const api = {
     projectPath: string,
     onChunk: (chunk: BuildStreamChunkT) => void,
   ) => {
-    const handler = (_e: unknown, data: BuildStreamChunkT) => onChunk(data);
+    const handler = (_e: unknown, data: BuildStreamChunkT) => {
+      onChunk(data);
+      if (data.done) ipcRenderer.removeListener(BUILD_STREAM_CHUNK, handler);
+    };
     ipcRenderer.on(BUILD_STREAM_CHUNK, handler);
-    ipcRenderer.invoke(BUILD_STREAM, { projectPath }).then(() => {
+    // P0 修复：invoke 失败时也要移除监听，否则内存泄漏
+    ipcRenderer.invoke(BUILD_STREAM, { projectPath }).finally(() => {
       ipcRenderer.removeListener(BUILD_STREAM_CHUNK, handler);
     });
   },
@@ -68,7 +77,7 @@ try {
   contextBridge.exposeInMainWorld('mcApi', api);
 } catch {
   // 测试环境无 contextBridge，挂到 globalThis
-  (globalThis as any).mcApi = api;
+  (globalThis as { mcApi?: typeof api }).mcApi = api;
 }
 
 export type McApi = typeof api;
