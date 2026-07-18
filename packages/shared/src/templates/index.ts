@@ -12,6 +12,7 @@ import { SERVER_TEMPLATES } from './server-templates.js';
 import { LAUNCHER_TEMPLATES } from './launcher-templates.js';
 import { SKIN_TEMPLATES } from './skin-templates.js';
 import { RESOURCE_PACK_TEMPLATES } from './resource-pack-templates.js';
+import { KUBEJS_TEMPLATES } from './kubejs-templates.js';
 
 export type { SpecTemplate, GeneratorType } from './types.js';
 export * from './mod-templates.js';
@@ -21,6 +22,7 @@ export * from './server-templates.js';
 export * from './launcher-templates.js';
 export * from './skin-templates.js';
 export * from './resource-pack-templates.js';
+export * from './kubejs-templates.js';
 
 /**
  * 按生成器类型分组的模板映射。
@@ -38,4 +40,5 @@ export const TEMPLATES_BY_TYPE: Record<GeneratorType, SpecTemplate[]> = {
   launcher: LAUNCHER_TEMPLATES,
   skin: SKIN_TEMPLATES,
   resource_pack: RESOURCE_PACK_TEMPLATES,
+  kubejs: KUBEJS_TEMPLATES,
 };

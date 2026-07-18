@@ -16,6 +16,7 @@ const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
   resource_pack: { scope: 'pixel', name: 'folder' },
   skin: { scope: 'pixel', name: 'user' },
   launcher: { scope: 'pixel', name: 'rocket' },
+  kubejs: { scope: 'pixel', name: 'zap' },
 };
 
 const TYPE_LABEL: Record<GeneratorType, string> = {
@@ -26,6 +27,7 @@ const TYPE_LABEL: Record<GeneratorType, string> = {
   resource_pack: '资源包',
   skin: '皮肤',
   launcher: '启动器',
+  kubejs: 'KubeJS',
 };
 
 const TYPE_DESC: Record<GeneratorType, string> = {
@@ -36,6 +38,7 @@ const TYPE_DESC: Record<GeneratorType, string> = {
   resource_pack: '创建资源包',
   skin: '创建玩家皮肤',
   launcher: '创建启动器配置',
+  kubejs: '创建 KubeJS 脚本',
 };
 
 const LOADER_LABEL: Record<string, string> = {

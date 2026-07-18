@@ -46,6 +46,9 @@ import {
   CHAT,
   CHAT_STREAM,
   CHAT_STREAM_CHUNK,
+  EXPLAIN_CODE,
+  EXPLAIN_CODE_CHUNK,
+  ExplainCodeRequest,
   BUILD_WITH_FIX,
   BuildWithFixRequest,
   BUILD_STREAM,
@@ -198,6 +201,42 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       }
     } catch (err) {
       e.sender.send(CHAT_STREAM_CHUNK, { delta: `错误：${(err as Error).message}`, done: true });
+    }
+  });
+
+  // 流式 AI 解释代码
+  ipcMain.handle(EXPLAIN_CODE, async (e, raw: unknown) => {
+    const req = ExplainCodeRequest.parse(raw);
+    const config = loadModelConfig();
+    if (!config.apiKey) {
+      e.sender.send(EXPLAIN_CODE_CHUNK, { delta: '请先在设置中配置 API Key。', done: true });
+      return;
+    }
+
+    const provider = new VercelAiProvider(config);
+    const prompt = `请解释以下 Minecraft 项目文件代码：${req.fileName}
+
+代码内容：
+\`\`\`
+${req.code}
+\`\`\`
+
+请从以下几个方面解释：
+1. 文件作用（在项目中的角色）
+2. 关键代码逻辑（逐段说明）
+3. Minecraft 模组开发相关知识点（如 loader API、事件、注册等）
+4. 可能的改进建议或注意事项
+
+用中文回答，使用 Markdown 格式，简洁清晰。`;
+
+    try {
+      for await (const chunk of provider.stream(prompt, {
+        system: '你是 Minecraft 模组开发专家，擅长解释代码并教学。回答使用中文。',
+      })) {
+        e.sender.send(EXPLAIN_CODE_CHUNK, { delta: chunk.delta, done: chunk.done });
+      }
+    } catch (err) {
+      e.sender.send(EXPLAIN_CODE_CHUNK, { delta: `错误：${(err as Error).message}`, done: true });
     }
   });
 

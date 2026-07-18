@@ -1,9 +1,27 @@
 import { useState, useEffect } from 'react';
-import { LayoutGrid, LayoutPanelTop, PanelRight, LayoutList, Circle } from 'lucide-react';
+import {
+  LayoutGrid,
+  LayoutPanelTop,
+  PanelRight,
+  LayoutList,
+  Circle,
+  Sun,
+  Moon,
+  Monitor,
+} from 'lucide-react';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModelConfigStore } from '../store/model-config-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
-import { MC_THEMES, applyTheme } from '../lib/themes.js';
+import {
+  MC_THEMES,
+  applyTheme,
+  applyColorMode,
+  getCurrentMode,
+  getCurrentThemeId,
+  getEffectiveMode,
+  getSystemMode,
+  type ColorMode,
+} from '../lib/themes.js';
 import type { ModelConfigRes } from '../../../shared/ipc-channels.js';
 
 interface SettingsPanelProps {
@@ -116,14 +134,14 @@ export function SettingsPanel({
   const [cfSaving, setCfSaving] = useState(false);
   const [cfSaved, setCfSaved] = useState(false);
 
-  // === 外观：主题 ===
-  const [activeTheme, setActiveTheme] = useState<string>(() => {
-    try {
-      return localStorage.getItem('mc-creator-theme') ?? 'grass';
-    } catch {
-      return 'grass';
-    }
-  });
+  // === 外观：颜色模式 + 主题 ===
+  const [activeMode, setActiveMode] = useState<ColorMode>(() => getCurrentMode());
+  const [effectiveMode, setEffectiveMode] = useState<'light' | 'dark'>(() =>
+    getEffectiveMode(getCurrentMode()),
+  );
+  const [activeTheme, setActiveTheme] = useState<string>(() =>
+    getCurrentThemeId(getEffectiveMode(getCurrentMode())),
+  );
 
   useEffect(() => {
     ipcClient.loadModelConfig().then((c: ModelConfigRes) => {
@@ -132,6 +150,23 @@ export function SettingsPanel({
     });
     ipcClient.loadCurseForgeConfig().then((c) => setCfApiKey(c.apiKey));
   }, [setConfig]);
+
+  // 系统模式变化时（仅 system 模式下）同步 UI 状态：effectiveMode + activeTheme
+  useEffect(() => {
+    if (activeMode !== 'system' || typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => {
+      const newEffective = getSystemMode();
+      setEffectiveMode(newEffective);
+      setActiveTheme(getCurrentThemeId(newEffective));
+    };
+    if (typeof mql.addEventListener === 'function') mql.addEventListener('change', handler);
+    else if (typeof mql.addListener === 'function') mql.addListener(handler);
+    return () => {
+      if (typeof mql.removeEventListener === 'function') mql.removeEventListener('change', handler);
+      else if (typeof mql.removeListener === 'function') mql.removeListener(handler);
+    };
+  }, [activeMode]);
 
   const saveModel = async () => {
     setSaving(true);
@@ -162,6 +197,14 @@ export function SettingsPanel({
   const setTheme = (id: string) => {
     applyTheme(id);
     setActiveTheme(id);
+  };
+
+  const setMode = (mode: ColorMode) => {
+    applyColorMode(mode);
+    setActiveMode(mode);
+    const newEffective = getEffectiveMode(mode);
+    setEffectiveMode(newEffective);
+    setActiveTheme(getCurrentThemeId(newEffective));
   };
 
   const getCurrentPreset = () => {
@@ -376,11 +419,42 @@ export function SettingsPanel({
               </div>
             </div>
 
+            {/* 颜色模式 */}
+            <div>
+              <div className="mb-2 text-xs font-medium text-mc-text">颜色模式</div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(
+                  [
+                    { id: 'light', label: '亮色', icon: Sun },
+                    { id: 'dark', label: '暗色', icon: Moon },
+                    { id: 'system', label: '跟随系统', icon: Monitor },
+                  ] as { id: ColorMode; label: string; icon: typeof Sun }[]
+                ).map((m) => {
+                  const Icon = m.icon;
+                  const isActive = activeMode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => setMode(m.id)}
+                      className={`flex items-center justify-center gap-1.5 rounded-mc p-2 text-xs font-medium transition-all border ${
+                        isActive
+                          ? 'bg-mc-accent/15 border-mc-accent/50 text-mc-accent-bright'
+                          : 'bg-mc-surface-2/50 border-transparent text-mc-text-dim hover:bg-mc-surface-2 hover:text-mc-text'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* 主题颜色 */}
             <div>
               <div className="mb-2 text-xs font-medium text-mc-text">主题颜色</div>
               <div className="space-y-1.5">
-                {MC_THEMES.map((theme) => {
+                {MC_THEMES.filter((t) => t.mode === effectiveMode).map((theme) => {
                   const isActive = activeTheme === theme.id;
                   const a = theme.vars['--mc-accent'];
                   const d = theme.vars['--mc-accent-deep'];

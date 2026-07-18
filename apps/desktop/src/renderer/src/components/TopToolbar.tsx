@@ -22,6 +22,7 @@ const TYPE_LABELS: Record<GeneratorType, string> = {
   resource_pack: '资源包',
   skin: '皮肤',
   launcher: '启动器',
+  kubejs: 'KubeJS',
 };
 
 export function TopToolbar({ onOpenSettings }: TopToolbarProps) {

@@ -10,6 +10,8 @@ import {
   CHAT,
   CHAT_STREAM,
   CHAT_STREAM_CHUNK,
+  EXPLAIN_CODE,
+  EXPLAIN_CODE_CHUNK,
   BUILD_WITH_FIX,
   BUILD_STREAM,
   BUILD_STREAM_CHUNK,
@@ -60,6 +62,21 @@ const api = {
     // P0 修复：invoke 失败时也要移除监听，否则内存泄漏
     ipcRenderer.invoke(CHAT_STREAM, { message }).finally(() => {
       ipcRenderer.removeListener(CHAT_STREAM_CHUNK, handler);
+    });
+  },
+  explainCode: (
+    fileName: string,
+    code: string,
+    generatorType: string | undefined,
+    onChunk: (delta: string, done: boolean) => void,
+  ) => {
+    const handler = (_e: unknown, data: { delta: string; done: boolean }) => {
+      onChunk(data.delta, data.done);
+      if (data.done) ipcRenderer.removeListener(EXPLAIN_CODE_CHUNK, handler);
+    };
+    ipcRenderer.on(EXPLAIN_CODE_CHUNK, handler);
+    ipcRenderer.invoke(EXPLAIN_CODE, { fileName, code, generatorType }).finally(() => {
+      ipcRenderer.removeListener(EXPLAIN_CODE_CHUNK, handler);
     });
   },
   buildWithFix: (projectPath: string) => ipcRenderer.invoke(BUILD_WITH_FIX, { projectPath }),

@@ -43,6 +43,12 @@ export const ipcClient = {
   chat: (message: string) => window.mcApi.chat(message),
   chatStream: (message: string, onChunk: (delta: string, done: boolean) => void) =>
     window.mcApi.chatStream(message, onChunk),
+  explainCode: (
+    fileName: string,
+    code: string,
+    generatorType: string | undefined,
+    onChunk: (delta: string, done: boolean) => void,
+  ) => window.mcApi.explainCode(fileName, code, generatorType, onChunk),
   buildWithFix: (projectPath: string): Promise<BuildWithFixRes> =>
     window.mcApi.buildWithFix(projectPath),
   buildStream: (projectPath: string, onChunk: (chunk: BuildStreamChunkT) => void) =>

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import Editor from '@monaco-editor/react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles, X } from 'lucide-react';
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModStore } from '../store/mod-store.js';
@@ -100,11 +100,17 @@ export function CodePreview() {
   const [exportMsg, setExportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null,
   );
+  // AI 解释代码：流式输出 + 可折叠面板
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [explanation, setExplanation] = useState('');
+  const [showExplanation, setShowExplanation] = useState(false);
 
   // P3 性能：仅 files/selectedFile 变化时重算 file，避免每次渲染都 O(n) find
   const file = useMemo(() => files.find((f) => f.path === selectedFile), [files, selectedFile]);
   const isPng = selectedFile?.endsWith('.png') ?? false;
   const fileIconName = file ? getFileIcon(file.path) : 'file';
+  // 仅文本文件且非空时才允许解释（PNG 走预览，空文件无内容可解释）
+  const canExplain = !!file && !isPng && file.content.length > 0;
 
   const handleExport = async () => {
     if (files.length === 0) return;
@@ -121,6 +127,29 @@ export function CodePreview() {
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExplain = async () => {
+    if (!file || isExplaining) return;
+    // 重置状态，开启新一轮解释
+    setExplanation('');
+    setIsExplaining(true);
+    setShowExplanation(true);
+    try {
+      await ipcClient.explainCode(file.path, file.content, generatorType, (delta, done) => {
+        // 用函数式更新避免闭包捕获旧值，确保流式 delta 正确累积
+        setExplanation((prev) => prev + delta);
+        if (done) setIsExplaining(false);
+      });
+    } catch (e) {
+      setExplanation((prev) => `${prev}\n\n错误：${(e as Error).message}`);
+      setIsExplaining(false);
+    }
+  };
+
+  const handleCloseExplanation = () => {
+    setShowExplanation(false);
+    setExplanation('');
   };
 
   const lang =
@@ -156,6 +185,21 @@ export function CodePreview() {
           {exportMsg?.type === 'error' && (
             <span className="max-w-xs truncate text-xs text-mc-redstone">{exportMsg.text}</span>
           )}
+          {canExplain && (
+            <button
+              onClick={handleExplain}
+              disabled={isExplaining}
+              className="mc-btn-ghost"
+              title="用 AI 解释当前文件代码"
+            >
+              {isExplaining ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3" />
+              )}
+              解释代码
+            </button>
+          )}
           <button
             onClick={handleExport}
             disabled={exporting || files.length === 0}
@@ -178,16 +222,56 @@ export function CodePreview() {
       ) : isPng ? (
         <PngPreview file={file} />
       ) : (
-        <div className="flex-1 overflow-hidden bg-mc-bg">
-          <Editor
-            height="100%"
-            path={file.path}
-            language={lang}
-            theme={MC_MONACO_THEME}
-            onMount={defineMcMonacoTheme}
-            value={file.content}
-            options={{ ...mcEditorOptions, readOnly: true }}
-          />
+        <div className="flex flex-1 flex-col overflow-hidden bg-mc-bg">
+          <div
+            className="min-h-0 overflow-hidden"
+            style={{ flex: showExplanation ? '3 1 0%' : '1 1 0%' }}
+          >
+            <Editor
+              height="100%"
+              path={file.path}
+              language={lang}
+              theme={MC_MONACO_THEME}
+              onMount={defineMcMonacoTheme}
+              value={file.content}
+              options={{ ...mcEditorOptions, readOnly: true }}
+            />
+          </div>
+          {showExplanation && (
+            <div
+              className="flex min-h-0 flex-col border-t border-mc-border bg-mc-surface"
+              style={{ flex: '2 1 0%' }}
+            >
+              <div className="flex items-center justify-between border-b border-mc-border px-3 py-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-mc-accent" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-mc-dim">
+                    AI 代码解释
+                  </span>
+                  {isExplaining && <span className="text-xs text-mc-mute">生成中…</span>}
+                </div>
+                <button
+                  onClick={handleCloseExplanation}
+                  className="rounded-mc p-1 text-mc-mute transition-colors hover:bg-mc-surface-2 hover:text-mc-text"
+                  title="关闭"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3">
+                {explanation ? (
+                  <div className="whitespace-pre-wrap text-xs leading-relaxed text-mc-text">
+                    {explanation}
+                    {isExplaining && (
+                      <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-mc-dim align-middle" />
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs text-mc-mute">思考中…</div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

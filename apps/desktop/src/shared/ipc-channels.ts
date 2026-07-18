@@ -10,6 +10,7 @@ export const GENERATOR_TYPES = [
   'resource_pack',
   'skin',
   'launcher',
+  'kubejs',
 ] as const;
 export type GeneratorType = (typeof GENERATOR_TYPES)[number];
 
@@ -108,6 +109,17 @@ export const CHAT_STREAM_CHUNK = 'ai:chatStream:chunk'; // 主进程→渲染进
 
 export const ChatStreamRequest = z.object({ message: z.string().min(1) });
 export type ChatStreamReq = z.infer<typeof ChatStreamRequest>;
+
+// === AI 解释代码（流式） ===
+export const EXPLAIN_CODE = 'ai:explainCode';
+export const EXPLAIN_CODE_CHUNK = 'ai:explainCode:chunk';
+
+export const ExplainCodeRequest = z.object({
+  fileName: z.string().min(1),
+  code: z.string().min(1),
+  generatorType: z.string().optional(),
+});
+export type ExplainCodeReq = z.infer<typeof ExplainCodeRequest>;
 
 // === 带修复的构建 ===
 export const BUILD_WITH_FIX = 'mod:buildWithFix';

@@ -6,6 +6,7 @@ import {
   SkinSpec,
   ResourcePackSpec,
   LauncherSpec,
+  KubejsSpec,
   type ModSpec as ModSpecType,
 } from '@mc-creator/shared';
 import type { ModelProvider } from '../model-provider/types.js';
@@ -15,7 +16,7 @@ const MAX_RETRIES = 3;
 
 /** 生成器类型 → 对应 schema 与 prompt 描述（与 desktop 层 GENERATOR_TYPES 对齐） */
 export type SpecType =
-  'mod' | 'datapack' | 'modpack' | 'server' | 'resource_pack' | 'skin' | 'launcher';
+  'mod' | 'datapack' | 'modpack' | 'server' | 'resource_pack' | 'skin' | 'launcher' | 'kubejs';
 
 interface SpecConfig {
   schema: ZodTypeAny;
@@ -143,6 +144,24 @@ Schema 字段：
 - fullscreen: 是否全屏（默认 false）
 - resolutionWidth: 分辨率宽（默认 854）
 - resolutionHeight: 分辨率高（默认 480）
+只输出 JSON，不要解释。`,
+  },
+  kubejs: {
+    schema: KubejsSpec,
+    prompt: `你是 Minecraft KubeJS 脚本规格生成器。根据描述生成 KubejsSpec JSON。
+Schema 字段：
+- packId: 小写下划线 ^[a-z0-9_]+$
+- packName: 显示名
+- description: 描述
+- packFormat: 数字（1.21.x 用 48）
+- mcVersion: MC 版本（默认 1.21.1）
+- recipes[]: 配方列表（id, type shaped/shapeless/smelting/stonecutting/custom, result, count, pattern[], key{}, ingredients[], customCode）
+- tags[]: 标签列表（id, type item/block/entity_type/fluid/function, values[], replace）
+- events[]: 事件列表（id, type 如 block.right_click/player.logged_in/item.tooltip/tick, target, handler JS 代码字符串）
+- tooltips[]: 工具提示列表（itemId, lines[], advanced）
+- lang: 语言对象，键为语言代码（en_us/zh_cn），值为键值对对象
+- registry[]: 自定义注册表（id, type item/block/sound/fluid, items[], blocks[], customCode）
+handler 字段是 JavaScript 代码字符串（不带 function 包裹），会被嵌入到事件回调中。
 只输出 JSON，不要解释。`,
   },
 };
