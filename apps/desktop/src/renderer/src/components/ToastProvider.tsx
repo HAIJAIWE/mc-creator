@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, type ReactNode } from 'react';
 import { McIcon } from '../assets/mc-ui/McIcon';
+import { ToastContext, type ToastType } from './useToast';
 
 /**
  * Toast 通知系统（P32）。
@@ -11,12 +12,14 @@ import { McIcon } from '../assets/mc-ui/McIcon';
  * - 右上角堆叠，slide-in 动画
  *
  * 用法：
+ *   import { useToast } from './useToast';
  *   const toast = useToast();
  *   toast.success('导入成功');
  *   toast.error('导入失败：xxx');
+ *
+ * 注：useToast hook 和 ToastContext 都在 ./useToast.ts 中导出，
+ * 让本文件只导出 ToastProvider component，符合 react-refresh/only-export-components 规则。
  */
-
-export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
 interface ToastItem {
   id: string;
@@ -24,24 +27,30 @@ interface ToastItem {
   message: string;
 }
 
-interface ToastContextValue {
-  toast: (message: string, type?: ToastType) => void;
-  success: (message: string) => void;
-  error: (message: string) => void;
-  warning: (message: string) => void;
-  info: (message: string) => void;
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null);
-
 const TYPE_CONFIG: Record<
   ToastType,
   { icon: { scope: 'pixel'; name: string }; color: string; border: string }
 > = {
-  success: { icon: { scope: 'pixel', name: 'check' }, color: 'text-mc-accent', border: 'border-mc-accent' },
-  error: { icon: { scope: 'pixel', name: 'square-alert' }, color: 'text-mc-redstone', border: 'border-mc-redstone' },
-  warning: { icon: { scope: 'pixel', name: 'warning-box' }, color: 'text-mc-gold', border: 'border-mc-gold' },
-  info: { icon: { scope: 'pixel', name: 'info-box' }, color: 'text-mc-accent', border: 'border-mc-accent' },
+  success: {
+    icon: { scope: 'pixel', name: 'check' },
+    color: 'text-mc-accent',
+    border: 'border-mc-accent',
+  },
+  error: {
+    icon: { scope: 'pixel', name: 'square-alert' },
+    color: 'text-mc-redstone',
+    border: 'border-mc-redstone',
+  },
+  warning: {
+    icon: { scope: 'pixel', name: 'warning-box' },
+    color: 'text-mc-gold',
+    border: 'border-mc-gold',
+  },
+  info: {
+    icon: { scope: 'pixel', name: 'info-box' },
+    color: 'text-mc-accent',
+    border: 'border-mc-accent',
+  },
 };
 
 const DEFAULT_DURATION: Record<ToastType, number> = {
@@ -68,12 +77,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [remove],
   );
 
-  const value: ToastContextValue = {
+  const value = {
     toast,
-    success: (m) => toast(m, 'success'),
-    error: (m) => toast(m, 'error'),
-    warning: (m) => toast(m, 'warning'),
-    info: (m) => toast(m, 'info'),
+    success: (m: string) => toast(m, 'success'),
+    error: (m: string) => toast(m, 'error'),
+    warning: (m: string) => toast(m, 'warning'),
+    info: (m: string) => toast(m, 'info'),
   };
 
   return (
@@ -89,7 +98,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               key={t.id}
               className={`pointer-events-auto flex items-start gap-2 rounded-mc-lg border ${config.border} bg-mc-surface px-4 py-3 shadow-mc-pop min-w-[280px] max-w-[400px] animate-mc-toast-in`}
             >
-              <McIcon scope={icon.scope} name={icon.name} size={20} className="mt-0.5 flex-shrink-0" />
+              <McIcon
+                scope={icon.scope}
+                name={icon.name}
+                size={20}
+                className="mt-0.5 flex-shrink-0"
+              />
               <div className="flex-1 text-sm text-mc-text">{t.message}</div>
               <button
                 onClick={() => remove(t.id)}
@@ -104,12 +118,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast(): ToastContextValue {
-  const ctx = useContext(ToastContext);
-  if (!ctx) {
-    throw new Error('useToast must be used within ToastProvider');
-  }
-  return ctx;
 }

@@ -45,7 +45,13 @@ export function SkinPreviewPanel() {
   }, [files, spec]);
 
   if (!spec) {
-    return <EmptyState icon="box" title="尚未生成皮肤 Spec" hint="在右侧 AgentPanel 描述你想要的皮肤，生成 Spec 后即可预览" />;
+    return (
+      <EmptyState
+        icon="box"
+        title="尚未生成皮肤 Spec"
+        hint="在右侧 AgentPanel 描述你想要的皮肤，生成 Spec 后即可预览"
+      />
+    );
   }
 
   const skin = spec as unknown as SkinSpec;
@@ -63,15 +69,22 @@ export function SkinPreviewPanel() {
           <McIcon scope="pixel" name="star" size={16} className="text-mc-accent" />
           <span className="text-sm font-bold text-mc-text">{skin.playerName}</span>
           <span className="text-xs text-mc-mute">·</span>
-          <span className="text-xs text-mc-dim">{skin.model === 'slim' ? 'Slim (Alex)' : 'Classic (Steve)'}</span>
+          <span className="text-xs text-mc-dim">
+            {skin.model === 'slim' ? 'Slim (Alex)' : 'Classic (Steve)'}
+          </span>
         </div>
-        <div className="mt-1 text-xs text-mc-mute">{skinUrl ? '皮肤 PNG 已生成' : '皮肤 PNG 未生成（保存后即可预览）'}</div>
+        <div className="mt-1 text-xs text-mc-mute">
+          {skinUrl ? '皮肤 PNG 已生成' : '皮肤 PNG 未生成（保存后即可预览）'}
+        </div>
       </div>
 
       {/* Body：左右分栏 */}
       <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
         {/* 左：3D 预览 */}
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4" style={{ backgroundColor: bgColor }}>
+        <div
+          className="flex flex-1 flex-col items-center justify-center gap-2 p-4"
+          style={{ backgroundColor: bgColor }}
+        >
           {skinUrl ? (
             <SkinViewer3D
               canvasRef={canvasRef}
@@ -88,8 +101,13 @@ export function SkinPreviewPanel() {
         </div>
 
         {/* 右：2D UV 贴图 */}
-        <div className="flex w-full flex-col gap-2 border-t border-mc-border p-4 md:w-80 md:border-l md:border-t-0" style={{ backgroundColor: bgColor }}>
-          <div className="text-xs font-bold uppercase tracking-wider text-mc-dim">2D 纹理贴图 (64×64)</div>
+        <div
+          className="flex w-full flex-col gap-2 border-t border-mc-border p-4 md:w-80 md:border-l md:border-t-0"
+          style={{ backgroundColor: bgColor }}
+        >
+          <div className="text-xs font-bold uppercase tracking-wider text-mc-dim">
+            2D 纹理贴图 (64×64)
+          </div>
           <div className="relative">
             {skinUrl ? (
               <Skin2DOverlay skinUrl={skinUrl} model={skin.model} />
@@ -138,11 +156,31 @@ export function SkinPreviewPanel() {
 
         <div className="mt-4">
           <FieldGroup title="颜色">
-            <ColorRow label="皮肤色" value={skin.skinColor} onChange={(v) => updateField('skinColor', v)} />
-            <ColorRow label="头发色" value={skin.hairColor} onChange={(v) => updateField('hairColor', v)} />
-            <ColorRow label="上衣色" value={skin.shirtColor} onChange={(v) => updateField('shirtColor', v)} />
-            <ColorRow label="裤子色" value={skin.pantsColor} onChange={(v) => updateField('pantsColor', v)} />
-            <ColorRow label="鞋子色" value={skin.shoesColor} onChange={(v) => updateField('shoesColor', v)} />
+            <ColorRow
+              label="皮肤色"
+              value={skin.skinColor}
+              onChange={(v) => updateField('skinColor', v)}
+            />
+            <ColorRow
+              label="头发色"
+              value={skin.hairColor}
+              onChange={(v) => updateField('hairColor', v)}
+            />
+            <ColorRow
+              label="上衣色"
+              value={skin.shirtColor}
+              onChange={(v) => updateField('shirtColor', v)}
+            />
+            <ColorRow
+              label="裤子色"
+              value={skin.pantsColor}
+              onChange={(v) => updateField('pantsColor', v)}
+            />
+            <ColorRow
+              label="鞋子色"
+              value={skin.shoesColor}
+              onChange={(v) => updateField('shoesColor', v)}
+            />
           </FieldGroup>
         </div>
       </div>
@@ -180,9 +218,14 @@ function SkinViewer3D({ canvasRef, viewerRef, skinUrl, model }: SkinViewer3DProp
   }, []);
 
   // 加载皮肤（url 或 model 变化时）
+  // 注：viewerRef 是 useRef 返回的稳定 ref object，引用永不变化，
+  // 加到 deps 数组无意义（React 官方文档明确说 ref 不应出现在 deps 里）。
+  // viewerRef.current 在上面的 useEffect 中初始化，首次渲染时为 null，
+  // 此时本 effect 提前 return；viewer 创建完成后 skinUrl/model 变化会再次触发。
   useEffect(() => {
     if (!viewerRef.current) return;
     viewerRef.current.loadSkin(skinUrl, { model });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skinUrl, model]);
 
   return (
@@ -244,7 +287,15 @@ function Skin2DOverlay({ skinUrl, model }: Skin2DOverlayProps) {
 
 // ===== 颜色行子组件 =====
 
-function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function ColorRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="flex items-center gap-3">
       <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>

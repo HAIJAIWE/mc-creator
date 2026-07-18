@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
-import { useToast } from './ToastProvider.js';
+import { useToast } from './useToast.js';
 import type { Project, GeneratorType } from '../../../shared/ipc-channels.js';
 import { GENERATOR_TYPES } from '../../../shared/ipc-channels.js';
 import { FolderInput, FolderOutput } from 'lucide-react';
@@ -138,18 +138,17 @@ export function Dashboard() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => handleNew()}
-            className="mc-btn-primary"
-          >
+          <button onClick={() => handleNew()} className="mc-btn-primary">
             <McIcon scope="pixel" name="plus" size={16} /> 新建项目
           </button>
-          <button
-            onClick={handleImport}
-            disabled={importing}
-            className="mc-btn-ghost"
-          >
-            {importing ? '导入中…' : <><FolderInput className="h-4 w-4" /> 导入项目</>}
+          <button onClick={handleImport} disabled={importing} className="mc-btn-ghost">
+            {importing ? (
+              '导入中…'
+            ) : (
+              <>
+                <FolderInput className="h-4 w-4" /> 导入项目
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -182,7 +181,9 @@ export function Dashboard() {
 
       <main className="flex-1 overflow-y-auto p-6">
         {loading && projects.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-mc-mute">加载中…</div>
+          <div className="flex h-full items-center justify-center text-sm text-mc-mute">
+            加载中…
+          </div>
         ) : projects.length === 0 ? (
           <div className="mx-auto max-w-4xl">
             <div className="mb-8 text-center">
@@ -190,7 +191,9 @@ export function Dashboard() {
                 <McMark className="h-9 w-9 text-mc-accent" />
               </div>
               <h2 className="mb-2 font-display text-xl font-bold">选择你要创建的内容类型</h2>
-              <p className="text-sm text-mc-mute">让 AI 帮你生成 Mod、数据包、整合包等 Minecraft 内容</p>
+              <p className="text-sm text-mc-mute">
+                让 AI 帮你生成 Mod、数据包、整合包等 Minecraft 内容
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
               {(GENERATOR_TYPES as readonly GeneratorType[]).map((type) => {
@@ -228,7 +231,9 @@ export function Dashboard() {
                           <McIcon scope={icon.scope} name={icon.name} size={20} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-base font-semibold text-mc-text">{p.name}</div>
+                          <div className="truncate text-base font-semibold text-mc-text">
+                            {p.name}
+                          </div>
                           <div className="text-xs text-mc-mute">{TYPE_LABEL[p.generatorType]}</div>
                         </div>
                       </div>
@@ -249,10 +254,7 @@ export function Dashboard() {
                         更新于 {new Date(p.updatedAt).toLocaleDateString()}
                       </div>
                       <div className="mt-auto flex gap-2">
-                        <button
-                          onClick={() => loadProject(p.id)}
-                          className="mc-btn-primary"
-                        >
+                        <button onClick={() => loadProject(p.id)} className="mc-btn-primary">
                           打开
                         </button>
                         <button
@@ -260,7 +262,13 @@ export function Dashboard() {
                           disabled={exportingId === p.id}
                           className="mc-btn-ghost"
                         >
-                          {exportingId === p.id ? '导出中…' : <><FolderOutput className="h-4 w-4" /> 导出</>}
+                          {exportingId === p.id ? (
+                            '导出中…'
+                          ) : (
+                            <>
+                              <FolderOutput className="h-4 w-4" /> 导出
+                            </>
+                          )}
                         </button>
                         <button
                           onClick={() => {

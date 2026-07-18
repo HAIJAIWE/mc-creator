@@ -1,20 +1,25 @@
 # MC Creator
 
+[![CI](https://github.com/USER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/USER/REPO/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+<!-- 推送到 GitHub 后，把上面的 USER/REPO 替换为你的仓库地址（owner/repo），CI 徽章会自动显示构建状态。 -->
+
 AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代码、数据包、整合包、服务器配置、材质包、皮肤和资源包，并通过内置构建链编译成 `.jar`，支持项目管理与一键部署。
 
 ## 功能特性
 
 支持 **7 种生成器类型**，覆盖 Minecraft 内容创作的主要场景：
 
-| 类型 | 说明 | 产物 |
-|------|------|------|
-| **Mod** | Fabric / NeoForge 模组源码 | 完整 Gradle 项目 + `.jar` + `_meta.json` 元数据 |
-| **数据包** | 原版数据包（配方 / 标签 / 函数 / 进度 / 战利品 / 谓词） | `pack.mcmeta` + `data/<ns>/` |
-| **整合包** | Modrinth / CurseForge 格式 | `modrinth.index.json` 或 `manifest.json` + overrides + server-overrides |
-| **服务器配置** | 服务端配置包 + 一键部署脚本 | `server.properties` / `eula.txt` / 启动脚本 / `ops.json` / `whitelist.json` / `mods/` + `deploy/`（systemd / Docker / backup） |
-| **材质包** | 资源包（纯色 / 渐变 / 棋盘格 PNG） | `pack.mcmeta` + `assets/<modId>/textures/` |
-| **皮肤** | 64×64 玩家皮肤（classic / slim 模型） | `<playerName>.png` + 可选 `preview.png` |
-| **资源包** | 贴图覆盖 / 模型 / 字体 / 音效 / 语言 | `pack.mcmeta` + `assets/<ns>/textures/` + `models/` + `font/` + `sounds/` + `lang/` |
+| 类型           | 说明                                                    | 产物                                                                                                                           |
+| -------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Mod**        | Fabric / NeoForge 模组源码                              | 完整 Gradle 项目 + `.jar` + `_meta.json` 元数据                                                                                |
+| **数据包**     | 原版数据包（配方 / 标签 / 函数 / 进度 / 战利品 / 谓词） | `pack.mcmeta` + `data/<ns>/`                                                                                                   |
+| **整合包**     | Modrinth / CurseForge 格式                              | `modrinth.index.json` 或 `manifest.json` + overrides + server-overrides                                                        |
+| **服务器配置** | 服务端配置包 + 一键部署脚本                             | `server.properties` / `eula.txt` / 启动脚本 / `ops.json` / `whitelist.json` / `mods/` + `deploy/`（systemd / Docker / backup） |
+| **材质包**     | 资源包（纯色 / 渐变 / 棋盘格 PNG）                      | `pack.mcmeta` + `assets/<modId>/textures/`                                                                                     |
+| **皮肤**       | 64×64 玩家皮肤（classic / slim 模型）                   | `<playerName>.png` + 可选 `preview.png`                                                                                        |
+| **资源包**     | 贴图覆盖 / 模型 / 字体 / 音效 / 语言                    | `pack.mcmeta` + `assets/<ns>/textures/` + `models/` + `font/` + `sounds/` + `lang/`                                            |
 
 ### 核心能力
 
@@ -34,19 +39,19 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 
 ## 技术栈
 
-| 层 | 技术 |
-|---|---|
-| 桌面框架 | Electron 31 + electron-vite 2.3 |
-| 前端 | React 18 + TypeScript 5 + Tailwind CSS 3 |
-| 状态管理 | Zustand 4 |
-| 代码编辑器 | Monaco Editor |
-| AI 编排 | Vercel AI SDK 4 + `@ai-sdk/openai` 1.x |
-| Schema 校验 | Zod 3 |
-| 打包 | JSZip 3 |
-| 测试 | Vitest 2 |
-| 包管理 | pnpm 9 workspaces |
-| Minecraft 版本 | 1.21.1 / 1.21.11 |
-| Loader | Fabric + NeoForge |
+| 层             | 技术                                     |
+| -------------- | ---------------------------------------- |
+| 桌面框架       | Electron 31 + electron-vite 2.3          |
+| 前端           | React 18 + TypeScript 5 + Tailwind CSS 3 |
+| 状态管理       | Zustand 4                                |
+| 代码编辑器     | Monaco Editor                            |
+| AI 编排        | Vercel AI SDK 4 + `@ai-sdk/openai` 1.x   |
+| Schema 校验    | Zod 3                                    |
+| 打包           | JSZip 3                                  |
+| 测试           | Vitest 2                                 |
+| 包管理         | pnpm 9 workspaces                        |
+| Minecraft 版本 | 1.21.1 / 1.21.11                         |
+| Loader         | Fabric + NeoForge                        |
 
 ## 项目结构
 
@@ -107,6 +112,7 @@ pnpm install
 ```
 
 > 注：Electron 二进制在国内网络可能下载失败，可设置镜像：
+>
 > ```bash
 > set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
 > pnpm install
@@ -124,6 +130,21 @@ pnpm --filter @mc-creator/desktop dev
 pnpm -r test          # 运行所有包的测试
 pnpm -r typecheck     # 类型检查所有包
 ```
+
+### 代码质量
+
+```bash
+pnpm lint             # ESLint 检查（flat config，按 main/preload/renderer/packages 区分规则）
+pnpm lint:fix         # ESLint 自动修复
+pnpm format           # Prettier 格式化所有源文件
+pnpm format:check     # Prettier 检查格式（不修改文件，CI 用）
+```
+
+代码风格约定：
+
+- ESLint 9 flat config（`eslint.config.mjs`）+ typescript-eslint + react-hooks + react-refresh
+- Prettier：单引号 / 分号 / 100 列 / trailing comma all / LF（`.prettierrc.json`）
+- EditorConfig：UTF-8 / LF / 2 空格（`.editorconfig`，bat/ps1 用 CRLF）
 
 ### 构建
 
@@ -147,6 +168,7 @@ pnpm --filter @mc-creator/desktop build
 ### 2. 选择生成器类型
 
 顶部工具栏「类型」下拉框选择：
+
 - Mod（默认）
 - 数据包
 - 整合包
@@ -231,9 +253,9 @@ CodePreview 展示 / 导出 zip
 
 ```typescript
 interface Generator {
-  readonly type: string;              // 'mod' | 'datapack' | 'modpack' | 'server' | 'texture' | 'skin'
-  readonly loaders: Loader[];         // 支持的 loader
-  readonly versions: McVersion[];     // 支持的 MC 版本
+  readonly type: string; // 'mod' | 'datapack' | 'modpack' | 'server' | 'texture' | 'skin'
+  readonly loaders: Loader[]; // 支持的 loader
+  readonly versions: McVersion[]; // 支持的 MC 版本
   generate(ctx: GeneratorContext): Promise<GenerationResult>;
 }
 ```
@@ -307,11 +329,11 @@ runGradleBuild
 
 当前共 **197 个测试**通过：
 
-| 包 | 测试文件 | 测试用例 |
-|---|---|---|
-| `@mc-creator/shared` | 1 | 6 |
-| `@mc-creator/core` | 23 | 169 |
-| `@mc-creator/desktop` | 4 | 22 |
+| 包                    | 测试文件 | 测试用例 |
+| --------------------- | -------- | -------- |
+| `@mc-creator/shared`  | 1        | 6        |
+| `@mc-creator/core`    | 23       | 169      |
+| `@mc-creator/desktop` | 4        | 22       |
 
 ## 路线图
 

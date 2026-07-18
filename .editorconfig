@@ -1,0 +1,23 @@
+# EditorConfig: https://editorconfig.org/
+# 统一团队所有编辑器/IDE 的基础格式（与 Prettier 配合，Prettier 处理细节）
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+# Markdown 保留行尾空格（Markdown 用两个尾随空格表示硬换行）
+trim_trailing_whitespace = false
+
+[*.{bat,ps1}]
+# Windows 批处理/PowerShell 脚本保留 CRLF
+end_of_line = crlf
+
+[Makefile]
+# Makefile 必须用 tab 缩进
+indent_style = tab
