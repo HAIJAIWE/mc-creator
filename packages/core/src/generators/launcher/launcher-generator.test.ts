@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { LauncherGenerator } from './launcher-generator.js';
 import { createDefaultRegistry } from '../index.js';
-import type { LauncherSpec } from '@mc-creator/shared';
 
 const validSpec = {
   launcherName: 'MyLauncher',

@@ -99,6 +99,10 @@ export function FileTree() {
     shallow,
   );
 
+  // P3 性能：仅 files 变化时重建树，避免每次渲染都 O(n) 重建
+  // 注意：useMemo 必须在 early return 之前调用，否则违反 React hooks 规则。
+  const tree = useMemo(() => buildTree(files), [files]);
+
   if (files.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -111,9 +115,6 @@ export function FileTree() {
       </div>
     );
   }
-
-  // P3 性能：仅 files 变化时重建树，避免每次渲染都 O(n) 重建
-  const tree = useMemo(() => buildTree(files), [files]);
 
   return (
     <div className="h-full overflow-y-auto">

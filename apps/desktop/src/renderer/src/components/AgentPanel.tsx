@@ -114,6 +114,7 @@ export function AgentPanel() {
       setSpec(JSON.parse(originalSpec) as unknown as ModSpec);
       setSpecError(null);
     } catch {
+      // 忽略：originalSpec 是展示用的字符串，重置时无需处理解析错误
     }
   };
 

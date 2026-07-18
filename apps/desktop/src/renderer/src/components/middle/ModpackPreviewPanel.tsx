@@ -13,13 +13,11 @@ export function ModpackPreviewPanel() {
   const [query, setQuery] = useState('');
   const [formatFilter, setFormatFilter] = useState<FormatFilter>('all');
 
-  if (!spec) {
-    return <EmptyState icon="box" title="尚未生成整合包 Spec" hint="在右侧 AgentPanel 描述你想要的整合包，生成 Spec 后即可预览" />;
-  }
+  const pack = spec as unknown as ModpackSpec | null;
 
-  const pack = spec as unknown as ModpackSpec;
-
+  // 注意：useMemo 必须在 early return 之前调用，否则违反 React hooks 规则。
   const filtered = useMemo(() => {
+    if (!pack) return [];
     let result = pack.mods;
     if (formatFilter !== 'all') {
       // 简单启发式：projectId 是数字则视为 CurseForge，否则 Modrinth（不精确但够用）
@@ -37,7 +35,11 @@ export function ModpackPreviewPanel() {
       );
     }
     return result;
-  }, [pack.mods, query, formatFilter]);
+  }, [pack, query, formatFilter]);
+
+  if (!spec || !pack) {
+    return <EmptyState icon="box" title="尚未生成整合包 Spec" hint="在右侧 AgentPanel 描述你想要的整合包，生成 Spec 后即可预览" />;
+  }
 
   const columns: Column<ModEntry>[] = [
     { key: 'name', header: 'Mod 名称', width: '25%', sortValue: (r) => r.name },
