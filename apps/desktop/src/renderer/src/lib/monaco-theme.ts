@@ -9,7 +9,9 @@ export const MC_MONACO_THEME = 'mc-craft-dark';
 
 /** 从实时 CSS 变量读 "R G B" -> "#RRGGBB"（读不到则用兜底值） */
 function readRgb(name: string, fallback: string): string {
-  const raw = (getComputedStyle(document.documentElement).getPropertyValue(name) || fallback).trim();
+  const raw = (
+    getComputedStyle(document.documentElement).getPropertyValue(name) || fallback
+  ).trim();
   const parts = raw.split(/\s+/).map(Number);
   if (parts.length === 3 && parts.every((n) => !Number.isNaN(n))) {
     return '#' + parts.map((n) => Math.round(n).toString(16).padStart(2, '0')).join('');

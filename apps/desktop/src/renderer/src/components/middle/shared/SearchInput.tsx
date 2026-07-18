@@ -8,7 +8,9 @@ interface SearchInputProps {
 export function SearchInput({ value, onChange, placeholder = '搜索…' }: SearchInputProps) {
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-mc-mute">🔍</span>
+      <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-mc-mute">
+        🔍
+      </span>
       <input
         type="text"
         value={value}

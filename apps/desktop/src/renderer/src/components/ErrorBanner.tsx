@@ -1,6 +1,5 @@
 import { McIcon } from '../assets/mc-ui/McIcon';
 
-
 interface Props {
   message: string;
   onClose?: () => void;
@@ -12,7 +11,9 @@ export function ErrorBanner({ message, onClose }: Props) {
       <McIcon scope="pixel" name="square-alert" size={16} className="flex-shrink-0" />
       <span className="flex-1">{message}</span>
       {onClose && (
-        <button onClick={onClose} className="text-mc-redstone hover:text-mc-text"><McIcon scope="pixel" name="close" size={16} /></button>
+        <button onClick={onClose} className="text-mc-redstone hover:text-mc-text">
+          <McIcon scope="pixel" name="close" size={16} />
+        </button>
       )}
     </div>
   );

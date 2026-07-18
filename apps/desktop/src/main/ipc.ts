@@ -6,7 +6,18 @@ import { dirname, join, basename } from 'node:path';
 import { homedir } from 'node:os';
 import JSZip from 'jszip';
 import { z } from 'zod';
-import { Orchestrator, runGradleBuild, detectJavaVersion, MockProvider, VercelAiProvider, BuildFixer, Filesystem, ModrinthApiClient, CurseForgeApiClient, createDefaultRegistry } from '@mc-creator/core';
+import {
+  Orchestrator,
+  runGradleBuild,
+  detectJavaVersion,
+  MockProvider,
+  VercelAiProvider,
+  BuildFixer,
+  Filesystem,
+  ModrinthApiClient,
+  CurseForgeApiClient,
+  createDefaultRegistry,
+} from '@mc-creator/core';
 import * as nodeFs from 'fs';
 import type { ModSpec } from '@mc-creator/shared';
 import { assertWithin, parseGitStatus } from './ipc-utils.js';
@@ -450,7 +461,16 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const { repoPath } = GitStatusRequest.parse(raw);
     const { code, stdout, stderr } = await runGit(['status', '--porcelain', '-b'], repoPath);
     if (code !== 0) {
-      return { ok: false, branch: null, upstream: null, ahead: 0, behind: 0, clean: true, files: [], error: stderr || '无法读取仓库状态（可能不是 git 仓库或 git 未安装）' };
+      return {
+        ok: false,
+        branch: null,
+        upstream: null,
+        ahead: 0,
+        behind: 0,
+        clean: true,
+        files: [],
+        error: stderr || '无法读取仓库状态（可能不是 git 仓库或 git 未安装）',
+      };
     }
     return { ok: true, ...parseGitStatus(stdout), error: null };
   });
@@ -495,7 +515,11 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
   ipcMain.handle(GIT_PUSH, async (_e, raw: unknown): Promise<GitSyncRes> => {
     const { repoPath } = GitPushRequest.parse(raw);
     const { code, stdout, stderr } = await runGit(['push'], repoPath);
-    return { ok: code === 0, stdout, error: code === 0 ? null : stderr || '推送失败（可能无 upstream 或需先拉取）' };
+    return {
+      ok: code === 0,
+      stdout,
+      error: code === 0 ? null : stderr || '推送失败（可能无 upstream 或需先拉取）',
+    };
   });
 
   // === Minecraft 启动器（A 切片：离线账号，无需微软 OAuth）===
@@ -517,7 +541,9 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
         try {
           const prof = JSON.parse(nodeFs.readFileSync(profPath, 'utf-8'));
           if (typeof prof.gameDir === 'string') mcDir = prof.gameDir;
-        } catch { /* 忽略损坏的 JSON */ }
+        } catch {
+          /* 忽略损坏的 JSON */
+        }
       }
     }
     const modsDir = mcDir ? join(mcDir, 'mods') : null;
@@ -526,8 +552,9 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const pf = process.env.ProgramFiles;
     const pf86 = process.env['ProgramFiles(x86)'];
     // 用户常见放置便携启动器（PCL2/HMCL 为绿色 exe，无固定安装路径）的目录
-    const scanDirs = [home, join(home, 'Desktop'), join(home, 'Downloads'), 'D:\\', 'C:\\']
-      .filter((d) => nodeFs.existsSync(d));
+    const scanDirs = [home, join(home, 'Desktop'), join(home, 'Downloads'), 'D:\\', 'C:\\'].filter(
+      (d) => nodeFs.existsSync(d),
+    );
 
     const candidates: { kind: LauncherKind; paths: string[] }[] = [
       {
@@ -548,7 +575,9 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
               .readdirSync(d)
               .filter((f) => /^HMCL.*\.exe$/i.test(f))
               .map((f) => join(d, f));
-          } catch { return []; }
+          } catch {
+            return [];
+          }
         }),
       },
     ];
@@ -563,7 +592,14 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
 
   ipcMain.handle(LOCATE_MC, (): LocateMcRes => {
     const { mcDir, modsDir, launcherExe, launcher } = detectMinecraft();
-    return { found: !!mcDir, mcDir, modsDir, launcherExe, launcher, error: mcDir ? null : '未检测到 .minecraft 目录，请手动选择' };
+    return {
+      found: !!mcDir,
+      mcDir,
+      modsDir,
+      launcherExe,
+      launcher,
+      error: mcDir ? null : '未检测到 .minecraft 目录，请手动选择',
+    };
   });
 
   ipcMain.handle(MC_CHOOSE_DIR, async (): Promise<McChooseDirRes> => {
@@ -591,7 +627,8 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
         ok: false,
         method: null,
         launcher: null,
-        error: '未找到任何启动器（官方 / PCL2 / HMCL）。请安装其一，或点「手动选择 .minecraft」后用自己的启动器打开游戏。',
+        error:
+          '未找到任何启动器（官方 / PCL2 / HMCL）。请安装其一，或点「手动选择 .minecraft」后用自己的启动器打开游戏。',
       };
     }
     // 离线账号：直接拉起检测到的启动器，由其离线档案进入游戏，无需微软 token
@@ -610,12 +647,16 @@ export function createDefaultOrchestrator(): Orchestrator {
   } catch {
     // 配置读取失败，fallback
   }
-  return new Orchestrator(new MockProvider(JSON.stringify({
-    modId: 'demo',
-    version: '1.0.0',
-    name: 'Demo Mod',
-    description: 'A demo mod',
-    items: [{ id: 'demo_item', name: 'Demo Item', maxStackSize: 64 }],
-    blocks: [],
-  })));
+  return new Orchestrator(
+    new MockProvider(
+      JSON.stringify({
+        modId: 'demo',
+        version: '1.0.0',
+        name: 'Demo Mod',
+        description: 'A demo mod',
+        items: [{ id: 'demo_item', name: 'Demo Item', maxStackSize: 64 }],
+        blocks: [],
+      }),
+    ),
+  );
 }

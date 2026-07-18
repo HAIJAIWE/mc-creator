@@ -36,7 +36,15 @@ describe('GeneratorRegistry', () => {
 // 且 launcher generator（P0 修复新增）能正确生成 8 个文件。
 describe('createDefaultRegistry 端到端', () => {
   // 注意：此列表必须与 GENERATOR_TYPES（apps/desktop/src/shared/ipc-channels.ts）保持一致。
-  const EXPECTED_TYPES = ['mod', 'datapack', 'modpack', 'server', 'resource_pack', 'skin', 'launcher'] as const;
+  const EXPECTED_TYPES = [
+    'mod',
+    'datapack',
+    'modpack',
+    'server',
+    'resource_pack',
+    'skin',
+    'launcher',
+  ] as const;
 
   it('注册了全部 7 种 generator', () => {
     const registry = createDefaultRegistry();

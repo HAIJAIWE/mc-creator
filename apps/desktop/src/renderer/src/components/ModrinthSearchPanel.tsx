@@ -95,7 +95,11 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
     setVersionsError(null);
     setVersionsLoading(true);
     try {
-      const res = await ipcClient.modrinthVersions({ projectId: hit.project_id, loader, mcVersion });
+      const res = await ipcClient.modrinthVersions({
+        projectId: hit.project_id,
+        loader,
+        mcVersion,
+      });
       setVersions(res.versions);
     } catch (e) {
       setVersionsError((e as Error).message);
@@ -160,20 +164,18 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
             className="mc-input flex-1"
             disabled={loading}
           />
-          <button
-            onClick={doSearch}
-            disabled={loading || !query.trim()}
-            className="mc-btn-primary"
-          >
-            {loading && (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            )}
+          <button onClick={doSearch} disabled={loading || !query.trim()} className="mc-btn-primary">
+            {loading && <Loader2 className="h-3 w-3 animate-spin" />}
             搜索
           </button>
         </div>
 
         {/* 错误提示 */}
-        {error && <div className="mb-3"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
+        {error && (
+          <div className="mb-3">
+            <ErrorBanner message={error} onClose={() => setError(null)} />
+          </div>
+        )}
 
         {/* 内容区 */}
         <div className="flex-1 overflow-y-auto">
@@ -194,13 +196,16 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
                 <span className="text-xs text-mc-text-dim">选择版本：{selectedHit.title}</span>
               </div>
               {versionsError && (
-                <div className="mb-2"><ErrorBanner message={versionsError} onClose={() => setVersionsError(null)} /></div>
+                <div className="mb-2">
+                  <ErrorBanner message={versionsError} onClose={() => setVersionsError(null)} />
+                </div>
               )}
               {versionsLoading ? (
                 <div className="py-8 text-center text-xs text-mc-text-dim">加载版本中…</div>
               ) : versions.length === 0 ? (
                 <div className="py-8 text-center text-xs text-mc-text-dim">
-                  没有匹配的版本{loader || mcVersion ? `（${loader ?? ''} ${mcVersion ?? ''}）` : ''}
+                  没有匹配的版本
+                  {loader || mcVersion ? `（${loader ?? ''} ${mcVersion ?? ''}）` : ''}
                 </div>
               ) : (
                 <ul className="space-y-1.5">
@@ -265,19 +270,21 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-medium text-mc-text">{hit.title}</span>
+                            <span className="truncate text-sm font-medium text-mc-text">
+                              {hit.title}
+                            </span>
                             <span className="flex-shrink-0 text-xs text-mc-text-dim">
-                              <McIcon scope="pixel" name="download" size={12} /> {formatDownloads(hit.downloads)}
+                              <McIcon scope="pixel" name="download" size={12} />{' '}
+                              {formatDownloads(hit.downloads)}
                             </span>
                           </div>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-mc-text-dim">{hit.description}</p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-mc-text-dim">
+                            {hit.description}
+                          </p>
                           {hit.categories.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {hit.categories.slice(0, 5).map((c) => (
-                                <span
-                                  key={c}
-                                  className="mc-tag"
-                                >
+                                <span key={c} className="mc-tag">
                                   {c}
                                 </span>
                               ))}

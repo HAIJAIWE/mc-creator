@@ -7,8 +7,31 @@ const SPEC: ModSpec = {
   version: '1.0.0',
   name: 'Ruby Tools',
   description: 'Adds ruby tools',
-  items: [{ id: 'ruby', name: 'Ruby', maxStackSize: 64, rarity: 'common', maxDamage: 0, fuelTick: 0, lore: '' }],
-  blocks: [{ id: 'ruby_block', name: 'Ruby Block', material: 'metal', hardness: 5.0, miningLevel: 0, lightLevel: 0, resistance: 6.0, soundType: 'stone', dropSelf: true, dropItem: '' }],
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
   license: 'MIT',
   authors: [],
   credits: '',
@@ -54,7 +77,9 @@ describe('NeoForgeAdapter Java 入口与注册代码', () => {
   const files = adapter.translate(CTX);
 
   it('生成 @Mod 主类', () => {
-    const main = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java');
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
     expect(main).toBeDefined();
     expect(main!.content).toContain('package com.example.ruby_tools;');
     expect(main!.content).toContain('@Mod("ruby_tools")');
@@ -64,7 +89,9 @@ describe('NeoForgeAdapter Java 入口与注册代码', () => {
   });
 
   it('生成 ModItems（DeferredRegister + 每个物品）', () => {
-    const items = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java');
+    const items = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java',
+    );
     expect(items).toBeDefined();
     expect(items!.content).toContain('DeferredRegister');
     expect(items!.content).toContain('RUBY');
@@ -72,7 +99,9 @@ describe('NeoForgeAdapter Java 入口与注册代码', () => {
   });
 
   it('生成 ModBlocks（DeferredRegister + 每个方块）', () => {
-    const blocks = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java');
+    const blocks = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java',
+    );
     expect(blocks).toBeDefined();
     expect(blocks!.content).toContain('DeferredRegister');
     expect(blocks!.content).toContain('RUBY_BLOCK');
@@ -84,7 +113,9 @@ describe('NeoForgeAdapter 资源文件', () => {
   const files = adapter.translate(CTX);
 
   it('生成 en_us.json 含物品与方块翻译键', () => {
-    const lang = files.find((f) => f.path === 'src/main/resources/assets/ruby_tools/lang/en_us.json');
+    const lang = files.find(
+      (f) => f.path === 'src/main/resources/assets/ruby_tools/lang/en_us.json',
+    );
     expect(lang).toBeDefined();
     const json = JSON.parse(lang!.content);
     expect(json['item.ruby_tools.ruby']).toBe('Ruby');

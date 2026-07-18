@@ -1,11 +1,51 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, EXPORT_ZIP, PREPARE_BUILD_DIR, EXPORT_PROJECT, IMPORT_PROJECT, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT, CHAT_STREAM, CHAT_STREAM_CHUNK, BUILD_WITH_FIX, BUILD_STREAM, BUILD_STREAM_CHUNK, LIST_PROJECTS, GET_PROJECT, SAVE_PROJECT, DELETE_PROJECT, MODRINTH_SEARCH, MODRINTH_VERSIONS, CURSEFORGE_SEARCH, CURSEFORGE_FILES, LOAD_CURSEFORGE_CONFIG, SAVE_CURSEFORGE_CONFIG, GIT_CHOOSE_REPO, GIT_STATUS, GIT_LOG, GIT_COMMIT, GIT_PULL, GIT_PUSH, LOCATE_MC, MC_CHOOSE_DIR, INSTALL_MOD, LAUNCH_MC, type GeneratorType, type BuildStreamChunkT } from '../shared/ipc-channels.js';
+import {
+  IPC,
+  EXPORT_ZIP,
+  PREPARE_BUILD_DIR,
+  EXPORT_PROJECT,
+  IMPORT_PROJECT,
+  LOAD_MODEL_CONFIG,
+  SAVE_MODEL_CONFIG,
+  CHAT,
+  CHAT_STREAM,
+  CHAT_STREAM_CHUNK,
+  BUILD_WITH_FIX,
+  BUILD_STREAM,
+  BUILD_STREAM_CHUNK,
+  LIST_PROJECTS,
+  GET_PROJECT,
+  SAVE_PROJECT,
+  DELETE_PROJECT,
+  MODRINTH_SEARCH,
+  MODRINTH_VERSIONS,
+  CURSEFORGE_SEARCH,
+  CURSEFORGE_FILES,
+  LOAD_CURSEFORGE_CONFIG,
+  SAVE_CURSEFORGE_CONFIG,
+  GIT_CHOOSE_REPO,
+  GIT_STATUS,
+  GIT_LOG,
+  GIT_COMMIT,
+  GIT_PULL,
+  GIT_PUSH,
+  LOCATE_MC,
+  MC_CHOOSE_DIR,
+  INSTALL_MOD,
+  LAUNCH_MC,
+  type GeneratorType,
+  type BuildStreamChunkT,
+} from '../shared/ipc-channels.js';
 
 const api = {
   generateSpec: (description: string, generatorType: GeneratorType) =>
     ipcRenderer.invoke(IPC.GENERATE_SPEC, { description, generatorType }),
-  generateFiles: (req: { loader: string; mcVersion: string; spec: unknown; generatorType: GeneratorType }) =>
-    ipcRenderer.invoke(IPC.GENERATE_FILES, req),
+  generateFiles: (req: {
+    loader: string;
+    mcVersion: string;
+    spec: unknown;
+    generatorType: GeneratorType;
+  }) => ipcRenderer.invoke(IPC.GENERATE_FILES, req),
   build: (projectPath: string) => ipcRenderer.invoke(IPC.BUILD, { projectPath }),
   loadModelConfig: () => ipcRenderer.invoke(LOAD_MODEL_CONFIG),
   saveModelConfig: (config: unknown) => ipcRenderer.invoke(SAVE_MODEL_CONFIG, config),
@@ -23,10 +63,7 @@ const api = {
     });
   },
   buildWithFix: (projectPath: string) => ipcRenderer.invoke(BUILD_WITH_FIX, { projectPath }),
-  buildStream: (
-    projectPath: string,
-    onChunk: (chunk: BuildStreamChunkT) => void,
-  ) => {
+  buildStream: (projectPath: string, onChunk: (chunk: BuildStreamChunkT) => void) => {
     const handler = (_e: unknown, data: BuildStreamChunkT) => {
       onChunk(data);
       if (data.done) ipcRenderer.removeListener(BUILD_STREAM_CHUNK, handler);
@@ -69,7 +106,8 @@ const api = {
   // Minecraft 启动器（离线）
   locateMc: () => ipcRenderer.invoke(LOCATE_MC),
   chooseMcDir: () => ipcRenderer.invoke(MC_CHOOSE_DIR),
-  installMod: (jarPath: string, mcDir?: string) => ipcRenderer.invoke(INSTALL_MOD, { jarPath, mcDir }),
+  installMod: (jarPath: string, mcDir?: string) =>
+    ipcRenderer.invoke(INSTALL_MOD, { jarPath, mcDir }),
   launchMc: (mcDir?: string) => ipcRenderer.invoke(LAUNCH_MC, { mcDir }),
 };
 

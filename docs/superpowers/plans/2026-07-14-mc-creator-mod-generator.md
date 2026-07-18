@@ -41,6 +41,7 @@ packages/core/src/generators/
 ## Task 1: 共享模板工具
 
 **Files:**
+
 - Create: `packages/core/src/generators/mod/templates.ts`
 - Test: `packages/core/src/generators/mod/templates.test.ts`
 
@@ -134,6 +135,7 @@ git commit -m "feat(core/mod): 共享模板工具（类名/包名生成）"
 ## Task 2: LoaderAdapter 接口
 
 **Files:**
+
 - Create: `packages/core/src/generators/mod/adapter.ts`
 - Create: `packages/core/src/generators/mod/index.ts`
 
@@ -177,6 +179,7 @@ git commit -m "feat(core/mod): LoaderAdapter 接口"
 ## Task 3: FabricAdapter — 元数据与构建脚本
 
 **Files:**
+
 - Create: `packages/core/src/generators/mod/fabric-adapter.ts`
 - Test: `packages/core/src/generators/mod/fabric-adapter.test.ts`
 
@@ -221,8 +224,8 @@ describe('FabricAdapter 元数据与构建脚本', () => {
   it('生成 build.gradle 含 fabric-loom 与 officialMojangMappings', () => {
     const bg = files.find((f) => f.path === 'build.gradle');
     expect(bg).toBeDefined();
-    expect(bg!.content).toContain("fabric-loom");
-    expect(bg!.content).toContain("officialMojangMappings");
+    expect(bg!.content).toContain('fabric-loom');
+    expect(bg!.content).toContain('officialMojangMappings');
   });
 
   it('生成 settings.gradle 与 gradle.properties', () => {
@@ -383,6 +386,7 @@ git commit -m "feat(core/mod): FabricAdapter 元数据与构建脚本"
 ## Task 4: FabricAdapter — Java 入口与注册代码
 
 **Files:**
+
 - Modify: `packages/core/src/generators/mod/fabric-adapter.ts`
 - Modify: `packages/core/src/generators/mod/fabric-adapter.test.ts`
 
@@ -397,7 +401,9 @@ describe('FabricAdapter Java 入口与注册代码', () => {
   const paths = files.map((f) => f.path);
 
   it('生成 ModInitializer 主类', () => {
-    const main = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java');
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
     expect(main).toBeDefined();
     expect(main!.content).toContain('package com.example.ruby_tools;');
     expect(main!.content).toContain('implements ModInitializer');
@@ -407,7 +413,9 @@ describe('FabricAdapter Java 入口与注册代码', () => {
   });
 
   it('生成 ModItems（Registry.register + 每个物品）', () => {
-    const items = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java');
+    const items = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java',
+    );
     expect(items).toBeDefined();
     expect(items!.content).toContain('Registry.register');
     expect(items!.content).toContain('RUBY');
@@ -415,7 +423,9 @@ describe('FabricAdapter Java 入口与注册代码', () => {
   });
 
   it('生成 ModBlocks（Registry.register + 每个方块）', () => {
-    const blocks = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java');
+    const blocks = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java',
+    );
     expect(blocks).toBeDefined();
     expect(blocks!.content).toContain('Registry.register');
     expect(blocks!.content).toContain('RUBY_BLOCK');
@@ -576,6 +586,7 @@ git commit -m "feat(core/mod): FabricAdapter Java 入口与注册代码"
 ## Task 5: FabricAdapter — 资源文件（语言/模型）
 
 **Files:**
+
 - Modify: `packages/core/src/generators/mod/fabric-adapter.ts`
 - Modify: `packages/core/src/generators/mod/fabric-adapter.test.ts`
 
@@ -589,7 +600,9 @@ describe('FabricAdapter 资源文件', () => {
   const files = adapter.translate(CTX);
 
   it('生成 en_us.json 含物品与方块翻译键', () => {
-    const lang = files.find((f) => f.path === 'src/main/resources/assets/ruby_tools/lang/en_us.json');
+    const lang = files.find(
+      (f) => f.path === 'src/main/resources/assets/ruby_tools/lang/en_us.json',
+    );
     expect(lang).toBeDefined();
     const json = JSON.parse(lang!.content);
     expect(json['item.ruby_tools.ruby']).toBe('Ruby');
@@ -597,7 +610,9 @@ describe('FabricAdapter 资源文件', () => {
   });
 
   it('生成物品模型 JSON', () => {
-    const model = files.find((f) => f.path === 'src/main/resources/assets/ruby_tools/models/item/ruby.json');
+    const model = files.find(
+      (f) => f.path === 'src/main/resources/assets/ruby_tools/models/item/ruby.json',
+    );
     expect(model).toBeDefined();
     const json = JSON.parse(model!.content);
     expect(json.parent).toBe('minecraft:item/generated');
@@ -661,6 +676,7 @@ git commit -m "feat(core/mod): FabricAdapter 资源文件（语言/模型）"
 ## Task 6: NeoForgeAdapter — 元数据与构建脚本
 
 **Files:**
+
 - Create: `packages/core/src/generators/mod/neoforge-adapter.ts`
 - Test: `packages/core/src/generators/mod/neoforge-adapter.test.ts`
 
@@ -855,6 +871,7 @@ git commit -m "feat(core/mod): NeoForgeAdapter 元数据与构建脚本"
 ## Task 7: NeoForgeAdapter — Java 入口与注册代码
 
 **Files:**
+
 - Modify: `packages/core/src/generators/mod/neoforge-adapter.ts`
 - Modify: `packages/core/src/generators/mod/neoforge-adapter.test.ts`
 
@@ -868,7 +885,9 @@ describe('NeoForgeAdapter Java 入口与注册代码', () => {
   const files = adapter.translate(CTX);
 
   it('生成 @Mod 主类', () => {
-    const main = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java');
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
     expect(main).toBeDefined();
     expect(main!.content).toContain('package com.example.ruby_tools;');
     expect(main!.content).toContain('@Mod("ruby_tools")');
@@ -878,7 +897,9 @@ describe('NeoForgeAdapter Java 入口与注册代码', () => {
   });
 
   it('生成 ModItems（DeferredRegister + 每个物品）', () => {
-    const items = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java');
+    const items = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java',
+    );
     expect(items).toBeDefined();
     expect(items!.content).toContain('DeferredRegister');
     expect(items!.content).toContain('RUBY');
@@ -886,7 +907,9 @@ describe('NeoForgeAdapter Java 入口与注册代码', () => {
   });
 
   it('生成 ModBlocks（DeferredRegister + 每个方块）', () => {
-    const blocks = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java');
+    const blocks = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java',
+    );
     expect(blocks).toBeDefined();
     expect(blocks!.content).toContain('DeferredRegister');
     expect(blocks!.content).toContain('RUBY_BLOCK');
@@ -1066,6 +1089,7 @@ git commit -m "feat(core/mod): NeoForgeAdapter Java 入口与 DeferredRegister �
 ## Task 8: NeoForgeAdapter — 资源文件
 
 **Files:**
+
 - Modify: `packages/core/src/generators/mod/neoforge-adapter.ts`
 - Modify: `packages/core/src/generators/mod/neoforge-adapter.test.ts`
 
@@ -1079,7 +1103,9 @@ describe('NeoForgeAdapter 资源文件', () => {
   const files = adapter.translate(CTX);
 
   it('生成 en_us.json 含物品与方块翻译键', () => {
-    const lang = files.find((f) => f.path === 'src/main/resources/assets/ruby_tools/lang/en_us.json');
+    const lang = files.find(
+      (f) => f.path === 'src/main/resources/assets/ruby_tools/lang/en_us.json',
+    );
     expect(lang).toBeDefined();
     const json = JSON.parse(lang!.content);
     expect(json['item.ruby_tools.ruby']).toBe('Ruby');
@@ -1132,6 +1158,7 @@ git commit -m "feat(core/mod): NeoForgeAdapter 资源文件"
 ## Task 9: ModGenerator — 按 loader 路由
 
 **Files:**
+
 - Create: `packages/core/src/generators/mod/mod-generator.ts`
 - Test: `packages/core/src/generators/mod/mod-generator.test.ts`
 
@@ -1245,6 +1272,7 @@ git commit -m "feat(core/mod): ModGenerator 按 loader 路由"
 ## Task 10: 端到端流程 + 黄金样本快照
 
 **Files:**
+
 - Modify: `packages/core/src/generators/mod/mod-generator.test.ts`
 - Modify: `packages/core/src/generators/mod/index.ts`
 
@@ -1291,7 +1319,9 @@ describe('ModGenerator 端到端（spec-first 流程）', () => {
     expect(dfs.exists('/proj/src/main/resources/fabric.mod.json')).toBe(true);
     expect(dfs.exists('/proj/src/main/java/com/example/magic_items/MagicItemsMod.java')).toBe(true);
     expect(dfs.exists('/proj/src/main/java/com/example/magic_items/ModItems.java')).toBe(true);
-    expect(dfs.readFile('/proj/src/main/resources/assets/magic_items/lang/en_us.json')).toContain('Magic Dust');
+    expect(dfs.readFile('/proj/src/main/resources/assets/magic_items/lang/en_us.json')).toContain(
+      'Magic Dust',
+    );
   });
 });
 
@@ -1367,6 +1397,7 @@ git commit -m "feat(core/mod): 端到端流程与黄金样本快照"
 ## Task 11: 注册 ModGenerator + 汇总出口 + 全量验证
 
 **Files:**
+
 - Modify: `packages/core/src/generators/index.ts`
 - Modify: `packages/core/src/index.ts`（如需）
 
@@ -1404,6 +1435,7 @@ describe('ModGenerator 注册集成', () => {
 
 Run: `pnpm --filter @mc-creator/core test`
 Expected: 全部 PASS
+
 - P1 原有 19 用例（filesystem 5 + model-provider 2 + orchestrator 3 + builder 6 + generators 3）
 - P2 新增：templates 4 + fabric-adapter 8 + neoforge-adapter 7 + mod-generator 5 + integration 1 = 25 用例
 - 合计 44 用例
@@ -1425,6 +1457,7 @@ git commit -m "feat(core/mod): 注册 ModGenerator 到 Registry 并跑通全量�
 ## 自审清单
 
 **1. 规格覆盖**（对应规格 §3 Mod 生成器、§3.2 Loader Adapter 差异点、§3.3 数据结构、§4 端到端数据流、§6 测试策略）：
+
 - ✅ §3.1 spec-first 流程 → Task 9/10（ModGenerator 路由 + 端到端 Orchestrator→Generator→Filesystem）
 - ✅ §3.2 FabricAdapter（fabric.mod.json + Loom + officialMojangMappings + ModInitializer + Registry.register）→ Task 3/4/5
 - ✅ §3.2 NeoForgeAdapter（mods.toml + moddev + @Mod + DeferredRegister）→ Task 6/7/8
@@ -1439,6 +1472,7 @@ git commit -m "feat(core/mod): 注册 ModGenerator 到 Registry 并跑通全量�
 **2. 占位符扫描**：无 TBD/TODO，每步含完整代码与命令。Task 10 Step 2 的 `-u` 是 vitest 快照更新标志，非占位符。
 
 **3. 类型一致性**：
+
 - `LoaderAdapter` 接口在 Task 2 定义，Task 3/6 实现引用一致
 - `ModGenerator` 在 Task 9 实现 `Generator` 接口（Task 11 P1 已定义），`type/loaders/versions/generate` 签名一致
 - `ModSpecLike` 在 fabric/neoforge-adapter.ts 各自定义（私有类型，字段与 shared ModSpec 一致）
@@ -1446,6 +1480,7 @@ git commit -m "feat(core/mod): 注册 ModGenerator 到 Registry 并跑通全量�
 - `Loader`/`McVersion` 从 @mc-creator/shared 导入，与 P1 loader.ts 一致
 
 **4. 关键设计决策**：
+
 - Fabric 用 `loom.officialMojangMappings()` 而非 Yarn → Java 代码用官方名（`net.minecraft.world.item.Item`），与 NeoForge 一致，实现 §3.2「以 Mojang 官方名为内部规范名」，26.1 切换无需改 Adapter
 - ModSpecLike 私有类型避免循环导入，字段与 shared ModSpec 保持一致
 - 黄金样本快照用 `toMatchInlineSnapshot` 防止文件路径列表回归

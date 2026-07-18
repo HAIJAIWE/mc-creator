@@ -12,5 +12,12 @@
       "@renderer/*": ["./src/renderer/src/*"]
     }
   },
-  "include": ["src/renderer/**/*", "src/shared/**/*", "src/preload/**/*", "src/skinview3d.d.ts", "../../packages/shared/src/**/*", "../../packages/core/src/**/*"]
+  "include": [
+    "src/renderer/**/*",
+    "src/shared/**/*",
+    "src/preload/**/*",
+    "src/skinview3d.d.ts",
+    "../../packages/shared/src/**/*",
+    "../../packages/core/src/**/*"
+  ]
 }

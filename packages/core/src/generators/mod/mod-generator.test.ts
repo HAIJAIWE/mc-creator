@@ -12,7 +12,17 @@ const SPEC: ModSpec = {
   version: '1.0.0',
   name: 'Demo',
   description: 'demo mod',
-  items: [{ id: 'ruby', name: 'Ruby', maxStackSize: 64, rarity: 'common', maxDamage: 0, fuelTick: 0, lore: '' }],
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
   blocks: [],
   license: 'MIT',
   authors: [],
@@ -120,7 +130,9 @@ describe('ModGenerator 端到端（spec-first 流程）', () => {
     expect(dfs.exists('/proj/src/main/resources/fabric.mod.json')).toBe(true);
     expect(dfs.exists('/proj/src/main/java/com/example/magic_items/MagicItemsMod.java')).toBe(true);
     expect(dfs.exists('/proj/src/main/java/com/example/magic_items/ModItems.java')).toBe(true);
-    expect(dfs.readFile('/proj/src/main/resources/assets/magic_items/lang/en_us.json')).toContain('Magic Dust');
+    expect(dfs.readFile('/proj/src/main/resources/assets/magic_items/lang/en_us.json')).toContain(
+      'Magic Dust',
+    );
   });
 });
 
@@ -130,8 +142,31 @@ describe('ModGenerator 黄金样本快照（防 Adapter 回归）', () => {
     version: '1.0.0',
     name: 'Golden',
     description: 'golden mod',
-    items: [{ id: 'gold_dust', name: 'Gold Dust', maxStackSize: 64, rarity: 'common', maxDamage: 0, fuelTick: 0, lore: '' }],
-    blocks: [{ id: 'gold_block', name: 'Gold Block', material: 'metal', hardness: 3.0, miningLevel: 0, lightLevel: 0, resistance: 6.0, soundType: 'stone', dropSelf: true, dropItem: '' }],
+    items: [
+      {
+        id: 'gold_dust',
+        name: 'Gold Dust',
+        maxStackSize: 64,
+        rarity: 'common',
+        maxDamage: 0,
+        fuelTick: 0,
+        lore: '',
+      },
+    ],
+    blocks: [
+      {
+        id: 'gold_block',
+        name: 'Gold Block',
+        material: 'metal',
+        hardness: 3.0,
+        miningLevel: 0,
+        lightLevel: 0,
+        resistance: 6.0,
+        soundType: 'stone',
+        dropSelf: true,
+        dropItem: '',
+      },
+    ],
     license: 'MIT',
     authors: [],
     credits: '',

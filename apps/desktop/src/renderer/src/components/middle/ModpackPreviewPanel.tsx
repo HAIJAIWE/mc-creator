@@ -28,25 +28,43 @@ export function ModpackPreviewPanel() {
     }
     if (query) {
       const q = query.toLowerCase();
-      result = result.filter((m) =>
-        m.name.toLowerCase().includes(q) ||
-        m.fileName.toLowerCase().includes(q) ||
-        m.projectId.toLowerCase().includes(q)
+      result = result.filter(
+        (m) =>
+          m.name.toLowerCase().includes(q) ||
+          m.fileName.toLowerCase().includes(q) ||
+          m.projectId.toLowerCase().includes(q),
       );
     }
     return result;
   }, [pack, query, formatFilter]);
 
   if (!spec || !pack) {
-    return <EmptyState icon="box" title="尚未生成整合包 Spec" hint="在右侧 AgentPanel 描述你想要的整合包，生成 Spec 后即可预览" />;
+    return (
+      <EmptyState
+        icon="box"
+        title="尚未生成整合包 Spec"
+        hint="在右侧 AgentPanel 描述你想要的整合包，生成 Spec 后即可预览"
+      />
+    );
   }
 
   const columns: Column<ModEntry>[] = [
     { key: 'name', header: 'Mod 名称', width: '25%', sortValue: (r) => r.name },
     { key: 'fileName', header: '文件名', width: '30%', sortValue: (r) => r.fileName },
     { key: 'versionId', header: '版本', width: '20%', sortValue: (r) => r.versionId },
-    { key: 'fileSize', header: '大小', width: '15%', sortValue: (r) => r.fileSize ?? 0, render: (r) => r.fileSize ? formatBytes(r.fileSize) : '—' },
-    { key: 'source', header: '来源', width: '10%', render: (r) => /^\d+$/.test(r.projectId) ? 'CurseForge' : 'Modrinth' },
+    {
+      key: 'fileSize',
+      header: '大小',
+      width: '15%',
+      sortValue: (r) => r.fileSize ?? 0,
+      render: (r) => (r.fileSize ? formatBytes(r.fileSize) : '—'),
+    },
+    {
+      key: 'source',
+      header: '来源',
+      width: '10%',
+      render: (r) => (/^\d+$/.test(r.projectId) ? 'CurseForge' : 'Modrinth'),
+    },
   ];
 
   return (
@@ -81,12 +99,18 @@ export function ModpackPreviewPanel() {
 
       {/* 表格 */}
       <div className="flex-1 overflow-y-auto">
-        <DataTable columns={columns} data={filtered} rowKey={(r) => `${r.projectId}:${r.versionId}`} emptyHint="暂无 mod" />
+        <DataTable
+          columns={columns}
+          data={filtered}
+          rowKey={(r) => `${r.projectId}:${r.versionId}`}
+          emptyHint="暂无 mod"
+        />
       </div>
 
       {/* Footer */}
       <div className="border-t border-mc-border px-4 py-2 text-xs text-mc-mute">
-        mod 数: {pack.mods.length} · 显示: {filtered.length} · 覆盖文件: {pack.overrides.length} · 服务器覆盖: {pack.serverOverrides.length}
+        mod 数: {pack.mods.length} · 显示: {filtered.length} · 覆盖文件: {pack.overrides.length} ·
+        服务器覆盖: {pack.serverOverrides.length}
       </div>
     </div>
   );

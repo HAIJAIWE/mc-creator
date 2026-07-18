@@ -24,10 +24,10 @@ export const MODPACK_TEMPLATES: SpecTemplate[] = [
     icon: '⚔️',
     description:
       '做一个 RPG 冒险整合包，MC 版本 1.21.1，loader fabric，包含：' +
-      'Oh The Biomes You\'ll Go（新增 80+ 生物群系）、Bosses of Mass Destruction（4 个 Boss）、' +
+      "Oh The Biomes You'll Go（新增 80+ 生物群系）、Bosses of Mass Destruction（4 个 Boss）、" +
       'Better Combat（战斗系统改进）、Spell Engine（法术系统）、' +
       'RPGStats（角色等级系统）、LevelZ（技能树）、' +
-      'Roughly Enough Items（合成查询）、Xaero\'s Minimap（小地图）。packId 用 rpg_adventure，' +
+      "Roughly Enough Items（合成查询）、Xaero's Minimap（小地图）。packId 用 rpg_adventure，" +
       'packName「RPG 冒险整合包」，作者 RPGFan，加载动画消息「准备好踏上冒险旅程了吗？」。',
   },
   {

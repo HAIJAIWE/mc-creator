@@ -21,7 +21,13 @@ export function ModPreviewPanel() {
   const [query, setQuery] = useState('');
 
   if (!spec) {
-    return <EmptyState icon="box" title="尚未生成 Mod Spec" hint="在右侧 AgentPanel 描述你想要的 mod，生成 Spec 后即可预览" />;
+    return (
+      <EmptyState
+        icon="box"
+        title="尚未生成 Mod Spec"
+        hint="在右侧 AgentPanel 描述你想要的 mod，生成 Spec 后即可预览"
+      />
+    );
   }
 
   const mod = spec as unknown as ModSpec;
@@ -44,7 +50,10 @@ export function ModPreviewPanel() {
         {TABS.map((t) => (
           <button
             key={t.key}
-            onClick={() => { setActiveTab(t.key); setQuery(''); }}
+            onClick={() => {
+              setActiveTab(t.key);
+              setQuery('');
+            }}
             className={`rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
               activeTab === t.key
                 ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
@@ -60,7 +69,11 @@ export function ModPreviewPanel() {
       {/* 搜索框（元数据 tab 不显示） */}
       {activeTab !== 'metadata' && (
         <div className="border-b border-mc-border px-3 py-2">
-          <SearchInput value={query} onChange={setQuery} placeholder={`搜索${tabLabel(activeTab)}…`} />
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder={`搜索${tabLabel(activeTab)}…`}
+          />
         </div>
       )}
 
@@ -107,10 +120,22 @@ function ItemsTab({ items, query }: { items: ItemSpec[]; query: string }) {
     { key: 'maxStackSize', header: '堆叠', width: '10%', sortValue: (r) => r.maxStackSize },
     { key: 'maxDamage', header: '耐久', width: '10%', sortValue: (r) => r.maxDamage },
     { key: 'fuelTick', header: '燃料', width: '10%', sortValue: (r) => r.fuelTick },
-    { key: 'food', header: '食物', width: '18%', render: (r) => r.food ? `饥饿 ${r.food.hunger}/饱和 ${r.food.saturation}` : '—' },
+    {
+      key: 'food',
+      header: '食物',
+      width: '18%',
+      render: (r) => (r.food ? `饥饿 ${r.food.hunger}/饱和 ${r.food.saturation}` : '—'),
+    },
   ];
 
-  return <DataTable columns={columns} data={filtered} rowKey={(r) => r.id} emptyHint="暂无物品，在 Spec 中添加 items" />;
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      rowKey={(r) => r.id}
+      emptyHint="暂无物品，在 Spec 中添加 items"
+    />
+  );
 }
 
 function BlocksTab({ blocks, query }: { blocks: BlockSpec[]; query: string }) {
@@ -128,10 +153,22 @@ function BlocksTab({ blocks, query }: { blocks: BlockSpec[]; query: string }) {
     { key: 'lightLevel', header: '发光', width: '10%', sortValue: (r) => r.lightLevel },
     { key: 'resistance', header: '抗性', width: '10%', sortValue: (r) => r.resistance },
     { key: 'soundType', header: '声音', width: '12%', sortValue: (r) => r.soundType },
-    { key: 'dropSelf', header: '掉落', width: '12%', render: (r) => r.dropSelf ? '自身' : (r.dropItem || '无') },
+    {
+      key: 'dropSelf',
+      header: '掉落',
+      width: '12%',
+      render: (r) => (r.dropSelf ? '自身' : r.dropItem || '无'),
+    },
   ];
 
-  return <DataTable columns={columns} data={filtered} rowKey={(r) => r.id} emptyHint="暂无方块，在 Spec 中添加 blocks" />;
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      rowKey={(r) => r.id}
+      emptyHint="暂无方块，在 Spec 中添加 blocks"
+    />
+  );
 }
 
 function DepsTab({ deps, query }: { deps: ModDependencySpec[]; query: string }) {
@@ -144,10 +181,12 @@ function DepsTab({ deps, query }: { deps: ModDependencySpec[]; query: string }) 
   const columns: Column<ModDependencySpec>[] = [
     { key: 'modId', header: 'Mod ID', width: '40%', sortValue: (r) => r.modId },
     { key: 'version', header: '版本', width: '30%', sortValue: (r) => r.version },
-    { key: 'mandatory', header: '必需', width: '30%', render: (r) => r.mandatory ? '是' : '否' },
+    { key: 'mandatory', header: '必需', width: '30%', render: (r) => (r.mandatory ? '是' : '否') },
   ];
 
-  return <DataTable columns={columns} data={filtered} rowKey={(r) => r.modId} emptyHint="暂无依赖" />;
+  return (
+    <DataTable columns={columns} data={filtered} rowKey={(r) => r.modId} emptyHint="暂无依赖" />
+  );
 }
 
 function MetadataTab({ mod }: { mod: ModSpec }) {

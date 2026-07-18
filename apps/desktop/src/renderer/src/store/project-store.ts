@@ -25,7 +25,9 @@ interface ProjectState {
   saveCurrentAsProject: (name: string, data: SaveProjectData) => Promise<void>;
   loadProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  exportProject: (project: Project) => Promise<{ ok: boolean; canceled: boolean; savedPath: string | null }>;
+  exportProject: (
+    project: Project,
+  ) => Promise<{ ok: boolean; canceled: boolean; savedPath: string | null }>;
   importProject: () => Promise<{ success: boolean; error?: string }>;
   setView: (v: 'dashboard' | 'editor') => void;
   backToDashboard: () => void;
@@ -99,7 +101,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const mod = useModStore.getState();
       // P23-3 迁移：texture 已合并到 resource_pack（旧项目数据库可能存 'texture'，类型层面已不含，运行时仍可能出现）
       const rawType = project.generatorType as string;
-      const migratedType: typeof project.generatorType = rawType === 'texture' ? 'resource_pack' : project.generatorType;
+      const migratedType: typeof project.generatorType =
+        rawType === 'texture' ? 'resource_pack' : project.generatorType;
       mod.setGeneratorType(migratedType);
       mod.setLoader(project.loader as Loader);
       mod.setMcVersion(project.mcVersion as McVersion);

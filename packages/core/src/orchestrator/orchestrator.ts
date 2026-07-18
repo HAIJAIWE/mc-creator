@@ -14,7 +14,8 @@ import type { ZodTypeAny } from 'zod';
 const MAX_RETRIES = 3;
 
 /** 生成器类型 → 对应 schema 与 prompt 描述（与 desktop 层 GENERATOR_TYPES 对齐） */
-export type SpecType = 'mod' | 'datapack' | 'modpack' | 'server' | 'resource_pack' | 'skin' | 'launcher';
+export type SpecType =
+  'mod' | 'datapack' | 'modpack' | 'server' | 'resource_pack' | 'skin' | 'launcher';
 
 interface SpecConfig {
   schema: ZodTypeAny;

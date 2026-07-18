@@ -1,4 +1,10 @@
-import type { FileNode, GeneratorContext, GenerationResult, Loader, McVersion } from '@mc-creator/shared';
+import type {
+  FileNode,
+  GeneratorContext,
+  GenerationResult,
+  Loader,
+  McVersion,
+} from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import type {
   DatapackSpec,
@@ -28,12 +34,16 @@ export class DatapackGenerator implements Generator {
     // pack.mcmeta
     files.push({
       path: 'pack.mcmeta',
-      content: JSON.stringify({
-        pack: {
-          pack_format: spec.packFormat,
-          description: spec.description || spec.packName,
+      content: JSON.stringify(
+        {
+          pack: {
+            pack_format: spec.packFormat,
+            description: spec.description || spec.packName,
+          },
         },
-      }, null, 2),
+        null,
+        2,
+      ),
     });
 
     // 配方

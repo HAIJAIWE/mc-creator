@@ -7,8 +7,31 @@ const SPEC: ModSpec = {
   version: '1.0.0',
   name: 'Ruby Tools',
   description: 'Adds ruby tools',
-  items: [{ id: 'ruby', name: 'Ruby', maxStackSize: 64, rarity: 'common', maxDamage: 0, fuelTick: 0, lore: '' }],
-  blocks: [{ id: 'ruby_block', name: 'Ruby Block', material: 'metal', hardness: 5.0, miningLevel: 0, lightLevel: 0, resistance: 6.0, soundType: 'stone', dropSelf: true, dropItem: '' }],
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
   license: 'MIT',
   authors: [],
   credits: '',
@@ -41,8 +64,8 @@ describe('FabricAdapter 元数据与构建脚本', () => {
   it('生成 build.gradle 含 fabric-loom 与 officialMojangMappings', () => {
     const bg = files.find((f) => f.path === 'build.gradle');
     expect(bg).toBeDefined();
-    expect(bg!.content).toContain("fabric-loom");
-    expect(bg!.content).toContain("officialMojangMappings");
+    expect(bg!.content).toContain('fabric-loom');
+    expect(bg!.content).toContain('officialMojangMappings');
   });
 
   it('生成 settings.gradle 与 gradle.properties', () => {
@@ -59,7 +82,9 @@ describe('FabricAdapter Java 入口与注册代码', () => {
   const files = adapter.translate(CTX);
 
   it('生成 ModInitializer 主类', () => {
-    const main = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java');
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
     expect(main).toBeDefined();
     expect(main!.content).toContain('package com.example.ruby_tools;');
     expect(main!.content).toContain('implements ModInitializer');
@@ -69,7 +94,9 @@ describe('FabricAdapter Java 入口与注册代码', () => {
   });
 
   it('生成 ModItems（Registry.register + 每个物品）', () => {
-    const items = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java');
+    const items = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java',
+    );
     expect(items).toBeDefined();
     expect(items!.content).toContain('Registry.register');
     expect(items!.content).toContain('RUBY');
@@ -77,7 +104,9 @@ describe('FabricAdapter Java 入口与注册代码', () => {
   });
 
   it('生成 ModBlocks（Registry.register + 每个方块）', () => {
-    const blocks = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java');
+    const blocks = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java',
+    );
     expect(blocks).toBeDefined();
     expect(blocks!.content).toContain('Registry.register');
     expect(blocks!.content).toContain('RUBY_BLOCK');
@@ -90,7 +119,9 @@ describe('FabricAdapter 资源文件', () => {
   const files = adapter.translate(CTX);
 
   it('生成 en_us.json 含物品与方块翻译键', () => {
-    const lang = files.find((f) => f.path === 'src/main/resources/assets/ruby_tools/lang/en_us.json');
+    const lang = files.find(
+      (f) => f.path === 'src/main/resources/assets/ruby_tools/lang/en_us.json',
+    );
     expect(lang).toBeDefined();
     const json = JSON.parse(lang!.content);
     expect(json['item.ruby_tools.ruby']).toBe('Ruby');
@@ -98,7 +129,9 @@ describe('FabricAdapter 资源文件', () => {
   });
 
   it('生成物品模型 JSON', () => {
-    const model = files.find((f) => f.path === 'src/main/resources/assets/ruby_tools/models/item/ruby.json');
+    const model = files.find(
+      (f) => f.path === 'src/main/resources/assets/ruby_tools/models/item/ruby.json',
+    );
     expect(model).toBeDefined();
     const json = JSON.parse(model!.content);
     expect(json.parent).toBe('minecraft:item/generated');

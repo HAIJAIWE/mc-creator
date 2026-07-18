@@ -22,10 +22,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 /** ResourcePack 预览面板：4 tab — 材质画廊/音效列表/模型表格/语言 key-value 表格 */
 export function ResourcePackPreviewPanel() {
-  const { spec, files } = useModStore(
-    (s) => ({ spec: s.spec, files: s.files }),
-    shallow,
-  );
+  const { spec, files } = useModStore((s) => ({ spec: s.spec, files: s.files }), shallow);
   const [tab, setTab] = useState<Tab>('textures');
 
   const fileMap = useMemo(() => {
@@ -35,7 +32,13 @@ export function ResourcePackPreviewPanel() {
   }, [files]);
 
   if (!spec) {
-    return <EmptyState icon="box" title="尚未生成资源包 Spec" hint="在右侧 AgentPanel 描述你想要的资源包，生成 Spec 后即可预览" />;
+    return (
+      <EmptyState
+        icon="box"
+        title="尚未生成资源包 Spec"
+        hint="在右侧 AgentPanel 描述你想要的资源包，生成 Spec 后即可预览"
+      />
+    );
   }
 
   const pack = spec as unknown as ResourcePackSpecType;
@@ -54,7 +57,11 @@ export function ResourcePackPreviewPanel() {
       />
 
       {/* Tab 切换栏 */}
-      <div role="tablist" aria-label="资源包分类" className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1">
+      <div
+        role="tablist"
+        aria-label="资源包分类"
+        className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1"
+      >
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -84,7 +91,8 @@ export function ResourcePackPreviewPanel() {
 
       {/* Footer */}
       <div className="border-t border-mc-border px-4 py-2 text-xs text-mc-mute">
-        材质: {pack.textureOverrides.length} · 音效: {pack.sounds.length} · 模型: {pack.models.length} · 字体: {pack.fonts.length}
+        材质: {pack.textureOverrides.length} · 音效: {pack.sounds.length} · 模型:{' '}
+        {pack.models.length} · 字体: {pack.fonts.length}
       </div>
     </div>
   );
@@ -92,7 +100,13 @@ export function ResourcePackPreviewPanel() {
 
 // ===== Textures tab =====
 
-function TexturesTab({ pack, fileMap }: { pack: ResourcePackSpecType; fileMap: Map<string, string> }) {
+function TexturesTab({
+  pack,
+  fileMap,
+}: {
+  pack: ResourcePackSpecType;
+  fileMap: Map<string, string>;
+}) {
   const dataUrl = (entry: TextureOverrideEntry): string | null => {
     const content = fileMap.get(`assets/minecraft/textures/${entry.path}.png`);
     if (!content) return null;
@@ -108,18 +122,35 @@ function TexturesTab({ pack, fileMap }: { pack: ResourcePackSpecType; fileMap: M
       {pack.textureOverrides.map((entry, idx) => {
         const url = dataUrl(entry);
         return (
-          <div key={`${entry.path}-${idx}`} className="rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
+          <div
+            key={`${entry.path}-${idx}`}
+            className="rounded-mc border border-mc-border bg-mc-surface-2/40 p-2"
+          >
             <div className="mb-1 flex aspect-square items-center justify-center overflow-hidden rounded-mc bg-mc-bg">
               {url ? (
-                <img src={url} alt={entry.path} className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
+                <img
+                  src={url}
+                  alt={entry.path}
+                  className="h-full w-full object-contain"
+                  style={{ imageRendering: 'pixelated' }}
+                />
               ) : (
-                <div className="flex h-full w-full items-center justify-center" style={{ backgroundColor: entry.color }}>
+                <div
+                  className="flex h-full w-full items-center justify-center"
+                  style={{ backgroundColor: entry.color }}
+                >
                   <span className="text-xs text-mc-mute">生成中</span>
                 </div>
               )}
             </div>
-            <div className="truncate text-xs text-mc-dim" title={entry.path}>{entry.path}</div>
-            <div className="text-xs text-mc-mute">{entry.width}×{entry.height}{entry.gradientTo ? ' · 渐变' : ''}{entry.checkerboard ? ' · 棋盘' : ''}</div>
+            <div className="truncate text-xs text-mc-dim" title={entry.path}>
+              {entry.path}
+            </div>
+            <div className="text-xs text-mc-mute">
+              {entry.width}×{entry.height}
+              {entry.gradientTo ? ' · 渐变' : ''}
+              {entry.checkerboard ? ' · 棋盘' : ''}
+            </div>
           </div>
         );
       })}
@@ -129,7 +160,13 @@ function TexturesTab({ pack, fileMap }: { pack: ResourcePackSpecType; fileMap: M
 
 // ===== Sounds tab =====
 
-function SoundsTab({ pack, fileMap }: { pack: ResourcePackSpecType; fileMap: Map<string, string> }) {
+function SoundsTab({
+  pack,
+  fileMap,
+}: {
+  pack: ResourcePackSpecType;
+  fileMap: Map<string, string>;
+}) {
   if (pack.sounds.length === 0) {
     return <div className="px-3 py-6 text-center text-xs text-mc-mute">暂无音效</div>;
   }
@@ -143,7 +180,15 @@ function SoundsTab({ pack, fileMap }: { pack: ResourcePackSpecType; fileMap: Map
   );
 }
 
-function SoundRow({ entry, pack, fileMap }: { entry: SoundEntry; pack: ResourcePackSpecType; fileMap: Map<string, string> }) {
+function SoundRow({
+  entry,
+  pack,
+  fileMap,
+}: {
+  entry: SoundEntry;
+  pack: ResourcePackSpecType;
+  fileMap: Map<string, string>;
+}) {
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [duration, setDuration] = useState<string>('—');
   const [playing, setPlaying] = useState(false);
@@ -170,7 +215,8 @@ function SoundRow({ entry, pack, fileMap }: { entry: SoundEntry; pack: ResourceP
   const togglePlay = () => {
     if (!audio) return;
     if (audio.paused) {
-      audio.play()
+      audio
+        .play()
         .then(() => setPlaying(true))
         .catch(() => setPlaying(false));
     } else {
@@ -198,8 +244,13 @@ function SoundRow({ entry, pack, fileMap }: { entry: SoundEntry; pack: ResourceP
         <McIcon scope="pixel" name={playing ? 'star' : 'box'} size={12} />
       </button>
       <div className="flex-1 min-w-0">
-        <div className="truncate text-xs font-medium text-mc-text" title={entry.id}>{entry.id}</div>
-        <div className="truncate text-xs text-mc-mute" title={entry.event}>{entry.event || '(无事件名)'} · 音量 {entry.volume} · 音调 {entry.pitch}{entry.stream ? ' · 流式' : ''}</div>
+        <div className="truncate text-xs font-medium text-mc-text" title={entry.id}>
+          {entry.id}
+        </div>
+        <div className="truncate text-xs text-mc-mute" title={entry.event}>
+          {entry.event || '(无事件名)'} · 音量 {entry.volume} · 音调 {entry.pitch}
+          {entry.stream ? ' · 流式' : ''}
+        </div>
       </div>
       <div className="text-xs text-mc-dim">{duration}</div>
       {audioUrl && (
@@ -221,13 +272,28 @@ function ModelsTab({ pack }: { pack: ResourcePackSpecType }) {
   const columns: Column<ModelEntry>[] = [
     { key: 'path', header: '路径', width: '40%', sortValue: (r) => r.path },
     { key: 'textureName', header: '贴图名', width: '20%', sortValue: (r) => r.textureName },
-    { key: 'autoCubeAll', header: '自动 cube_all', width: '15%', render: (r) => (r.autoCubeAll ? '是' : '否') },
-    { key: 'jsonPreview', header: 'JSON 摘要', width: '25%', render: (r) => r.json ? `${r.json.slice(0, 40)}${r.json.length > 40 ? '…' : ''}` : '—' },
+    {
+      key: 'autoCubeAll',
+      header: '自动 cube_all',
+      width: '15%',
+      render: (r) => (r.autoCubeAll ? '是' : '否'),
+    },
+    {
+      key: 'jsonPreview',
+      header: 'JSON 摘要',
+      width: '25%',
+      render: (r) => (r.json ? `${r.json.slice(0, 40)}${r.json.length > 40 ? '…' : ''}` : '—'),
+    },
   ];
 
   return (
     <div className="p-2">
-      <DataTable columns={columns} data={pack.models} rowKey={(r) => r.path} emptyHint="暂无模型覆盖" />
+      <DataTable
+        columns={columns}
+        data={pack.models}
+        rowKey={(r) => r.path}
+        emptyHint="暂无模型覆盖"
+      />
     </div>
   );
 }
@@ -252,7 +318,12 @@ function LangTab({ pack }: { pack: ResourcePackSpecType }) {
     }));
     if (query) {
       const q = query.toLowerCase();
-      result = result.filter((r) => r.key.toLowerCase().includes(q) || r.en.toLowerCase().includes(q) || r.zh.toLowerCase().includes(q));
+      result = result.filter(
+        (r) =>
+          r.key.toLowerCase().includes(q) ||
+          r.en.toLowerCase().includes(q) ||
+          r.zh.toLowerCase().includes(q),
+      );
     }
     return result.sort((a, b) => a.key.localeCompare(b.key));
   }, [pack.langEnUs, pack.langZhCn, query]);

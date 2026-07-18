@@ -1,13 +1,42 @@
-import type { GenerateSpecRes, GenerateFilesRes, BuildRes, BuildWithFixRes, ExportZipRes, PrepareBuildDirRes, ExportProjectRes, ImportProjectRes, GeneratorType, Project, BuildStreamChunkT, ModrinthSearchRes, ModrinthVersionsRes, CurseForgeSearchRes, CurseForgeFilesRes, CurseForgeConfig, GitChooseRepoRes, GitStatusRes, GitLogRes, GitCommitRes, GitSyncRes, LocateMcRes, McChooseDirRes, InstallModRes, LaunchMcRes } from '../../../shared/ipc-channels.js';
+import type {
+  GenerateSpecRes,
+  GenerateFilesRes,
+  BuildRes,
+  BuildWithFixRes,
+  ExportZipRes,
+  PrepareBuildDirRes,
+  ExportProjectRes,
+  ImportProjectRes,
+  GeneratorType,
+  Project,
+  BuildStreamChunkT,
+  ModrinthSearchRes,
+  ModrinthVersionsRes,
+  CurseForgeSearchRes,
+  CurseForgeFilesRes,
+  CurseForgeConfig,
+  GitChooseRepoRes,
+  GitStatusRes,
+  GitLogRes,
+  GitCommitRes,
+  GitSyncRes,
+  LocateMcRes,
+  McChooseDirRes,
+  InstallModRes,
+  LaunchMcRes,
+} from '../../../shared/ipc-channels.js';
 
 /** 封装 window.mcApi，提供类型安全调用 */
 export const ipcClient = {
   generateSpec: (description: string, generatorType: GeneratorType): Promise<GenerateSpecRes> =>
     window.mcApi.generateSpec(description, generatorType),
-  generateFiles: (req: { loader: string; mcVersion: string; spec: unknown; generatorType: GeneratorType }): Promise<GenerateFilesRes> =>
-    window.mcApi.generateFiles(req),
-  build: (projectPath: string): Promise<BuildRes> =>
-    window.mcApi.build(projectPath),
+  generateFiles: (req: {
+    loader: string;
+    mcVersion: string;
+    spec: unknown;
+    generatorType: GeneratorType;
+  }): Promise<GenerateFilesRes> => window.mcApi.generateFiles(req),
+  build: (projectPath: string): Promise<BuildRes> => window.mcApi.build(projectPath),
   loadModelConfig: () => window.mcApi.loadModelConfig(),
   saveModelConfig: (config: { name: string; modelId: string; baseURL: string; apiKey: string }) =>
     window.mcApi.saveModelConfig(config),
@@ -18,31 +47,49 @@ export const ipcClient = {
     window.mcApi.buildWithFix(projectPath),
   buildStream: (projectPath: string, onChunk: (chunk: BuildStreamChunkT) => void) =>
     window.mcApi.buildStream(projectPath, onChunk),
-  exportZip: (req: { files: { path: string; content: string }[]; defaultName: string }): Promise<ExportZipRes> =>
-    window.mcApi.exportZip(req),
+  exportZip: (req: {
+    files: { path: string; content: string }[];
+    defaultName: string;
+  }): Promise<ExportZipRes> => window.mcApi.exportZip(req),
   prepareBuildDir: (files: { path: string; content: string }[]): Promise<PrepareBuildDirRes> =>
     window.mcApi.prepareBuildDir(files),
   listProjects: (): Promise<Project[]> => window.mcApi.listProjects(),
   getProject: (id: string): Promise<Project | null> => window.mcApi.getProject(id),
   saveProject: (project: Project): Promise<{ ok: true }> => window.mcApi.saveProject(project),
   deleteProject: (id: string): Promise<{ ok: true }> => window.mcApi.deleteProject(id),
-  exportProject: (project: Project): Promise<ExportProjectRes> => window.mcApi.exportProject(project),
+  exportProject: (project: Project): Promise<ExportProjectRes> =>
+    window.mcApi.exportProject(project),
   importProject: (): Promise<ImportProjectRes> => window.mcApi.importProject(),
-  modrinthSearch: (req: { query: string; loader?: string; mcVersion?: string; limit?: number }): Promise<ModrinthSearchRes> =>
-    window.mcApi.modrinthSearch(req),
-  modrinthVersions: (req: { projectId: string; loader?: string; mcVersion?: string }): Promise<ModrinthVersionsRes> =>
-    window.mcApi.modrinthVersions(req),
-  curseforgeSearch: (req: { query: string; loader?: string; mcVersion?: string; limit?: number }): Promise<CurseForgeSearchRes> =>
-    window.mcApi.curseforgeSearch(req),
-  curseforgeFiles: (req: { modId: number; loader?: string; mcVersion?: string }): Promise<CurseForgeFilesRes> =>
-    window.mcApi.curseforgeFiles(req),
+  modrinthSearch: (req: {
+    query: string;
+    loader?: string;
+    mcVersion?: string;
+    limit?: number;
+  }): Promise<ModrinthSearchRes> => window.mcApi.modrinthSearch(req),
+  modrinthVersions: (req: {
+    projectId: string;
+    loader?: string;
+    mcVersion?: string;
+  }): Promise<ModrinthVersionsRes> => window.mcApi.modrinthVersions(req),
+  curseforgeSearch: (req: {
+    query: string;
+    loader?: string;
+    mcVersion?: string;
+    limit?: number;
+  }): Promise<CurseForgeSearchRes> => window.mcApi.curseforgeSearch(req),
+  curseforgeFiles: (req: {
+    modId: number;
+    loader?: string;
+    mcVersion?: string;
+  }): Promise<CurseForgeFilesRes> => window.mcApi.curseforgeFiles(req),
   loadCurseForgeConfig: (): Promise<CurseForgeConfig> => window.mcApi.loadCurseForgeConfig(),
   saveCurseForgeConfig: (config: CurseForgeConfig): Promise<{ ok: true }> =>
     window.mcApi.saveCurseForgeConfig(config),
   // 源代码管理
   gitChooseRepo: (): Promise<GitChooseRepoRes> => window.mcApi.gitChooseRepo(),
   gitStatus: (repoPath: string): Promise<GitStatusRes> => window.mcApi.gitStatus(repoPath),
-  gitLog: (repoPath: string, limit: number): Promise<GitLogRes> => window.mcApi.gitLog(repoPath, limit),
+  gitLog: (repoPath: string, limit: number): Promise<GitLogRes> =>
+    window.mcApi.gitLog(repoPath, limit),
   gitCommit: (repoPath: string, message: string, all: boolean): Promise<GitCommitRes> =>
     window.mcApi.gitCommit(repoPath, message, all),
   gitPull: (repoPath: string): Promise<GitSyncRes> => window.mcApi.gitPull(repoPath),

@@ -19,7 +19,9 @@ describe('BuildFixer', () => {
 
   it('首次构建成功直接返回', async () => {
     vi.mocked(runGradleBuild).mockResolvedValue({
-      success: true, jarPath: 'build/libs/mod.jar', log: 'BUILD SUCCESSFUL',
+      success: true,
+      jarPath: 'build/libs/mod.jar',
+      log: 'BUILD SUCCESSFUL',
     });
     const fixer = makeFixer('');
     const result = await fixer.buildWithFix('/proj');
@@ -30,8 +32,9 @@ describe('BuildFixer', () => {
   it('构建失败 + AI 修复后成功', async () => {
     vi.mocked(runGradleBuild)
       .mockResolvedValueOnce({
-        success: false, jarPath: null,
-        log: '/proj/src/main/java/ModItems.java:10: error: \';\' expected',
+        success: false,
+        jarPath: null,
+        log: "/proj/src/main/java/ModItems.java:10: error: ';' expected",
       })
       .mockResolvedValueOnce({ success: true, jarPath: 'build/libs/mod.jar', log: 'ok' });
 
@@ -44,7 +47,8 @@ describe('BuildFixer', () => {
 
   it('3 次修复仍失败返回 false', async () => {
     vi.mocked(runGradleBuild).mockResolvedValue({
-      success: false, jarPath: null,
+      success: false,
+      jarPath: null,
       log: '/proj/src/ModItems.java:1: error: cannot find symbol',
     });
     const fixer = makeFixer('=== FILE: src/ModItems.java ===\nclass X {}');
@@ -55,7 +59,8 @@ describe('BuildFixer', () => {
 
   it('无法解析错误时直接返回', async () => {
     vi.mocked(runGradleBuild).mockResolvedValue({
-      success: false, jarPath: null,
+      success: false,
+      jarPath: null,
       log: 'Some unknown error without file:line format',
     });
     const fixer = makeFixer('');

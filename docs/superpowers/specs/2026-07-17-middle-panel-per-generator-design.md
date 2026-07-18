@@ -9,6 +9,7 @@
 当前 MC Creator 中间预览窗口（[CodePreview.tsx](file:///d:/MC%20mod/apps/desktop/src/renderer/src/components/CodePreview.tsx)）对所有 generatorType 用同一逻辑：根据 `selectedFile` 显示文件内容（代码或 PNG）。
 
 问题：
+
 1. **没有按类型可视化**：用户切换 generatorType 后，中间窗口仍只显示文件内容，看不到项目整体结构
 2. **小白门槛高**：用户需要知道"点哪个文件"才能看到内容
 3. **类型不全**：缺少 `launcher` 类型；`texture` 与 `resource_pack` 功能重叠
@@ -24,15 +25,15 @@
 
 ## 3. 类型清单（最终）
 
-| 类型 | 说明 | 是否新增 |
-|---|---|---|
-| `mod` | Mod（需 Fabric/NeoForge/Quilt/Legacy Fabric） | 保留 |
-| `datapack` | 数据包（原版功能扩展，无需 mod 加载器） | 保留 |
-| `modpack` | 整合包（mod 集合 + 配置） | 保留 |
-| `server` | 服务器配置（server.properties） | 保留 |
-| `resource_pack` | 资源包（**合并原 texture + sound + resource_pack**） | 合并 |
-| `skin` | 皮肤（classic/slim 模型） | 保留 |
-| `launcher` | 启动器配置/脚本（PCL2/HMCL/official） | **新增** |
+| 类型            | 说明                                                 | 是否新增 |
+| --------------- | ---------------------------------------------------- | -------- |
+| `mod`           | Mod（需 Fabric/NeoForge/Quilt/Legacy Fabric）        | 保留     |
+| `datapack`      | 数据包（原版功能扩展，无需 mod 加载器）              | 保留     |
+| `modpack`       | 整合包（mod 集合 + 配置）                            | 保留     |
+| `server`        | 服务器配置（server.properties）                      | 保留     |
+| `resource_pack` | 资源包（**合并原 texture + sound + resource_pack**） | 合并     |
+| `skin`          | 皮肤（classic/slim 模型）                            | 保留     |
+| `launcher`      | 启动器配置/脚本（PCL2/HMCL/official）                | **新增** |
 
 **删除**：`texture`（功能并入 `resource_pack`）
 **新增**：`launcher`
@@ -80,6 +81,7 @@ apps/desktop/src/renderer/src/components/
 ### 4.4 App.tsx 改动
 
 原 [App.tsx](file:///d:/MC%20mod/apps/desktop/src/renderer/src/App.tsx) 中：
+
 ```tsx
 <main className="flex flex-1 flex-col overflow-hidden">
   <TabBar />
@@ -91,6 +93,7 @@ apps/desktop/src/renderer/src/components/
 ```
 
 替换为：
+
 ```tsx
 <main className="flex flex-1 flex-col overflow-hidden">
   <MiddlePanel />
@@ -179,17 +182,35 @@ apps/desktop/src/renderer/src/components/
 ### 6.1 GENERATOR_TYPES 修改
 
 `apps/desktop/src/shared/ipc-channels.ts`：
+
 ```typescript
 // 修改前
-export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'texture', 'skin', 'resource_pack'] as const;
+export const GENERATOR_TYPES = [
+  'mod',
+  'datapack',
+  'modpack',
+  'server',
+  'texture',
+  'skin',
+  'resource_pack',
+] as const;
 
 // 修改后
-export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'resource_pack', 'skin', 'launcher'] as const;
+export const GENERATOR_TYPES = [
+  'mod',
+  'datapack',
+  'modpack',
+  'server',
+  'resource_pack',
+  'skin',
+  'launcher',
+] as const;
 ```
 
 ### 6.2 新增 LauncherSpec
 
 `packages/shared/src/schemas/launcher-spec.ts`：
+
 ```typescript
 import { z } from 'zod';
 
@@ -218,6 +239,7 @@ export type LauncherSpec = z.infer<typeof LauncherSpec>;
 ### 6.3 导出 LauncherSpec
 
 `packages/shared/src/schemas/index.ts` 新增：
+
 ```typescript
 export { LauncherSpec } from './launcher-spec.js';
 export type { LauncherSpec } from './launcher-spec.js';
@@ -228,6 +250,7 @@ export type { LauncherSpec } from './launcher-spec.js';
 删除 `texture` 类型后，已存的 `texture` 项目加载时需迁移到 `resource_pack`：
 
 在 `apps/desktop/src/main/project-store.ts`（或加载 spec 的入口）加迁移逻辑：
+
 ```typescript
 if (loadedSpec.generatorType === 'texture') {
   loadedSpec.generatorType = 'resource_pack';
@@ -253,16 +276,17 @@ const TYPE_LABELS: Record<GeneratorType, string> = {
 ### 6.6 AgentPanel placeholder 更新
 
 [AgentPanel.tsx](file:///d:/MC%20mod/apps/desktop/src/renderer/src/components/AgentPanel.tsx) 的 `placeholder` 函数：
+
 - 删除 `texture` case
 - 新增 `launcher` case：`'描述你想要的启动器配置…'`
 
 ## 7. 第三方依赖
 
-| 依赖 | 用途 | 大小 | 必要性 |
-|---|---|---|---|
-| `skinview3d` | MC 皮肤 3D 预览（SkinPreviewPanel） | ~50KB | 必需（阶段 4） |
-| HTML5 `<audio>` | 音效播放（ResourcePackPreviewPanel） | 0（内置） | 已有 |
-| HTML5 `<canvas>` | 2D UV 贴图绘制（SkinPreviewPanel） | 0（内置） | 已有 |
+| 依赖             | 用途                                 | 大小      | 必要性         |
+| ---------------- | ------------------------------------ | --------- | -------------- |
+| `skinview3d`     | MC 皮肤 3D 预览（SkinPreviewPanel）  | ~50KB     | 必需（阶段 4） |
+| HTML5 `<audio>`  | 音效播放（ResourcePackPreviewPanel） | 0（内置） | 已有           |
+| HTML5 `<canvas>` | 2D UV 贴图绘制（SkinPreviewPanel）   | 0（内置） | 已有           |
 
 **安装命令**：`pnpm add skinview3d -F @mc-creator/desktop`（仅在阶段 4 执行）
 
@@ -285,44 +309,48 @@ useModStore
 
 这是大项目（7 个面板 + 框架），分 4 个独立 sub-project，每个独立 spec → plan → 实施：
 
-| 阶段 | 内容 | 复杂度 | 依赖 |
-|---|---|---|---|
-| **阶段 1** | 调度框架（MiddlePanel + tab 切换）+ Schema 变更 + server 面板（最简单的表单） | 中 | 无 |
-| **阶段 2** | mod + datapack + modpack 面板（列表/表格类） | 中 | 阶段 1 |
-| **阶段 3** | launcher 面板（表单类，类似 server） | 低 | 阶段 1 |
-| **阶段 4** | resource_pack + skin 面板（视觉类，需 skinview3d） | 高 | 阶段 1 |
+| 阶段       | 内容                                                                          | 复杂度 | 依赖   |
+| ---------- | ----------------------------------------------------------------------------- | ------ | ------ |
+| **阶段 1** | 调度框架（MiddlePanel + tab 切换）+ Schema 变更 + server 面板（最简单的表单） | 中     | 无     |
+| **阶段 2** | mod + datapack + modpack 面板（列表/表格类）                                  | 中     | 阶段 1 |
+| **阶段 3** | launcher 面板（表单类，类似 server）                                          | 低     | 阶段 1 |
+| **阶段 4** | resource_pack + skin 面板（视觉类，需 skinview3d）                            | 高     | 阶段 1 |
 
 **当前设计文档覆盖所有 4 个阶段**。每个阶段实施前可独立写 implementation plan。
 
 ## 10. 验证标准
 
 ### 通用
+
 - typecheck 0 错误（node + web）
 - 现有测试全通过
 - noUnusedLocals/noUnusedParameters 0 错误
 
 ### 组件
+
 - 每个预览面板组件 ≤ 300 行
 - MiddlePanel 调度器 ≤ 150 行
 - 删除 texture 后无 import 断裂
 
 ### Schema
+
 - 新增 `launcher-spec.test.ts`（覆盖默认值、round-trip、枚举校验）
 - 现有 mod-spec/datapack-spec/modpack-spec/server-spec/resource-pack-spec 测试仍通过
 
 ### 功能
+
 - 切换 generatorType 后中间面板自动切换
 - 预览/代码 tab 切换正常
 - 每个面板能正确读取 spec 并渲染
 
 ## 11. 风险与缓解
 
-| 风险 | 影响 | 缓解 |
-|---|---|---|
-| `skinview3d` 与 React 18 集成 | 阶段 4 阻塞 | 先在孤立 demo 验证，再集成 |
-| 删除 `texture` 影响已存项目 | 旧项目 spec 加载失败 | 加迁移逻辑：`texture` → `resource_pack` |
-| launcher spec 字段不全 | 实际启动失败 | 阶段 3 实施时参考真实 PCL2/HMCL 配置 |
-| 表格性能（mod 物品多） | UI 卡顿 | 用虚拟滚动（react-window）备选 |
+| 风险                          | 影响                 | 缓解                                    |
+| ----------------------------- | -------------------- | --------------------------------------- |
+| `skinview3d` 与 React 18 集成 | 阶段 4 阻塞          | 先在孤立 demo 验证，再集成              |
+| 删除 `texture` 影响已存项目   | 旧项目 spec 加载失败 | 加迁移逻辑：`texture` → `resource_pack` |
+| launcher spec 字段不全        | 实际启动失败         | 阶段 3 实施时参考真实 PCL2/HMCL 配置    |
+| 表格性能（mod 物品多）        | UI 卡顿              | 用虚拟滚动（react-window）备选          |
 
 ## 12. 不做的事（YAGNI）
 

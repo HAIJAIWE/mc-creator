@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 /** 服务端模组条目 */
 export const ServerModEntry = z.object({
-  id: z.string(),           // modId 或文件名
-  version: z.string(),      // 版本号
+  id: z.string(), // modId 或文件名
+  version: z.string(), // 版本号
   source: z.enum(['modrinth', 'curseforge', 'url']).default('modrinth'),
 });
 

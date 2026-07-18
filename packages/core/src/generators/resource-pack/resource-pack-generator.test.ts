@@ -39,7 +39,18 @@ function mod(p: Partial<ModelEntry>): ModelEntry {
 
 /** 构造完整 FontEntry */
 function font(p: Partial<FontEntry>): FontEntry {
-  return { id: '', char: '', texture: '', width: 8, height: 8, x: 0, y: 0, advance: 8, ascent: 7, ...p };
+  return {
+    id: '',
+    char: '',
+    texture: '',
+    width: 8,
+    height: 8,
+    x: 0,
+    y: 0,
+    advance: 8,
+    ascent: 7,
+    ...p,
+  };
 }
 
 /** 构造完整 SoundEntry */
@@ -47,18 +58,20 @@ function snd(p: Partial<SoundEntry>): SoundEntry {
   return { id: '', event: '', data: '', volume: 1, pitch: 1, stream: false, ...p };
 }
 
-const PNG_SIG = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 describe('ResourcePackGenerator', () => {
   const gen = new ResourcePackGenerator();
 
   it('空 spec（最小配置）只生成 pack.mcmeta + 2 个 lang 文件', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'Empty Pack',
-      packDescription: '空资源包',
-      packFormat: 34,
-      namespace: 'minecraft',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'Empty Pack',
+        packDescription: '空资源包',
+        packFormat: 34,
+        namespace: 'minecraft',
+      }),
+    );
 
     // 仅 pack.mcmeta + en_us.json + zh_cn.json
     expect(result.files).toHaveLength(3);
@@ -71,13 +84,15 @@ describe('ResourcePackGenerator', () => {
   });
 
   it('textureOverrides 生成对应 PNG 文件', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'Tex',
-      textureOverrides: [
-        tex({ path: 'block/stone', color: '#FF0000', width: 16, height: 16 }),
-        tex({ path: 'item/diamond', color: '#00FF00', width: 8, height: 8 }),
-      ],
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'Tex',
+        textureOverrides: [
+          tex({ path: 'block/stone', color: '#FF0000', width: 16, height: 16 }),
+          tex({ path: 'item/diamond', color: '#00FF00', width: 8, height: 8 }),
+        ],
+      }),
+    );
 
     const png1 = result.files.find((f) => f.path === 'assets/minecraft/textures/block/stone.png');
     const png2 = result.files.find((f) => f.path === 'assets/minecraft/textures/item/diamond.png');
@@ -89,13 +104,15 @@ describe('ResourcePackGenerator', () => {
   });
 
   it('models 用 autoCubeAll 自动生成 cube_all JSON', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'Model',
-      models: [
-        mod({ path: 'block/stone', autoCubeAll: true, textureName: 'stone' }),
-        mod({ path: 'block/dirt' }),  // textureName 默认为空，应使用 path basename
-      ],
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'Model',
+        models: [
+          mod({ path: 'block/stone', autoCubeAll: true, textureName: 'stone' }),
+          mod({ path: 'block/dirt' }), // textureName 默认为空，应使用 path basename
+        ],
+      }),
+    );
 
     const m1 = result.files.find((f) => f.path === 'assets/minecraft/models/block/stone.json');
     expect(m1).toBeDefined();
@@ -115,12 +132,12 @@ describe('ResourcePackGenerator', () => {
       parent: 'minecraft:item/generated',
       textures: { layer0: 'minecraft:item/iron_ingot' },
     });
-    const result = await gen.generate(makeCtx({
-      packName: 'Custom',
-      models: [
-        mod({ path: 'item/iron', json: customJson, autoCubeAll: true }),
-      ],
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'Custom',
+        models: [mod({ path: 'item/iron', json: customJson, autoCubeAll: true })],
+      }),
+    );
 
     const m = result.files.find((f) => f.path === 'assets/minecraft/models/item/iron.json');
     expect(m).toBeDefined();
@@ -130,14 +147,16 @@ describe('ResourcePackGenerator', () => {
   });
 
   it('fonts 生成贴图 PNG + font JSON', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'Font',
-      namespace: 'myfont',
-      fonts: [
-        font({ id: 'a', char: 'A', width: 8, height: 8 }),
-        font({ id: 'b', char: 'B', width: 16, height: 16 }),
-      ],
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'Font',
+        namespace: 'myfont',
+        fonts: [
+          font({ id: 'a', char: 'A', width: 8, height: 8 }),
+          font({ id: 'b', char: 'B', width: 16, height: 16 }),
+        ],
+      }),
+    );
 
     // 字体贴图 PNG
     const pngA = result.files.find((f) => f.path === 'assets/myfont/textures/font/a.png');
@@ -164,14 +183,16 @@ describe('ResourcePackGenerator', () => {
   });
 
   it('sounds 生成 sounds.json + 占位 ogg 文件', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'Sound',
-      namespace: 'mysound',
-      sounds: [
-        snd({ id: 'hit', event: 'block.stone.hit', volume: 1, pitch: 1, stream: false }),
-        snd({ id: 'rain', event: 'ambience.rain', volume: 0.5, pitch: 1, stream: true }),
-      ],
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'Sound',
+        namespace: 'mysound',
+        sounds: [
+          snd({ id: 'hit', event: 'block.stone.hit', volume: 1, pitch: 1, stream: false }),
+          snd({ id: 'rain', event: 'ambience.rain', volume: 0.5, pitch: 1, stream: true }),
+        ],
+      }),
+    );
 
     // ogg 占位文件
     const oggHit = result.files.find((f) => f.path === 'assets/mysound/sounds/hit.ogg');
@@ -193,12 +214,14 @@ describe('ResourcePackGenerator', () => {
   });
 
   it('lang 文件内容正确', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'Lang',
-      namespace: 'minecraft',
-      langEnUs: { 'item.test.name': 'Test Item', 'block.test.name': 'Test Block' },
-      langZhCn: { 'item.test.name': '测试物品', 'block.test.name': '测试方块' },
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'Lang',
+        namespace: 'minecraft',
+        langEnUs: { 'item.test.name': 'Test Item', 'block.test.name': 'Test Block' },
+        langZhCn: { 'item.test.name': '测试物品', 'block.test.name': '测试方块' },
+      }),
+    );
 
     const en = result.files.find((f) => f.path === 'assets/minecraft/lang/en_us.json');
     const zh = result.files.find((f) => f.path === 'assets/minecraft/lang/zh_cn.json');
@@ -213,16 +236,16 @@ describe('ResourcePackGenerator', () => {
   });
 
   it('PNG 文件 content 是合法 base64，Buffer.from 后以 PNG signature 开头', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'B64',
-      namespace: 'b64',
-      textureOverrides: [
-        tex({ path: 'block/check', color: '#123456', width: 16, height: 16, checkerboard: true }),
-      ],
-      fonts: [
-        font({ id: 'f1', char: 'F', width: 8, height: 8 }),
-      ],
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'B64',
+        namespace: 'b64',
+        textureOverrides: [
+          tex({ path: 'block/check', color: '#123456', width: 16, height: 16, checkerboard: true }),
+        ],
+        fonts: [font({ id: 'f1', char: 'F', width: 8, height: 8 })],
+      }),
+    );
 
     const pngFiles = result.files.filter((f) => f.path.endsWith('.png'));
     expect(pngFiles.length).toBeGreaterThanOrEqual(2);
@@ -246,19 +269,23 @@ describe('ResourcePackGenerator', () => {
   });
 
   it('buildCmd 与 warnings 内容正确', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'Cmd',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'Cmd',
+      }),
+    );
     expect(result.buildCmd).toBe('echo 资源包无需编译');
     expect(result.warnings).toContain('PNG/OGG 文件已 base64 编码，写入磁盘时需 decode');
   });
 
   it('pack.mcmeta 内容正确', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'My Pack',
-      packDescription: '我的资源包',
-      packFormat: 34,
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'My Pack',
+        packDescription: '我的资源包',
+        packFormat: 34,
+      }),
+    );
     const mcmeta = result.files.find((f) => f.path === 'pack.mcmeta');
     expect(mcmeta).toBeDefined();
     const parsed = JSON.parse(mcmeta!.content);
@@ -267,13 +294,21 @@ describe('ResourcePackGenerator', () => {
   });
 
   it('textureOverrides 渐变与棋盘格不崩溃', async () => {
-    const result = await gen.generate(makeCtx({
-      packName: 'Grad',
-      textureOverrides: [
-        tex({ path: 'block/sky', color: '#87CEEB', gradientTo: '#000080', width: 16, height: 16 }),
-        tex({ path: 'block/grid', color: '#FF0000', checkerboard: true, width: 16, height: 16 }),
-      ],
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        packName: 'Grad',
+        textureOverrides: [
+          tex({
+            path: 'block/sky',
+            color: '#87CEEB',
+            gradientTo: '#000080',
+            width: 16,
+            height: 16,
+          }),
+          tex({ path: 'block/grid', color: '#FF0000', checkerboard: true, width: 16, height: 16 }),
+        ],
+      }),
+    );
 
     const grad = result.files.find((f) => f.path === 'assets/minecraft/textures/block/sky.png');
     const check = result.files.find((f) => f.path === 'assets/minecraft/textures/block/grid.png');

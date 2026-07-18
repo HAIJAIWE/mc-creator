@@ -35,7 +35,11 @@ export function SearchPanel() {
             className="flex-1 bg-transparent text-sm text-mc-text outline-none placeholder:text-mc-mute"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="text-mc-mute hover:text-mc-text" aria-label="清除">
+            <button
+              onClick={() => setQuery('')}
+              className="text-mc-mute hover:text-mc-text"
+              aria-label="清除"
+            >
               <McIcon scope="pixel" name="close" size={14} />
             </button>
           )}
@@ -61,7 +65,12 @@ export function SearchPanel() {
                   active ? 'bg-mc-surface-2 text-mc-text' : 'text-mc-dim hover:bg-mc-surface-2/60'
                 }`}
               >
-                <McIcon scope={ic.scope} name={ic.name} size={14} className="flex-shrink-0 text-mc-mute" />
+                <McIcon
+                  scope={ic.scope}
+                  name={ic.name}
+                  size={14}
+                  className="flex-shrink-0 text-mc-mute"
+                />
                 <span className="truncate">{f.path}</span>
               </button>
             );

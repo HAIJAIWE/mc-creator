@@ -1,8 +1,21 @@
-import type { FileNode, GeneratorContext, GenerationResult, Loader, McVersion } from '@mc-creator/shared';
+import type {
+  FileNode,
+  GeneratorContext,
+  GenerationResult,
+  Loader,
+  McVersion,
+} from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import { SkinSpec } from '@mc-creator/shared';
 import type { SkinSpec as SkinSpecType } from '@mc-creator/shared';
-import { createBuffer, encodePng, setPixel, hexToRgb, fillSolid, type PixelBuffer } from '../../utils/png-encoder.js';
+import {
+  createBuffer,
+  encodePng,
+  setPixel,
+  hexToRgb,
+  fillSolid,
+  type PixelBuffer,
+} from '../../utils/png-encoder.js';
 
 /**
  * 皮肤生成器（P9）。
@@ -88,7 +101,16 @@ export class SkinGenerator implements Generator {
   }
 
   /** 矩形填充 */
-  private fillRect(buf: PixelBuffer, x0: number, y0: number, w: number, h: number, r: number, g: number, b: number): void {
+  private fillRect(
+    buf: PixelBuffer,
+    x0: number,
+    y0: number,
+    w: number,
+    h: number,
+    r: number,
+    g: number,
+    b: number,
+  ): void {
     for (let y = y0; y < y0 + h; y++) {
       for (let x = x0; x < x0 + w; x++) {
         setPixel(buf, x, y, r, g, b, 255);

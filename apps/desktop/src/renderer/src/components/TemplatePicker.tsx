@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { TEMPLATES_BY_TYPE, type SpecTemplate, type GeneratorType } from '@mc-creator/shared';
 
-
 interface Props {
   generatorType: GeneratorType;
   onPick: (template: SpecTemplate) => void;
@@ -42,9 +41,7 @@ export function TemplatePicker({ generatorType, onPick, onClose }: Props) {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-bold">
             选择模板
-            <span className="ml-2 text-xs font-normal text-mc-text-dim">
-              （{generatorType}）
-            </span>
+            <span className="ml-2 text-xs font-normal text-mc-text-dim">（{generatorType}）</span>
           </h2>
           <button
             onClick={onClose}
@@ -56,9 +53,7 @@ export function TemplatePicker({ generatorType, onPick, onClose }: Props) {
         </div>
 
         {templates.length === 0 ? (
-          <div className="py-8 text-center text-xs text-mc-text-dim">
-            暂无可用模板
-          </div>
+          <div className="py-8 text-center text-xs text-mc-text-dim">暂无可用模板</div>
         ) : (
           <ul className="space-y-2">
             {templates.map((t) => (
@@ -68,25 +63,17 @@ export function TemplatePicker({ generatorType, onPick, onClose }: Props) {
                   className="mc-card w-full p-3 text-left hover:border-mc-accent transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    {t.icon && (
-                      <span className="text-base">{t.icon}</span>
-                    )}
-                    <span className="text-sm font-medium text-mc-text">
-                      {t.title}
-                    </span>
+                    {t.icon && <span className="text-base">{t.icon}</span>}
+                    <span className="text-sm font-medium text-mc-text">{t.title}</span>
                   </div>
-                  <p className="mt-1 line-clamp-3 text-xs text-mc-text-dim">
-                    {t.description}
-                  </p>
+                  <p className="mt-1 line-clamp-3 text-xs text-mc-text-dim">{t.description}</p>
                 </button>
               </li>
             ))}
           </ul>
         )}
 
-        <div className="mt-3 text-right text-xs text-mc-text-dim">
-          点击模板将填充到描述框
-        </div>
+        <div className="mt-3 text-right text-xs text-mc-text-dim">点击模板将填充到描述框</div>
       </div>
     </div>
   );

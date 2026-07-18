@@ -2,8 +2,16 @@ import { z } from 'zod';
 import { LOADERS } from '@mc-creator/shared';
 
 /** 生成器类型联合（mod/datapack/modpack/server/resource_pack/skin/launcher） */
-export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'resource_pack', 'skin', 'launcher'] as const;
-export type GeneratorType = typeof GENERATOR_TYPES[number];
+export const GENERATOR_TYPES = [
+  'mod',
+  'datapack',
+  'modpack',
+  'server',
+  'resource_pack',
+  'skin',
+  'launcher',
+] as const;
+export type GeneratorType = (typeof GENERATOR_TYPES)[number];
 
 /** IPC 通道名常量 */
 export const IPC = {
@@ -196,15 +204,17 @@ export const ModrinthSearchRequest = z.object({
   limit: z.number().optional().default(20),
 });
 export const ModrinthSearchResponse = z.object({
-  hits: z.array(z.object({
-    project_id: z.string(),
-    slug: z.string(),
-    title: z.string(),
-    description: z.string(),
-    icon_url: z.string().nullable(),
-    downloads: z.number(),
-    categories: z.array(z.string()),
-  })),
+  hits: z.array(
+    z.object({
+      project_id: z.string(),
+      slug: z.string(),
+      title: z.string(),
+      description: z.string(),
+      icon_url: z.string().nullable(),
+      downloads: z.number(),
+      categories: z.array(z.string()),
+    }),
+  ),
 });
 
 export const ModrinthVersionsRequest = z.object({
@@ -213,18 +223,22 @@ export const ModrinthVersionsRequest = z.object({
   mcVersion: z.string().optional(),
 });
 export const ModrinthVersionsResponse = z.object({
-  versions: z.array(z.object({
-    id: z.string(),
-    project_id: z.string(),
-    version_number: z.string(),
-    name: z.string(),
-    files: z.array(z.object({
-      url: z.string(),
-      filename: z.string(),
-      primary: z.boolean(),
-      size: z.number(),
-    })),
-  })),
+  versions: z.array(
+    z.object({
+      id: z.string(),
+      project_id: z.string(),
+      version_number: z.string(),
+      name: z.string(),
+      files: z.array(
+        z.object({
+          url: z.string(),
+          filename: z.string(),
+          primary: z.boolean(),
+          size: z.number(),
+        }),
+      ),
+    }),
+  ),
 });
 
 export type ModrinthSearchReq = z.infer<typeof ModrinthSearchRequest>;

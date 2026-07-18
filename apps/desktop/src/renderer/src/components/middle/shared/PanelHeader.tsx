@@ -17,7 +17,9 @@ export function PanelHeader({ icon, title, meta = [], subtitle }: PanelHeaderPro
         {meta.map((m, i) => (
           <span key={i} className="flex items-center gap-2">
             <span className="text-xs text-mc-mute">·</span>
-            <span className="text-xs text-mc-dim">{m.label}: {m.value}</span>
+            <span className="text-xs text-mc-dim">
+              {m.label}: {m.value}
+            </span>
           </span>
         ))}
       </div>

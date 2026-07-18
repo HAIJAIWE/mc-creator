@@ -52,7 +52,11 @@ function PngPreview({ file }: { file: FileNode }) {
         </div>
         <div className="flex items-center gap-2 text-xs text-mc-mute">
           <span className="break-all">{file.path}</span>
-          {size && <span className="text-mc-dim">• {size.width}×{size.height}</span>}
+          {size && (
+            <span className="text-mc-dim">
+              • {size.width}×{size.height}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -62,7 +66,8 @@ function PngPreview({ file }: { file: FileNode }) {
 function getFileIcon(path: string): string {
   if (path.endsWith('.json')) return 'file-text';
   if (path.endsWith('.java')) return 'terminal';
-  if (path.endsWith('.gradle') || path.endsWith('.toml') || path.endsWith('.properties')) return 'terminal';
+  if (path.endsWith('.gradle') || path.endsWith('.toml') || path.endsWith('.properties'))
+    return 'terminal';
   if (path.endsWith('.png')) return 'image';
   return 'file';
 }
@@ -83,11 +88,18 @@ function computeDefaultName(generatorType: GeneratorType, spec: unknown): string
 export function CodePreview() {
   // P3 性能：shallow 选择器避免 buildLog 流式更新触发重渲染
   const { files, selectedFile, generatorType, spec } = useModStore(
-    (s) => ({ files: s.files, selectedFile: s.selectedFile, generatorType: s.generatorType, spec: s.spec }),
+    (s) => ({
+      files: s.files,
+      selectedFile: s.selectedFile,
+      generatorType: s.generatorType,
+      spec: s.spec,
+    }),
     shallow,
   );
   const [exporting, setExporting] = useState(false);
-  const [exportMsg, setExportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [exportMsg, setExportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
+    null,
+  );
 
   // P3 性能：仅 files/selectedFile 变化时重算 file，避免每次渲染都 O(n) find
   const file = useMemo(() => files.find((f) => f.path === selectedFile), [files, selectedFile]);
@@ -111,13 +123,18 @@ export function CodePreview() {
     }
   };
 
-  const lang = file && !isPng
-    ? file.path.endsWith('.java') ? 'java'
-      : file.path.endsWith('.json') ? 'json'
-      : file.path.endsWith('.gradle') ? 'groovy'
-      : file.path.endsWith('.toml') ? 'ini'
-      : 'plaintext'
-    : 'plaintext';
+  const lang =
+    file && !isPng
+      ? file.path.endsWith('.java')
+        ? 'java'
+        : file.path.endsWith('.json')
+          ? 'json'
+          : file.path.endsWith('.gradle')
+            ? 'groovy'
+            : file.path.endsWith('.toml')
+              ? 'ini'
+              : 'plaintext'
+      : 'plaintext';
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

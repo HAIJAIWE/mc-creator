@@ -4,7 +4,7 @@ import { z } from 'zod';
 export const RecipeSpec = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
   type: z.enum(['crafting_shaped', 'crafting_shapeless', 'smelting', 'stonecutting']),
-  result: z.string(),           // 产物物品 ID，如 minecraft:diamond
+  result: z.string(), // 产物物品 ID，如 minecraft:diamond
   count: z.number().int().min(1).default(1),
   // shaped 配方用
   pattern: z.array(z.string()).optional(),
@@ -32,8 +32,8 @@ export const AdvancementSpec = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
   title: z.string(),
   description: z.string(),
-  icon: z.string(),           // 物品 ID
-  trigger: z.string(),        // 触发器，如 minecraft:inventory_changed
+  icon: z.string(), // 物品 ID
+  trigger: z.string(), // 触发器，如 minecraft:inventory_changed
   conditions: z.string().optional(), // 条件 JSON 字符串
 });
 

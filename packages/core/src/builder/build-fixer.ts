@@ -32,10 +32,7 @@ export class BuildFixer {
     private provider: ModelProvider,
   ) {}
 
-  async buildWithFix(
-    projectPath: string,
-    onProgress?: (msg: string) => void,
-  ): Promise<FixResult> {
+  async buildWithFix(projectPath: string, onProgress?: (msg: string) => void): Promise<FixResult> {
     const fixLog: string[] = [];
 
     for (let attempt = 0; attempt <= MAX_FIX_ATTEMPTS; attempt++) {

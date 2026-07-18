@@ -22,24 +22,87 @@ interface Preset {
 }
 
 const MODEL_PRESETS: Preset[] = [
-  { name: 'OpenAI', baseURL: 'https://api.openai.com/v1', modelId: 'gpt-4o-mini', apiKeyPlaceholder: 'sk-...' },
-  { name: 'DeepSeek', baseURL: 'https://api.deepseek.com/v1', modelId: 'deepseek-chat', apiKeyPlaceholder: 'sk-...' },
-  { name: '通义千问', baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', modelId: 'qwen-plus', apiKeyPlaceholder: 'sk-...' },
-  { name: '智谱 GLM', baseURL: 'https://open.bigmodel.cn/api/paas/v4', modelId: 'glm-4-flash', apiKeyPlaceholder: '...' },
-  { name: 'Ollama (本地)', baseURL: 'http://localhost:11434/v1', modelId: 'qwen2.5:7b', local: true },
-  { name: 'LM Studio (本地)', baseURL: 'http://localhost:1234/v1', modelId: 'local-model', local: true },
+  {
+    name: 'OpenAI',
+    baseURL: 'https://api.openai.com/v1',
+    modelId: 'gpt-4o-mini',
+    apiKeyPlaceholder: 'sk-...',
+  },
+  {
+    name: 'DeepSeek',
+    baseURL: 'https://api.deepseek.com/v1',
+    modelId: 'deepseek-chat',
+    apiKeyPlaceholder: 'sk-...',
+  },
+  {
+    name: '通义千问',
+    baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    modelId: 'qwen-plus',
+    apiKeyPlaceholder: 'sk-...',
+  },
+  {
+    name: '智谱 GLM',
+    baseURL: 'https://open.bigmodel.cn/api/paas/v4',
+    modelId: 'glm-4-flash',
+    apiKeyPlaceholder: '...',
+  },
+  {
+    name: 'Ollama (本地)',
+    baseURL: 'http://localhost:11434/v1',
+    modelId: 'qwen2.5:7b',
+    local: true,
+  },
+  {
+    name: 'LM Studio (本地)',
+    baseURL: 'http://localhost:1234/v1',
+    modelId: 'local-model',
+    local: true,
+  },
 ];
 
 const LAYOUT_PRESETS = [
-  { id: 'full', name: '全屏', icon: LayoutList, description: '只显示中间编辑器', left: 0, right: 0 },
-  { id: 'left', name: '左侧', icon: LayoutPanelTop, description: '左侧文件树 + 中间编辑器', left: 200, right: 0 },
-  { id: 'right', name: '右侧', icon: PanelRight, description: '中间编辑器 + 右侧面板', left: 0, right: 360 },
-  { id: 'both', name: '三栏', icon: LayoutGrid, description: '左侧文件树 + 中间编辑器 + 右侧面板', left: 200, right: 360 },
+  {
+    id: 'full',
+    name: '全屏',
+    icon: LayoutList,
+    description: '只显示中间编辑器',
+    left: 0,
+    right: 0,
+  },
+  {
+    id: 'left',
+    name: '左侧',
+    icon: LayoutPanelTop,
+    description: '左侧文件树 + 中间编辑器',
+    left: 200,
+    right: 0,
+  },
+  {
+    id: 'right',
+    name: '右侧',
+    icon: PanelRight,
+    description: '中间编辑器 + 右侧面板',
+    left: 0,
+    right: 360,
+  },
+  {
+    id: 'both',
+    name: '三栏',
+    icon: LayoutGrid,
+    description: '左侧文件树 + 中间编辑器 + 右侧面板',
+    left: 200,
+    right: 360,
+  },
 ];
 
 type Tab = 'model' | 'curseforge' | 'appearance';
 
-export function SettingsPanel({ leftWidth, rightWidth, onLeftWidthChange, onRightWidthChange }: SettingsPanelProps) {
+export function SettingsPanel({
+  leftWidth,
+  rightWidth,
+  onLeftWidthChange,
+  onRightWidthChange,
+}: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('model');
 
   // === 模型配置 ===
@@ -55,7 +118,11 @@ export function SettingsPanel({ leftWidth, rightWidth, onLeftWidthChange, onRigh
 
   // === 外观：主题 ===
   const [activeTheme, setActiveTheme] = useState<string>(() => {
-    try { return localStorage.getItem('mc-creator-theme') ?? 'grass'; } catch { return 'grass'; }
+    try {
+      return localStorage.getItem('mc-creator-theme') ?? 'grass';
+    } catch {
+      return 'grass';
+    }
   });
 
   useEffect(() => {
@@ -87,7 +154,7 @@ export function SettingsPanel({ leftWidth, rightWidth, onLeftWidthChange, onRigh
     setForm((prev) => ({ ...prev, name: p.name, baseURL: p.baseURL, modelId: p.modelId }));
   };
 
-  const applyLayoutPreset = (preset: typeof LAYOUT_PRESETS[0]) => {
+  const applyLayoutPreset = (preset: (typeof LAYOUT_PRESETS)[0]) => {
     onLeftWidthChange(preset.left);
     onRightWidthChange(preset.right);
   };
@@ -113,16 +180,20 @@ export function SettingsPanel({ leftWidth, rightWidth, onLeftWidthChange, onRigh
 
       {/* Tab 切换 */}
       <div className="flex border-b border-mc-border">
-        {([
-          { id: 'model', label: '模型' },
-          { id: 'curseforge', label: 'CurseForge' },
-          { id: 'appearance', label: '外观' },
-        ] as { id: Tab; label: string }[]).map((tab) => (
+        {(
+          [
+            { id: 'model', label: '模型' },
+            { id: 'curseforge', label: 'CurseForge' },
+            { id: 'appearance', label: '外观' },
+          ] as { id: Tab; label: string }[]
+        ).map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-2 text-xs font-medium transition-colors ${
-              activeTab === tab.id ? 'bg-mc-surface-2 text-mc-text' : 'text-mc-text-dim hover:text-mc-text'
+              activeTab === tab.id
+                ? 'bg-mc-surface-2 text-mc-text'
+                : 'text-mc-text-dim hover:text-mc-text'
             }`}
           >
             {tab.label}
@@ -142,7 +213,9 @@ export function SettingsPanel({ leftWidth, rightWidth, onLeftWidthChange, onRigh
                     key={p.name}
                     onClick={() => applyModelPreset(p)}
                     className="mc-btn-ghost !py-1 !text-xs"
-                    title={p.local ? `本地模型，需先安装 ${p.name.split(' ')[0]}` : `云端：${p.baseURL}`}
+                    title={
+                      p.local ? `本地模型，需先安装 ${p.name.split(' ')[0]}` : `云端：${p.baseURL}`
+                    }
                   >
                     {p.local && <Circle className="mr-1 h-3 w-3 fill-current text-mc-accent" />}
                     {p.name}
@@ -204,7 +277,12 @@ export function SettingsPanel({ leftWidth, rightWidth, onLeftWidthChange, onRigh
             <div>
               <label className="text-xs text-mc-dim">
                 CurseForge API Key（去{' '}
-                <a href="https://console.curseforge.com/" target="_blank" rel="noreferrer" className="text-mc-accent hover:underline">
+                <a
+                  href="https://console.curseforge.com/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-mc-accent hover:underline"
+                >
                   console.curseforge.com
                 </a>{' '}
                 免费申请）
@@ -246,9 +324,13 @@ export function SettingsPanel({ leftWidth, rightWidth, onLeftWidthChange, onRigh
                           : 'bg-mc-surface-2/50 border border-transparent hover:bg-mc-surface-2'
                       }`}
                     >
-                      <Icon className={`h-4 w-4 ${isActive ? 'text-mc-accent' : 'text-mc-text-dim'}`} />
+                      <Icon
+                        className={`h-4 w-4 ${isActive ? 'text-mc-accent' : 'text-mc-text-dim'}`}
+                      />
                       <div className="flex-1 text-left">
-                        <div className={`text-xs font-medium ${isActive ? 'text-mc-accent-bright' : 'text-mc-text'}`}>
+                        <div
+                          className={`text-xs font-medium ${isActive ? 'text-mc-accent-bright' : 'text-mc-text'}`}
+                        >
                           {preset.name}
                         </div>
                         <div className="text-xs text-mc-text-dim">{preset.description}</div>
@@ -313,18 +395,36 @@ export function SettingsPanel({ leftWidth, rightWidth, onLeftWidthChange, onRigh
                       }`}
                     >
                       <div className="flex items-center gap-1.5">
-                        <div className="h-2.5 w-5 rounded-sm" style={{ backgroundColor: `rgb(${a})` }} />
-                        <div className="h-2.5 w-5 rounded-sm" style={{ backgroundColor: `rgb(${d})` }} />
+                        <div
+                          className="h-2.5 w-5 rounded-sm"
+                          style={{ backgroundColor: `rgb(${a})` }}
+                        />
+                        <div
+                          className="h-2.5 w-5 rounded-sm"
+                          style={{ backgroundColor: `rgb(${d})` }}
+                        />
                       </div>
                       <div className="flex-1">
-                        <div className={`text-xs font-medium ${isActive ? 'text-mc-accent-bright' : 'text-mc-text'}`}>
+                        <div
+                          className={`text-xs font-medium ${isActive ? 'text-mc-accent-bright' : 'text-mc-text'}`}
+                        >
                           {theme.name}
                         </div>
                       </div>
                       {isActive && (
                         <div className="flex h-4 w-4 items-center justify-center rounded-full bg-mc-accent">
-                          <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          <svg
+                            className="h-2.5 w-2.5 text-white"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
                         </div>
                       )}

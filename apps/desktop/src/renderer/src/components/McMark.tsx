@@ -12,12 +12,7 @@ interface McMarkProps {
 export function McMark({ className, grass }: McMarkProps) {
   const grassColor = grass ?? 'currentColor';
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      aria-hidden="true"
-      shapeRendering="crispEdges"
-    >
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" shapeRendering="crispEdges">
       {/* 泥土底座 */}
       <rect x="0" y="0" width="24" height="24" fill="#6b5638" />
       <rect x="0" y="0" width="24" height="24" fill="#000" opacity="0.06" />

@@ -1,4 +1,10 @@
-import type { FileNode, GeneratorContext, GenerationResult, Loader, McVersion } from '@mc-creator/shared';
+import type {
+  FileNode,
+  GeneratorContext,
+  GenerationResult,
+  Loader,
+  McVersion,
+} from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import { ServerSpec } from '@mc-creator/shared';
 import type { ServerSpec as ServerSpecType, OpEntry, WhitelistEntry } from '@mc-creator/shared';
@@ -44,13 +50,13 @@ export class ServerGenerator implements Generator {
 
     const props: Record<string, string> = {
       'server-name': spec.serverName,
-      'motd': spec.motd,
+      motd: spec.motd,
       'max-players': String(spec.maxPlayers),
       'server-port': String(spec.port),
-      'gamemode': spec.gamemode,
-      'difficulty': spec.difficulty,
+      gamemode: spec.gamemode,
+      difficulty: spec.difficulty,
       'level-name': spec.levelName,
-      'pvp': String(spec.pvp),
+      pvp: String(spec.pvp),
       'online-mode': String(spec.onlineMode),
       'white-list': String(spec.whitelist),
       'enforce-whitelist': String(spec.enforceWhitelist),

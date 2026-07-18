@@ -108,7 +108,8 @@ export function GitPanel() {
     setError(null);
     setSyncMsg(null);
     try {
-      const res = kind === 'pull' ? await ipcClient.gitPull(repoPath) : await ipcClient.gitPush(repoPath);
+      const res =
+        kind === 'pull' ? await ipcClient.gitPull(repoPath) : await ipcClient.gitPush(repoPath);
       if (!res.ok) setError(res.error || (kind === 'pull' ? '拉取失败' : '推送失败'));
       else {
         setSyncMsg(res.stdout.trim() || (kind === 'pull' ? '已拉取最新' : '已推送'));
@@ -144,10 +145,14 @@ export function GitPanel() {
       </div>
 
       {error && (
-        <div className="mx-3 mt-2 rounded-mc bg-mc-surface-2 px-3 py-2 text-xs text-mc-redstone">{error}</div>
+        <div className="mx-3 mt-2 rounded-mc bg-mc-surface-2 px-3 py-2 text-xs text-mc-redstone">
+          {error}
+        </div>
       )}
       {syncMsg && !error && (
-        <div className="mx-3 mt-2 rounded-mc bg-mc-surface-2 px-3 py-2 text-xs text-mc-green">{syncMsg}</div>
+        <div className="mx-3 mt-2 rounded-mc bg-mc-surface-2 px-3 py-2 text-xs text-mc-green">
+          {syncMsg}
+        </div>
       )}
 
       {!repoPath ? (
@@ -161,8 +166,14 @@ export function GitPanel() {
         <div className="flex flex-1 flex-col overflow-auto">
           {/* 状态概要 */}
           <div className="flex items-center gap-2 px-3 py-2 text-xs">
-            <span className="rounded-mc bg-mc-surface-2 px-2 py-0.5 text-mc-text">{status?.branch ?? '—'}</span>
-            {status?.upstream && <span className="text-mc-mute">↑{status.ahead} ↓{status.behind}</span>}
+            <span className="rounded-mc bg-mc-surface-2 px-2 py-0.5 text-mc-text">
+              {status?.branch ?? '—'}
+            </span>
+            {status?.upstream && (
+              <span className="text-mc-mute">
+                ↑{status.ahead} ↓{status.behind}
+              </span>
+            )}
             <span className={status?.clean ? 'text-mc-text' : 'text-mc-gold'}>
               {status?.clean ? '工作区干净' : `${status?.files.length ?? 0} 项改动`}
             </span>
@@ -175,7 +186,9 @@ export function GitPanel() {
               <ul className="divide-y divide-mc-border">
                 {status.files.map((f, i) => (
                   <li key={i} className="flex items-center gap-2 py-1 text-xs">
-                    <span className={`w-20 flex-shrink-0 ${statusColor(f.x, f.y)}`}>{statusText(f.x, f.y)}</span>
+                    <span className={`w-20 flex-shrink-0 ${statusColor(f.x, f.y)}`}>
+                      {statusText(f.x, f.y)}
+                    </span>
                     <span className="flex-1 truncate font-mono text-mc-text" title={f.path}>
                       {f.path}
                     </span>
@@ -197,7 +210,11 @@ export function GitPanel() {
               className="w-full resize-none rounded-mc bg-mc-surface-2 px-2 py-1 text-xs text-mc-text outline-none"
             />
             <div className="mt-2 flex gap-2">
-              <button className="mc-btn-primary" onClick={doCommit} disabled={busy || !message.trim()}>
+              <button
+                className="mc-btn-primary"
+                onClick={doCommit}
+                disabled={busy || !message.trim()}
+              >
                 <McIcon scope="pixel" name="check" size={14} /> 提交
               </button>
               <button className="mc-btn-ghost" onClick={() => doSync('pull')} disabled={busy}>

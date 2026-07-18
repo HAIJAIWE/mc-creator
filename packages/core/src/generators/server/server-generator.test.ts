@@ -24,39 +24,41 @@ describe('ServerGenerator', () => {
   const gen = new ServerGenerator();
 
   it('生成完整配置时生成全部 8 个文件', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'My Server',
-      mcVersion: '1.21.1',
-      motd: 'Hello World',
-      maxPlayers: 30,
-      port: 25566,
-      gamemode: 'creative',
-      difficulty: 'hard',
-      levelName: 'myworld',
-      levelSeed: '12345',
-      pvp: false,
-      onlineMode: false,
-      whitelist: true,
-      enforceWhitelist: true,
-      viewDistance: 12,
-      simulationDistance: 8,
-      allowFlight: true,
-      allowNether: false,
-      allowEnd: false,
-      spawnAnimals: false,
-      spawnNpcs: false,
-      spawnMonsters: false,
-      generateStructures: false,
-      ops: [{ name: 'Admin', level: 4 }],
-      whitelistEntries: [{ name: 'Player1', uuid: 'abc-123' }],
-      mods: [
-        { id: 'sodium', version: '0.5.0', source: 'modrinth' },
-        { id: 'fabric-api', version: '0.100.0', source: 'modrinth' },
-      ],
-      eula: true,
-      startMemory: '2G',
-      maxMemory: '6G',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'My Server',
+        mcVersion: '1.21.1',
+        motd: 'Hello World',
+        maxPlayers: 30,
+        port: 25566,
+        gamemode: 'creative',
+        difficulty: 'hard',
+        levelName: 'myworld',
+        levelSeed: '12345',
+        pvp: false,
+        onlineMode: false,
+        whitelist: true,
+        enforceWhitelist: true,
+        viewDistance: 12,
+        simulationDistance: 8,
+        allowFlight: true,
+        allowNether: false,
+        allowEnd: false,
+        spawnAnimals: false,
+        spawnNpcs: false,
+        spawnMonsters: false,
+        generateStructures: false,
+        ops: [{ name: 'Admin', level: 4 }],
+        whitelistEntries: [{ name: 'Player1', uuid: 'abc-123' }],
+        mods: [
+          { id: 'sodium', version: '0.5.0', source: 'modrinth' },
+          { id: 'fabric-api', version: '0.100.0', source: 'modrinth' },
+        ],
+        eula: true,
+        startMemory: '2G',
+        maxMemory: '6G',
+      }),
+    );
 
     expect(result.files).toHaveLength(8);
     const paths = result.files.map((f) => f.path).sort();
@@ -73,15 +75,17 @@ describe('ServerGenerator', () => {
   });
 
   it('server.properties 包含正确的键值对', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'My Server',
-      maxPlayers: 20,
-      port: 25565,
-      gamemode: 'survival',
-      difficulty: 'normal',
-      pvp: true,
-      onlineMode: true,
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'My Server',
+        maxPlayers: 20,
+        port: 25565,
+        gamemode: 'survival',
+        difficulty: 'normal',
+        pvp: true,
+        onlineMode: true,
+      }),
+    );
     const props = result.files.find((f) => f.path === 'server.properties');
     expect(props).toBeDefined();
     const content = props!.content;
@@ -94,10 +98,15 @@ describe('ServerGenerator', () => {
   });
 
   it('ops.json 内容正确', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'S',
-      ops: [{ name: 'Admin', level: 4 }, { name: 'Mod', level: 2 }],
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'S',
+        ops: [
+          { name: 'Admin', level: 4 },
+          { name: 'Mod', level: 2 },
+        ],
+      }),
+    );
     const ops = result.files.find((f) => f.path === 'ops.json');
     expect(ops).toBeDefined();
     const parsed = JSON.parse(ops!.content);
@@ -111,13 +120,12 @@ describe('ServerGenerator', () => {
   });
 
   it('whitelist.json 内容正确', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'S',
-      whitelistEntries: [
-        { name: 'Player1', uuid: 'uuid-1' },
-        { name: 'Player2' },
-      ],
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'S',
+        whitelistEntries: [{ name: 'Player1', uuid: 'uuid-1' }, { name: 'Player2' }],
+      }),
+    );
     const wl = result.files.find((f) => f.path === 'whitelist.json');
     expect(wl).toBeDefined();
     const parsed = JSON.parse(wl!.content);
@@ -129,11 +137,13 @@ describe('ServerGenerator', () => {
   });
 
   it('start.bat / start.sh 内容正确', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'S',
-      startMemory: '2G',
-      maxMemory: '4G',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'S',
+        startMemory: '2G',
+        maxMemory: '4G',
+      }),
+    );
     const bat = result.files.find((f) => f.path === 'start.bat');
     const sh = result.files.find((f) => f.path === 'start.sh');
     expect(bat).toBeDefined();
@@ -146,9 +156,11 @@ describe('ServerGenerator', () => {
   });
 
   it('空配置（最小 Spec）不崩溃且生成 8 个文件', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'Minimal',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'Minimal',
+      }),
+    );
     expect(result.files).toHaveLength(8);
     const props = result.files.find((f) => f.path === 'server.properties');
     expect(props).toBeDefined();
@@ -168,14 +180,16 @@ describe('ServerGenerator', () => {
   });
 
   it('extraProperties 被合并到 server.properties', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'S',
-      extraProperties: {
-        'resource-pack': 'https://example.com/pack.zip',
-        'max-build-height': 256,
-        'enable-command-block': true,
-      },
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'S',
+        extraProperties: {
+          'resource-pack': 'https://example.com/pack.zip',
+          'max-build-height': 256,
+          'enable-command-block': true,
+        },
+      }),
+    );
     const props = result.files.find((f) => f.path === 'server.properties');
     expect(props).toBeDefined();
     const content = props!.content;
@@ -198,10 +212,12 @@ describe('ServerGenerator', () => {
   });
 
   it("deployTarget='systemd' 生成 minecraft.service + install-systemd.sh", async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'Srv',
-      deployTarget: 'systemd',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'Srv',
+        deployTarget: 'systemd',
+      }),
+    );
     const deployFiles = result.files.filter((f) => f.path.startsWith('deploy/'));
     const paths = deployFiles.map((f) => f.path).sort();
     expect(paths).toEqual(['deploy/install-systemd.sh', 'deploy/minecraft.service']);
@@ -210,10 +226,12 @@ describe('ServerGenerator', () => {
   });
 
   it("deployTarget='docker' 生成 Dockerfile + docker-compose.yml + build-docker.sh", async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'Srv',
-      deployTarget: 'docker',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'Srv',
+        deployTarget: 'docker',
+      }),
+    );
     const deployFiles = result.files.filter((f) => f.path.startsWith('deploy/'));
     const paths = deployFiles.map((f) => f.path).sort();
     expect(paths).toEqual([
@@ -226,10 +244,12 @@ describe('ServerGenerator', () => {
   });
 
   it("deployTarget='both' 生成全部 5 个部署文件", async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'Srv',
-      deployTarget: 'both',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'Srv',
+        deployTarget: 'both',
+      }),
+    );
     const deployFiles = result.files.filter((f) => f.path.startsWith('deploy/'));
     const paths = deployFiles.map((f) => f.path).sort();
     expect(paths).toEqual([
@@ -244,10 +264,12 @@ describe('ServerGenerator', () => {
   });
 
   it('backupInterval=6 生成 backup.sh + backup-cron', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'Srv',
-      backupInterval: 6,
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'Srv',
+        backupInterval: 6,
+      }),
+    );
     const deployFiles = result.files.filter((f) => f.path.startsWith('deploy/'));
     const paths = deployFiles.map((f) => f.path).sort();
     expect(paths).toEqual(['deploy/backup-cron', 'deploy/backup.sh']);
@@ -265,17 +287,19 @@ describe('ServerGenerator', () => {
   });
 
   it('systemd service 文件包含正确的 ExecStart 和 User', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'MyServer',
-      deployTarget: 'systemd',
-      javaPath: '/usr/bin/java',
-      jarName: 'paper.jar',
-      startMemory: '2G',
-      maxMemory: '6G',
-      serviceUser: 'mcadmin',
-      serviceDir: '/srv/mc',
-      restartOnCrash: false,
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'MyServer',
+        deployTarget: 'systemd',
+        javaPath: '/usr/bin/java',
+        jarName: 'paper.jar',
+        startMemory: '2G',
+        maxMemory: '6G',
+        serviceUser: 'mcadmin',
+        serviceDir: '/srv/mc',
+        restartOnCrash: false,
+      }),
+    );
     const svc = result.files.find((f) => f.path === 'deploy/minecraft.service');
     expect(svc).toBeDefined();
     const content = svc!.content;
@@ -287,24 +311,28 @@ describe('ServerGenerator', () => {
   });
 
   it('systemd restartOnCrash=true 时 Restart=on-failure', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'S',
-      deployTarget: 'systemd',
-      restartOnCrash: true,
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'S',
+        deployTarget: 'systemd',
+        restartOnCrash: true,
+      }),
+    );
     const svc = result.files.find((f) => f.path === 'deploy/minecraft.service');
     expect(svc!.content).toContain('Restart=on-failure');
   });
 
   it('Dockerfile EXPOSE 端口正确', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'S',
-      deployTarget: 'docker',
-      port: 25570,
-      maxMemory: '8G',
-      startMemory: '4G',
-      jarName: 'fabric.jar',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'S',
+        deployTarget: 'docker',
+        port: 25570,
+        maxMemory: '8G',
+        startMemory: '4G',
+        jarName: 'fabric.jar',
+      }),
+    );
     const df = result.files.find((f) => f.path === 'deploy/Dockerfile');
     expect(df).toBeDefined();
     const content = df!.content;
@@ -315,13 +343,15 @@ describe('ServerGenerator', () => {
   });
 
   it('docker-compose restart 和 mem_limit 受配置控制', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'ComposeSrv',
-      deployTarget: 'docker',
-      port: 25590,
-      maxRamPercent: 75,
-      restartOnCrash: false,
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'ComposeSrv',
+        deployTarget: 'docker',
+        port: 25590,
+        maxRamPercent: 75,
+        restartOnCrash: false,
+      }),
+    );
     const dc = result.files.find((f) => f.path === 'deploy/docker-compose.yml');
     expect(dc).toBeDefined();
     const content = dc!.content;
@@ -333,22 +363,26 @@ describe('ServerGenerator', () => {
   });
 
   it('docker-compose restartOnCrash=true 时 restart: unless-stopped', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'S',
-      deployTarget: 'docker',
-      restartOnCrash: true,
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'S',
+        deployTarget: 'docker',
+        restartOnCrash: true,
+      }),
+    );
     const dc = result.files.find((f) => f.path === 'deploy/docker-compose.yml');
     expect(dc!.content).toContain('restart: unless-stopped');
   });
 
   it('install-systemd.sh 内容正确', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'S',
-      deployTarget: 'systemd',
-      serviceUser: 'mcuser',
-      serviceDir: '/opt/mc',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'S',
+        deployTarget: 'systemd',
+        serviceUser: 'mcuser',
+        serviceDir: '/opt/mc',
+      }),
+    );
     const sh = result.files.find((f) => f.path === 'deploy/install-systemd.sh');
     expect(sh).toBeDefined();
     const content = sh!.content;
@@ -363,10 +397,12 @@ describe('ServerGenerator', () => {
   });
 
   it('build-docker.sh 内容正确', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'DockerSrv',
-      deployTarget: 'docker',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'DockerSrv',
+        deployTarget: 'docker',
+      }),
+    );
     const sh = result.files.find((f) => f.path === 'deploy/build-docker.sh');
     expect(sh).toBeDefined();
     const content = sh!.content;
@@ -376,11 +412,13 @@ describe('ServerGenerator', () => {
   });
 
   it('backup.sh 内容正确', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'S',
-      backupInterval: 12,
-      serviceDir: '/opt/mc',
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'S',
+        backupInterval: 12,
+        serviceDir: '/opt/mc',
+      }),
+    );
     const sh = result.files.find((f) => f.path === 'deploy/backup.sh');
     expect(sh).toBeDefined();
     const content = sh!.content;
@@ -391,11 +429,13 @@ describe('ServerGenerator', () => {
   });
 
   it('both + backupInterval 同时生成 7 个 deploy 文件', async () => {
-    const result = await gen.generate(makeCtx({
-      serverName: 'Full',
-      deployTarget: 'both',
-      backupInterval: 3,
-    }));
+    const result = await gen.generate(
+      makeCtx({
+        serverName: 'Full',
+        deployTarget: 'both',
+        backupInterval: 3,
+      }),
+    );
     const deployFiles = result.files.filter((f) => f.path.startsWith('deploy/'));
     expect(deployFiles).toHaveLength(7);
     expect(deployFiles.map((f) => f.path).sort()).toEqual([

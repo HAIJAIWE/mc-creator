@@ -128,12 +128,7 @@ describe('parseGitStatus', () => {
     expect(r.behind).toBe(2);
     expect(r.files).toHaveLength(4);
     expect(r.clean).toBe(false);
-    expect(r.files.map((f) => f.path)).toEqual([
-      'modified.ts',
-      'added.ts',
-      'new.ts',
-      'renamed.ts',
-    ]);
+    expect(r.files.map((f) => f.path)).toEqual(['modified.ts', 'added.ts', 'new.ts', 'renamed.ts']);
   });
 
   it('多行文件路径含空格保留', () => {

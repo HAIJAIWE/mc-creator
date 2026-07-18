@@ -11,7 +11,12 @@ const RARITIES = ['common', 'uncommon', 'rare', 'epic'] as const;
 
 /** 由素材名生成合法的 ItemSpec.id（小写下划线，匹配 ^[a-z0-9_]+$） */
 function toItemId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'item';
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'item'
+  );
 }
 
 /** 方块 / 物品属性编辑器：选素材 → 配属性 → 写入 mod-store.spec.items。 */

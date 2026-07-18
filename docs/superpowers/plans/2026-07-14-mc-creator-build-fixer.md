@@ -40,6 +40,7 @@ apps/desktop/
 ## Task 1: core 层 BuildFixer
 
 **Files:**
+
 - Create: `packages/core/src/builder/build-fixer.ts`
 - Test: `packages/core/src/builder/build-fixer.test.ts`
 - Modify: `packages/core/src/builder/index.ts`
@@ -72,10 +73,7 @@ export class BuildFixer {
     private provider: ModelProvider,
   ) {}
 
-  async buildWithFix(
-    projectPath: string,
-    onProgress?: (msg: string) => void,
-  ): Promise<FixResult> {
+  async buildWithFix(projectPath: string, onProgress?: (msg: string) => void): Promise<FixResult> {
     const fixLog: string[] = [];
 
     for (let attempt = 0; attempt <= MAX_FIX_ATTEMPTS; attempt++) {
@@ -167,7 +165,9 @@ describe('BuildFixer', () => {
 
   it('首次构建成功直接返回', async () => {
     vi.mocked(runGradleBuild).mockResolvedValue({
-      success: true, jarPath: 'build/libs/mod.jar', log: 'BUILD SUCCESSFUL',
+      success: true,
+      jarPath: 'build/libs/mod.jar',
+      log: 'BUILD SUCCESSFUL',
     });
     const fixer = makeFixer('');
     const result = await fixer.buildWithFix('/proj');
@@ -179,8 +179,9 @@ describe('BuildFixer', () => {
     // 第一次失败，第二次成功
     vi.mocked(runGradleBuild)
       .mockResolvedValueOnce({
-        success: false, jarPath: null,
-        log: '/proj/src/main/java/ModItems.java:10: error: \';\' expected',
+        success: false,
+        jarPath: null,
+        log: "/proj/src/main/java/ModItems.java:10: error: ';' expected",
       })
       .mockResolvedValueOnce({ success: true, jarPath: 'build/libs/mod.jar', log: 'ok' });
 
@@ -193,7 +194,8 @@ describe('BuildFixer', () => {
 
   it('3 次修复仍失败返回 false', async () => {
     vi.mocked(runGradleBuild).mockResolvedValue({
-      success: false, jarPath: null,
+      success: false,
+      jarPath: null,
       log: '/proj/src/ModItems.java:1: error: cannot find symbol',
     });
     const fixer = makeFixer('=== FILE: src/ModItems.java ===\nclass X {}');
@@ -204,7 +206,8 @@ describe('BuildFixer', () => {
 
   it('无法解析错误时直接返回', async () => {
     vi.mocked(runGradleBuild).mockResolvedValue({
-      success: false, jarPath: null,
+      success: false,
+      jarPath: null,
       log: 'Some unknown error without file:line format',
     });
     const fixer = makeFixer('');
@@ -246,6 +249,7 @@ git commit -m "feat(core): BuildFixer 构建修复循环（AI 自动修复编译
 ## Task 2: desktop IPC 接入 BuildFixer
 
 **Files:**
+
 - Modify: `apps/desktop/src/main/ipc.ts`
 - Modify: `apps/desktop/src/shared/ipc-channels.ts`
 
@@ -271,6 +275,7 @@ export type BuildWithFixRes = z.infer<typeof BuildWithFixResponse>;
 - [ ] **Step 2: 修改 `apps/desktop/src/main/ipc.ts`**
 
 在顶部导入追加：
+
 ```typescript
 import { BuildFixer, Filesystem } from '@mc-creator/core';
 import { BuildWithFixRequest, BUILD_WITH_FIX } from '../shared/ipc-channels.js';
@@ -278,35 +283,37 @@ import * as nodeFs from 'fs';
 ```
 
 在 `registerIpcHandlers` 追加：
+
 ```typescript
-  ipcMain.handle(BUILD_WITH_FIX, async (_e, raw: unknown) => {
-    const req = BuildWithFixRequest.parse(raw);
-    const config = loadModelConfig();
+ipcMain.handle(BUILD_WITH_FIX, async (_e, raw: unknown) => {
+  const req = BuildWithFixRequest.parse(raw);
+  const config = loadModelConfig();
 
-    // 创建 fixer（有 apiKey 用真实模型，否则用 Mock）
-    const realFs = new Filesystem(nodeFs as any);
-    let fixer: BuildFixer;
-    if (config.apiKey) {
-      const { VercelAiProvider } = await import('@mc-creator/core');
-      fixer = new BuildFixer(realFs, new VercelAiProvider(config));
-    } else {
-      fixer = new BuildFixer(realFs, new MockProvider(''));
-    }
+  // 创建 fixer（有 apiKey 用真实模型，否则用 Mock）
+  const realFs = new Filesystem(nodeFs as any);
+  let fixer: BuildFixer;
+  if (config.apiKey) {
+    const { VercelAiProvider } = await import('@mc-creator/core');
+    fixer = new BuildFixer(realFs, new VercelAiProvider(config));
+  } else {
+    fixer = new BuildFixer(realFs, new MockProvider(''));
+  }
 
-    const result = await fixer.buildWithFix(req.projectPath);
-    return {
-      success: result.success,
-      attempts: result.attempts,
-      jarPath: result.finalResult.jarPath,
-      log: result.finalResult.log,
-      fixLog: result.fixLog,
-    };
-  });
+  const result = await fixer.buildWithFix(req.projectPath);
+  return {
+    success: result.success,
+    attempts: result.attempts,
+    jarPath: result.finalResult.jarPath,
+    log: result.finalResult.log,
+    fixLog: result.fixLog,
+  };
+});
 ```
 
 - [ ] **Step 3: 更新 preload + ipc-client**
 
 在 `preload/index.ts` 的 api 对象追加：
+
 ```typescript
   buildWithFix: (projectPath: string) => ipcRenderer.invoke(IPC.BUILD_WITH_FIX, { projectPath }),
 ```
@@ -314,6 +321,7 @@ import * as nodeFs from 'fs';
 在 IPC 常量导入追加 `BUILD_WITH_FIX`。
 
 在 `ipc-client.ts` 追加：
+
 ```typescript
   buildWithFix: (projectPath: string) => window.mcApi.buildWithFix(projectPath),
 ```
@@ -335,18 +343,21 @@ git commit -m "feat(desktop): 带修复循环的构建 IPC"
 ## Task 3: BuildPanel 展示修复过程
 
 **Files:**
+
 - Modify: `apps/desktop/src/renderer/src/store/mod-store.ts`
 - Modify: `apps/desktop/src/renderer/src/components/BuildPanel.tsx`
 
 - [ ] **Step 1: 在 `mod-store.ts` 追加状态**
 
 在 ModState 接口追加：
+
 ```typescript
   fixLog: string[];
   setFixLog: (logs: string[]) => void;
 ```
 
 在 store 实现追加：
+
 ```typescript
   fixLog: [],
   setFixLog: (logs) => set({ fixLog: logs }),
@@ -360,8 +371,17 @@ import { ipcClient } from '../lib/ipc-client.js';
 
 export function BuildPanel() {
   const {
-    files, buildLog, buildSuccess, jarPath, loading, fixLog,
-    setBuildResult, setLoading, setError, error, setFixLog,
+    files,
+    buildLog,
+    buildSuccess,
+    jarPath,
+    loading,
+    fixLog,
+    setBuildResult,
+    setLoading,
+    setError,
+    error,
+    setFixLog,
   } = useModStore();
 
   const build = async () => {
@@ -370,7 +390,7 @@ export function BuildPanel() {
     setFixLog([]);
     try {
       // P3 阶段用临时目录，P4 接真实文件系统写入
-      const res = await ipcClient.buildWithFix('/tmp/mc-mod') as any;
+      const res = (await ipcClient.buildWithFix('/tmp/mc-mod')) as any;
       setBuildResult({ success: res.success, log: res.log, jarPath: res.jarPath });
       setFixLog(res.fixLog ?? []);
     } catch (e) {
@@ -399,12 +419,16 @@ export function BuildPanel() {
         <div className="mb-2 space-y-1">
           <div className="text-xs font-semibold text-zinc-400">修复过程</div>
           {fixLog.map((log, i) => (
-            <div key={i} className="text-xs text-zinc-500">• {log}</div>
+            <div key={i} className="text-xs text-zinc-500">
+              • {log}
+            </div>
           ))}
         </div>
       )}
       {buildLog && (
-        <pre className="max-h-40 overflow-auto rounded bg-black p-2 text-xs text-zinc-300">{buildLog}</pre>
+        <pre className="max-h-40 overflow-auto rounded bg-black p-2 text-xs text-zinc-300">
+          {buildLog}
+        </pre>
       )}
     </div>
   );
@@ -449,6 +473,7 @@ git commit -m "feat: P5 构建修复循环验证通过"
 ## 自审清单
 
 **1. 规格覆盖**：
+
 - ✅ §5 Gradle 编译失败 → 解析错误日志 → AI 修复循环（最多 3 次）→ Task 1
 - ✅ §5 仍失败展示日志+建议 → Task 1 fixLog + Task 3 展示
 

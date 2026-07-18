@@ -102,7 +102,10 @@ public class ${mainCls} {
 
   private modItemsJava(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
     const fields = spec.items
-      .map((it) => `    public static final DeferredItem<Item> ${it.id.toUpperCase()} = ITEMS.registerSimpleItem("${it.id}");`)
+      .map(
+        (it) =>
+          `    public static final DeferredItem<Item> ${it.id.toUpperCase()} = ITEMS.registerSimpleItem("${it.id}");`,
+      )
       .join('\n');
     const content = `package ${pkg};
 
@@ -129,7 +132,10 @@ ${fields}
 
   private modBlocksJava(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
     const fields = spec.blocks
-      .map((b) => `    public static final DeferredBlock<Block> ${b.id.toUpperCase()} = BLOCKS.registerSimpleBlock("${b.id}");`)
+      .map(
+        (b) =>
+          `    public static final DeferredBlock<Block> ${b.id.toUpperCase()} = BLOCKS.registerSimpleBlock("${b.id}");`,
+      )
       .join('\n');
     const content = `package ${pkg};
 

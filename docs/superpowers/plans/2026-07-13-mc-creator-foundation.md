@@ -62,6 +62,7 @@ mc-creator/
 ## Task 1: 搭建 monorepo 脚手架
 
 **Files:**
+
 - Create: `package.json`
 - Create: `pnpm-workspace.yaml`
 - Create: `tsconfig.base.json`
@@ -86,8 +87,8 @@ mc-creator/
 
 ```yaml
 packages:
-  - "packages/*"
-  - "apps/*"
+  - 'packages/*'
+  - 'apps/*'
 ```
 
 - [ ] **Step 3: 写 `tsconfig.base.json`**
@@ -125,6 +126,7 @@ git commit -m "chore: 初始化 monorepo 脚手架"
 ## Task 2: shared 包 — loader/version 类型
 
 **Files:**
+
 - Create: `packages/shared/package.json`
 - Create: `packages/shared/tsconfig.json`
 - Create: `packages/shared/src/types/loader.ts`
@@ -211,6 +213,7 @@ git commit -m "feat(shared): 添加 loader/version 类型"
 ## Task 3: shared 包 — ModSpec 与生成器 schema
 
 **Files:**
+
 - Create: `packages/shared/src/schemas/mod-spec.ts`
 - Create: `packages/shared/src/schemas/generator.ts`
 - Create: `packages/shared/src/schemas/index.ts`
@@ -223,7 +226,7 @@ import { z } from 'zod';
 /** 物品条目（loader 无关） */
 export const ItemSpec = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/), // 小写下划线
-  name: z.string(),                       // 显示名
+  name: z.string(), // 显示名
   maxStackSize: z.number().int().min(1).max(64).default(64),
 });
 
@@ -258,7 +261,7 @@ import { ModSpec } from './mod-spec.js';
 
 /** 文件树节点（生成产物） */
 export const FileNode = z.object({
-  path: z.string(),       // 相对项目根
+  path: z.string(), // 相对项目根
   content: z.string(),
 });
 
@@ -307,6 +310,7 @@ git commit -m "feat(shared): 添加 ModSpec 与生成器 schema"
 ## Task 4: core 包初始化
 
 **Files:**
+
 - Create: `packages/core/package.json`
 - Create: `packages/core/tsconfig.json`
 - Create: `packages/core/vitest.config.ts`
@@ -388,6 +392,7 @@ git commit -m "chore(core): 初始化 core 包与 vitest"
 ## Task 5: core 文件系统 — 原子写入与 diff
 
 **Files:**
+
 - Create: `packages/core/src/filesystem/index.ts`
 - Test: `packages/core/src/filesystem/filesystem.test.ts`
 
@@ -512,6 +517,7 @@ git commit -m "feat(core): 文件系统原子写入与 diff"
 ## Task 6: core 文件系统 — 快照与回滚
 
 **Files:**
+
 - Modify: `packages/core/src/filesystem/index.ts`
 - Modify: `packages/core/src/filesystem/filesystem.test.ts`
 
@@ -520,14 +526,14 @@ git commit -m "feat(core): 文件系统原子写入与 diff"
 在 `filesystem.test.ts` 末尾追加：
 
 ```typescript
-  it('快照后可回滚到之前状态', async () => {
-    await dfs.writeFile('/proj/a.txt', 'v1');
-    const snap = await dfs.snapshot('/proj');
-    await dfs.writeFile('/proj/a.txt', 'v2');
-    expect(dfs.readFile('/proj/a.txt')).toBe('v2');
-    await dfs.restore(snap);
-    expect(dfs.readFile('/proj/a.txt')).toBe('v1');
-  });
+it('快照后可回滚到之前状态', async () => {
+  await dfs.writeFile('/proj/a.txt', 'v1');
+  const snap = await dfs.snapshot('/proj');
+  await dfs.writeFile('/proj/a.txt', 'v2');
+  expect(dfs.readFile('/proj/a.txt')).toBe('v2');
+  await dfs.restore(snap);
+  expect(dfs.readFile('/proj/a.txt')).toBe('v1');
+});
 ```
 
 - [ ] **Step 2: 运行确认失败**
@@ -578,6 +584,7 @@ git commit -m "feat(core): 文件系统快照与回滚"
 ## Task 7: core 模型提供者接口与 mock
 
 **Files:**
+
 - Create: `packages/core/src/model-provider/types.ts`
 - Create: `packages/core/src/model-provider/mock-provider.ts`
 - Create: `packages/core/src/model-provider/index.ts`
@@ -668,7 +675,12 @@ describe('MockProvider', () => {
     const chunks = [];
     for await (const c of p.stream('x')) chunks.push(c);
     expect(chunks.at(-1)?.done).toBe(true);
-    expect(chunks.map((c) => c.delta).join('').trim()).toBe('a b c');
+    expect(
+      chunks
+        .map((c) => c.delta)
+        .join('')
+        .trim(),
+    ).toBe('a b c');
   });
 });
 ```
@@ -690,6 +702,7 @@ git commit -m "feat(core): 模型提供者接口与 mock"
 ## Task 8: core 编排器 — Schema 校验重试
 
 **Files:**
+
 - Create: `packages/core/src/orchestrator/orchestrator.ts`
 - Create: `packages/core/src/orchestrator/index.ts`
 - Test: `packages/core/src/orchestrator/orchestrator.test.ts`
@@ -805,6 +818,7 @@ git commit -m "feat(core): AI 编排器与 schema 校验重试"
 ## Task 9: core 构建器 — JDK 检测
 
 **Files:**
+
 - Create: `packages/core/src/builder/jdk.ts`
 - Create: `packages/core/src/builder/index.ts`
 - Test: `packages/core/src/builder/builder.test.ts`
@@ -823,7 +837,9 @@ describe('detectJavaVersion', () => {
 
   it('解析 Java 25', async () => {
     const run = vi.fn().mockResolvedValue('openjdk version "25" 2025-09-16');
-    expect(await detectJavaVersion(run).catch(() => null) ?? (await detectJavaVersion(run))).toBe(25);
+    expect((await detectJavaVersion(run).catch(() => null)) ?? (await detectJavaVersion(run))).toBe(
+      25,
+    );
   });
 
   it('java 不存在返回 null', async () => {
@@ -888,6 +904,7 @@ git commit -m "feat(core): JDK 版本检测"
 ## Task 10: core 构建器 — Gradle 调用与日志解析
 
 **Files:**
+
 - Create: `packages/core/src/builder/gradle.ts`
 - Create: `packages/core/src/builder/log-parser.ts`
 - Modify: `packages/core/src/builder/builder.test.ts`
@@ -926,7 +943,11 @@ export interface BuildResult {
 /** 调用 Gradle 编译并提取产物 .jar（规格 §2.2 构建器） */
 export async function runGradleBuild(
   projectPath: string,
-  run: (cmd: string, args: string[], opts: any) => Promise<{ stdout: string; stderr: string; exitCode: number }> = defaultRun,
+  run: (
+    cmd: string,
+    args: string[],
+    opts: any,
+  ) => Promise<{ stdout: string; stderr: string; exitCode: number }> = defaultRun,
 ): Promise<BuildResult> {
   const r = await run('./gradlew', ['build', '--quiet'], { cwd: projectPath });
   const log = `${r.stdout}\n${r.stderr}`;
@@ -951,16 +972,24 @@ import { runGradleBuild } from './gradle.js';
 
 describe('parseGradleErrors', () => {
   it('解析 java 编译错误', () => {
-    const log = '/proj/src/Item.java:12: error: \';\' expected\nother line';
+    const log = "/proj/src/Item.java:12: error: ';' expected\nother line";
     const errs = parseGradleErrors(log);
     expect(errs).toHaveLength(1);
-    expect(errs[0]).toMatchObject({ file: '/proj/src/Item.java', line: 12, message: "';' expected" });
+    expect(errs[0]).toMatchObject({
+      file: '/proj/src/Item.java',
+      line: 12,
+      message: "';' expected",
+    });
   });
 });
 
 describe('runGradleBuild', () => {
   it('成功时返回 jarPath', async () => {
-    const run = vi.fn().mockResolvedValue({ stdout: 'BUILD SUCCESSFUL\nbuild/libs/demo-1.0.0.jar', stderr: '', exitCode: 0 });
+    const run = vi.fn().mockResolvedValue({
+      stdout: 'BUILD SUCCESSFUL\nbuild/libs/demo-1.0.0.jar',
+      stderr: '',
+      exitCode: 0,
+    });
     const r = await runGradleBuild('/proj', run as any);
     expect(r.success).toBe(true);
     expect(r.jarPath).toContain('demo-1.0.0.jar');
@@ -992,6 +1021,7 @@ git commit -m "feat(core): Gradle 调用与编译错误日志解析"
 ## Task 11: core 生成器注册表
 
 **Files:**
+
 - Create: `packages/core/src/generators/types.ts`
 - Create: `packages/core/src/generators/registry.ts`
 - Create: `packages/core/src/generators/index.ts`
@@ -1004,9 +1034,9 @@ import type { GeneratorContext, GenerationResult } from '@mc-creator/shared';
 import type { Loader, McVersion } from '@mc-creator/shared';
 
 export interface Generator {
-  readonly type: string;              // 'mod' | 'datapack' | ...
-  readonly loaders: Loader[];         // 支持的 loader
-  readonly versions: McVersion[];     // 支持的 MC 版本
+  readonly type: string; // 'mod' | 'datapack' | ...
+  readonly loaders: Loader[]; // 支持的 loader
+  readonly versions: McVersion[]; // 支持的 MC 版本
   generate(ctx: GeneratorContext): Promise<GenerationResult>;
 }
 ```
@@ -1014,7 +1044,7 @@ export interface Generator {
 - [ ] **Step 2: 写 `registry.ts`**
 
 ```typescript
-import type { Generator, } from './types.js';
+import type { Generator } from './types.js';
 import type { Loader, McVersion } from '@mc-creator/shared';
 
 /** 生成器注册表：按类型路由，能力声明匹配（规格 §2.2） */
@@ -1104,6 +1134,7 @@ git commit -m "feat(core): 生成器接口与注册表"
 ## Task 12: core 出口汇总与全量测试
 
 **Files:**
+
 - Modify: `packages/core/src/index.ts`
 
 - [ ] **Step 1: 更新 `packages/core/src/index.ts`**
@@ -1138,6 +1169,7 @@ git commit -m "feat(core): 汇总出口并跑通全量测试"
 ## 自审清单
 
 **1. 规格覆盖**（对应规格 §2.2 六组件、§2.4 编排选型、§5 错误处理、§7 项目结构）：
+
 - ✅ AI 编排器 → Task 8（校验重试；多步/工具调用/流式留 P2 接 AI SDK streamText）
 - ✅ 模型提供者 → Task 7（接口 + 能力声明 + mock）
 - ✅ 文件系统 → Task 5/6（原子写/diff/快照/回滚）

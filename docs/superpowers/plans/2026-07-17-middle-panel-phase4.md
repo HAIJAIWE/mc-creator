@@ -15,10 +15,12 @@
 ## 文件结构
 
 ### 新建
+
 - `apps/desktop/src/renderer/src/components/middle/ResourcePackPreviewPanel.tsx` — 资源包预览（4 tab）
 - `apps/desktop/src/renderer/src/components/middle/SkinPreviewPanel.tsx` — 皮肤预览（3D + 2D + 表单）
 
 ### 修改
+
 - `apps/desktop/package.json` — 新增 `skinview3d` 依赖
 - `apps/desktop/src/renderer/src/components/middle/MiddlePanel.tsx` — switch 的 resource_pack/skin 分支替换 placeholder
 
@@ -29,12 +31,14 @@
 ### FileNode 与二进制内容
 
 `FileNode = { path: string, content: string }`。对于 PNG/OGG 等二进制文件，generator 会把 Buffer 用 base64 编码后存入 `content`。前端展示时构造 data URL：
+
 - PNG: `data:image/png;base64,${file.content}`
 - OGG: `data:audio/ogg;base64,${file.content}`
 
 ### 资源包生成器产出的文件路径
 
 参考 [resource-pack-generator.ts](file:///d:/MC%20mod/packages/core/src/generators/resource-pack/resource-pack-generator.ts)：
+
 - 贴图覆盖 PNG: `assets/minecraft/textures/${entry.path}.png`（entry.path 如 `block/stone`）
 - 模型 JSON: `assets/minecraft/models/${entry.path}.json`
 - 音效 OGG: `assets/${namespace}/sounds/${entry.id}.ogg`
@@ -44,6 +48,7 @@
 ### 皮肤生成器产出的文件路径
 
 参考 [skin-generator.ts](file:///d:/MC%20mod/packages/core/src/generators/texture/skin-generator.ts)：
+
 - 主皮肤 PNG: `${spec.playerName}.png`（64x64）
 - 预览 PNG（可选）: `preview.png`
 
@@ -52,15 +57,18 @@
 ## Task 1: 安装 skinview3d + 创建 ResourcePackPreviewPanel
 
 **Files:**
+
 - Modify: `apps/desktop/package.json`（自动）
 - Create: `apps/desktop/src/renderer/src/components/middle/ResourcePackPreviewPanel.tsx`
 
 - [ ] **Step 1: 安装 skinview3d 依赖**
 
 Run（PowerShell，工作目录 `d:/MC mod`）:
+
 ```powershell
 pnpm add skinview3d -F @mc-creator/desktop
 ```
+
 Expected: 输出包含 `+ skinview3d x.x.x`，apps/desktop/package.json 的 dependencies 新增 `skinview3d`。
 
 - [ ] **Step 2: 创建 ResourcePackPreviewPanel.tsx**
@@ -91,14 +99,17 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 /** ResourcePack 预览面板：4 tab — 材质画廊/音效列表/模型表格/语言 key-value 表格 */
 export function ResourcePackPreviewPanel() {
-  const { spec, files } = useModStore(
-    (s) => ({ spec: s.spec, files: s.files }),
-    shallow,
-  );
+  const { spec, files } = useModStore((s) => ({ spec: s.spec, files: s.files }), shallow);
   const [tab, setTab] = useState<Tab>('textures');
 
   if (!spec) {
-    return <EmptyState icon="box" title="尚未生成资源包 Spec" hint="在右侧 AgentPanel 描述你想要的资源包，生成 Spec 后即可预览" />;
+    return (
+      <EmptyState
+        icon="box"
+        title="尚未生成资源包 Spec"
+        hint="在右侧 AgentPanel 描述你想要的资源包，生成 Spec 后即可预览"
+      />
+    );
   }
 
   const pack = spec as unknown as ResourcePackSpecType;
@@ -144,7 +155,8 @@ export function ResourcePackPreviewPanel() {
 
       {/* Footer */}
       <div className="border-t border-mc-border px-4 py-2 text-xs text-mc-mute">
-        材质: {pack.textureOverrides.length} · 音效: {pack.sounds.length} · 模型: {pack.models.length} · 字体: {pack.fonts.length}
+        材质: {pack.textureOverrides.length} · 音效: {pack.sounds.length} · 模型:{' '}
+        {pack.models.length} · 字体: {pack.fonts.length}
       </div>
     </div>
   );
@@ -152,7 +164,13 @@ export function ResourcePackPreviewPanel() {
 
 // ===== Textures tab =====
 
-function TexturesTab({ pack, files }: { pack: ResourcePackSpecType; files: { path: string; content: string }[] }) {
+function TexturesTab({
+  pack,
+  files,
+}: {
+  pack: ResourcePackSpecType;
+  files: { path: string; content: string }[];
+}) {
   const dataUrl = (entry: TextureOverrideEntry): string | null => {
     const file = files.find((f) => f.path === `assets/minecraft/textures/${entry.path}.png`);
     if (!file) return null;
@@ -168,18 +186,35 @@ function TexturesTab({ pack, files }: { pack: ResourcePackSpecType; files: { pat
       {pack.textureOverrides.map((entry, idx) => {
         const url = dataUrl(entry);
         return (
-          <div key={`${entry.path}-${idx}`} className="rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
+          <div
+            key={`${entry.path}-${idx}`}
+            className="rounded-mc border border-mc-border bg-mc-surface-2/40 p-2"
+          >
             <div className="mb-1 flex aspect-square items-center justify-center overflow-hidden rounded-mc bg-mc-bg">
               {url ? (
-                <img src={url} alt={entry.path} className="h-full w-full object-contain" style={{ imageRendering: 'pixelated' }} />
+                <img
+                  src={url}
+                  alt={entry.path}
+                  className="h-full w-full object-contain"
+                  style={{ imageRendering: 'pixelated' }}
+                />
               ) : (
-                <div className="flex h-full w-full items-center justify-center" style={{ backgroundColor: entry.color }}>
+                <div
+                  className="flex h-full w-full items-center justify-center"
+                  style={{ backgroundColor: entry.color }}
+                >
                   <span className="text-xs text-mc-mute">生成中</span>
                 </div>
               )}
             </div>
-            <div className="truncate text-xs text-mc-dim" title={entry.path}>{entry.path}</div>
-            <div className="text-xs text-mc-mute">{entry.width}×{entry.height}{entry.gradientTo ? ' · 渐变' : ''}{entry.checkerboard ? ' · 棋盘' : ''}</div>
+            <div className="truncate text-xs text-mc-dim" title={entry.path}>
+              {entry.path}
+            </div>
+            <div className="text-xs text-mc-mute">
+              {entry.width}×{entry.height}
+              {entry.gradientTo ? ' · 渐变' : ''}
+              {entry.checkerboard ? ' · 棋盘' : ''}
+            </div>
           </div>
         );
       })}
@@ -189,7 +224,13 @@ function TexturesTab({ pack, files }: { pack: ResourcePackSpecType; files: { pat
 
 // ===== Sounds tab =====
 
-function SoundsTab({ pack, files }: { pack: ResourcePackSpecType; files: { path: string; content: string }[] }) {
+function SoundsTab({
+  pack,
+  files,
+}: {
+  pack: ResourcePackSpecType;
+  files: { path: string; content: string }[];
+}) {
   if (pack.sounds.length === 0) {
     return <div className="px-3 py-6 text-center text-xs text-mc-mute">暂无音效</div>;
   }
@@ -203,7 +244,15 @@ function SoundsTab({ pack, files }: { pack: ResourcePackSpecType; files: { path:
   );
 }
 
-function SoundRow({ entry, pack, files }: { entry: SoundEntry; pack: ResourcePackSpecType; files: { path: string; content: string }[] }) {
+function SoundRow({
+  entry,
+  pack,
+  files,
+}: {
+  entry: SoundEntry;
+  pack: ResourcePackSpecType;
+  files: { path: string; content: string }[];
+}) {
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [duration, setDuration] = useState<string>('—');
   const [playing, setPlaying] = useState(false);
@@ -244,8 +293,13 @@ function SoundRow({ entry, pack, files }: { entry: SoundEntry; pack: ResourcePac
         <McIcon scope="pixel" name={playing ? 'star' : 'box'} size={12} />
       </button>
       <div className="flex-1 min-w-0">
-        <div className="truncate text-xs font-medium text-mc-text" title={entry.id}>{entry.id}</div>
-        <div className="truncate text-xs text-mc-mute" title={entry.event}>{entry.event || '(无事件名)'} · 音量 {entry.volume} · 音调 {entry.pitch}{entry.stream ? ' · 流式' : ''}</div>
+        <div className="truncate text-xs font-medium text-mc-text" title={entry.id}>
+          {entry.id}
+        </div>
+        <div className="truncate text-xs text-mc-mute" title={entry.event}>
+          {entry.event || '(无事件名)'} · 音量 {entry.volume} · 音调 {entry.pitch}
+          {entry.stream ? ' · 流式' : ''}
+        </div>
       </div>
       <div className="text-xs text-mc-dim">{duration}</div>
       {audioUrl && (
@@ -267,13 +321,28 @@ function ModelsTab({ pack }: { pack: ResourcePackSpecType }) {
   const columns: Column<ModelEntry>[] = [
     { key: 'path', header: '路径', width: '40%', sortValue: (r) => r.path },
     { key: 'textureName', header: '贴图名', width: '20%', sortValue: (r) => r.textureName },
-    { key: 'autoCubeAll', header: '自动 cube_all', width: '15%', render: (r) => (r.autoCubeAll ? '是' : '否') },
-    { key: 'jsonPreview', header: 'JSON 摘要', width: '25%', render: (r) => r.json ? `${r.json.slice(0, 40)}${r.json.length > 40 ? '…' : ''}` : '—' },
+    {
+      key: 'autoCubeAll',
+      header: '自动 cube_all',
+      width: '15%',
+      render: (r) => (r.autoCubeAll ? '是' : '否'),
+    },
+    {
+      key: 'jsonPreview',
+      header: 'JSON 摘要',
+      width: '25%',
+      render: (r) => (r.json ? `${r.json.slice(0, 40)}${r.json.length > 40 ? '…' : ''}` : '—'),
+    },
   ];
 
   return (
     <div className="p-2">
-      <DataTable columns={columns} data={pack.models} rowKey={(r) => r.path} emptyHint="暂无模型覆盖" />
+      <DataTable
+        columns={columns}
+        data={pack.models}
+        rowKey={(r) => r.path}
+        emptyHint="暂无模型覆盖"
+      />
     </div>
   );
 }
@@ -298,7 +367,12 @@ function LangTab({ pack }: { pack: ResourcePackSpecType }) {
     }));
     if (query) {
       const q = query.toLowerCase();
-      result = result.filter((r) => r.key.toLowerCase().includes(q) || r.en.toLowerCase().includes(q) || r.zh.toLowerCase().includes(q));
+      result = result.filter(
+        (r) =>
+          r.key.toLowerCase().includes(q) ||
+          r.en.toLowerCase().includes(q) ||
+          r.zh.toLowerCase().includes(q),
+      );
     }
     return result.sort((a, b) => a.key.localeCompare(b.key));
   }, [pack.langEnUs, pack.langZhCn, query]);
@@ -322,6 +396,7 @@ function LangTab({ pack }: { pack: ResourcePackSpecType }) {
 
 Run: `pnpm typecheck`
 Expected: PASS（0 错误）。如果失败，检查：
+
 - 是否 `shallow` 应从 `zustand/shallow` 导入（是的，已正确）
 - ResourcePackSpec 的导出名（应是 `ResourcePackSpec as ResourcePackSpecType` 别名导入避免和组件局部变量冲突）
 - DataTable 的 `Column` 是否从 `./shared/index.js` 导出（是的，阶段 2 已导出）
@@ -344,9 +419,11 @@ git commit -m "feat(middle): add ResourcePack preview panel with skinview3d depe
 ## Task 2: 创建 SkinPreviewPanel
 
 **Files:**
+
 - Create: `apps/desktop/src/renderer/src/components/middle/SkinPreviewPanel.tsx`
 
 **SkinSpec 字段**（[skin-spec.ts](file:///d:/MC%20mod/packages/shared/src/schemas/skin-spec.ts)，供表单编辑）：
+
 - playerName: string (default 'Player')
 - model: 'classic' | 'slim' (default 'classic')
 - skinColor: Color (default '#E0AC69')
@@ -357,10 +434,16 @@ git commit -m "feat(middle): add ResourcePack preview panel with skinview3d depe
 - generatePreview: boolean (default false)
 
 **skinview3d API 关键点**：
+
 ```typescript
 import { SkinViewer, WalkingAnimation } from 'skinview3d';
 // 创建
-const viewer = new SkinViewer({ canvas, width: 300, height: 400, skin: 'data:image/png;base64,...' });
+const viewer = new SkinViewer({
+  canvas,
+  width: 300,
+  height: 400,
+  skin: 'data:image/png;base64,...',
+});
 viewer.autoRotate = true;
 viewer.autoRotateSpeed = 0.5;
 viewer.animation = new WalkingAnimation();
@@ -406,7 +489,13 @@ export function SkinPreviewPanel() {
   const [bgColor, setBgColor] = useState<'#1a1a1a' | '#3a3a3a' | '#ffffff'>('#1a1a1a');
 
   if (!spec) {
-    return <EmptyState icon="box" title="尚未生成皮肤 Spec" hint="在右侧 AgentPanel 描述你想要的皮肤，生成 Spec 后即可预览" />;
+    return (
+      <EmptyState
+        icon="box"
+        title="尚未生成皮肤 Spec"
+        hint="在右侧 AgentPanel 描述你想要的皮肤，生成 Spec 后即可预览"
+      />
+    );
   }
 
   const skin = spec as unknown as SkinSpec;
@@ -431,15 +520,22 @@ export function SkinPreviewPanel() {
           <McIcon scope="pixel" name="star" size={16} className="text-mc-accent" />
           <span className="text-sm font-bold text-mc-text">{skin.playerName}</span>
           <span className="text-xs text-mc-mute">·</span>
-          <span className="text-xs text-mc-dim">{skin.model === 'slim' ? 'Slim (Alex)' : 'Classic (Steve)'}</span>
+          <span className="text-xs text-mc-dim">
+            {skin.model === 'slim' ? 'Slim (Alex)' : 'Classic (Steve)'}
+          </span>
         </div>
-        <div className="mt-1 text-xs text-mc-mute">{skinUrl ? '皮肤 PNG 已生成' : '皮肤 PNG 未生成（保存后即可预览）'}</div>
+        <div className="mt-1 text-xs text-mc-mute">
+          {skinUrl ? '皮肤 PNG 已生成' : '皮肤 PNG 未生成（保存后即可预览）'}
+        </div>
       </div>
 
       {/* Body：左右分栏 */}
       <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
         {/* 左：3D 预览 */}
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4" style={{ backgroundColor: bgColor }}>
+        <div
+          className="flex flex-1 flex-col items-center justify-center gap-2 p-4"
+          style={{ backgroundColor: bgColor }}
+        >
           {skinUrl ? (
             <SkinViewer3D
               canvasRef={canvasRef}
@@ -456,8 +552,13 @@ export function SkinPreviewPanel() {
         </div>
 
         {/* 右：2D UV 贴图 */}
-        <div className="flex w-full flex-col gap-2 border-t border-mc-border p-4 md:w-80 md:border-l md:border-t-0" style={{ backgroundColor: bgColor }}>
-          <div className="text-xs font-bold uppercase tracking-wider text-mc-dim">2D 纹理贴图 (64×64)</div>
+        <div
+          className="flex w-full flex-col gap-2 border-t border-mc-border p-4 md:w-80 md:border-l md:border-t-0"
+          style={{ backgroundColor: bgColor }}
+        >
+          <div className="text-xs font-bold uppercase tracking-wider text-mc-dim">
+            2D 纹理贴图 (64×64)
+          </div>
           <div className="relative">
             {skinUrl ? (
               <Skin2DOverlay skinUrl={skinUrl} model={skin.model} />
@@ -512,11 +613,31 @@ export function SkinPreviewPanel() {
 
         <div className="mt-4">
           <FieldGroup title="颜色">
-            <ColorRow label="皮肤色" value={skin.skinColor} onChange={(v) => updateField('skinColor', v)} />
-            <ColorRow label="头发色" value={skin.hairColor} onChange={(v) => updateField('hairColor', v)} />
-            <ColorRow label="上衣色" value={skin.shirtColor} onChange={(v) => updateField('shirtColor', v)} />
-            <ColorRow label="裤子色" value={skin.pantsColor} onChange={(v) => updateField('pantsColor', v)} />
-            <ColorRow label="鞋子色" value={skin.shoesColor} onChange={(v) => updateField('shoesColor', v)} />
+            <ColorRow
+              label="皮肤色"
+              value={skin.skinColor}
+              onChange={(v) => updateField('skinColor', v)}
+            />
+            <ColorRow
+              label="头发色"
+              value={skin.hairColor}
+              onChange={(v) => updateField('hairColor', v)}
+            />
+            <ColorRow
+              label="上衣色"
+              value={skin.shirtColor}
+              onChange={(v) => updateField('shirtColor', v)}
+            />
+            <ColorRow
+              label="裤子色"
+              value={skin.pantsColor}
+              onChange={(v) => updateField('pantsColor', v)}
+            />
+            <ColorRow
+              label="鞋子色"
+              value={skin.shoesColor}
+              onChange={(v) => updateField('shoesColor', v)}
+            />
           </FieldGroup>
         </div>
       </div>
@@ -580,7 +701,14 @@ interface Skin2DOverlayProps {
 function Skin2DOverlay({ skinUrl, model }: Skin2DOverlayProps) {
   // 标准 Minecraft 皮肤 UV 坐标（基于 64x64 像素图）
   // 每个部位格式：[x, y, w, h, label, color]
-  const regions: Array<{ x: number; y: number; w: number; h: number; label: string; color: string }> = [
+  const regions: Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    label: string;
+    color: string;
+  }> = [
     { x: 8, y: 8, w: 8, h: 8, label: '头', color: 'rgba(224, 172, 105, 0.4)' },
     { x: 20, y: 20, w: 8, h: 12, label: '身体', color: 'rgba(25, 166, 255, 0.4)' },
     { x: 44, y: 20, w: 4, h: 12, label: '右臂', color: 'rgba(49, 39, 24, 0.5)' },
@@ -626,7 +754,15 @@ function Skin2DOverlay({ skinUrl, model }: Skin2DOverlayProps) {
 
 // ===== 颜色行子组件 =====
 
-function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function ColorRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="flex items-center gap-3">
       <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
@@ -651,22 +787,29 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
 
 Run: `pnpm typecheck`
 Expected: PASS（0 错误）。如果失败，检查：
+
 - skinview3d 的类型定义是否随包一起安装（应是 `bundle.js` 同目录有 `.d.ts`）
 - `SkinViewer` 构造参数是否正确（参考 [skinview3d 文档](https://github.com/bs-community/skinview3d)）
 - `WalkingAnimation` 是否从 `skinview3d` 直接导出（是的）
 
 如果 skinview3d 没有类型定义（纯 JS 库），需在文件顶部加 `// @ts-ignore` 或创建 `apps/desktop/src/skinview3d.d.ts` 声明模块：
+
 ```typescript
 declare module 'skinview3d' {
   export class SkinViewer {
-    constructor(opts: { canvas: HTMLCanvasElement; width?: number; height?: number; skin?: string });
+    constructor(opts: {
+      canvas: HTMLCanvasElement;
+      width?: number;
+      height?: number;
+      skin?: string;
+    });
     autoRotate: boolean;
     autoRotateSpeed: number;
     animation: unknown;
     loadSkin(url: string, opts?: { model?: 'classic' | 'slim' }): void;
     dispose(): void;
   }
-  export class WalkingAnimation { }
+  export class WalkingAnimation {}
 }
 ```
 
@@ -688,6 +831,7 @@ git commit -m "feat(middle): add Skin preview panel with 3D viewer and 2D UV ove
 ## Task 3: MiddlePanel 集成 + 最终验证
 
 **Files:**
+
 - Modify: `apps/desktop/src/renderer/src/components/middle/MiddlePanel.tsx`
 
 - [ ] **Step 1: 修改 MiddlePanel.tsx**
@@ -695,12 +839,14 @@ git commit -m "feat(middle): add Skin preview panel with 3D viewer and 2D UV ove
 先用 Read 工具读取 `d:\MC mod\apps\desktop\src\renderer\src\components\middle\MiddlePanel.tsx`。
 
 **修改 1：新增 import。** 在现有 4 个面板 import（ServerPreviewPanel/ModPreviewPanel/DatapackPreviewPanel/ModpackPreviewPanel/LauncherPreviewPanel）之后，新增 2 行：
+
 ```tsx
 import { ResourcePackPreviewPanel } from './ResourcePackPreviewPanel.js';
 import { SkinPreviewPanel } from './SkinPreviewPanel.js';
 ```
 
 **修改 2：修改 switch。** 把：
+
 ```tsx
       case 'launcher':
         return <LauncherPreviewPanel />;
@@ -708,7 +854,9 @@ import { SkinPreviewPanel } from './SkinPreviewPanel.js';
       case 'skin':
         return <PlaceholderPanel type={generatorType} />;
 ```
+
 改为：
+
 ```tsx
       case 'launcher':
         return <LauncherPreviewPanel />;
@@ -735,6 +883,7 @@ Expected: PASS（258 测试通过，无回归）
 - [ ] **Step 4: 行数检查**
 
 用 Read 工具读取以下文件末尾确认行数：
+
 - `d:\MC mod\apps\desktop\src\renderer\src\components\middle\ResourcePackPreviewPanel.tsx` — 目标 ≤ 280 行
 - `d:\MC mod\apps\desktop\src\renderer\src\components\middle\SkinPreviewPanel.tsx` — 目标 ≤ 260 行
 - `d:\MC mod\apps\desktop\src\renderer\src\components\middle\MiddlePanel.tsx` — 目标 ≤ 100 行
@@ -742,6 +891,7 @@ Expected: PASS（258 测试通过，无回归）
 - [ ] **Step 5: 最终验证 — 所有 7 种类型已实现**
 
 确认 `MiddlePanel.tsx` 的 `renderPreviewPanel` switch 中：
+
 - ✅ server → ServerPreviewPanel
 - ✅ mod → ModPreviewPanel
 - ✅ datapack → DatapackPreviewPanel

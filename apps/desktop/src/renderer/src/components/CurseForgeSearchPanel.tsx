@@ -158,20 +158,18 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
             className="mc-input flex-1"
             disabled={loading}
           />
-          <button
-            onClick={doSearch}
-            disabled={loading || !query.trim()}
-            className="mc-btn-primary"
-          >
-            {loading && (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            )}
+          <button onClick={doSearch} disabled={loading || !query.trim()} className="mc-btn-primary">
+            {loading && <Loader2 className="h-3 w-3 animate-spin" />}
             搜索
           </button>
         </div>
 
         {/* 错误提示 */}
-        {error && <div className="mb-3"><ErrorBanner message={error} onClose={() => setError(null)} /></div>}
+        {error && (
+          <div className="mb-3">
+            <ErrorBanner message={error} onClose={() => setError(null)} />
+          </div>
+        )}
 
         {/* 内容区 */}
         <div className="flex-1 overflow-y-auto">
@@ -192,13 +190,16 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                 <span className="text-xs text-mc-text-dim">选择文件：{selectedHit.name}</span>
               </div>
               {filesError && (
-                <div className="mb-2"><ErrorBanner message={filesError} onClose={() => setFilesError(null)} /></div>
+                <div className="mb-2">
+                  <ErrorBanner message={filesError} onClose={() => setFilesError(null)} />
+                </div>
               )}
               {filesLoading ? (
                 <div className="py-8 text-center text-xs text-mc-text-dim">加载文件列表中…</div>
               ) : files.length === 0 ? (
                 <div className="py-8 text-center text-xs text-mc-text-dim">
-                  没有匹配的文件{loader || mcVersion ? `（${loader ?? ''} ${mcVersion ?? ''}）` : ''}
+                  没有匹配的文件
+                  {loader || mcVersion ? `（${loader ?? ''} ${mcVersion ?? ''}）` : ''}
                 </div>
               ) : (
                 <ul className="space-y-1.5">
@@ -210,12 +211,16 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-mc-text">{f.displayName}</span>
-                          <span className="text-xs text-mc-text-dim">{formatSize(f.fileLength)}</span>
+                          <span className="text-xs text-mc-text-dim">
+                            {formatSize(f.fileLength)}
+                          </span>
                         </div>
                         <div className="mt-1 text-xs text-mc-text-dim">
                           {f.fileName}
                           {f.modLoaderNames.length > 0 && (
-                            <span className="ml-1 text-mc-accent">[{f.modLoaderNames.join(', ')}]</span>
+                            <span className="ml-1 text-mc-accent">
+                              [{f.modLoaderNames.join(', ')}]
+                            </span>
                           )}
                         </div>
                       </button>
@@ -260,19 +265,21 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-medium text-mc-text">{hit.name}</span>
+                            <span className="truncate text-sm font-medium text-mc-text">
+                              {hit.name}
+                            </span>
                             <span className="flex-shrink-0 text-xs text-mc-text-dim">
-                              <McIcon scope="pixel" name="download" size={12} /> {formatDownloads(hit.downloadCount)}
+                              <McIcon scope="pixel" name="download" size={12} />{' '}
+                              {formatDownloads(hit.downloadCount)}
                             </span>
                           </div>
-                          <p className="mt-0.5 line-clamp-2 text-xs text-mc-text-dim">{hit.summary}</p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-mc-text-dim">
+                            {hit.summary}
+                          </p>
                           {hit.categories.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {hit.categories.slice(0, 5).map((c) => (
-                                <span
-                                  key={c}
-                                  className="mc-tag"
-                                >
+                                <span key={c} className="mc-tag">
                                   {c}
                                 </span>
                               ))}

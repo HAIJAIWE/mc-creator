@@ -1,4 +1,10 @@
-import type { FileNode, GeneratorContext, GenerationResult, Loader, McVersion } from '@mc-creator/shared';
+import type {
+  FileNode,
+  GeneratorContext,
+  GenerationResult,
+  Loader,
+  McVersion,
+} from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import { LauncherSpec } from '@mc-creator/shared';
 import type { LauncherSpec as LauncherSpecType } from '@mc-creator/shared';
@@ -40,24 +46,28 @@ export class LauncherGenerator implements Generator {
   private generateLauncherJson(spec: LauncherSpecType): FileNode {
     return {
       path: 'launcher.json',
-      content: JSON.stringify({
-        name: spec.launcherName,
-        type: spec.launcherType,
-        mcVersion: spec.mcVersion,
-        loader: spec.loader,
-        java: {
-          path: spec.javaPath,
-          args: spec.jvmArgs,
-          memoryMin: spec.memoryMin,
-          memoryMax: spec.memoryMax,
+      content: JSON.stringify(
+        {
+          name: spec.launcherName,
+          type: spec.launcherType,
+          mcVersion: spec.mcVersion,
+          loader: spec.loader,
+          java: {
+            path: spec.javaPath,
+            args: spec.jvmArgs,
+            memoryMin: spec.memoryMin,
+            memoryMax: spec.memoryMax,
+          },
+          display: {
+            fullscreen: spec.fullscreen,
+            width: spec.resolutionWidth,
+            height: spec.resolutionHeight,
+          },
+          serverAutorun: spec.serverAutorun,
         },
-        display: {
-          fullscreen: spec.fullscreen,
-          width: spec.resolutionWidth,
-          height: spec.resolutionHeight,
-        },
-        serverAutorun: spec.serverAutorun,
-      }, null, 2),
+        null,
+        2,
+      ),
     };
   }
 
@@ -110,11 +120,15 @@ export class LauncherGenerator implements Generator {
   private generateVersionsJson(spec: LauncherSpecType): FileNode {
     return {
       path: 'versions.json',
-      content: JSON.stringify({
-        mcVersion: spec.mcVersion,
-        loader: spec.loader,
-        compatibleLoaders: ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'vanilla'],
-      }, null, 2),
+      content: JSON.stringify(
+        {
+          mcVersion: spec.mcVersion,
+          loader: spec.loader,
+          compatibleLoaders: ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'vanilla'],
+        },
+        null,
+        2,
+      ),
     };
   }
 
@@ -134,12 +148,16 @@ export class LauncherGenerator implements Generator {
   private generateThemeJson(spec: LauncherSpecType): FileNode {
     return {
       path: 'config/theme.json',
-      content: JSON.stringify({
-        launcherName: spec.launcherName,
-        launcherType: spec.launcherType,
-        theme: 'default',
-        accentColor: '#4A90E2',
-      }, null, 2),
+      content: JSON.stringify(
+        {
+          launcherName: spec.launcherName,
+          launcherType: spec.launcherType,
+          theme: 'default',
+          accentColor: '#4A90E2',
+        },
+        null,
+        2,
+      ),
     };
   }
 }

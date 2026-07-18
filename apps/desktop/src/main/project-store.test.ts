@@ -132,9 +132,11 @@ describe('project-store（分文件存储）', () => {
 
   it('已迁移过则不重复迁移', () => {
     // 同时存在旧文件和迁移标记
-    writeFileSync(join(tmpDir, 'projects.json'), JSON.stringify([
-      makeProject({ id: 'old1', name: 'legacy1' }),
-    ]), 'utf-8');
+    writeFileSync(
+      join(tmpDir, 'projects.json'),
+      JSON.stringify([makeProject({ id: 'old1', name: 'legacy1' })]),
+      'utf-8',
+    );
     writeFileSync(join(tmpDir, 'projects.json.migrated'), '', 'utf-8');
     // 同时存在新的分文件
     saveProject(makeProject({ id: 'new1' }));

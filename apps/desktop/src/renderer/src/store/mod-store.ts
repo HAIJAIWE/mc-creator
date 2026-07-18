@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import { ModSpec, type Loader, type McVersion, type FileNode, type ItemSpec } from '@mc-creator/shared';
+import {
+  ModSpec,
+  type Loader,
+  type McVersion,
+  type FileNode,
+  type ItemSpec,
+} from '@mc-creator/shared';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
 
 interface ModState {
@@ -60,10 +66,14 @@ export const useModStore = create<ModState>((set) => ({
   setSpec: (s) => set({ spec: s }),
   setFiles: (f) => set({ files: f, selectedFile: f[0]?.path ?? null }),
   selectFile: (p) => set({ selectedFile: p }),
-  closeFile: (p) => set((state) => ({
-    files: state.files.filter((f) => f.path !== p),
-    selectedFile: state.selectedFile === p ? state.files.find((f) => f.path !== p)?.path ?? null : state.selectedFile,
-  })),
+  closeFile: (p) =>
+    set((state) => ({
+      files: state.files.filter((f) => f.path !== p),
+      selectedFile:
+        state.selectedFile === p
+          ? (state.files.find((f) => f.path !== p)?.path ?? null)
+          : state.selectedFile,
+    })),
   setBuildResult: (r) => set({ buildSuccess: r.success, buildLog: r.log, jarPath: r.jarPath }),
   setLoading: (b) => set({ loading: b }),
   setError: (e) => set({ error: e }),

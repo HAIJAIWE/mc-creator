@@ -1,4 +1,4 @@
-import type { Generator, } from './types.js';
+import type { Generator } from './types.js';
 import type { Loader, McVersion } from '@mc-creator/shared';
 
 /** 生成器注册表：按类型路由，能力声明匹配（规格 §2.2） */

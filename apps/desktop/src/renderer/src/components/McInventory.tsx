@@ -50,8 +50,7 @@ export function McInventory({ scale = 1, main = [], hotbar = [] }: McInventoryPr
         alignItems: 'center',
         justifyContent: 'center',
         background: 'rgb(var(--mc-surface-2))',
-        boxShadow:
-          'inset 1px 1px 0 rgb(0 0 0 / 0.5), inset -1px -1px 0 rgb(255 255 255 / 0.08)',
+        boxShadow: 'inset 1px 1px 0 rgb(0 0 0 / 0.5), inset -1px -1px 0 rgb(255 255 255 / 0.08)',
         imageRendering: 'pixelated',
       }}
     >
@@ -87,10 +86,7 @@ export function McInventory({ scale = 1, main = [], hotbar = [] }: McInventoryPr
   const panelH = 90 * scale;
 
   // 补齐到固定格数，缺省填空槽
-  const mainCells = Array.from(
-    { length: COLUMNS * MAIN_ROWS },
-    (_, i) => main[i] ?? null,
-  );
+  const mainCells = Array.from({ length: COLUMNS * MAIN_ROWS }, (_, i) => main[i] ?? null);
   const hotbarCells = Array.from({ length: COLUMNS }, (_, i) => hotbar[i] ?? null);
 
   return (

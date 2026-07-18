@@ -38,7 +38,14 @@ describe('IPC schema 校验', () => {
     const valid = {
       loader: 'fabric',
       mcVersion: '1.21.11',
-      spec: { modId: 'demo', version: '1.0.0', name: 'Demo', description: '', items: [], blocks: [] },
+      spec: {
+        modId: 'demo',
+        version: '1.0.0',
+        name: 'Demo',
+        description: '',
+        items: [],
+        blocks: [],
+      },
     };
     expect(GenerateFilesRequest.safeParse(valid).success).toBe(true);
     expect(GenerateFilesRequest.safeParse({ ...valid, loader: 'forge' }).success).toBe(false);
@@ -48,7 +55,14 @@ describe('IPC schema 校验', () => {
     const valid = {
       loader: 'fabric',
       mcVersion: '1.21.11',
-      spec: { modId: 'demo', version: '1.0.0', name: 'Demo', description: '', items: [], blocks: [] },
+      spec: {
+        modId: 'demo',
+        version: '1.0.0',
+        name: 'Demo',
+        description: '',
+        items: [],
+        blocks: [],
+      },
     };
     const result = GenerateFilesRequest.safeParse(valid);
     expect(result.success).toBe(true);
@@ -63,7 +77,9 @@ describe('IPC schema 校验', () => {
   });
 
   it('PrepareBuildDirRequest 校验 files 非空数组', () => {
-    expect(PrepareBuildDirRequest.safeParse({ files: [{ path: 'a.txt', content: 'hi' }] }).success).toBe(true);
+    expect(
+      PrepareBuildDirRequest.safeParse({ files: [{ path: 'a.txt', content: 'hi' }] }).success,
+    ).toBe(true);
     expect(PrepareBuildDirRequest.safeParse({ files: [] }).success).toBe(true);
     expect(PrepareBuildDirRequest.safeParse({ files: [{ path: 'a.txt' }] }).success).toBe(false);
     expect(PrepareBuildDirRequest.safeParse({}).success).toBe(false);
@@ -88,23 +104,19 @@ describe('IPC schema 校验', () => {
       ExportProjectResponse.safeParse({ ok: false, canceled: true, savedPath: null }).success,
     ).toBe(true);
     // 缺 savedPath 时拒绝
-    expect(
-      ExportProjectResponse.safeParse({ ok: true, canceled: false }).success,
-    ).toBe(false);
+    expect(ExportProjectResponse.safeParse({ ok: true, canceled: false }).success).toBe(false);
   });
 
   it('ImportProjectResponse 校验 project 可空', () => {
     // 导入成功：project 非空
-    expect(
-      ImportProjectResponse.safeParse({ project: validProject, error: null }).success,
-    ).toBe(true);
+    expect(ImportProjectResponse.safeParse({ project: validProject, error: null }).success).toBe(
+      true,
+    );
     // 用户取消或失败：project 为 null
-    expect(
-      ImportProjectResponse.safeParse({ project: null, error: null }).success,
-    ).toBe(true);
-    expect(
-      ImportProjectResponse.safeParse({ project: null, error: 'zip 损坏' }).success,
-    ).toBe(true);
+    expect(ImportProjectResponse.safeParse({ project: null, error: null }).success).toBe(true);
+    expect(ImportProjectResponse.safeParse({ project: null, error: 'zip 损坏' }).success).toBe(
+      true,
+    );
     // 缺 project 字段时拒绝
     expect(ImportProjectResponse.safeParse({ error: null }).success).toBe(false);
   });
@@ -129,9 +141,7 @@ describe('IPC schema 校验', () => {
     if (withDefault.success) expect(withDefault.data.limit).toBe(20);
 
     // Response：hits 数组
-    expect(
-      CurseForgeSearchResponse.safeParse({ hits: [] }).success,
-    ).toBe(true);
+    expect(CurseForgeSearchResponse.safeParse({ hits: [] }).success).toBe(true);
     expect(
       CurseForgeSearchResponse.safeParse({
         hits: [

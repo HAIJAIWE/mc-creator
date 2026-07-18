@@ -41,18 +41,24 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
     );
 
   // 项目菜单
-  const { projects, loadProjects, loadProject, importProject, saveCurrentAsProject, currentProjectId } =
-    useProjectStore(
-      (s) => ({
-        projects: s.projects,
-        loadProjects: s.loadProjects,
-        loadProject: s.loadProject,
-        importProject: s.importProject,
-        saveCurrentAsProject: s.saveCurrentAsProject,
-        currentProjectId: s.currentProjectId,
-      }),
-      shallow,
-    );
+  const {
+    projects,
+    loadProjects,
+    loadProject,
+    importProject,
+    saveCurrentAsProject,
+    currentProjectId,
+  } = useProjectStore(
+    (s) => ({
+      projects: s.projects,
+      loadProjects: s.loadProjects,
+      loadProject: s.loadProject,
+      importProject: s.importProject,
+      saveCurrentAsProject: s.saveCurrentAsProject,
+      currentProjectId: s.currentProjectId,
+    }),
+    shallow,
+  );
 
   // 保存项目需要 spec/files/description/generatorType/loader/mcVersion
   const { spec, files, description, setError } = useModStore(
@@ -132,10 +138,7 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
       {/* 左侧：项目菜单 */}
       <div className="flex items-center gap-2">
         <div className="relative">
-          <button
-            onClick={handleLoadProjects}
-            className="mc-btn-ghost !px-2 !py-1"
-          >
+          <button onClick={handleLoadProjects} className="mc-btn-ghost !px-2 !py-1">
             <McIcon scope="pixel" name="folder" size={14} />
             <span className="max-w-24 truncate text-xs">{currentProject?.name || '项目'}</span>
           </button>
@@ -179,7 +182,9 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
                         key={p.id}
                         onClick={() => handleSelectProject(p.id)}
                         className={`flex w-full items-center gap-2 px-2 py-1 text-left text-xs transition-colors hover:bg-mc-surface-2 ${
-                          currentProjectId === p.id ? 'bg-mc-surface-2/60 text-mc-text' : 'text-mc-dim'
+                          currentProjectId === p.id
+                            ? 'bg-mc-surface-2/60 text-mc-text'
+                            : 'text-mc-dim'
                         }`}
                       >
                         <McIcon scope="pixel" name="folder" size={12} />
@@ -203,7 +208,9 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
           className="mc-select"
         >
           {Object.entries(TYPE_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
+            <option key={value} value={value}>
+              {label}
+            </option>
           ))}
         </select>
         <select
@@ -224,7 +231,9 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
           className="mc-select"
         >
           {MC_VERSIONS.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v}>
+              {v}
+            </option>
           ))}
         </select>
         {loading && <Loader2 className="h-3 w-3 animate-spin text-mc-mute" />}
@@ -236,9 +245,7 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
         className="mc-btn-ghost !px-2 !py-1"
         title={apiKey ? 'API Key 已配置' : '未配置 API Key，点击设置'}
       >
-        <span
-          className={`h-2 w-2 rounded-full ${apiKey ? 'bg-mc-accent' : 'bg-mc-redstone'}`}
-        />
+        <span className={`h-2 w-2 rounded-full ${apiKey ? 'bg-mc-accent' : 'bg-mc-redstone'}`} />
         <span className="text-xs text-mc-dim">{apiKey ? '已配置' : '未配置'}</span>
       </button>
     </div>

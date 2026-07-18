@@ -46,7 +46,11 @@ export function MiddlePanel() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Tab 切换栏 */}
-      <div role="tablist" aria-label="中间面板视图切换" className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1">
+      <div
+        role="tablist"
+        aria-label="中间面板视图切换"
+        className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1"
+      >
         <button
           role="tab"
           aria-selected={activeTab === 'preview'}
@@ -102,7 +106,9 @@ function PlaceholderPanel({ type }: { type: GeneratorType }) {
         <McIcon scope="pixel" name="box" size={32} className="text-mc-mute" />
       </div>
       <div className="text-sm font-medium text-mc-dim">{type} 预览面板开发中</div>
-      <div className="text-xs text-mc-mute">阶段 2-4 实现该类型，当前可切换到「代码」tab 查看文件</div>
+      <div className="text-xs text-mc-mute">
+        阶段 2-4 实现该类型，当前可切换到「代码」tab 查看文件
+      </div>
     </div>
   );
 }

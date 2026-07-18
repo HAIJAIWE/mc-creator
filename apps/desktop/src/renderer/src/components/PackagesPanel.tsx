@@ -49,7 +49,9 @@ export function PackagesPanel() {
 
       {generatorType === 'modpack' && (
         <>
-          <div className="mc-section-title border-b border-mc-border">整合包模组（{mods.length}）</div>
+          <div className="mc-section-title border-b border-mc-border">
+            整合包模组（{mods.length}）
+          </div>
           <div className="space-y-1 p-2">
             {mods.length === 0 ? (
               <div className="py-4 text-center text-xs text-mc-mute">尚未添加模组</div>

@@ -74,7 +74,11 @@ function Workbench() {
       <TopToolbar onOpenSettings={() => setActiveActivity('settings')} />
 
       <div className="flex flex-1 overflow-hidden">
-        <ActivityBar active={activeActivity} onChange={setActiveActivity} onHome={backToDashboard} />
+        <ActivityBar
+          active={activeActivity}
+          onChange={setActiveActivity}
+          onHome={backToDashboard}
+        />
 
         <aside
           style={{ width: leftWidth }}
@@ -100,9 +104,7 @@ function Workbench() {
         </aside>
       </div>
 
-      {showSaveDialog && (
-        <ProjectSaveDialog onClose={() => setShowSaveDialog(false)} />
-      )}
+      {showSaveDialog && <ProjectSaveDialog onClose={() => setShowSaveDialog(false)} />}
 
       <TaskCompleteDialog
         show={showTaskComplete}

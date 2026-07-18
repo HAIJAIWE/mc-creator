@@ -36,10 +36,18 @@ export function parseGitStatus(raw: string): {
       const b = rest.match(/behind (\d+)/);
       if (a) ahead = Number(a[1]);
       if (b) behind = Number(b[1]);
-      const branchPart = rest.split('...')[0].replace(/\s*\(.*\)\s*$/, '').trim();
+      const branchPart = rest
+        .split('...')[0]
+        .replace(/\s*\(.*\)\s*$/, '')
+        .trim();
       branch = branchPart || null;
       const up = rest.split('...')[1];
-      if (up) upstream = up.split(/\s/)[0].replace(/\[.*\]/, '').trim() || null;
+      if (up)
+        upstream =
+          up
+            .split(/\s/)[0]
+            .replace(/\[.*\]/, '')
+            .trim() || null;
       continue;
     }
     const x = line[0];

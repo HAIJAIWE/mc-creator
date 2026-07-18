@@ -10,5 +10,13 @@
       "@mc-creator/shared": ["../../packages/shared/src"]
     }
   },
-  "include": ["src/main/**/*", "src/preload/**/*", "src/shared/**/*", "electron.vite.config.ts", "vitest.config.ts", "../../packages/core/src/**/*", "../../packages/shared/src/**/*"]
+  "include": [
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*",
+    "electron.vite.config.ts",
+    "vitest.config.ts",
+    "../../packages/core/src/**/*",
+    "../../packages/shared/src/**/*"
+  ]
 }

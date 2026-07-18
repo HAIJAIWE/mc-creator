@@ -64,8 +64,11 @@ export const ModelEntry = z.object({
 export const ResourcePackSpec = z.object({
   packName: z.string(),
   packDescription: z.string().default(''),
-  packFormat: z.number().int().default(34),  // 1.21.x
-  namespace: z.string().regex(/^[a-z0-9_]+$/).default('minecraft'),
+  packFormat: z.number().int().default(34), // 1.21.x
+  namespace: z
+    .string()
+    .regex(/^[a-z0-9_]+$/)
+    .default('minecraft'),
   // 字体贴图（生成 PNG + font JSON）
   fonts: z.array(FontEntry).default([]),
   // 音效（生成 sounds.json + 占位 ogg）

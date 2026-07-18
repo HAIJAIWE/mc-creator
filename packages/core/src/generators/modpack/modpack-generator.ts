@@ -1,4 +1,10 @@
-import type { FileNode, GeneratorContext, GenerationResult, Loader, McVersion } from '@mc-creator/shared';
+import type {
+  FileNode,
+  GeneratorContext,
+  GenerationResult,
+  Loader,
+  McVersion,
+} from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import type { ModpackSpec } from '@mc-creator/shared';
 
@@ -62,7 +68,9 @@ export class ModpackGenerator implements Generator {
       files: spec.mods.map((m) => ({
         path: `mods/${m.fileName}`,
         hashes: m.projectId ? { sha1: m.versionId } : {}, // 简化：用 versionId 作为 hash
-        downloads: m.downloadUrl ? [m.downloadUrl] : [`modrinth://mod/${m.projectId}/${m.versionId}`],
+        downloads: m.downloadUrl
+          ? [m.downloadUrl]
+          : [`modrinth://mod/${m.projectId}/${m.versionId}`],
         fileSize: m.fileSize ?? 0,
       })),
       dependencies: {
@@ -126,9 +134,7 @@ export class ModpackGenerator implements Generator {
 
   /** CurseForge 格式：modlist.html */
   private generateModlistHtml(spec: ModpackSpec): FileNode {
-    const items = spec.mods
-      .map((m) => `<li>${m.name}</li>`)
-      .join('\n');
+    const items = spec.mods.map((m) => `<li>${m.name}</li>`).join('\n');
     const html = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><title>${spec.packName} - Mod List</title></head>

@@ -47,10 +47,9 @@ describe('TEMPLATES_BY_TYPE', () => {
   it('每种类型至少有 3 个模板', () => {
     for (const t of ALL_TYPES) {
       const arr = TEMPLATES_BY_TYPE[t];
-      expect(
-        arr.length,
-        `${t} 类型应至少有 3 个模板，实际 ${arr.length}`
-      ).toBeGreaterThanOrEqual(3);
+      expect(arr.length, `${t} 类型应至少有 3 个模板，实际 ${arr.length}`).toBeGreaterThanOrEqual(
+        3,
+      );
     }
   });
 
@@ -76,10 +75,7 @@ describe('TEMPLATES_BY_TYPE', () => {
       ...RESOURCE_PACK_TEMPLATES,
     ];
     for (const tpl of all) {
-      expect(
-        ids.has(tpl.id),
-        `重复的模板 id: ${tpl.id}`
-      ).toBe(false);
+      expect(ids.has(tpl.id), `重复的模板 id: ${tpl.id}`).toBe(false);
       ids.add(tpl.id);
     }
     expect(ids.size).toBe(all.length);

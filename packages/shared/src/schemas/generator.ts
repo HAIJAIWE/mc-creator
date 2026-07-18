@@ -4,7 +4,7 @@ import { LOADERS } from '../types/loader.js';
 
 /** 文件树节点（生成产物） */
 export const FileNode = z.object({
-  path: z.string(),       // 相对项目根
+  path: z.string(), // 相对项目根
   content: z.string(),
 });
 

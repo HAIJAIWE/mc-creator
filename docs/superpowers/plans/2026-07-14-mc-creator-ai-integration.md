@@ -54,6 +54,7 @@ apps/desktop/
 ## Task 1: core 层 VercelAiProvider
 
 **Files:**
+
 - Create: `packages/core/src/model-provider/vercel-ai-provider.ts`
 - Test: `packages/core/src/model-provider/vercel-ai-provider.test.ts`
 - Modify: `packages/core/src/model-provider/index.ts`
@@ -156,7 +157,9 @@ describe('VercelAiProvider', () => {
 
   it('stream 返回流式片段', async () => {
     const chunks = ['hello', ' ', 'world'];
-    const asyncIter = (async function* () { for (const c of chunks) yield c; })();
+    const asyncIter = (async function* () {
+      for (const c of chunks) yield c;
+    })();
     vi.mocked(streamText).mockResolvedValue({ textStream: asyncIter } as any);
     const provider = new VercelAiProvider(config);
     const collected: string[] = [];
@@ -181,6 +184,7 @@ Expected: PASS（含原有 MockProvider 测试 + 3 个新测试）
 - [ ] **Step 4: 更新 `index.ts` 导出**
 
 在 `packages/core/src/model-provider/index.ts` 追加：
+
 ```typescript
 export * from './vercel-ai-provider.js';
 ```
@@ -206,6 +210,7 @@ git commit -m "feat(core): VercelAiProvider（Vercel AI SDK 接入云端模型�
 ## Task 2: 模型配置管理（electron-store）
 
 **Files:**
+
 - Create: `apps/desktop/src/main/model-config.ts`
 
 - [ ] **Step 1: 写 `model-config.ts`**
@@ -266,6 +271,7 @@ git commit -m "feat(desktop): 模型配置持久化管理"
 ## Task 3: IPC 通道 + 处理器（模型配置 + 流式 chat）
 
 **Files:**
+
 - Modify: `apps/desktop/src/shared/ipc-channels.ts`（新增模型配置 + chat IPC）
 - Modify: `apps/desktop/src/main/ipc.ts`（注册新 IPC 处理器）
 - Modify: `apps/desktop/src/main/index.ts`（用真实配置创建 Orchestrator）
@@ -306,47 +312,57 @@ export type ChatRes = z.infer<typeof ChatResponse>;
 - [ ] **Step 2: 在 `ipc.ts` 追加处理器**
 
 在文件顶部添加导入：
+
 ```typescript
 import { VercelAiProvider } from '@mc-creator/core';
 import type { AiModelConfig } from '@mc-creator/core';
 import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
-import { SaveModelConfigRequest, ModelConfigResponse, ChatRequest, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT } from '../shared/ipc-channels.js';
+import {
+  SaveModelConfigRequest,
+  ModelConfigResponse,
+  ChatRequest,
+  LOAD_MODEL_CONFIG,
+  SAVE_MODEL_CONFIG,
+  CHAT,
+} from '../shared/ipc-channels.js';
 ```
 
 在 `registerIpcHandlers` 函数末尾追加：
+
 ```typescript
-  // 模型配置
-  ipcMain.handle(LOAD_MODEL_CONFIG, async () => {
-    const config = loadModelConfig();
-    return ModelConfigResponse.parse(config);
-  });
+// 模型配置
+ipcMain.handle(LOAD_MODEL_CONFIG, async () => {
+  const config = loadModelConfig();
+  return ModelConfigResponse.parse(config);
+});
 
-  ipcMain.handle(SAVE_MODEL_CONFIG, async (_e, raw: unknown) => {
-    const req = SaveModelConfigRequest.parse(raw);
-    saveModelConfig(req as ModelConfigFull);
-    return { ok: true };
-  });
+ipcMain.handle(SAVE_MODEL_CONFIG, async (_e, raw: unknown) => {
+  const req = SaveModelConfigRequest.parse(raw);
+  saveModelConfig(req as ModelConfigFull);
+  return { ok: true };
+});
 
-  // AI 聊天（非流式，后续可加流式 IPC）
-  let chatProvider: VercelAiProvider | null = null;
+// AI 聊天（非流式，后续可加流式 IPC）
+let chatProvider: VercelAiProvider | null = null;
 
-  ipcMain.handle(CHAT, async (_e, raw: unknown) => {
-    const req = ChatRequest.parse(raw);
-    const config = loadModelConfig();
-    if (!config.apiKey) {
-      return { reply: '请先在设置中配置 API Key。' };
-    }
-    if (!chatProvider || chatProvider.id !== config.modelId) {
-      chatProvider = new VercelAiProvider(config);
-    }
-    const reply = await chatProvider.complete(req.message, {
-      system: '你是 Minecraft mod 专家助手，帮助用户设计 mod。',
-    });
-    return { reply };
+ipcMain.handle(CHAT, async (_e, raw: unknown) => {
+  const req = ChatRequest.parse(raw);
+  const config = loadModelConfig();
+  if (!config.apiKey) {
+    return { reply: '请先在设置中配置 API Key。' };
+  }
+  if (!chatProvider || chatProvider.id !== config.modelId) {
+    chatProvider = new VercelAiProvider(config);
+  }
+  const reply = await chatProvider.complete(req.message, {
+    system: '你是 Minecraft mod 专家助手，帮助用户设计 mod。',
   });
+  return { reply };
+});
 ```
 
 修改 `createDefaultOrchestrator`：读模型配置，如果有 API key 就用 VercelAiProvider，否则 fallback 到 MockProvider：
+
 ```typescript
 export function createDefaultOrchestrator(): Orchestrator {
   try {
@@ -357,10 +373,18 @@ export function createDefaultOrchestrator(): Orchestrator {
   } catch {
     // 配置读取失败，fallback
   }
-  return new Orchestrator(new MockProvider(JSON.stringify({
-    modId: 'demo', version: '1.0.0', name: 'Demo Mod', description: 'A demo mod',
-    items: [{ id: 'demo_item', name: 'Demo Item', maxStackSize: 64 }], blocks: [],
-  })));
+  return new Orchestrator(
+    new MockProvider(
+      JSON.stringify({
+        modId: 'demo',
+        version: '1.0.0',
+        name: 'Demo Mod',
+        description: 'A demo mod',
+        items: [{ id: 'demo_item', name: 'Demo Item', maxStackSize: 64 }],
+        blocks: [],
+      }),
+    ),
+  );
 }
 ```
 
@@ -371,6 +395,7 @@ export function createDefaultOrchestrator(): Orchestrator {
 - [ ] **Step 4: 更新 `src/preload/index.ts`**
 
 在 api 对象中追加：
+
 ```typescript
   loadModelConfig: () => ipcRenderer.invoke(IPC.LOAD_MODEL_CONFIG),
   saveModelConfig: (config: unknown) => ipcRenderer.invoke(IPC.SAVE_MODEL_CONFIG, config),
@@ -378,6 +403,7 @@ export function createDefaultOrchestrator(): Orchestrator {
 ```
 
 并在 IPC 常量导入中追加：
+
 ```typescript
 import { IPC, LOAD_MODEL_CONFIG, SAVE_MODEL_CONFIG, CHAT } from '../shared/ipc-channels.js';
 ```
@@ -403,6 +429,7 @@ git commit -m "feat(desktop): 模型配置 IPC + AI 聊天处理器"
 ## Task 4: 模型配置 Store + SettingsPanel
 
 **Files:**
+
 - Create: `apps/desktop/src/renderer/src/store/model-config-store.ts`
 - Create: `apps/desktop/src/renderer/src/components/SettingsPanel.tsx`
 - Modify: `apps/desktop/src/renderer/src/components/TopBar.tsx`（加设置按钮）
@@ -439,6 +466,7 @@ export const useModelConfigStore = create<ModelConfigState>((set) => ({
 - [ ] **Step 2: 更新 `ipc-client.ts`**
 
 追加：
+
 ```typescript
   loadModelConfig: () => window.mcApi.loadModelConfig(),
   saveModelConfig: (config: { name: string; modelId: string; baseURL: string; apiKey: string }) =>
@@ -484,7 +512,9 @@ export function SettingsPanel({ onClose }: Props) {
       <div className="w-[480px] rounded-lg border border-zinc-700 bg-zinc-900 p-6 text-zinc-100">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">模型配置</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white">
+            ✕
+          </button>
         </div>
 
         <div className="space-y-3">
@@ -555,10 +585,15 @@ import { SettingsPanel } from './SettingsPanel.js';
 const [showSettings, setShowSettings] = useState(false);
 
 // 在 header 末尾：
-<button onClick={() => setShowSettings(true)} className="ml-auto text-sm text-zinc-400 hover:text-white">
+<button
+  onClick={() => setShowSettings(true)}
+  className="ml-auto text-sm text-zinc-400 hover:text-white"
+>
   设置
-</button>
-{showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+</button>;
+{
+  showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />;
+}
 ```
 
 - [ ] **Step 5: typecheck**
@@ -578,6 +613,7 @@ git commit -m "feat(desktop): 模型配置面板 + 设置按钮"
 ## Task 5: AiChat 接真实 AI 流式响应
 
 **Files:**
+
 - Modify: `apps/desktop/src/renderer/src/components/AiChat.tsx`
 
 - [ ] **Step 1: 重写 `AiChat.tsx`**
@@ -587,7 +623,10 @@ import { useState, useRef } from 'react';
 import { ipcClient } from '../lib/ipc-client.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
 
-interface Msg { role: 'user' | 'assistant'; text: string }
+interface Msg {
+  role: 'user' | 'assistant';
+  text: string;
+}
 
 export function AiChat() {
   const { loaded, apiKey } = useModelConfigStore();
@@ -622,12 +661,17 @@ export function AiChat() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-zinc-800 p-2 text-xs font-semibold text-zinc-400">AI 助手</div>
+      <div className="border-b border-zinc-800 p-2 text-xs font-semibold text-zinc-400">
+        AI 助手
+      </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {messages.map((m, i) => (
-          <div key={i} className={`rounded p-2 text-xs whitespace-pre-wrap ${
-            m.role === 'user' ? 'bg-blue-900/40' : 'bg-zinc-800'
-          }`}>
+          <div
+            key={i}
+            className={`rounded p-2 text-xs whitespace-pre-wrap ${
+              m.role === 'user' ? 'bg-blue-900/40' : 'bg-zinc-800'
+            }`}
+          >
             {m.text}
           </div>
         ))}
@@ -693,6 +737,7 @@ git commit -m "feat(desktop): P4 AI 模型接入验证通过"
 ## 自审清单
 
 **1. 规格覆盖**：
+
 - ✅ §2.4 AI 编排技术选型（Vercel AI SDK + 自建薄编排层）→ Task 1
 - ✅ §2.2 模型提供者统一接口（云端/本地同接口）→ Task 1
 - ✅ §2.1 对话界面 → Task 5

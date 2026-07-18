@@ -42,12 +42,23 @@ function buildTree(files: { path: string; content: string }[]): TreeNode[] {
 function getFileIcon(path: string): string {
   if (path.endsWith('.json')) return 'file-text';
   if (path.endsWith('.java')) return 'terminal';
-  if (path.endsWith('.gradle') || path.endsWith('.toml') || path.endsWith('.properties')) return 'terminal';
+  if (path.endsWith('.gradle') || path.endsWith('.toml') || path.endsWith('.properties'))
+    return 'terminal';
   if (path.endsWith('.png')) return 'image';
   return 'file';
 }
 
-function TreeItem({ node, selectedFile, onSelect, depth = 0 }: { node: TreeNode; selectedFile: string | null; onSelect: (path: string) => void; depth?: number }) {
+function TreeItem({
+  node,
+  selectedFile,
+  onSelect,
+  depth = 0,
+}: {
+  node: TreeNode;
+  selectedFile: string | null;
+  onSelect: (path: string) => void;
+  depth?: number;
+}) {
   const [expanded, setExpanded] = useState(true);
   const FolderIcon = node.type === 'folder' ? (expanded ? FolderOpen : Folder) : null;
   const fileIconName = node.type === 'file' ? getFileIcon(node.path) : null;
@@ -60,14 +71,24 @@ function TreeItem({ node, selectedFile, onSelect, depth = 0 }: { node: TreeNode;
           className="flex w-full items-center gap-1 py-1 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2"
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
-          {expanded ? <ChevronDown className="h-3 w-3 text-mc-mute" /> : <ChevronRight className="h-3 w-3 text-mc-mute" />}
+          {expanded ? (
+            <ChevronDown className="h-3 w-3 text-mc-mute" />
+          ) : (
+            <ChevronRight className="h-3 w-3 text-mc-mute" />
+          )}
           {FolderIcon && <FolderIcon className="h-3 w-3 text-mc-accent" />}
           <span className="truncate text-mc-text">{node.name}</span>
         </button>
         {expanded && node.children && (
           <div>
             {node.children.map((child) => (
-              <TreeItem key={child.path} node={child} selectedFile={selectedFile} onSelect={onSelect} depth={depth + 1} />
+              <TreeItem
+                key={child.path}
+                node={child}
+                selectedFile={selectedFile}
+                onSelect={onSelect}
+                depth={depth + 1}
+              />
             ))}
           </div>
         )}

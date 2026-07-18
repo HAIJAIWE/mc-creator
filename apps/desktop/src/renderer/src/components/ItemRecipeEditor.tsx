@@ -30,8 +30,7 @@ function slotStyle(scale: number, selected: boolean): CSSProperties {
     alignItems: 'center',
     justifyContent: 'center',
     background: 'rgb(var(--mc-surface-2))',
-    boxShadow:
-      'inset 1px 1px 0 rgb(0 0 0 / 0.5), inset -1px -1px 0 rgb(255 255 255 / 0.08)',
+    boxShadow: 'inset 1px 1px 0 rgb(0 0 0 / 0.5), inset -1px -1px 0 rgb(255 255 255 / 0.08)',
     imageRendering: 'pixelated',
     cursor: 'pointer',
     outline: selected ? '2px solid rgb(var(--mc-accent))' : 'none',
@@ -144,10 +143,7 @@ export function ItemRecipeEditor() {
   const [recipeJson, setRecipeJson] = useState('');
 
   // 调色板素材（按 scope 分组，memo 避免每次渲染重新扫描）
-  const palettes = useMemo(
-    () => SCOPES.map((s) => ({ ...s, names: listAssets(s.scope) })),
-    [],
-  );
+  const palettes = useMemo(() => SCOPES.map((s) => ({ ...s, names: listAssets(s.scope) })), []);
 
   // 在指定网格的 index 上：空格+笔刷→放置；已填→选中编辑
   const handleSlot = (
@@ -316,15 +312,12 @@ export function ItemRecipeEditor() {
                       }}
                     >
                       {group.names.map((name) => {
-                        const isBrush =
-                          brush?.scope === group.scope && brush?.name === name;
+                        const isBrush = brush?.scope === group.scope && brush?.name === name;
                         return (
                           <button
                             key={name}
                             title={`${group.scope}:${name}`}
-                            onClick={() =>
-                              setBrush({ scope: group.scope, name })
-                            }
+                            onClick={() => setBrush({ scope: group.scope, name })}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -333,14 +326,10 @@ export function ItemRecipeEditor() {
                               background: 'rgb(var(--mc-surface-2))',
                               border:
                                 '1px solid ' +
-                                (isBrush
-                                  ? 'rgb(var(--mc-accent))'
-                                  : 'rgb(var(--mc-border))'),
+                                (isBrush ? 'rgb(var(--mc-accent))' : 'rgb(var(--mc-border))'),
                               borderRadius: 'var(--mc-radius-lg)',
                               cursor: 'pointer',
-                              outline: isBrush
-                                ? '2px solid rgb(var(--mc-accent))'
-                                : 'none',
+                              outline: isBrush ? '2px solid rgb(var(--mc-accent))' : 'none',
                               outlineOffset: isBrush ? -2 : 0,
                             }}
                           >
@@ -363,9 +352,7 @@ export function ItemRecipeEditor() {
                 rows={MAIN_ROWS}
                 selectedIndex={selected?.grid === 'main' ? selected.index : null}
                 scale={1}
-                onSlotClick={(i) =>
-                  handleSlot('main', i, mainItems[i], setMainItems)
-                }
+                onSlotClick={(i) => handleSlot('main', i, mainItems[i], setMainItems)}
               />
               <div style={{ height: 6 }} />
               <SlotGrid
@@ -374,9 +361,7 @@ export function ItemRecipeEditor() {
                 rows={1}
                 selectedIndex={selected?.grid === 'hotbar' ? selected.index : null}
                 scale={1}
-                onSlotClick={(i) =>
-                  handleSlot('hotbar', i, hotbarItems[i], setHotbarItems)
-                }
+                onSlotClick={(i) => handleSlot('hotbar', i, hotbarItems[i], setHotbarItems)}
               />
 
               {selected && (selected.grid === 'main' || selected.grid === 'hotbar') && (
@@ -440,9 +425,7 @@ export function ItemRecipeEditor() {
                   rows={3}
                   selectedIndex={selected?.grid === 'recipe' ? selected.index : null}
                   scale={1}
-                  onSlotClick={(i) =>
-                    handleSlot('recipe', i, recipeGrid[i], setRecipeGrid)
-                  }
+                  onSlotClick={(i) => handleSlot('recipe', i, recipeGrid[i], setRecipeGrid)}
                 />
                 <div className="flex flex-col items-center gap-1">
                   <span className="text-xs text-mc-dim">结果</span>
@@ -462,23 +445,22 @@ export function ItemRecipeEditor() {
                 </div>
               </div>
 
-              {selected &&
-                (selected.grid === 'recipe' || selected.grid === 'result') && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-xs text-mc-dim">数量</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={64}
-                      value={selectedItem?.amount ?? 1}
-                      onChange={(e) => updateAmount(Number(e.target.value))}
-                      className="mc-input w-20"
-                    />
-                    <button className="mc-btn-ghost" onClick={clearSelected}>
-                      清除
-                    </button>
-                  </div>
-                )}
+              {selected && (selected.grid === 'recipe' || selected.grid === 'result') && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-mc-dim">数量</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={64}
+                    value={selectedItem?.amount ?? 1}
+                    onChange={(e) => updateAmount(Number(e.target.value))}
+                    className="mc-input w-20"
+                  />
+                  <button className="mc-btn-ghost" onClick={clearSelected}>
+                    清除
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 生成配方 JSON */}
@@ -496,9 +478,7 @@ export function ItemRecipeEditor() {
                   复制
                 </button>
               </div>
-              {!recipeResult && (
-                <div className="mt-1 text-xs text-mc-mute">请先放置结果物品</div>
-              )}
+              {!recipeResult && <div className="mt-1 text-xs text-mc-mute">请先放置结果物品</div>}
               {recipeJson && (
                 <pre className="mc-card mt-2 overflow-auto p-2 text-xs text-mc-text">
                   {recipeJson}

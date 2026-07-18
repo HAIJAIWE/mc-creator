@@ -1,7 +1,12 @@
 import { app } from 'electron';
 import {
-  readFileSync, writeFileSync, existsSync, mkdirSync,
-  renameSync, readdirSync, unlinkSync,
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  renameSync,
+  readdirSync,
+  unlinkSync,
 } from 'fs';
 import { join } from 'path';
 import { ProjectSchema, type Project } from '../shared/ipc-channels.js';

@@ -1,4 +1,3 @@
-
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../store/mod-store.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
@@ -20,7 +19,12 @@ function getFileIcon(path: string) {
 export function TabBar() {
   // P3 性能：shallow 选择器避免 buildLog 流式更新触发重渲染
   const { files, selectedFile, selectFile, closeFile } = useModStore(
-    (s) => ({ files: s.files, selectedFile: s.selectedFile, selectFile: s.selectFile, closeFile: s.closeFile }),
+    (s) => ({
+      files: s.files,
+      selectedFile: s.selectedFile,
+      selectFile: s.selectFile,
+      closeFile: s.closeFile,
+    }),
     shallow,
   );
 

@@ -138,7 +138,13 @@ describe('LauncherGenerator', () => {
     const parsed = JSON.parse(versions!.content);
     expect(parsed.mcVersion).toBe('1.21.1');
     expect(parsed.loader).toBe('fabric');
-    expect(parsed.compatibleLoaders).toEqual(['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'vanilla']);
+    expect(parsed.compatibleLoaders).toEqual([
+      'fabric',
+      'neoforge',
+      'quilt',
+      'legacy_fabric',
+      'vanilla',
+    ]);
     expect(parsed.compatibleLoaders).toHaveLength(5);
   });
 

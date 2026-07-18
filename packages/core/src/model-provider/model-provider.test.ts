@@ -12,6 +12,11 @@ describe('MockProvider', () => {
     const chunks = [];
     for await (const c of p.stream('x')) chunks.push(c);
     expect(chunks.at(-1)?.done).toBe(true);
-    expect(chunks.map((c) => c.delta).join('').trim()).toBe('a b c');
+    expect(
+      chunks
+        .map((c) => c.delta)
+        .join('')
+        .trim(),
+    ).toBe('a b c');
   });
 });

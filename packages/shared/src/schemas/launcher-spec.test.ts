@@ -21,31 +21,57 @@ describe('LauncherSpec schema', () => {
   });
 
   it('launcherType 枚举校验', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'unknown' })).toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'pcl2' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'hmcl' })).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'unknown' }),
+    ).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'pcl2' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'hmcl' }),
+    ).not.toThrow();
   });
 
   it('loader 枚举校验（含 vanilla）', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'vanilla' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'fabric' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'unknown' })).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'vanilla' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'fabric' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'unknown' }),
+    ).toThrow();
   });
 
   it('accountType 枚举校验', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'offline' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'microsoft' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'cracked' })).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'offline' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'microsoft' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'cracked' }),
+    ).toThrow();
   });
 
   it('memoryMin 范围校验（>=512）', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMin: 256 })).toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMin: 512 })).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMin: 256 }),
+    ).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMin: 512 }),
+    ).not.toThrow();
   });
 
   it('memoryMax 范围校验（>=1024）', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMax: 512 })).toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMax: 1024 })).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMax: 512 }),
+    ).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMax: 1024 }),
+    ).not.toThrow();
   });
 
   it('完整 spec round-trip', () => {

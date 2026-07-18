@@ -4,7 +4,6 @@ import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
 
-
 interface Props {
   onClose: () => void;
 }
@@ -67,7 +66,13 @@ export function ProjectSaveDialog({ onClose }: Props) {
       <div className="w-[420px] max-w-full rounded-mc-lg border border-mc-border-strong bg-mc-surface p-6 text-mc-text shadow-mc-pop animate-mc-dialog-in">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-lg font-bold">保存项目</h2>
-          <button onClick={onClose} className="text-mc-mute transition-colors hover:text-mc-text" aria-label="关闭"><McIcon scope="pixel" name="close" size={16} /></button>
+          <button
+            onClick={onClose}
+            className="text-mc-mute transition-colors hover:text-mc-text"
+            aria-label="关闭"
+          >
+            <McIcon scope="pixel" name="close" size={16} />
+          </button>
         </div>
         <div className="space-y-3">
           <div>

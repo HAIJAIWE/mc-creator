@@ -1,4 +1,10 @@
-import type { FileNode, GeneratorContext, GenerationResult, Loader, McVersion } from '@mc-creator/shared';
+import type {
+  FileNode,
+  GeneratorContext,
+  GenerationResult,
+  Loader,
+  McVersion,
+} from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import { ResourcePackSpec } from '@mc-creator/shared';
 import type {
@@ -82,12 +88,16 @@ export class ResourcePackGenerator implements Generator {
   private generatePackMcmeta(spec: ResourcePackSpecType): FileNode {
     return {
       path: 'pack.mcmeta',
-      content: JSON.stringify({
-        pack: {
-          pack_format: spec.packFormat,
-          description: spec.packDescription || spec.packName,
+      content: JSON.stringify(
+        {
+          pack: {
+            pack_format: spec.packFormat,
+            description: spec.packDescription || spec.packName,
+          },
         },
-      }, null, 2),
+        null,
+        2,
+      ),
     };
   }
 
@@ -131,12 +141,16 @@ export class ResourcePackGenerator implements Generator {
       // 自动生成 cube_all 模型
       // textureName 优先；为空则取 path basename（最后一段）
       const texName = entry.textureName || entry.path.split('/').pop() || entry.path;
-      content = JSON.stringify({
-        parent: 'minecraft:block/cube_all',
-        textures: {
-          all: `minecraft:block/${texName}`,
+      content = JSON.stringify(
+        {
+          parent: 'minecraft:block/cube_all',
+          textures: {
+            all: `minecraft:block/${texName}`,
+          },
         },
-      }, null, 2);
+        null,
+        2,
+      );
     } else {
       // autoCubeAll=false 且无 json：输出空对象占位
       content = '{}';
@@ -198,12 +212,14 @@ export class ResourcePackGenerator implements Generator {
     for (const s of sounds) {
       const eventKey = s.event || s.id;
       obj[eventKey] = {
-        sounds: [{
-          name: `${namespace}:${s.id}`,
-          volume: s.volume,
-          pitch: s.pitch,
-          stream: s.stream,
-        }],
+        sounds: [
+          {
+            name: `${namespace}:${s.id}`,
+            volume: s.volume,
+            pitch: s.pitch,
+            stream: s.stream,
+          },
+        ],
         replace: false,
       };
     }

@@ -8,8 +8,31 @@ const SPEC: ModSpec = {
   version: '1.0.0',
   name: 'Ruby Tools',
   description: 'Adds ruby tools',
-  items: [{ id: 'ruby', name: 'Ruby', maxStackSize: 64, rarity: 'common', maxDamage: 0, fuelTick: 0, lore: '' }],
-  blocks: [{ id: 'ruby_block', name: 'Ruby Block', material: 'metal', hardness: 5.0, miningLevel: 0, lightLevel: 0, resistance: 6.0, soundType: 'stone', dropSelf: true, dropItem: '' }],
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
   license: 'MIT',
   authors: [],
   credits: '',
@@ -45,7 +68,7 @@ describe('LegacyFabricAdapter 元数据与构建脚本', () => {
   it('build.gradle 含 fabric-loom 0.5-SNAPSHOT（旧版本，非 1.7-SNAPSHOT）', () => {
     const bg = files.find((f) => f.path === 'build.gradle');
     expect(bg).toBeDefined();
-    expect(bg!.content).toContain("fabric-loom");
+    expect(bg!.content).toContain('fabric-loom');
     expect(bg!.content).toContain('0.5-SNAPSHOT');
     // 不应包含现代 Fabric 的 1.7-SNAPSHOT
     expect(bg!.content).not.toContain('1.7-SNAPSHOT');

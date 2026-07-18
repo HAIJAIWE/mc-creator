@@ -13,20 +13,40 @@ import { ModrinthSearchPanel } from './ModrinthSearchPanel.js';
 import { CurseForgeSearchPanel } from './CurseForgeSearchPanel.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
 
-interface Msg { role: 'user' | 'assistant'; text: string }
+interface Msg {
+  role: 'user' | 'assistant';
+  text: string;
+}
 
 export function AgentPanel() {
   // P3 性能：shallow 选择器避免无关字段变化触发重渲染
   const {
-    description, setDescription, loader, mcVersion, generatorType,
-    spec, setSpec, setFiles, setLoading, setError, loading, error,
+    description,
+    setDescription,
+    loader,
+    mcVersion,
+    generatorType,
+    spec,
+    setSpec,
+    setFiles,
+    setLoading,
+    setError,
+    loading,
+    error,
   } = useModStore(
     (s) => ({
-      description: s.description, setDescription: s.setDescription,
-      loader: s.loader, mcVersion: s.mcVersion, generatorType: s.generatorType,
-      spec: s.spec, setSpec: s.setSpec, setFiles: s.setFiles,
-      setLoading: s.setLoading, setError: s.setError,
-      loading: s.loading, error: s.error,
+      description: s.description,
+      setDescription: s.setDescription,
+      loader: s.loader,
+      mcVersion: s.mcVersion,
+      generatorType: s.generatorType,
+      spec: s.spec,
+      setSpec: s.setSpec,
+      setFiles: s.setFiles,
+      setLoading: s.setLoading,
+      setError: s.setError,
+      loading: s.loading,
+      error: s.error,
     }),
     shallow,
   );
@@ -87,7 +107,12 @@ export function AgentPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await ipcClient.generateFiles({ loader, mcVersion, spec: parsedSpec, generatorType });
+      const res = await ipcClient.generateFiles({
+        loader,
+        mcVersion,
+        spec: parsedSpec,
+        generatorType,
+      });
       setFiles(res.files);
     } catch (e) {
       setError((e as Error).message);
@@ -147,8 +172,10 @@ export function AgentPanel() {
     closePanel();
   };
 
-  const handleModrinthPick = (mod: ModEntry) => pickModToSpec(mod, () => setShowModrinthSearch(false));
-  const handleCurseForgePick = (mod: ModEntry) => pickModToSpec(mod, () => setShowCurseForgeSearch(false));
+  const handleModrinthPick = (mod: ModEntry) =>
+    pickModToSpec(mod, () => setShowModrinthSearch(false));
+  const handleCurseForgePick = (mod: ModEntry) =>
+    pickModToSpec(mod, () => setShowCurseForgeSearch(false));
 
   const send = async () => {
     if (!input.trim() || sending) return;
@@ -195,19 +222,20 @@ export function AgentPanel() {
     }
   };
 
-  const placeholder = generatorType === 'mod'
-    ? '描述你想要的 mod…'
-    : generatorType === 'datapack'
-    ? '描述你想要的数据包…'
-    : generatorType === 'modpack'
-    ? '描述你想要的整合包…'
-    : generatorType === 'server'
-    ? '描述你想要的服务器配置…'
-    : generatorType === 'resource_pack'
-    ? '描述你想要的资源包…'
-    : generatorType === 'skin'
-    ? '描述你想要的皮肤…'
-    : '描述你想要的启动器配置…';
+  const placeholder =
+    generatorType === 'mod'
+      ? '描述你想要的 mod…'
+      : generatorType === 'datapack'
+        ? '描述你想要的数据包…'
+        : generatorType === 'modpack'
+          ? '描述你想要的整合包…'
+          : generatorType === 'server'
+            ? '描述你想要的服务器配置…'
+            : generatorType === 'resource_pack'
+              ? '描述你想要的资源包…'
+              : generatorType === 'skin'
+                ? '描述你想要的皮肤…'
+                : '描述你想要的启动器配置…';
 
   return (
     <div className="flex h-full flex-col bg-mc-surface">
@@ -219,7 +247,11 @@ export function AgentPanel() {
             className="mc-section-title flex w-full items-center justify-between transition-colors hover:bg-mc-surface-2/50"
           >
             <span>描述输入</span>
-            {expandedSections.description ? <McIcon scope="pixel" name="chevron-up" size={12} /> : <McIcon scope="pixel" name="chevron-down" size={12} />}
+            {expandedSections.description ? (
+              <McIcon scope="pixel" name="chevron-up" size={12} />
+            ) : (
+              <McIcon scope="pixel" name="chevron-down" size={12} />
+            )}
           </button>
           {expandedSections.description && (
             <div className="space-y-3 p-3">
@@ -315,10 +347,16 @@ export function AgentPanel() {
               className="mc-section-title flex w-full items-center justify-between transition-colors hover:bg-mc-surface-2/50"
             >
               <span>Spec</span>
-              {expandedSections.spec ? <McIcon scope="pixel" name="chevron-up" size={12} /> : <McIcon scope="pixel" name="chevron-down" size={12} />}
+              {expandedSections.spec ? (
+                <McIcon scope="pixel" name="chevron-up" size={12} />
+              ) : (
+                <McIcon scope="pixel" name="chevron-down" size={12} />
+              )}
             </button>
             {expandedSections.spec && (
-              <div className={`rounded-b border-x border-b ${specError ? 'border-mc-redstone' : 'border-mc-border'} bg-mc-bg`}>
+              <div
+                className={`rounded-b border-x border-b ${specError ? 'border-mc-redstone' : 'border-mc-border'} bg-mc-bg`}
+              >
                 <div className="flex items-center justify-between border-b border-mc-border px-2 py-1.5">
                   <div className="text-xs text-mc-mute">可编辑，修改后点生成代码</div>
                   <button
@@ -338,7 +376,9 @@ export function AgentPanel() {
                   options={{ ...mcEditorOptions, fontSize: 11 }}
                 />
                 {specError && (
-                  <div className="px-2 py-1 text-xs text-mc-redstone">JSON 解析错误：{specError}</div>
+                  <div className="px-2 py-1 text-xs text-mc-redstone">
+                    JSON 解析错误：{specError}
+                  </div>
                 )}
               </div>
             )}
@@ -354,24 +394,35 @@ export function AgentPanel() {
             <span className="flex items-center gap-1.5">
               <McIcon scope="pixel" name="star" size={12} /> AI 助手
             </span>
-            {expandedSections.chat ? <McIcon scope="pixel" name="chevron-up" size={12} /> : <McIcon scope="pixel" name="chevron-down" size={12} />}
+            {expandedSections.chat ? (
+              <McIcon scope="pixel" name="chevron-up" size={12} />
+            ) : (
+              <McIcon scope="pixel" name="chevron-down" size={12} />
+            )}
           </button>
           {expandedSections.chat && (
             <div className="flex min-h-[180px] flex-1 flex-col">
               <div className="flex-1 space-y-2 overflow-y-auto p-3">
                 {messages.map((m, i) => (
-                  <div key={i} className={`rounded-mc-lg p-2 text-xs ${
-                    m.role === 'user'
-                      ? 'border border-mc-accent/40 bg-mc-accent/15'
-                      : 'bg-mc-surface-2'
-                  }`}>
+                  <div
+                    key={i}
+                    className={`rounded-mc-lg p-2 text-xs ${
+                      m.role === 'user'
+                        ? 'border border-mc-accent/40 bg-mc-accent/15'
+                        : 'bg-mc-surface-2'
+                    }`}
+                  >
                     <div className="whitespace-pre-wrap text-mc-text">{m.text}</div>
-                    {m.role === 'assistant' && sending && i === messages.length - 1 && m.text === '' && (
-                      <span className="text-mc-mute">思考中…</span>
-                    )}
-                    {m.role === 'assistant' && sending && i === messages.length - 1 && m.text !== '' && (
-                      <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-mc-dim" />
-                    )}
+                    {m.role === 'assistant' &&
+                      sending &&
+                      i === messages.length - 1 &&
+                      m.text === '' && <span className="text-mc-mute">思考中…</span>}
+                    {m.role === 'assistant' &&
+                      sending &&
+                      i === messages.length - 1 &&
+                      m.text !== '' && (
+                        <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-mc-dim" />
+                      )}
                   </div>
                 ))}
                 <div ref={bottomRef} />
@@ -390,7 +441,13 @@ export function AgentPanel() {
                   disabled={sending || !input.trim() || !apiKey}
                   className="mc-btn-primary"
                 >
-                  {sending ? '…' : <><Send className="h-3 w-3" /> 发送</>}
+                  {sending ? (
+                    '…'
+                  ) : (
+                    <>
+                      <Send className="h-3 w-3" /> 发送
+                    </>
+                  )}
                 </button>
               </div>
             </div>

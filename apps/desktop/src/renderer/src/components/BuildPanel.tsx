@@ -16,14 +16,30 @@ const LAUNCHER_LABEL: Record<string, string> = {
 export function BuildPanel() {
   // P3 性能：shallow 选择器仅订阅所需字段，避免 description/spec/files 变化时重渲染
   const {
-    files, buildLog, buildSuccess, jarPath, loading, fixLog,
-    setBuildResult, setLoading, setError, error, setFixLog,
+    files,
+    buildLog,
+    buildSuccess,
+    jarPath,
+    loading,
+    fixLog,
+    setBuildResult,
+    setLoading,
+    setError,
+    error,
+    setFixLog,
   } = useModStore(
     (s) => ({
-      files: s.files, buildLog: s.buildLog, buildSuccess: s.buildSuccess,
-      jarPath: s.jarPath, loading: s.loading, fixLog: s.fixLog,
-      setBuildResult: s.setBuildResult, setLoading: s.setLoading,
-      setError: s.setError, error: s.error, setFixLog: s.setFixLog,
+      files: s.files,
+      buildLog: s.buildLog,
+      buildSuccess: s.buildSuccess,
+      jarPath: s.jarPath,
+      loading: s.loading,
+      fixLog: s.fixLog,
+      setBuildResult: s.setBuildResult,
+      setLoading: s.setLoading,
+      setError: s.setError,
+      error: s.error,
+      setFixLog: s.setFixLog,
     }),
     shallow,
   );
@@ -121,47 +137,69 @@ export function BuildPanel() {
   };
 
   const detectMc = async () => {
-    setDeploying(true); setDeployErr(null); setDeployMsg(null);
+    setDeploying(true);
+    setDeployErr(null);
+    setDeployMsg(null);
     try {
       const res = await ipcClient.locateMc();
       setMcInfo(res);
       if (!res.found) setDeployErr(res.error ?? '未检测到 .minecraft');
-    } finally { setDeploying(false); }
+    } finally {
+      setDeploying(false);
+    }
   };
   const chooseMcDir = async () => {
     const res = await ipcClient.chooseMcDir();
     if (res.path) {
       setMcDirOverride(res.path);
-      setMcInfo({ found: true, mcDir: res.path, modsDir: `${res.path}/mods`, launcherExe: null, launcher: null, error: null });
+      setMcInfo({
+        found: true,
+        mcDir: res.path,
+        modsDir: `${res.path}/mods`,
+        launcherExe: null,
+        launcher: null,
+        error: null,
+      });
       setDeployErr(null);
     }
   };
   const installMod = async () => {
     if (!jarAbs) return;
-    setDeploying(true); setDeployErr(null); setDeployMsg(null);
+    setDeploying(true);
+    setDeployErr(null);
+    setDeployMsg(null);
     try {
       const res = await ipcClient.installMod(jarAbs, mcDirOverride ?? mcInfo?.mcDir ?? undefined);
       if (res.ok) setDeployMsg(`已安装到 ${res.modsDir}`);
       else setDeployErr(res.error ?? '安装失败');
-    } catch (e) { setDeployErr((e as Error).message); } finally { setDeploying(false); }
+    } catch (e) {
+      setDeployErr((e as Error).message);
+    } finally {
+      setDeploying(false);
+    }
   };
   const launchMc = async () => {
-    setDeploying(true); setLaunchMsg(null); setDeployErr(null);
+    setDeploying(true);
+    setLaunchMsg(null);
+    setDeployErr(null);
     try {
       const res = await ipcClient.launchMc(mcDirOverride ?? mcInfo?.mcDir ?? undefined);
-      if (res.ok) setLaunchMsg(`已拉起${res.launcher ? (LAUNCHER_LABEL[res.launcher] ?? '启动器') : '启动器'}，用离线档案进游戏即可`);
+      if (res.ok)
+        setLaunchMsg(
+          `已拉起${res.launcher ? (LAUNCHER_LABEL[res.launcher] ?? '启动器') : '启动器'}，用离线档案进游戏即可`,
+        );
       else setDeployErr(res.error ?? '启动失败');
-    } catch (e) { setDeployErr((e as Error).message); } finally { setDeploying(false); }
+    } catch (e) {
+      setDeployErr((e as Error).message);
+    } finally {
+      setDeploying(false);
+    }
   };
 
   return (
     <div className="border-t border-mc-border p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <button
-          onClick={build}
-          disabled={loading || files.length === 0}
-          className="mc-btn-primary"
-        >
+        <button onClick={build} disabled={loading || files.length === 0} className="mc-btn-primary">
           {loading ? '构建中…' : '编译 .jar'}
         </button>
         <button
@@ -172,10 +210,7 @@ export function BuildPanel() {
           {streamBuilding ? '流式编译中…' : '流式编译'}
         </button>
         {(streamLog || buildLog) && (
-          <button
-            onClick={clearStreamLog}
-            className="mc-btn-ghost"
-          >
+          <button onClick={clearStreamLog} className="mc-btn-ghost">
             清空日志
           </button>
         )}
@@ -195,23 +230,31 @@ export function BuildPanel() {
       {streamSuccess === true && (
         <div className="mb-2 text-sm text-mc-accent">
           构建成功！
-          {streamJarPath && <span className="ml-2 text-xs text-mc-text-dim">产物：{streamJarPath}</span>}
+          {streamJarPath && (
+            <span className="ml-2 text-xs text-mc-text-dim">产物：{streamJarPath}</span>
+          )}
         </div>
       )}
       {streamSuccess === false && (
-        <div className="mb-2 text-sm text-mc-redstone">构建失败，请查看日志中标记为红色的错误行</div>
+        <div className="mb-2 text-sm text-mc-redstone">
+          构建失败，请查看日志中标记为红色的错误行
+        </div>
       )}
 
       {/* 部署与运行（离线账号，无需微软登录） */}
       {jarAbs && (
         <div className="mb-3 mt-2 space-y-2 border-t border-mc-border pt-2">
-          <div className="text-xs font-semibold text-mc-text-dim">部署与运行（离线账号，无需微软登录）</div>
+          <div className="text-xs font-semibold text-mc-text-dim">
+            部署与运行（离线账号，无需微软登录）
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={detectMc} disabled={deploying} className="mc-btn-ghost">
               {mcInfo ? '重新检测 Minecraft' : '检测 Minecraft'}
             </button>
             {mcInfo && !mcInfo.found && (
-              <button onClick={chooseMcDir} disabled={deploying} className="mc-btn-ghost">手动选择 .minecraft</button>
+              <button onClick={chooseMcDir} disabled={deploying} className="mc-btn-ghost">
+                手动选择 .minecraft
+              </button>
             )}
             <button
               onClick={installMod}
@@ -243,7 +286,9 @@ export function BuildPanel() {
         <div className="mb-2 space-y-1">
           <div className="text-xs font-semibold text-mc-text-dim">修复过程</div>
           {fixLog.map((log, i) => (
-            <div key={i} className="text-xs text-mc-text-dim">• {log}</div>
+            <div key={i} className="text-xs text-mc-text-dim">
+              • {log}
+            </div>
           ))}
         </div>
       )}
@@ -253,7 +298,9 @@ export function BuildPanel() {
         </div>
       ) : (
         buildLog && (
-          <pre className="mc-card max-h-40 overflow-auto p-2 text-xs font-mono text-mc-text">{buildLog}</pre>
+          <pre className="mc-card max-h-40 overflow-auto p-2 text-xs font-mono text-mc-text">
+            {buildLog}
+          </pre>
         )
       )}
     </div>

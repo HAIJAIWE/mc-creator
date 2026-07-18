@@ -36,15 +36,31 @@ describe('ModSpec schema', () => {
       credits: 'Thanks to community',
       website: 'https://example.com',
       items: [
-        { id: 'ruby', name: 'Ruby', maxStackSize: 16, rarity: 'rare', maxDamage: 100, fuelTick: 0, lore: 'A shiny gem' },
+        {
+          id: 'ruby',
+          name: 'Ruby',
+          maxStackSize: 16,
+          rarity: 'rare',
+          maxDamage: 100,
+          fuelTick: 0,
+          lore: 'A shiny gem',
+        },
         { id: 'apple_custom', name: 'Custom Apple', food: { hunger: 5, saturation: 0.8 } },
       ],
       blocks: [
-        { id: 'ruby_block', name: 'Ruby Block', material: 'metal', hardness: 5.0, miningLevel: 2, lightLevel: 3, resistance: 30, soundType: 'metal', dropSelf: true },
+        {
+          id: 'ruby_block',
+          name: 'Ruby Block',
+          material: 'metal',
+          hardness: 5.0,
+          miningLevel: 2,
+          lightLevel: 3,
+          resistance: 30,
+          soundType: 'metal',
+          dropSelf: true,
+        },
       ],
-      dependencies: [
-        { modId: 'fabric_api', version: '>=0.100', mandatory: true },
-      ],
+      dependencies: [{ modId: 'fabric_api', version: '>=0.100', mandatory: true }],
     };
     const r = ModSpec.parse(input);
     expect(r.modId).toBe('my_mod');
@@ -158,7 +174,11 @@ describe('ModDependencySpec schema', () => {
   });
 
   it('完整依赖 round-trip', () => {
-    const r = ModDependencySpec.parse({ modId: 'fabric_api', version: '>=0.100', mandatory: false });
+    const r = ModDependencySpec.parse({
+      modId: 'fabric_api',
+      version: '>=0.100',
+      mandatory: false,
+    });
     expect(r.modId).toBe('fabric_api');
     expect(r.version).toBe('>=0.100');
     expect(r.mandatory).toBe(false);

@@ -84,9 +84,7 @@ describe('ModrinthApiClient', () => {
         project_id: 'AABB',
         version_number: '1.0.0',
         name: 'Sodium 1.0.0',
-        files: [
-          { url: 'https://example.com/a.jar', filename: 'a.jar', primary: true, size: 1024 },
-        ],
+        files: [{ url: 'https://example.com/a.jar', filename: 'a.jar', primary: true, size: 1024 }],
       },
     ];
     fetchMock.mockResolvedValueOnce({

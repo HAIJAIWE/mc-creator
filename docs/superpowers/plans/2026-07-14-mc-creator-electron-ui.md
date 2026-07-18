@@ -60,6 +60,7 @@ apps/desktop/
 ## Task 1: apps/desktop 脚手架
 
 **Files:**
+
 - Create: `apps/desktop/package.json`
 - Create: `apps/desktop/electron.vite.config.ts`
 - Create: `apps/desktop/tsconfig.json` / `tsconfig.node.json` / `tsconfig.web.json`
@@ -135,17 +136,16 @@ export default defineConfig({
 - [ ] **Step 3: 写 tsconfig 三件套**
 
 `tsconfig.json`:
+
 ```json
 {
   "files": [],
-  "references": [
-    { "path": "./tsconfig.node.json" },
-    { "path": "./tsconfig.web.json" }
-  ]
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }]
 }
 ```
 
 `tsconfig.node.json`:
+
 ```json
 {
   "extends": "../../tsconfig.base.json",
@@ -154,13 +154,17 @@ export default defineConfig({
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "types": ["electron-vite/node"],
-    "paths": { "@mc-creator/core": ["../../packages/core/src"], "@mc-creator/shared": ["../../packages/shared/src"] }
+    "paths": {
+      "@mc-creator/core": ["../../packages/core/src"],
+      "@mc-creator/shared": ["../../packages/shared/src"]
+    }
   },
   "include": ["src/main/**/*", "src/preload/**/*", "src/shared/**/*", "electron.vite.config.ts"]
 }
 ```
 
 `tsconfig.web.json`:
+
 ```json
 {
   "extends": "../../tsconfig.base.json",
@@ -171,7 +175,10 @@ export default defineConfig({
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
-    "paths": { "@mc-creator/shared": ["../../packages/shared/src"], "@renderer/*": ["src/renderer/src/*"] }
+    "paths": {
+      "@mc-creator/shared": ["../../packages/shared/src"],
+      "@renderer/*": ["src/renderer/src/*"]
+    }
   },
   "include": ["src/renderer/**/*", "src/shared/**/*"]
 }
@@ -180,6 +187,7 @@ export default defineConfig({
 - [ ] **Step 4: 写 tailwind + postcss 配置**
 
 `tailwind.config.js`:
+
 ```javascript
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -190,6 +198,7 @@ export default {
 ```
 
 `postcss.config.js`:
+
 ```javascript
 export default {
   plugins: { tailwindcss: {}, autoprefixer: {} },
@@ -214,6 +223,7 @@ git commit -m "chore(desktop): 初始化 Electron 脚手架"
 ## Task 2: IPC 通道定义 + zod 校验
 
 **Files:**
+
 - Create: `apps/desktop/src/shared/ipc-channels.ts`
 - Test: `apps/desktop/src/shared/ipc-channels.test.ts`
 
@@ -275,7 +285,14 @@ describe('IPC schema 校验', () => {
     const valid = {
       loader: 'fabric',
       mcVersion: '1.21.11',
-      spec: { modId: 'demo', version: '1.0.0', name: 'Demo', description: '', items: [], blocks: [] },
+      spec: {
+        modId: 'demo',
+        version: '1.0.0',
+        name: 'Demo',
+        description: '',
+        items: [],
+        blocks: [],
+      },
     };
     expect(GenerateFilesRequest.safeParse(valid).success).toBe(true);
     expect(GenerateFilesRequest.safeParse({ ...valid, loader: 'forge' }).success).toBe(false);
@@ -305,6 +322,7 @@ git commit -m "feat(desktop): IPC 通道定义与 zod 校验"
 ## Task 3: 主进程 + IPC 处理器
 
 **Files:**
+
 - Create: `apps/desktop/src/main/index.ts`
 - Create: `apps/desktop/src/main/ipc.ts`
 - Create: `apps/desktop/src/main/ipc.test.ts`
@@ -365,14 +383,18 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
 
 /** 默认编排器工厂（用 MockProvider，后续 P4 接真实模型） */
 export function createDefaultOrchestrator(): Orchestrator {
-  return new Orchestrator(new MockProvider(JSON.stringify({
-    modId: 'demo',
-    version: '1.0.0',
-    name: 'Demo Mod',
-    description: 'A demo mod',
-    items: [{ id: 'demo_item', name: 'Demo Item', maxStackSize: 64 }],
-    blocks: [],
-  })));
+  return new Orchestrator(
+    new MockProvider(
+      JSON.stringify({
+        modId: 'demo',
+        version: '1.0.0',
+        name: 'Demo Mod',
+        description: 'A demo mod',
+        items: [{ id: 'demo_item', name: 'Demo Item', maxStackSize: 64 }],
+        blocks: [],
+      }),
+    ),
+  );
 }
 ```
 
@@ -387,9 +409,18 @@ import { GenerateSpecRequest, GenerateFilesRequest } from '../shared/ipc-channel
 describe('IPC 处理逻辑（不经过 ipcMain）', () => {
   it('GenerateSpec：描述 → spec', async () => {
     const req = GenerateSpecRequest.parse({ description: '做一个 mod' });
-    const o = new Orchestrator(new MockProvider(JSON.stringify({
-      modId: 'demo', version: '1.0.0', name: 'Demo', description: '', items: [], blocks: [],
-    })));
+    const o = new Orchestrator(
+      new MockProvider(
+        JSON.stringify({
+          modId: 'demo',
+          version: '1.0.0',
+          name: 'Demo',
+          description: '',
+          items: [],
+          blocks: [],
+        }),
+      ),
+    );
     const spec = await o.generateModSpec(req.description);
     expect(spec.modId).toBe('demo');
   });
@@ -398,11 +429,22 @@ describe('IPC 处理逻辑（不经过 ipcMain）', () => {
     const req = GenerateFilesRequest.parse({
       loader: 'fabric',
       mcVersion: '1.21.11',
-      spec: { modId: 'demo', version: '1.0.0', name: 'Demo', description: '', items: [], blocks: [] },
+      spec: {
+        modId: 'demo',
+        version: '1.0.0',
+        name: 'Demo',
+        description: '',
+        items: [],
+        blocks: [],
+      },
     });
     const gen = new ModGenerator();
     const result = await gen.generate({
-      loader: req.loader, mcVersion: req.mcVersion, modId: req.spec.modId, spec: req.spec, projectPath: '',
+      loader: req.loader,
+      mcVersion: req.mcVersion,
+      modId: req.spec.modId,
+      spec: req.spec,
+      projectPath: '',
     });
     expect(result.files.some((f) => f.path === 'src/main/resources/fabric.mod.json')).toBe(true);
   });
@@ -464,6 +506,7 @@ git commit -m "feat(desktop): 主进程与 IPC 处理器（调 core 引擎）"
 ## Task 4: preload + 渲染进程入口 + Tailwind
 
 **Files:**
+
 - Create: `apps/desktop/src/preload/index.ts`
 - Create: `apps/desktop/src/preload/api.d.ts`
 - Create: `apps/desktop/src/renderer/index.html`
@@ -510,15 +553,15 @@ export {};
 ```html
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MC Creator</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="./src/main.tsx"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MC Creator</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
 </html>
 ```
 
@@ -529,7 +572,10 @@ export {};
 @tailwind components;
 @tailwind utilities;
 
-body { margin: 0; font-family: system-ui, sans-serif; }
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}
 ```
 
 - [ ] **Step 5: 写 `renderer/src/main.tsx`（React 入口，占位 App）**
@@ -558,6 +604,7 @@ git commit -m "feat(desktop): preload 桥与渲染进程入口"
 ## Task 5: Zustand store（全局状态）
 
 **Files:**
+
 - Create: `apps/desktop/src/renderer/src/store/mod-store.ts`
 - Test: `apps/desktop/src/renderer/src/store/mod-store.test.ts`
 
@@ -666,6 +713,7 @@ git commit -m "feat(desktop): Zustand 全局状态管理"
 ## Task 6: App 布局 + TopBar（Loader/版本切换器）
 
 **Files:**
+
 - Create: `apps/desktop/src/renderer/src/App.tsx`
 - Create: `apps/desktop/src/renderer/src/components/TopBar.tsx`
 
@@ -703,7 +751,9 @@ export function TopBar() {
           className="rounded bg-zinc-800 px-2 py-1 text-sm"
         >
           {MC_VERSIONS.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v}>
+              {v}
+            </option>
           ))}
         </select>
       </div>
@@ -762,6 +812,7 @@ git commit -m "feat(desktop): 三栏布局骨架与 Loader/版本切换器"
 ## Task 7: FileTree + ChatPanel + CodePreview + AiChat + BuildPanel
 
 **Files:**
+
 - Create: `apps/desktop/src/renderer/src/components/FileTree.tsx`
 - Create: `apps/desktop/src/renderer/src/components/ChatPanel.tsx`
 - Create: `apps/desktop/src/renderer/src/components/CodePreview.tsx`
@@ -777,10 +828,12 @@ import type { GenerateSpecRes, GenerateFilesRes, BuildRes } from '../../../share
 export const ipcClient = {
   generateSpec: (description: string): Promise<GenerateSpecRes> =>
     window.mcApi.generateSpec(description),
-  generateFiles: (req: { loader: string; mcVersion: string; spec: unknown }): Promise<GenerateFilesRes> =>
-    window.mcApi.generateFiles(req),
-  build: (projectPath: string): Promise<BuildRes> =>
-    window.mcApi.build(projectPath),
+  generateFiles: (req: {
+    loader: string;
+    mcVersion: string;
+    spec: unknown;
+  }): Promise<GenerateFilesRes> => window.mcApi.generateFiles(req),
+  build: (projectPath: string): Promise<BuildRes> => window.mcApi.build(projectPath),
 };
 ```
 
@@ -805,7 +858,9 @@ export function FileTree() {
             <button
               onClick={() => selectFile(f.path)}
               className={`w-full truncate rounded px-2 py-1 text-left text-xs ${
-                selectedFile === f.path ? 'bg-zinc-700 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                selectedFile === f.path
+                  ? 'bg-zinc-700 text-white'
+                  : 'text-zinc-300 hover:bg-zinc-800'
               }`}
             >
               {f.path}
@@ -826,8 +881,17 @@ import { ipcClient } from '../lib/ipc-client.js';
 
 export function ChatPanel() {
   const {
-    description, setDescription, loader, mcVersion,
-    spec, setSpec, setFiles, setLoading, setError, loading, error,
+    description,
+    setDescription,
+    loader,
+    mcVersion,
+    spec,
+    setSpec,
+    setFiles,
+    setLoading,
+    setError,
+    loading,
+    error,
   } = useModStore();
 
   const generateSpec = async () => {
@@ -907,14 +971,22 @@ export function CodePreview() {
   const file = files.find((f) => f.path === selectedFile);
 
   if (!file) {
-    return <div className="flex-1 flex items-center justify-center text-sm text-zinc-600">选择文件预览代码</div>;
+    return (
+      <div className="flex-1 flex items-center justify-center text-sm text-zinc-600">
+        选择文件预览代码
+      </div>
+    );
   }
 
-  const lang = file.path.endsWith('.java') ? 'java'
-    : file.path.endsWith('.json') ? 'json'
-    : file.path.endsWith('.gradle') ? 'groovy'
-    : file.path.endsWith('.toml') ? 'ini'
-    : 'plaintext';
+  const lang = file.path.endsWith('.java')
+    ? 'java'
+    : file.path.endsWith('.json')
+      ? 'json'
+      : file.path.endsWith('.gradle')
+        ? 'groovy'
+        : file.path.endsWith('.toml')
+          ? 'ini'
+          : 'plaintext';
 
   return (
     <div className="flex-1 overflow-hidden">
@@ -936,7 +1008,10 @@ export function CodePreview() {
 ```tsx
 import { useState } from 'react';
 
-interface Msg { role: 'user' | 'assistant'; text: string }
+interface Msg {
+  role: 'user' | 'assistant';
+  text: string;
+}
 
 export function AiChat() {
   const [messages, setMessages] = useState<Msg[]>([
@@ -949,15 +1024,23 @@ export function AiChat() {
     setMessages((m) => [...m, { role: 'user', text: input }]);
     setInput('');
     // TODO: P4 接真实 AI 流式响应
-    setMessages((m) => [...m, { role: 'assistant', text: '（P3 阶段用 Mock，P4 接真实模型流式响应）' }]);
+    setMessages((m) => [
+      ...m,
+      { role: 'assistant', text: '（P3 阶段用 Mock，P4 接真实模型流式响应）' },
+    ]);
   };
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-zinc-800 p-2 text-xs font-semibold text-zinc-400">AI 助手</div>
+      <div className="border-b border-zinc-800 p-2 text-xs font-semibold text-zinc-400">
+        AI 助手
+      </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {messages.map((m, i) => (
-          <div key={i} className={`rounded p-2 text-xs ${m.role === 'user' ? 'bg-blue-900/40' : 'bg-zinc-800'}`}>
+          <div
+            key={i}
+            className={`rounded p-2 text-xs ${m.role === 'user' ? 'bg-blue-900/40' : 'bg-zinc-800'}`}
+          >
             {m.text}
           </div>
         ))}
@@ -970,7 +1053,9 @@ export function AiChat() {
           placeholder="输入消息…"
           className="flex-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-100"
         />
-        <button onClick={send} className="rounded bg-blue-600 px-3 py-1 text-xs text-white">发送</button>
+        <button onClick={send} className="rounded bg-blue-600 px-3 py-1 text-xs text-white">
+          发送
+        </button>
       </div>
     </div>
   );
@@ -994,6 +1079,7 @@ git commit -m "feat(desktop): 文件树 + 对话 + 代码预览 + AI 聊天面�
 ## Task 8: BuildPanel + 端到端流程串联
 
 **Files:**
+
 - Create: `apps/desktop/src/renderer/src/components/BuildPanel.tsx`
 - Modify: `apps/desktop/src/renderer/src/App.tsx`（挂载 BuildPanel）
 
@@ -1004,7 +1090,17 @@ import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 
 export function BuildPanel() {
-  const { files, buildLog, buildSuccess, jarPath, loading, setBuildResult, setLoading, setError, error } = useModStore();
+  const {
+    files,
+    buildLog,
+    buildSuccess,
+    jarPath,
+    loading,
+    setBuildResult,
+    setLoading,
+    setError,
+    error,
+  } = useModStore();
 
   const build = async () => {
     setLoading(true);
@@ -1036,7 +1132,9 @@ export function BuildPanel() {
       </div>
       {error && <div className="text-sm text-red-400">{error}</div>}
       {buildLog && (
-        <pre className="max-h-40 overflow-auto rounded bg-black p-2 text-xs text-zinc-300">{buildLog}</pre>
+        <pre className="max-h-40 overflow-auto rounded bg-black p-2 text-xs text-zinc-300">
+          {buildLog}
+        </pre>
       )}
     </div>
   );
@@ -1050,11 +1148,11 @@ export function BuildPanel() {
 ```tsx
 import { BuildPanel } from './components/BuildPanel.js';
 // ...
-        <main className="flex flex-1 flex-col overflow-hidden">
-          <ChatPanel />
-          <CodePreview />
-          <BuildPanel />
-        </main>
+<main className="flex flex-1 flex-col overflow-hidden">
+  <ChatPanel />
+  <CodePreview />
+  <BuildPanel />
+</main>;
 ```
 
 - [ ] **Step 3: 全量测试 + typecheck**
@@ -1088,6 +1186,7 @@ Expected: 0 错误
 
 Run: `pnpm --filter @mc-creator/desktop dev`
 Expected: Electron 窗口打开，显示三栏布局 + 顶部 loader 切换器
+
 - 输入描述 → 点「生成 Spec」→ 看到 ModSpec JSON
 - 点「生成代码」→ 左侧文件树出现 → 中间 Monaco 预览代码
 - 切换 loader → 重新生成 → 文件树变化（fabric.mod.json ↔ mods.toml）
@@ -1104,6 +1203,7 @@ git commit -m "feat(desktop): P3 端到端验证通过"
 ## 自审清单
 
 **1. 规格覆盖**：
+
 - ✅ §2.1 UI 层（对话/Spec 审阅/代码预览/Loader 切换器）→ Task 6/7/8
 - ✅ §2.2 核心引擎接线（主进程调 core）→ Task 3
 - ✅ §4 端到端数据流（描述→spec→生成→编译）→ Task 8

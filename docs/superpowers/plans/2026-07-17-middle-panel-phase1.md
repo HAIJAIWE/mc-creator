@@ -15,12 +15,14 @@
 ## 文件结构
 
 ### 新建
+
 - `packages/shared/src/schemas/launcher-spec.ts` — LauncherSpec Zod schema
 - `packages/shared/src/schemas/launcher-spec.test.ts` — LauncherSpec 单测
 - `apps/desktop/src/renderer/src/components/middle/MiddlePanel.tsx` — 调度器（预览/代码 tab + 按 generatorType 分发）
 - `apps/desktop/src/renderer/src/components/middle/ServerPreviewPanel.tsx` — server 类型预览面板（表单）
 
 ### 修改
+
 - `apps/desktop/src/shared/ipc-channels.ts` — GENERATOR_TYPES 删 texture 加 launcher
 - `packages/shared/src/schemas/index.ts` — 导出 LauncherSpec
 - `apps/desktop/src/renderer/src/components/TopToolbar.tsx` — TYPE_LABELS 更新
@@ -33,21 +35,41 @@
 ## Task 1: 更新 GENERATOR_TYPES（删 texture 加 launcher）
 
 **Files:**
+
 - Modify: `apps/desktop/src/shared/ipc-channels.ts:4`
 
 - [ ] **Step 1: 修改 GENERATOR_TYPES**
 
 把第 4 行：
+
 ```typescript
-export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'texture', 'skin', 'resource_pack'] as const;
+export const GENERATOR_TYPES = [
+  'mod',
+  'datapack',
+  'modpack',
+  'server',
+  'texture',
+  'skin',
+  'resource_pack',
+] as const;
 ```
 
 改为：
+
 ```typescript
-export const GENERATOR_TYPES = ['mod', 'datapack', 'modpack', 'server', 'resource_pack', 'skin', 'launcher'] as const;
+export const GENERATOR_TYPES = [
+  'mod',
+  'datapack',
+  'modpack',
+  'server',
+  'resource_pack',
+  'skin',
+  'launcher',
+] as const;
 ```
 
 同时更新第 3 行的注释：
+
 ```typescript
 /** 生成器类型联合（mod/datapack/modpack/server/resource_pack/skin/launcher） */
 ```
@@ -64,6 +86,7 @@ Expected: 失败，提示 `TopToolbar.tsx` 和 `AgentPanel.tsx` 中 `texture` ca
 ## Task 2: 新建 LauncherSpec schema + 测试
 
 **Files:**
+
 - Create: `packages/shared/src/schemas/launcher-spec.ts`
 - Test: `packages/shared/src/schemas/launcher-spec.test.ts`
 
@@ -95,31 +118,57 @@ describe('LauncherSpec schema', () => {
   });
 
   it('launcherType 枚举校验', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'unknown' })).toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'pcl2' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'hmcl' })).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'unknown' }),
+    ).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'pcl2' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', launcherType: 'hmcl' }),
+    ).not.toThrow();
   });
 
   it('loader 枚举校验（含 vanilla）', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'vanilla' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'fabric' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'unknown' })).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'vanilla' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'fabric' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', loader: 'unknown' }),
+    ).toThrow();
   });
 
   it('accountType 枚举校验', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'offline' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'microsoft' })).not.toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'cracked' })).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'offline' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'microsoft' }),
+    ).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', accountType: 'cracked' }),
+    ).toThrow();
   });
 
   it('memoryMin 范围校验（>=512）', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMin: 256 })).toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMin: 512 })).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMin: 256 }),
+    ).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMin: 512 }),
+    ).not.toThrow();
   });
 
   it('memoryMax 范围校验（>=1024）', () => {
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMax: 512 })).toThrow();
-    expect(() => LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMax: 1024 })).not.toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMax: 512 }),
+    ).toThrow();
+    expect(() =>
+      LauncherSpec.parse({ launcherName: 'x', mcVersion: '1.21.1', memoryMax: 1024 }),
+    ).not.toThrow();
   });
 
   it('完整 spec round-trip', () => {
@@ -199,6 +248,7 @@ export * from './launcher-spec.js';
 ```
 
 完整文件应为：
+
 ```typescript
 export * from './mod-spec.js';
 export * from './generator.js';
@@ -223,6 +273,7 @@ git commit -m "feat(schema): 新增 LauncherSpec，GENERATOR_TYPES 删 texture �
 ## Task 3: 更新 TopToolbar TYPE_LABELS
 
 **Files:**
+
 - Modify: `apps/desktop/src/renderer/src/components/TopToolbar.tsx:17-25`
 
 - [ ] **Step 1: 修改 TYPE_LABELS**
@@ -255,6 +306,7 @@ Expected: TopToolbar.tsx 不再有错误。AgentPanel.tsx 仍有 `texture` case 
 ## Task 4: 更新 AgentPanel placeholder
 
 **Files:**
+
 - Modify: `apps/desktop/src/renderer/src/components/AgentPanel.tsx:197-209`
 
 - [ ] **Step 1: 修改 placeholder 函数**
@@ -262,19 +314,20 @@ Expected: TopToolbar.tsx 不再有错误。AgentPanel.tsx 仍有 `texture` case 
 把 [AgentPanel.tsx:197-209](file:///d:/MC%20mod/apps/desktop/src/renderer/src/components/AgentPanel.tsx#L197-L209) 的 `placeholder` 函数改为：
 
 ```typescript
-  const placeholder = generatorType === 'mod'
+const placeholder =
+  generatorType === 'mod'
     ? '描述你想要的 mod…'
     : generatorType === 'datapack'
-    ? '描述你想要的数据包…'
-    : generatorType === 'modpack'
-    ? '描述你想要的整合包…'
-    : generatorType === 'server'
-    ? '描述你想要的服务器配置…'
-    : generatorType === 'resource_pack'
-    ? '描述你想要的资源包…'
-    : generatorType === 'skin'
-    ? '描述你想要的皮肤…'
-    : '描述你想要的启动器配置…';
+      ? '描述你想要的数据包…'
+      : generatorType === 'modpack'
+        ? '描述你想要的整合包…'
+        : generatorType === 'server'
+          ? '描述你想要的服务器配置…'
+          : generatorType === 'resource_pack'
+            ? '描述你想要的资源包…'
+            : generatorType === 'skin'
+              ? '描述你想要的皮肤…'
+              : '描述你想要的启动器配置…';
 ```
 
 （删除 `texture` case，把最后的 `resource_pack` 改为 `resource_pack`，把 default 改为 `launcher` 提示）
@@ -302,6 +355,7 @@ git commit -m "feat(ui): TopToolbar/AgentPanel 适配新 generatorType 清单"
 ## Task 5: 添加 texture → resource_pack 迁移逻辑
 
 **Files:**
+
 - Modify: `apps/desktop/src/renderer/src/store/project-store.ts:90-110`（loadProject 函数）
 - Modify: `apps/desktop/src/renderer/src/store/project-store.ts:132-`（importProject 函数）
 
@@ -310,9 +364,9 @@ git commit -m "feat(ui): TopToolbar/AgentPanel 适配新 generatorType 清单"
 在 [project-store.ts:90-110](file:///d:/MC%20mod/apps/desktop/src/renderer/src/store/project-store.ts#L90-L110) 的 `loadProject` 函数中，第 100 行 `mod.setGeneratorType(project.generatorType);` 改为：
 
 ```typescript
-      // P23-3 迁移：texture 已合并到 resource_pack
-      const migratedType = project.generatorType === 'texture' ? 'resource_pack' : project.generatorType;
-      mod.setGeneratorType(migratedType);
+// P23-3 迁移：texture 已合并到 resource_pack
+const migratedType = project.generatorType === 'texture' ? 'resource_pack' : project.generatorType;
+mod.setGeneratorType(migratedType);
 ```
 
 - [ ] **Step 2: 查看 importProject 函数完整内容**
@@ -324,8 +378,8 @@ Read `apps/desktop/src/renderer/src/store/project-store.ts` 第 132-160 行，�
 在 importProject 函数中，把 `generatorType` 设置到 mod-store 之前，加同样的迁移逻辑。具体修改位置取决于代码结构，通常在 `mod.setGeneratorType(...)` 调用前加：
 
 ```typescript
-      const migratedType = importedType === 'texture' ? 'resource_pack' : importedType;
-      mod.setGeneratorType(migratedType);
+const migratedType = importedType === 'texture' ? 'resource_pack' : importedType;
+mod.setGeneratorType(migratedType);
 ```
 
 （如果 importProject 通过调用 loadProject 实现，则无需重复加迁移逻辑，Task 5 Step 1 已经覆盖）
@@ -348,6 +402,7 @@ git commit -m "fix(store): texture → resource_pack 迁移逻辑（向后兼容
 ## Task 6: 创建 MiddlePanel 调度器
 
 **Files:**
+
 - Create: `apps/desktop/src/renderer/src/components/middle/MiddlePanel.tsx`
 
 - [ ] **Step 1: 创建 middle 目录**
@@ -445,7 +500,9 @@ function PlaceholderPanel({ type }: { type: string }) {
         <McIcon scope="pixel" name="box" size={32} className="text-mc-mute" />
       </div>
       <div className="text-sm font-medium text-mc-dim">{type} 预览面板开发中</div>
-      <div className="text-xs text-mc-mute">阶段 2-4 实现该类型，当前可切换到「代码」tab 查看文件</div>
+      <div className="text-xs text-mc-mute">
+        阶段 2-4 实现该类型，当前可切换到「代码」tab 查看文件
+      </div>
     </div>
   );
 }
@@ -463,6 +520,7 @@ Expected: 失败，提示 `./ServerPreviewPanel.js` 不存在（Task 7 创建）
 ## Task 7: 创建 ServerPreviewPanel
 
 **Files:**
+
 - Create: `apps/desktop/src/renderer/src/components/middle/ServerPreviewPanel.tsx`
 
 - [ ] **Step 1: 创建 ServerPreviewPanel.tsx**
@@ -480,10 +538,7 @@ import type { ServerSpec } from '@mc-creator/shared';
  * 字段修改后写回 useModStore.spec（实时同步）。
  */
 export function ServerPreviewPanel() {
-  const { spec, setSpec } = useModStore(
-    (s) => ({ spec: s.spec, setSpec: s.setSpec }),
-    shallow,
-  );
+  const { spec, setSpec } = useModStore((s) => ({ spec: s.spec, setSpec: s.setSpec }), shallow);
 
   if (!spec) {
     return (
@@ -492,7 +547,9 @@ export function ServerPreviewPanel() {
           <McIcon scope="pixel" name="server" size={32} className="text-mc-mute" />
         </div>
         <div className="text-sm font-medium text-mc-dim">尚未生成 Server Spec</div>
-        <div className="text-xs text-mc-mute">在右侧 AgentPanel 描述你想要的服务器，生成 Spec 后即可预览</div>
+        <div className="text-xs text-mc-mute">
+          在右侧 AgentPanel 描述你想要的服务器，生成 Spec 后即可预览
+        </div>
       </div>
     );
   }
@@ -523,15 +580,35 @@ export function ServerPreviewPanel() {
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* 基本 */}
         <FieldGroup title="基本">
-          <TextField label="服务器名称" value={server.serverName} onChange={(v) => updateField('serverName', v)} />
+          <TextField
+            label="服务器名称"
+            value={server.serverName}
+            onChange={(v) => updateField('serverName', v)}
+          />
           <TextField label="MOTD" value={server.motd} onChange={(v) => updateField('motd', v)} />
-          <NumberField label="最大玩家数" value={server.maxPlayers} min={1} max={999} onChange={(v) => updateField('maxPlayers', v)} />
-          <NumberField label="端口" value={server.port} min={1} max={65535} onChange={(v) => updateField('port', v)} />
+          <NumberField
+            label="最大玩家数"
+            value={server.maxPlayers}
+            min={1}
+            max={999}
+            onChange={(v) => updateField('maxPlayers', v)}
+          />
+          <NumberField
+            label="端口"
+            value={server.port}
+            min={1}
+            max={65535}
+            onChange={(v) => updateField('port', v)}
+          />
         </FieldGroup>
 
         {/* 世界 */}
         <FieldGroup title="世界">
-          <TextField label="世界名称" value={server.levelName} onChange={(v) => updateField('levelName', v)} />
+          <TextField
+            label="世界名称"
+            value={server.levelName}
+            onChange={(v) => updateField('levelName', v)}
+          />
           <SelectField
             label="游戏模式"
             value={server.gamemode}
@@ -554,28 +631,63 @@ export function ServerPreviewPanel() {
             ]}
             onChange={(v) => updateField('difficulty', v as ServerSpec['difficulty'])}
           />
-          <NumberField label="出生保护半径" value={server.spawnProtection} min={0} max={100} onChange={(v) => updateField('spawnProtection', v)} />
+          <NumberField
+            label="出生保护半径"
+            value={server.spawnProtection}
+            min={0}
+            max={100}
+            onChange={(v) => updateField('spawnProtection', v)}
+          />
         </FieldGroup>
 
         {/* 玩家 */}
         <FieldGroup title="玩家">
           <ToggleField label="PVP" value={server.pvp} onChange={(v) => updateField('pvp', v)} />
-          <ToggleField label="正版验证" value={server.onlineMode} onChange={(v) => updateField('onlineMode', v)} />
-          <ToggleField label="白名单" value={server.whitelist} onChange={(v) => updateField('whitelist', v)} />
-          <ToggleField label="强制白名单" value={server.enforceWhitelist} onChange={(v) => updateField('enforceWhitelist', v)} />
+          <ToggleField
+            label="正版验证"
+            value={server.onlineMode}
+            onChange={(v) => updateField('onlineMode', v)}
+          />
+          <ToggleField
+            label="白名单"
+            value={server.whitelist}
+            onChange={(v) => updateField('whitelist', v)}
+          />
+          <ToggleField
+            label="强制白名单"
+            value={server.enforceWhitelist}
+            onChange={(v) => updateField('enforceWhitelist', v)}
+          />
         </FieldGroup>
 
         {/* 网络 */}
         <FieldGroup title="网络">
-          <TextField label="服务器 IP" value={server.serverIp ?? ''} onChange={(v) => updateField('serverIp', v)} />
-          <NumberField label="视距" value={server.viewDistance} min={3} max={32} onChange={(v) => updateField('viewDistance', v)} />
-          <NumberField label="模拟距离" value={server.simulationDistance} min={3} max={32} onChange={(v) => updateField('simulationDistance', v)} />
+          <TextField
+            label="服务器 IP"
+            value={server.serverIp ?? ''}
+            onChange={(v) => updateField('serverIp', v)}
+          />
+          <NumberField
+            label="视距"
+            value={server.viewDistance}
+            min={3}
+            max={32}
+            onChange={(v) => updateField('viewDistance', v)}
+          />
+          <NumberField
+            label="模拟距离"
+            value={server.simulationDistance}
+            min={3}
+            max={32}
+            onChange={(v) => updateField('simulationDistance', v)}
+          />
         </FieldGroup>
       </div>
 
       {/* Footer：统计 */}
       <div className="border-t border-mc-border px-4 py-2 text-xs text-mc-mute">
-        OP 玩家：{server.ops.length} · 白名单条目：{server.whitelistEntries.length} · 服务器 Mod：{server.mods.length}
+        OP 玩家：{server.ops.length} · 白名单条目：{server.whitelistEntries.length} · 服务器 Mod：
+        {server.mods.length}
       </div>
     </div>
   );
@@ -594,7 +706,15 @@ function FieldGroup({ title, children }: { title: string; children: React.ReactN
   );
 }
 
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function TextField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="flex items-center gap-3">
       <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
@@ -608,7 +728,19 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
   );
 }
 
-function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
+function NumberField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
   return (
     <div className="flex items-center gap-3">
       <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
@@ -624,7 +756,17 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
   );
 }
 
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }) {
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="flex items-center gap-3">
       <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
@@ -634,14 +776,24 @@ function SelectField({ label, value, options, onChange }: { label: string; value
         className="mc-select flex-1 !py-1 !text-xs"
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
         ))}
       </select>
     </div>
   );
 }
 
-function ToggleField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+function ToggleField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <div className="flex items-center gap-3">
       <label className="w-28 shrink-0 text-xs text-mc-dim">{label}</label>
@@ -664,6 +816,7 @@ function ToggleField({ label, value, onChange }: { label: string; value: boolean
 - [ ] **Step 2: 确认 ServerSpec 字段**
 
 Read `packages/shared/src/schemas/server-spec.ts` 确认 `serverIp` 和 `spawnProtection` 是否存在。如果不存在：
+
 - `serverIp` → 用 `extraProperties.serverIp` 或删除该字段
 - `spawnProtection` → 在 ServerSpec schema 中新增 `spawnProtection: z.number().int().min(0).max(100).default(16)` 字段
 
@@ -679,6 +832,7 @@ Expected: PASS（0 错误）。如果失败，按错误信息修复字段名。
 ## Task 8: 修改 App.tsx 集成 MiddlePanel
 
 **Files:**
+
 - Modify: `apps/desktop/src/renderer/src/App.tsx`
 
 - [ ] **Step 1: 修改 App.tsx 的 main 区域**
@@ -686,22 +840,22 @@ Expected: PASS（0 错误）。如果失败，按错误信息修复字段名。
 把 [App.tsx](file:///d:/MC%20mod/apps/desktop/src/renderer/src/App.tsx) 中的 main 区域：
 
 ```tsx
-        <main className="flex flex-1 flex-col overflow-hidden">
-          <TabBar />
-          <div className="flex-1 overflow-hidden">
-            <CodePreview />
-          </div>
-          <BuildPanel />
-        </main>
+<main className="flex flex-1 flex-col overflow-hidden">
+  <TabBar />
+  <div className="flex-1 overflow-hidden">
+    <CodePreview />
+  </div>
+  <BuildPanel />
+</main>
 ```
 
 改为：
 
 ```tsx
-        <main className="flex flex-1 flex-col overflow-hidden">
-          <MiddlePanel />
-          <BuildPanel />
-        </main>
+<main className="flex flex-1 flex-col overflow-hidden">
+  <MiddlePanel />
+  <BuildPanel />
+</main>
 ```
 
 - [ ] **Step 2: 更新 imports**
@@ -709,12 +863,14 @@ Expected: PASS（0 错误）。如果失败，按错误信息修复字段名。
 在 App.tsx 顶部 imports 区域，删除不再直接使用的 TabBar 和 CodePreview import，新增 MiddlePanel import：
 
 删除：
+
 ```typescript
 import { TabBar } from './components/TabBar.js';
 import { CodePreview } from './components/CodePreview.js';
 ```
 
 新增：
+
 ```typescript
 import { MiddlePanel } from './components/middle/MiddlePanel.js';
 ```
@@ -742,6 +898,7 @@ git commit -m "feat(middle): 新增 MiddlePanel 调度框架 + ServerPreviewPane
 ## Task 9: 验证 + 清理
 
 **Files:**
+
 - 无文件修改，仅运行验证
 
 - [ ] **Step 1: 完整 typecheck**
@@ -769,6 +926,7 @@ Expected: 应该只有 MiddlePanel.tsx 引用它们（在「代码」tab 中复�
 
 Run: `pnpm dev:win`
 验证：
+
 1. 打开应用，进入工作台
 2. 切换 generatorType 到「服务器」
 3. 中间面板应显示「预览」tab（默认），内容是 ServerPreviewPanel 的表单（如未生成 spec 则显示空状态）
@@ -778,6 +936,7 @@ Run: `pnpm dev:win`
 - [ ] **Step 6: 最终提交（如有修复）**
 
 如 Step 4-5 发现问题，修复后提交：
+
 ```bash
 cd "d:/MC mod"
 git add -A

@@ -67,22 +67,19 @@ export function DataTable<T>({ columns, data, rowKey, emptyHint = '暂无数据'
                 }`}
               >
                 {col.header}
-                {sortCol === idx && (
-                  <span className="ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
-                )}
+                {sortCol === idx && <span className="ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {sorted.map((row) => (
-            <tr
-              key={rowKey(row)}
-              className="border-b border-mc-border/60 hover:bg-mc-surface-2/40"
-            >
+            <tr key={rowKey(row)} className="border-b border-mc-border/60 hover:bg-mc-surface-2/40">
               {columns.map((col) => (
                 <td key={String(col.key)} className="px-2 py-1.5 text-mc-text">
-                  {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key as string] ?? '')}
+                  {col.render
+                    ? col.render(row)
+                    : String((row as Record<string, unknown>)[col.key as string] ?? '')}
                 </td>
               ))}
             </tr>
