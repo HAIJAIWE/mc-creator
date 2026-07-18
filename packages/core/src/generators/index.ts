@@ -6,6 +6,7 @@ export * from './modpack/index.js';
 export * from './server/index.js';
 export * from './skin/index.js';
 export * from './resource-pack/index.js';
+export * from './launcher/index.js';
 import { GeneratorRegistry } from './registry.js';
 import { ModGenerator } from './mod/index.js';
 import { DatapackGenerator } from './datapack/index.js';
@@ -13,6 +14,7 @@ import { ModpackGenerator } from './modpack/index.js';
 import { ServerGenerator } from './server/index.js';
 import { SkinGenerator } from './skin/index.js';
 import { ResourcePackGenerator } from './resource-pack/index.js';
+import { LauncherGenerator } from './launcher/index.js';
 
 /**
  * 创建已注册所有内置生成器的默认注册表。
@@ -26,5 +28,6 @@ export function createDefaultRegistry(): GeneratorRegistry {
   registry.register(new ServerGenerator());
   registry.register(new SkinGenerator());
   registry.register(new ResourcePackGenerator());
+  registry.register(new LauncherGenerator());
   return registry;
 }
