@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
 import { DataTable, PanelHeader, SearchInput, EmptyState } from './shared/index.js';
@@ -9,29 +9,289 @@ import type {
   TextureOverrideEntry,
   SoundEntry,
   ModelEntry,
+  FontEntry,
 } from '@mc-creator/shared';
+import {
+  Download,
+  AlertTriangle,
+  FileText,
+  Image,
+  Music,
+  Box,
+  Type,
+  Languages,
+} from 'lucide-react';
 
-type Tab = 'textures' | 'sounds' | 'models' | 'lang';
+type Tab = 'textures' | 'sounds' | 'models' | 'fonts' | 'lang' | 'metadata' | 'export';
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'textures', label: '材质', icon: 'box' },
-  { id: 'sounds', label: '音效', icon: 'star' },
-  { id: 'models', label: '模型', icon: 'box' },
-  { id: 'lang', label: '语言', icon: 'star' },
+const TABS: { id: Tab; label: string; icon: typeof Image }[] = [
+  { id: 'textures', label: '材质', icon: Image },
+  { id: 'sounds', label: '音效', icon: Music },
+  { id: 'models', label: '模型', icon: Box },
+  { id: 'fonts', label: '字体', icon: Type },
+  { id: 'lang', label: '语言', icon: Languages },
+  { id: 'metadata', label: '元数据', icon: FileText },
+  { id: 'export', label: '导出', icon: Download },
 ];
 
-/** ResourcePack 预览面板：4 tab — 材质画廊/音效列表/模型表格/语言 key-value 表格 */
+interface LangRow {
+  key: string;
+  en: string;
+  zh: string;
+}
+
+/** ResourcePack 预览面板：7 tab — 材质画廊/音效/模型/字体/语言/元数据/导出 */
 export function ResourcePackPreviewPanel() {
   const { spec, files } = useModStore((s) => ({ spec: s.spec, files: s.files }), shallow);
   const [tab, setTab] = useState<Tab>('textures');
+  const [query, setQuery] = useState('');
 
+  const pack = spec as unknown as ResourcePackSpecType | null;
+
+  // ===== fileMap 必须在 early return 之前 =====
   const fileMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const f of files) m.set(f.path, f.content);
     return m;
   }, [files]);
 
-  if (!spec) {
+  // ===== 统计计算 =====
+  const stats = useMemo(() => {
+    if (!pack) {
+      return {
+        textures: 0,
+        sounds: 0,
+        models: 0,
+        fonts: 0,
+        langEnUs: 0,
+        langZhCn: 0,
+        streamSounds: 0,
+        cubeAllModels: 0,
+        gradientTextures: 0,
+        checkerTextures: 0,
+      };
+    }
+    return {
+      textures: pack.textureOverrides.length,
+      sounds: pack.sounds.length,
+      models: pack.models.length,
+      fonts: pack.fonts.length,
+      langEnUs: Object.keys(pack.langEnUs).length,
+      langZhCn: Object.keys(pack.langZhCn).length,
+      streamSounds: pack.sounds.filter((s) => s.stream).length,
+      cubeAllModels: pack.models.filter((m) => m.autoCubeAll).length,
+      gradientTextures: pack.textureOverrides.filter((t) => t.gradientTo).length,
+      checkerTextures: pack.textureOverrides.filter((t) => t.checkerboard).length,
+    };
+  }, [pack]);
+
+  // ===== ID 重复检测 =====
+  const conflicts = useMemo(() => {
+    if (!pack)
+      return {
+        duplicateSoundIds: [],
+        duplicateFontIds: [],
+        duplicateTexturePaths: [],
+        duplicateModelPaths: [],
+      };
+    const soundIds = new Map<string, number>();
+    const fontIds = new Map<string, number>();
+    const texturePaths = new Map<string, number>();
+    const modelPaths = new Map<string, number>();
+    for (const s of pack.sounds) {
+      soundIds.set(s.id, (soundIds.get(s.id) ?? 0) + 1);
+    }
+    for (const f of pack.fonts) {
+      fontIds.set(f.id, (fontIds.get(f.id) ?? 0) + 1);
+    }
+    for (const t of pack.textureOverrides) {
+      texturePaths.set(t.path, (texturePaths.get(t.path) ?? 0) + 1);
+    }
+    for (const m of pack.models) {
+      modelPaths.set(m.path, (modelPaths.get(m.path) ?? 0) + 1);
+    }
+    return {
+      duplicateSoundIds: Array.from(soundIds.entries())
+        .filter(([, count]) => count > 1)
+        .map(([id, count]) => ({ id, count })),
+      duplicateFontIds: Array.from(fontIds.entries())
+        .filter(([, count]) => count > 1)
+        .map(([id, count]) => ({ id, count })),
+      duplicateTexturePaths: Array.from(texturePaths.entries())
+        .filter(([, count]) => count > 1)
+        .map(([id, count]) => ({ id, count })),
+      duplicateModelPaths: Array.from(modelPaths.entries())
+        .filter(([, count]) => count > 1)
+        .map(([id, count]) => ({ id, count })),
+    };
+  }, [pack]);
+
+  const totalConflicts =
+    conflicts.duplicateSoundIds.length +
+    conflicts.duplicateFontIds.length +
+    conflicts.duplicateTexturePaths.length +
+    conflicts.duplicateModelPaths.length;
+
+  // ===== 导出函数 =====
+  const exportData = useCallback(
+    (
+      format: 'json' | 'csv' | 'markdown',
+      scope: 'all' | 'textures' | 'sounds' | 'models' | 'fonts' | 'lang',
+    ) => {
+      if (!pack) return;
+      let data: unknown;
+      let filename = '';
+      let content = '';
+
+      if (scope === 'all') {
+        data = pack;
+      } else if (scope === 'textures') {
+        data = pack.textureOverrides;
+      } else if (scope === 'sounds') {
+        data = pack.sounds;
+      } else if (scope === 'models') {
+        data = pack.models;
+      } else if (scope === 'fonts') {
+        data = pack.fonts;
+      } else {
+        data = { en_us: pack.langEnUs, zh_cn: pack.langZhCn };
+      }
+
+      if (format === 'json') {
+        content = JSON.stringify(data, null, 2);
+        filename = `${pack.namespace}-${scope}.json`;
+      } else if (format === 'csv') {
+        if (scope === 'textures') {
+          const rows = ['Path,Color,Width,Height,Gradient,Checkerboard'];
+          for (const t of pack.textureOverrides) {
+            rows.push(
+              `"${t.path}","${t.color}",${t.width},${t.height},${t.gradientTo ? 'Yes' : 'No'},${t.checkerboard ? 'Yes' : 'No'}`,
+            );
+          }
+          content = rows.join('\n');
+        } else if (scope === 'sounds') {
+          const rows = ['ID,Event,Volume,Pitch,Stream'];
+          for (const s of pack.sounds) {
+            rows.push(`"${s.id}","${s.event}",${s.volume},${s.pitch},${s.stream ? 'Yes' : 'No'}`);
+          }
+          content = rows.join('\n');
+        } else if (scope === 'models') {
+          const rows = ['Path,TextureName,AutoCubeAll'];
+          for (const m of pack.models) {
+            rows.push(`"${m.path}","${m.textureName}",${m.autoCubeAll ? 'Yes' : 'No'}`);
+          }
+          content = rows.join('\n');
+        } else if (scope === 'fonts') {
+          const rows = ['ID,Char,Texture,Width,Height,Advance,Ascent'];
+          for (const f of pack.fonts) {
+            rows.push(
+              `"${f.id}","${f.char}","${f.texture}",${f.width},${f.height},${f.advance},${f.ascent}`,
+            );
+          }
+          content = rows.join('\n');
+        } else if (scope === 'lang') {
+          const rows = ['Key,en_us,zh_cn'];
+          const allKeys = new Set([...Object.keys(pack.langEnUs), ...Object.keys(pack.langZhCn)]);
+          for (const k of allKeys) {
+            rows.push(`"${k}","${pack.langEnUs[k] ?? ''}","${pack.langZhCn[k] ?? ''}"`);
+          }
+          content = rows.join('\n');
+        } else {
+          content = JSON.stringify(data, null, 2);
+        }
+        filename = `${pack.namespace}-${scope}.csv`;
+      } else {
+        // markdown
+        const lines: string[] = [];
+        if (scope === 'all') {
+          lines.push(`# ${pack.packName}`, '');
+          lines.push(`- **Namespace**: ${pack.namespace}`);
+          lines.push(`- **Format**: ${pack.packFormat}`);
+          lines.push(`- **描述**: ${pack.packDescription || '—'}`);
+          lines.push('');
+          lines.push('## 材质覆盖', '');
+          for (const t of pack.textureOverrides) {
+            lines.push(`- \`${t.path}\` — ${t.width}×${t.height} (${t.color})`);
+          }
+          lines.push('');
+          lines.push('## 音效', '');
+          for (const s of pack.sounds) {
+            lines.push(
+              `- \`${s.id}\` — 音量 ${s.volume} · 音调 ${s.pitch}${s.stream ? ' · 流式' : ''}`,
+            );
+          }
+          lines.push('');
+          lines.push('## 模型', '');
+          for (const m of pack.models) {
+            lines.push(`- \`${m.path}\` — ${m.autoCubeAll ? '自动 cube_all' : '自定义 JSON'}`);
+          }
+          lines.push('');
+          lines.push('## 字体', '');
+          for (const f of pack.fonts) {
+            lines.push(`- \`${f.id}\` — 字符 "${f.char}" → ${f.texture}`);
+          }
+          lines.push('');
+          lines.push('## 语言 (en_us)', '');
+          for (const [k, v] of Object.entries(pack.langEnUs)) {
+            lines.push(`- \`${k}\` = ${v}`);
+          }
+        } else if (scope === 'textures') {
+          lines.push(`# ${pack.packName} - 材质覆盖`, '');
+          lines.push(`共 ${pack.textureOverrides.length} 个材质`, '');
+          lines.push('| 路径 | 颜色 | 尺寸 |', '|---|---|---|');
+          for (const t of pack.textureOverrides) {
+            lines.push(`| \`${t.path}\` | ${t.color} | ${t.width}×${t.height} |`);
+          }
+        } else if (scope === 'sounds') {
+          lines.push(`# ${pack.packName} - 音效`, '');
+          lines.push(`共 ${pack.sounds.length} 个音效`, '');
+          lines.push('| ID | 事件 | 音量 | 音调 |', '|---|---|---|---|');
+          for (const s of pack.sounds) {
+            lines.push(`| \`${s.id}\` | ${s.event || '—'} | ${s.volume} | ${s.pitch} |`);
+          }
+        } else if (scope === 'models') {
+          lines.push(`# ${pack.packName} - 模型`, '');
+          lines.push(`共 ${pack.models.length} 个模型`, '');
+          lines.push('| 路径 | 贴图名 | 类型 |', '|---|---|---|');
+          for (const m of pack.models) {
+            lines.push(
+              `| \`${m.path}\` | ${m.textureName || '—'} | ${m.autoCubeAll ? 'cube_all' : '自定义'} |`,
+            );
+          }
+        } else if (scope === 'fonts') {
+          lines.push(`# ${pack.packName} - 字体`, '');
+          lines.push(`共 ${pack.fonts.length} 个字体条目`, '');
+          lines.push('| ID | 字符 | 贴图 | 尺寸 |', '|---|---|---|---|');
+          for (const f of pack.fonts) {
+            lines.push(
+              `| \`${f.id}\` | "${f.char}" | ${f.texture || '—'} | ${f.width}×${f.height} |`,
+            );
+          }
+        } else if (scope === 'lang') {
+          lines.push(`# ${pack.packName} - 语言条目`, '');
+          lines.push(`en_us: ${stats.langEnUs} 条 · zh_cn: ${stats.langZhCn} 条`, '');
+          lines.push('| 键 | en_us | zh_cn |', '|---|---|---|');
+          const allKeys = new Set([...Object.keys(pack.langEnUs), ...Object.keys(pack.langZhCn)]);
+          for (const k of allKeys) {
+            lines.push(`| \`${k}\` | ${pack.langEnUs[k] ?? '—'} | ${pack.langZhCn[k] ?? '—'} |`);
+          }
+        }
+        content = lines.join('\n');
+        filename = `${pack.namespace}-${scope}.md`;
+      }
+
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    [pack, stats.langEnUs, stats.langZhCn],
+  );
+
+  if (!spec || !pack) {
     return (
       <EmptyState
         icon="box"
@@ -40,8 +300,6 @@ export function ResourcePackPreviewPanel() {
       />
     );
   }
-
-  const pack = spec as unknown as ResourcePackSpecType;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-mc-surface">
@@ -56,11 +314,66 @@ export function ResourcePackPreviewPanel() {
         subtitle={pack.packDescription}
       />
 
+      {/* 统计卡片行 */}
+      <div className="grid grid-cols-3 gap-2 border-b border-mc-border bg-mc-surface-2/30 p-2 sm:grid-cols-4 md:grid-cols-7">
+        <StatCard
+          label="材质"
+          value={stats.textures}
+          sub={`${stats.gradientTextures} 渐变 · ${stats.checkerTextures} 棋盘`}
+          icon={<Image className="h-3 w-3" />}
+        />
+        <StatCard
+          label="音效"
+          value={stats.sounds}
+          sub={`${stats.streamSounds} 流式`}
+          icon={<Music className="h-3 w-3" />}
+        />
+        <StatCard
+          label="模型"
+          value={stats.models}
+          sub={`${stats.cubeAllModels} cube_all`}
+          icon={<Box className="h-3 w-3" />}
+        />
+        <StatCard label="字体" value={stats.fonts} icon={<Type className="h-3 w-3" />} />
+        <StatCard label="en_us" value={stats.langEnUs} icon={<Languages className="h-3 w-3" />} />
+        <StatCard label="zh_cn" value={stats.langZhCn} icon={<Languages className="h-3 w-3" />} />
+        <StatCard
+          label="总条目"
+          value={
+            stats.textures +
+            stats.sounds +
+            stats.models +
+            stats.fonts +
+            stats.langEnUs +
+            stats.langZhCn
+          }
+          icon={<FileText className="h-3 w-3" />}
+        />
+      </div>
+
+      {/* 冲突检测告警 */}
+      {totalConflicts > 0 && (
+        <div className="flex items-start gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-yellow-400" />
+          <div className="text-[11px] text-yellow-300">
+            检测到 <strong>{totalConflicts}</strong> 处冲突：
+            {conflicts.duplicateTexturePaths.length > 0 &&
+              ` 材质路径重复 ${conflicts.duplicateTexturePaths.length} 处`}
+            {conflicts.duplicateSoundIds.length > 0 &&
+              ` · 音效 ID 重复 ${conflicts.duplicateSoundIds.length} 处`}
+            {conflicts.duplicateModelPaths.length > 0 &&
+              ` · 模型路径重复 ${conflicts.duplicateModelPaths.length} 处`}
+            {conflicts.duplicateFontIds.length > 0 &&
+              ` · 字体 ID 重复 ${conflicts.duplicateFontIds.length} 处`}
+          </div>
+        </div>
+      )}
+
       {/* Tab 切换栏 */}
       <div
         role="tablist"
         aria-label="资源包分类"
-        className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1"
+        className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1"
       >
         {TABS.map((t) => (
           <button
@@ -68,32 +381,90 @@ export function ResourcePackPreviewPanel() {
             role="tab"
             aria-selected={tab === t.id}
             tabIndex={tab === t.id ? 0 : -1}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
+            onClick={() => {
+              setTab(t.id);
+              setQuery('');
+            }}
+            className={`flex items-center gap-1.5 rounded-mc px-2.5 py-1 text-[11px] font-medium transition-colors ${
               tab === t.id
                 ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
                 : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
             }`}
           >
-            <McIcon scope="pixel" name={t.icon} size={12} />
+            <t.icon className="h-3 w-3" />
             {t.label}
+            {t.id !== 'metadata' && t.id !== 'export' && (
+              <span className="ml-0.5 text-mc-mute">({countByTab(pack, t.id, stats)})</span>
+            )}
           </button>
         ))}
       </div>
 
+      {/* 搜索栏（除元数据/导出外） */}
+      {tab !== 'metadata' && tab !== 'export' && (
+        <div className="border-b border-mc-border px-3 py-2">
+          <SearchInput value={query} onChange={setQuery} placeholder={`搜索${tabLabel(tab)}…`} />
+        </div>
+      )}
+
       {/* Tab 内容 */}
       <div className="flex-1 overflow-y-auto">
-        {tab === 'textures' && <TexturesTab pack={pack} fileMap={fileMap} />}
-        {tab === 'sounds' && <SoundsTab pack={pack} fileMap={fileMap} />}
-        {tab === 'models' && <ModelsTab pack={pack} />}
-        {tab === 'lang' && <LangTab pack={pack} />}
+        {tab === 'textures' && <TexturesTab pack={pack} fileMap={fileMap} query={query} />}
+        {tab === 'sounds' && <SoundsTab pack={pack} fileMap={fileMap} query={query} />}
+        {tab === 'models' && <ModelsTab pack={pack} query={query} />}
+        {tab === 'fonts' && <FontsTab pack={pack} query={query} />}
+        {tab === 'lang' && <LangTab pack={pack} query={query} />}
+        {tab === 'metadata' && <MetadataView pack={pack} />}
+        {tab === 'export' && <ExportView pack={pack} stats={stats} onExport={exportData} />}
       </div>
 
       {/* Footer */}
       <div className="border-t border-mc-border px-4 py-2 text-xs text-mc-mute">
         材质: {pack.textureOverrides.length} · 音效: {pack.sounds.length} · 模型:{' '}
-        {pack.models.length} · 字体: {pack.fonts.length}
+        {pack.models.length} · 字体: {pack.fonts.length} · en_us: {stats.langEnUs} · zh_cn:{' '}
+        {stats.langZhCn}
       </div>
+    </div>
+  );
+}
+
+function countByTab(
+  pack: ResourcePackSpecType,
+  tab: Tab,
+  stats: { langEnUs: number; langZhCn: number },
+): number {
+  if (tab === 'textures') return pack.textureOverrides.length;
+  if (tab === 'sounds') return pack.sounds.length;
+  if (tab === 'models') return pack.models.length;
+  if (tab === 'fonts') return pack.fonts.length;
+  if (tab === 'lang') return stats.langEnUs + stats.langZhCn;
+  return 0;
+}
+
+function tabLabel(tab: Tab): string {
+  return TABS.find((t) => t.id === tab)?.label ?? '';
+}
+
+// ===== 统计卡片 =====
+function StatCard({
+  label,
+  value,
+  sub,
+  icon,
+}: {
+  label: string;
+  value: number | string;
+  sub?: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-mc border border-mc-border bg-mc-surface-2/60 px-2 py-1.5">
+      <div className="flex items-center gap-1 text-[10px] text-mc-mute">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-0.5 font-display text-base font-bold text-mc-text">{value}</div>
+      {sub && <div className="text-[9px] text-mc-dim">{sub}</div>}
     </div>
   );
 }
@@ -103,23 +474,31 @@ export function ResourcePackPreviewPanel() {
 function TexturesTab({
   pack,
   fileMap,
+  query,
 }: {
   pack: ResourcePackSpecType;
   fileMap: Map<string, string>;
+  query: string;
 }) {
+  const filtered = useMemo(() => {
+    if (!query) return pack.textureOverrides;
+    const q = query.toLowerCase();
+    return pack.textureOverrides.filter((t) => t.path.toLowerCase().includes(q));
+  }, [pack.textureOverrides, query]);
+
   const dataUrl = (entry: TextureOverrideEntry): string | null => {
     const content = fileMap.get(`assets/minecraft/textures/${entry.path}.png`);
     if (!content) return null;
     return `data:image/png;base64,${content}`;
   };
 
-  if (pack.textureOverrides.length === 0) {
+  if (filtered.length === 0) {
     return <div className="px-3 py-6 text-center text-xs text-mc-mute">暂无材质覆盖</div>;
   }
 
   return (
     <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4">
-      {pack.textureOverrides.map((entry, idx) => {
+      {filtered.map((entry, idx) => {
         const url = dataUrl(entry);
         return (
           <div
@@ -151,6 +530,14 @@ function TexturesTab({
               {entry.gradientTo ? ' · 渐变' : ''}
               {entry.checkerboard ? ' · 棋盘' : ''}
             </div>
+            <div className="mt-0.5 flex items-center gap-1">
+              <span
+                className="h-2 w-2 rounded-mc border border-mc-border"
+                style={{ backgroundColor: entry.color }}
+                title={entry.color}
+              />
+              <span className="text-[9px] text-mc-mute">{entry.color}</span>
+            </div>
           </div>
         );
       })}
@@ -163,17 +550,27 @@ function TexturesTab({
 function SoundsTab({
   pack,
   fileMap,
+  query,
 }: {
   pack: ResourcePackSpecType;
   fileMap: Map<string, string>;
+  query: string;
 }) {
-  if (pack.sounds.length === 0) {
+  const filtered = useMemo(() => {
+    if (!query) return pack.sounds;
+    const q = query.toLowerCase();
+    return pack.sounds.filter(
+      (s) => s.id.toLowerCase().includes(q) || s.event.toLowerCase().includes(q),
+    );
+  }, [pack.sounds, query]);
+
+  if (filtered.length === 0) {
     return <div className="px-3 py-6 text-center text-xs text-mc-mute">暂无音效</div>;
   }
 
   return (
     <div className="flex flex-col gap-1 p-3">
-      {pack.sounds.map((entry, idx) => (
+      {filtered.map((entry, idx) => (
         <SoundRow key={`${entry.id}-${idx}`} entry={entry} pack={pack} fileMap={fileMap} />
       ))}
     </div>
@@ -198,19 +595,6 @@ function SoundRow({
     if (!content) return null;
     return `data:audio/ogg;base64,${content}`;
   }, [fileMap, pack.namespace, entry.id]);
-
-  // audioUrl 变化时重置 UI 状态
-  useEffect(() => {
-    setPlaying(false);
-    setDuration('—');
-  }, [audioUrl]);
-
-  // 组件卸载时停止播放
-  useEffect(() => {
-    return () => {
-      audio?.pause();
-    };
-  }, [audio]);
 
   const togglePlay = () => {
     if (!audio) return;
@@ -268,7 +652,15 @@ function SoundRow({
 
 // ===== Models tab =====
 
-function ModelsTab({ pack }: { pack: ResourcePackSpecType }) {
+function ModelsTab({ pack, query }: { pack: ResourcePackSpecType; query: string }) {
+  const filtered = useMemo(() => {
+    if (!query) return pack.models;
+    const q = query.toLowerCase();
+    return pack.models.filter(
+      (m) => m.path.toLowerCase().includes(q) || m.textureName.toLowerCase().includes(q),
+    );
+  }, [pack.models, query]);
+
   const columns: Column<ModelEntry>[] = [
     { key: 'path', header: '路径', width: '40%', sortValue: (r) => r.path },
     { key: 'textureName', header: '贴图名', width: '20%', sortValue: (r) => r.textureName },
@@ -276,7 +668,15 @@ function ModelsTab({ pack }: { pack: ResourcePackSpecType }) {
       key: 'autoCubeAll',
       header: '自动 cube_all',
       width: '15%',
-      render: (r) => (r.autoCubeAll ? '是' : '否'),
+      sortValue: (r) => (r.autoCubeAll ? 1 : 0),
+      render: (r) =>
+        r.autoCubeAll ? (
+          <span className="rounded-mc bg-green-500/20 px-1.5 py-0.5 text-[10px] text-green-400">
+            是
+          </span>
+        ) : (
+          <span className="text-[10px] text-mc-mute">否</span>
+        ),
     },
     {
       key: 'jsonPreview',
@@ -290,7 +690,7 @@ function ModelsTab({ pack }: { pack: ResourcePackSpecType }) {
     <div className="p-2">
       <DataTable
         columns={columns}
-        data={pack.models}
+        data={filtered}
         rowKey={(r) => r.path}
         emptyHint="暂无模型覆盖"
       />
@@ -298,17 +698,62 @@ function ModelsTab({ pack }: { pack: ResourcePackSpecType }) {
   );
 }
 
-// ===== Lang tab =====
+// ===== Fonts tab（新增）=====
 
-interface LangRow {
-  key: string;
-  en: string;
-  zh: string;
+function FontsTab({ pack, query }: { pack: ResourcePackSpecType; query: string }) {
+  const filtered = useMemo(() => {
+    if (!query) return pack.fonts;
+    const q = query.toLowerCase();
+    return pack.fonts.filter(
+      (f) => f.id.toLowerCase().includes(q) || f.char.toLowerCase().includes(q),
+    );
+  }, [pack.fonts, query]);
+
+  const columns: Column<FontEntry>[] = [
+    {
+      key: 'char',
+      header: '字符',
+      width: '10%',
+      sortValue: (r) => r.char,
+      render: (r) => (
+        <span className="rounded-mc bg-mc-surface-3 px-2 py-0.5 font-mono text-sm text-mc-text">
+          {r.char}
+        </span>
+      ),
+    },
+    { key: 'id', header: 'ID', width: '20%', sortValue: (r) => r.id },
+    { key: 'texture', header: '贴图路径', width: '30%', sortValue: (r) => r.texture },
+    {
+      key: 'size',
+      header: '尺寸',
+      width: '12%',
+      sortValue: (r) => r.width * r.height,
+      render: (r) => `${r.width}×${r.height}`,
+    },
+    {
+      key: 'position',
+      header: '位置 (x,y)',
+      width: '12%',
+      sortValue: (r) => r.x + r.y,
+      render: (r) => `(${r.x},${r.y})`,
+    },
+    {
+      key: 'advance',
+      header: 'advance/ascent',
+      width: '16%',
+      sortValue: (r) => r.advance,
+      render: (r) => `${r.advance}/${r.ascent}`,
+    },
+  ];
+
+  return (
+    <DataTable columns={columns} data={filtered} rowKey={(r) => r.id} emptyHint="暂无字体条目" />
+  );
 }
 
-function LangTab({ pack }: { pack: ResourcePackSpecType }) {
-  const [query, setQuery] = useState('');
+// ===== Lang tab =====
 
+function LangTab({ pack, query }: { pack: ResourcePackSpecType; query: string }) {
   const rows = useMemo<LangRow[]>(() => {
     const keys = new Set([...Object.keys(pack.langEnUs), ...Object.keys(pack.langZhCn)]);
     let result = Array.from(keys).map((key) => ({
@@ -336,8 +781,138 @@ function LangTab({ pack }: { pack: ResourcePackSpecType }) {
 
   return (
     <div className="flex flex-col gap-2 p-2">
-      <SearchInput value={query} onChange={setQuery} placeholder="搜索语言键或翻译…" />
       <DataTable columns={columns} data={rows} rowKey={(r) => r.key} emptyHint="暂无语言条目" />
+    </div>
+  );
+}
+
+// ===== 元数据视图 =====
+function MetadataView({ pack }: { pack: ResourcePackSpecType }) {
+  const rows: { label: string; value: string }[] = [
+    { label: 'Pack Name', value: pack.packName },
+    { label: '描述', value: pack.packDescription || '—' },
+    { label: 'packFormat', value: String(pack.packFormat) },
+    { label: 'Namespace', value: pack.namespace },
+    { label: 'MC 版本', value: '1.21.x' },
+  ];
+
+  return (
+    <div className="p-4">
+      <table className="w-full text-xs">
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label} className="border-b border-mc-border/60">
+              <td className="w-32 px-2 py-1.5 font-medium text-mc-dim">{r.label}</td>
+              <td className="px-2 py-1.5 text-mc-text">{r.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ===== 导出视图 =====
+function ExportView({
+  pack,
+  stats,
+  onExport,
+}: {
+  pack: ResourcePackSpecType;
+  stats: {
+    textures: number;
+    sounds: number;
+    models: number;
+    fonts: number;
+    langEnUs: number;
+    langZhCn: number;
+    streamSounds: number;
+    cubeAllModels: number;
+    gradientTextures: number;
+    checkerTextures: number;
+  };
+  onExport: (
+    format: 'json' | 'csv' | 'markdown',
+    scope: 'all' | 'textures' | 'sounds' | 'models' | 'fonts' | 'lang',
+  ) => void;
+}) {
+  const exportSections: {
+    scope: 'all' | 'textures' | 'sounds' | 'models' | 'fonts' | 'lang';
+    label: string;
+    count: number;
+  }[] = [
+    { scope: 'all', label: '完整 Spec', count: 0 },
+    { scope: 'textures', label: '材质覆盖', count: pack.textureOverrides.length },
+    { scope: 'sounds', label: '音效', count: pack.sounds.length },
+    { scope: 'models', label: '模型', count: pack.models.length },
+    { scope: 'fonts', label: '字体', count: pack.fonts.length },
+    {
+      scope: 'lang',
+      label: '语言',
+      count: stats.langEnUs + stats.langZhCn,
+    },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div>
+        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-mc-text">
+          <Download className="h-4 w-4 text-mc-accent" />
+          导出资源包数据
+        </h3>
+        <p className="mb-3 text-xs text-mc-mute">
+          将当前资源包的 Spec 数据导出为不同格式，方便分享、文档归档或迁移
+        </p>
+
+        {exportSections.map((section) => (
+          <div
+            key={section.scope}
+            className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2"
+          >
+            <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
+              {section.label}
+              {section.scope !== 'all' && ` (${section.count})`}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => onExport('json', section.scope)}
+                className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+              >
+                <Download className="h-3 w-3" /> JSON
+              </button>
+              {section.scope !== 'all' && (
+                <button
+                  onClick={() => onExport('csv', section.scope)}
+                  className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+                >
+                  <Download className="h-3 w-3" /> CSV
+                </button>
+              )}
+              <button
+                onClick={() => onExport('markdown', section.scope)}
+                className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+              >
+                <Download className="h-3 w-3" /> Markdown
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 统计概览 */}
+      <div className="border-t border-mc-border pt-4">
+        <h3 className="mb-2 text-sm font-medium text-mc-text">资源包统计</h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+          <StatCard label="材质总数" value={stats.textures} />
+          <StatCard label="音效总数" value={stats.sounds} sub={`${stats.streamSounds} 流式`} />
+          <StatCard label="模型总数" value={stats.models} sub={`${stats.cubeAllModels} cube_all`} />
+          <StatCard label="字体总数" value={stats.fonts} />
+          <StatCard label="en_us 条目" value={stats.langEnUs} />
+          <StatCard label="zh_cn 条目" value={stats.langZhCn} />
+          <StatCard label="渐变材质" value={stats.gradientTextures} />
+          <StatCard label="棋盘材质" value={stats.checkerTextures} />
+        </div>
+      </div>
     </div>
   );
 }

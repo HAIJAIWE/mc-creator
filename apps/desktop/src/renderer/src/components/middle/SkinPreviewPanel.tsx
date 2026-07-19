@@ -1,10 +1,18 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
-import { SkinViewer, WalkingAnimation } from 'skinview3d';
+import {
+  SkinViewer,
+  WalkingAnimation,
+  RunningAnimation,
+  IdleAnimation,
+  FlyingAnimation,
+  type PlayerAnimation,
+} from 'skinview3d';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { useModStore } from '../../store/mod-store.js';
 import { EmptyState, FieldGroup, TextField, SelectField } from './shared/index.js';
 import type { SkinSpec } from '@mc-creator/shared';
+import { Download, Shuffle, Play, Pause, RotateCcw, User, Sparkles, Camera } from 'lucide-react';
 
 /** 标准 Minecraft 皮肤 UV 坐标（基于 64x64 像素图），模块级常量 */
 const BASE_SKIN_REGIONS = [
@@ -14,12 +22,153 @@ const BASE_SKIN_REGIONS = [
   { x: 36, y: 52, w: 4, h: 12, label: '右腿', color: 'rgba(60, 42, 30, 0.5)' },
 ] as const;
 
+type AnimationType = 'idle' | 'walking' | 'running' | 'flying';
+
+const ANIMATIONS: { id: AnimationType; label: string; factory: () => PlayerAnimation }[] = [
+  { id: 'idle', label: '站立', factory: () => new IdleAnimation() },
+  { id: 'walking', label: '行走', factory: () => new WalkingAnimation() },
+  { id: 'running', label: '跑步', factory: () => new RunningAnimation() },
+  { id: 'flying', label: '飞行', factory: () => new FlyingAnimation() },
+];
+
+/** 预设皮肤颜色组合 */
+const PRESETS: {
+  name: string;
+  colors: Pick<SkinSpec, 'skinColor' | 'hairColor' | 'shirtColor' | 'pantsColor' | 'shoesColor'>;
+}[] = [
+  {
+    name: 'Steve',
+    colors: {
+      skinColor: '#9c6b4a',
+      hairColor: '#3a2a1a',
+      shirtColor: '#4a8aff',
+      pantsColor: '#3a3a8a',
+      shoesColor: '#5a3a2a',
+    },
+  },
+  {
+    name: 'Alex',
+    colors: {
+      skinColor: '#e0ac69',
+      hairColor: '#a85a3a',
+      shirtColor: '#5aa85a',
+      pantsColor: '#5a4a3a',
+      shoesColor: '#4a3a2a',
+    },
+  },
+  {
+    name: '骑士',
+    colors: {
+      skinColor: '#d4a574',
+      hairColor: '#2a2a2a',
+      shirtColor: '#6a6a7a',
+      pantsColor: '#4a4a5a',
+      shoesColor: '#3a3a3a',
+    },
+  },
+  {
+    name: '法师',
+    colors: {
+      skinColor: '#e8c4a0',
+      hairColor: '#5a3a8a',
+      shirtColor: '#8a3a8a',
+      pantsColor: '#4a2a6a',
+      shoesColor: '#2a1a4a',
+    },
+  },
+  {
+    name: '矿工',
+    colors: {
+      skinColor: '#c89870',
+      hairColor: '#1a1a1a',
+      shirtColor: '#8a6a3a',
+      pantsColor: '#5a4a2a',
+      shoesColor: '#3a2a1a',
+    },
+  },
+  {
+    name: '忍者',
+    colors: {
+      skinColor: '#d4a574',
+      hairColor: '#1a1a1a',
+      shirtColor: '#1a1a1a',
+      pantsColor: '#1a1a1a',
+      shoesColor: '#2a2a2a',
+    },
+  },
+];
+
+const RANDOM_SKIN_COLORS = [
+  '#d4a574',
+  '#e0ac69',
+  '#9c6b4a',
+  '#c89870',
+  '#e8c4a0',
+  '#a87a5a',
+  '#b88a6a',
+  '#d4a0a0',
+  '#e8b8a0',
+  '#a8b8c8',
+];
+const RANDOM_HAIR_COLORS = [
+  '#1a1a1a',
+  '#3a2a1a',
+  '#5a3a2a',
+  '#7a4a2a',
+  '#a85a3a',
+  '#c87a3a',
+  '#e8a85a',
+  '#5a3a8a',
+  '#8a3a8a',
+  '#3a5a8a',
+];
+const RANDOM_SHIRT_COLORS = [
+  '#4a8aff',
+  '#5aa85a',
+  '#a85a3a',
+  '#6a6a7a',
+  '#8a3a8a',
+  '#5a4a3a',
+  '#e84a4a',
+  '#4ae8e8',
+  '#e8e84a',
+  '#4ae84a',
+];
+const RANDOM_PANTS_COLORS = [
+  '#3a3a8a',
+  '#5a4a3a',
+  '#4a4a5a',
+  '#2a1a4a',
+  '#5a2a2a',
+  '#1a3a1a',
+  '#3a3a3a',
+  '#5a3a5a',
+  '#1a4a4a',
+  '#4a5a4a',
+];
+const RANDOM_SHOES_COLORS = [
+  '#5a3a2a',
+  '#4a3a2a',
+  '#3a3a3a',
+  '#2a2a2a',
+  '#4a2a1a',
+  '#3a2a1a',
+  '#2a1a1a',
+  '#4a4a2a',
+  '#3a4a3a',
+  '#2a3a4a',
+];
+
+function randomColor(arr: string[]): string {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 /**
- * Skin 预览面板：
- * - 左：skinview3d 3D 角色预览（可拖动旋转、滚轮缩放、自动旋转）
- * - 右：2D 皮肤贴图（显示完整 64x64 PNG + overlay 标注身体部位）
- * - 底部：表单编辑 playerName/model/5 颜色字段
- * 字段修改写回 useModStore.spec。
+ * Skin 预览面板（增强版）：
+ * - 顶栏统计：5 颜色配置概览
+ * - 左：3D 角色预览（动画切换 / 自动旋转 / 暂停）
+ * - 右：2D 皮肤贴图（64x64 + 部位标注）
+ * - 底部：预设皮肤 / 随机颜色 / 导出 PNG / 颜色编辑表单
  */
 export function SkinPreviewPanel() {
   const { spec, setSpec, files } = useModStore(
@@ -31,11 +180,16 @@ export function SkinPreviewPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewerRef = useRef<SkinViewer | null>(null);
 
+  // 动画/控制状态
+  const [animation, setAnimation] = useState<AnimationType>('walking');
+  const [autoRotate, setAutoRotate] = useState(true);
+  const [paused, setPaused] = useState(false);
+
   // 2D 视图背景色切换
-  const [bgColor, setBgColor] = useState<'#1a1a1a' | '#3a3a3a' | '#ffffff'>('#1a1a1a');
+  const [bgColor, setBgColor] = useState<'#1a1a1a' | '#3a3a3a' | '#ffffff' | '#7a5a3a'>('#1a1a1a');
 
   // 从 files 找皮肤 PNG（路径是 ${playerName}.png）
-  // 注意：useMemo 必须在 early return 之前调用，否则 hooks 数量会随 spec 变化
+  // 注意：useMemo/useCallback 必须在 early return 之前调用，否则 hooks 数量会随 spec 变化
   const skinUrl = useMemo(() => {
     if (!spec) return null;
     const skinSpec = spec as unknown as SkinSpec;
@@ -43,6 +197,52 @@ export function SkinPreviewPanel() {
     if (!file) return null;
     return `data:image/png;base64,${file.content}`;
   }, [files, spec]);
+
+  const applyPreset = useCallback(
+    (preset: (typeof PRESETS)[number]) => {
+      if (!spec) return;
+      const skinSpec = spec as unknown as SkinSpec;
+      const updated = { ...skinSpec, ...preset.colors };
+      setSpec(updated as unknown as typeof spec);
+    },
+    [spec, setSpec],
+  );
+
+  const randomizeColors = useCallback(() => {
+    if (!spec) return;
+    const skinSpec = spec as unknown as SkinSpec;
+    const updated = {
+      ...skinSpec,
+      skinColor: randomColor(RANDOM_SKIN_COLORS),
+      hairColor: randomColor(RANDOM_HAIR_COLORS),
+      shirtColor: randomColor(RANDOM_SHIRT_COLORS),
+      pantsColor: randomColor(RANDOM_PANTS_COLORS),
+      shoesColor: randomColor(RANDOM_SHOES_COLORS),
+    };
+    setSpec(updated as unknown as typeof spec);
+  }, [spec, setSpec]);
+
+  const exportPng = useCallback(() => {
+    if (!viewerRef.current || !spec) return;
+    // 从 skinview3d viewer 渲染当前帧并导出
+    const viewer = viewerRef.current;
+    viewer.render();
+    const dataUrl = viewer.canvas.toDataURL('image/png');
+    const skinSpec = spec as unknown as SkinSpec;
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `${skinSpec.playerName}-preview.png`;
+    a.click();
+  }, [spec]);
+
+  const export2DPng = useCallback(() => {
+    if (!skinUrl || !spec) return;
+    const skinSpec = spec as unknown as SkinSpec;
+    const a = document.createElement('a');
+    a.href = skinUrl;
+    a.download = `${skinSpec.playerName}.png`;
+    a.click();
+  }, [skinUrl, spec]);
 
   if (!spec) {
     return (
@@ -78,6 +278,34 @@ export function SkinPreviewPanel() {
         </div>
       </div>
 
+      {/* 颜色配置概览统计 */}
+      <div className="grid grid-cols-5 gap-2 border-b border-mc-border bg-mc-surface-2/30 p-2">
+        {(
+          [
+            { label: '皮肤', value: skin.skinColor },
+            { label: '头发', value: skin.hairColor },
+            { label: '上衣', value: skin.shirtColor },
+            { label: '裤子', value: skin.pantsColor },
+            { label: '鞋子', value: skin.shoesColor },
+          ] as const
+        ).map((c) => (
+          <div
+            key={c.label}
+            className="flex items-center gap-2 rounded-mc border border-mc-border bg-mc-surface-2/60 px-2 py-1.5"
+          >
+            <span
+              className="h-5 w-5 rounded-mc border border-mc-border"
+              style={{ backgroundColor: c.value }}
+              title={c.value}
+            />
+            <div>
+              <div className="text-[10px] text-mc-mute">{c.label}</div>
+              <div className="font-mono text-[10px] text-mc-dim">{c.value}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Body：左右分栏 */}
       <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
         {/* 左：3D 预览 */}
@@ -91,13 +319,50 @@ export function SkinPreviewPanel() {
               viewerRef={viewerRef}
               skinUrl={skinUrl}
               model={skin.model}
+              animation={animation}
+              autoRotate={autoRotate}
+              paused={paused}
             />
           ) : (
             <div className="flex h-64 w-48 items-center justify-center rounded-mc border border-dashed border-mc-border text-xs text-mc-mute">
               等待皮肤 PNG 生成
             </div>
           )}
-          <div className="text-xs text-mc-mute">拖动旋转 · 滚轮缩放 · 自动旋转中</div>
+
+          {/* 动画控制条 */}
+          <div className="flex flex-wrap items-center justify-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2/80 px-2 py-1">
+            {ANIMATIONS.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => setAnimation(a.id)}
+                className={`rounded-mc px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  animation === a.id
+                    ? 'bg-mc-accent/30 text-mc-accent'
+                    : 'text-mc-dim hover:bg-mc-surface-3 hover:text-mc-text'
+                }`}
+              >
+                {a.label}
+              </button>
+            ))}
+            <span className="mx-1 h-3 w-px bg-mc-border" />
+            <button
+              onClick={() => setAutoRotate(!autoRotate)}
+              className={`flex items-center gap-0.5 rounded-mc px-1.5 py-0.5 text-[10px] transition-colors ${
+                autoRotate ? 'bg-mc-accent/20 text-mc-accent' : 'text-mc-dim hover:bg-mc-surface-3'
+              }`}
+              title="自动旋转"
+            >
+              <RotateCcw className="h-2.5 w-2.5" /> 自转
+            </button>
+            <button
+              onClick={() => setPaused(!paused)}
+              className="flex items-center gap-0.5 rounded-mc px-1.5 py-0.5 text-[10px] text-mc-dim transition-colors hover:bg-mc-surface-3"
+              title={paused ? '继续' : '暂停'}
+            >
+              {paused ? <Play className="h-2.5 w-2.5" /> : <Pause className="h-2.5 w-2.5" />}
+              {paused ? '继续' : '暂停'}
+            </button>
+          </div>
         </div>
 
         {/* 右：2D UV 贴图 */}
@@ -105,8 +370,19 @@ export function SkinPreviewPanel() {
           className="flex w-full flex-col gap-2 border-t border-mc-border p-4 md:w-80 md:border-l md:border-t-0"
           style={{ backgroundColor: bgColor }}
         >
-          <div className="text-xs font-bold uppercase tracking-wider text-mc-dim">
-            2D 纹理贴图 (64×64)
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold uppercase tracking-wider text-mc-dim">
+              2D 纹理贴图 (64×64)
+            </div>
+            {skinUrl && (
+              <button
+                onClick={export2DPng}
+                className="flex items-center gap-0.5 rounded-mc border border-mc-border bg-mc-surface-2 px-1.5 py-0.5 text-[10px] text-mc-dim hover:border-mc-accent hover:text-mc-text"
+                title="导出 2D 皮肤 PNG"
+              >
+                <Download className="h-2.5 w-2.5" /> 导出 PNG
+              </button>
+            )}
           </div>
           <div className="relative">
             {skinUrl ? (
@@ -122,7 +398,7 @@ export function SkinPreviewPanel() {
           {/* 背景色切换 */}
           <div className="mt-2 flex items-center gap-2">
             <span className="text-xs text-mc-dim">背景:</span>
-            {(['#1a1a1a', '#3a3a3a', '#ffffff'] as const).map((c) => (
+            {(['#1a1a1a', '#3a3a3a', '#ffffff', '#7a5a3a'] as const).map((c) => (
               <button
                 key={c}
                 onClick={() => setBgColor(c)}
@@ -132,11 +408,56 @@ export function SkinPreviewPanel() {
               />
             ))}
           </div>
+
+          {/* 预设皮肤 */}
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-mc-dim">
+              <Sparkles className="h-3 w-3" /> 预设皮肤
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.name}
+                  onClick={() => applyPreset(p)}
+                  className="flex flex-col items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-1 py-1.5 hover:border-mc-accent"
+                  title={`应用 ${p.name} 预设`}
+                >
+                  <div className="flex gap-0.5">
+                    {[p.colors.skinColor, p.colors.hairColor, p.colors.shirtColor].map((c, i) => (
+                      <span key={i} className="h-2 w-2 rounded-sm" style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                  <span className="text-[10px] text-mc-dim">{p.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Footer：颜色与字段编辑表单 */}
-      <div className="max-h-64 overflow-y-auto border-t border-mc-border p-4">
+      <div className="max-h-72 overflow-y-auto border-t border-mc-border p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={randomizeColors}
+            className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+          >
+            <Shuffle className="h-3 w-3" /> 随机颜色
+          </button>
+          <button
+            onClick={exportPng}
+            disabled={!skinUrl}
+            className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent disabled:cursor-not-allowed disabled:opacity-40"
+            title={skinUrl ? '导出 3D 预览截图为 PNG' : '需要先有皮肤 PNG'}
+          >
+            <Camera className="h-3 w-3" /> 导出 3D 截图
+          </button>
+          <div className="ml-auto flex items-center gap-1 text-[10px] text-mc-mute">
+            <User className="h-2.5 w-2.5" />
+            {skin.model === 'slim' ? 'Alex 模型 (3px 臂)' : 'Steve 模型 (4px 臂)'}
+          </div>
+        </div>
+
         <FieldGroup title="基本">
           <TextField
             label="玩家名"
@@ -195,9 +516,20 @@ interface SkinViewer3DProps {
   viewerRef: React.MutableRefObject<SkinViewer | null>;
   skinUrl: string;
   model: SkinSpec['model'];
+  animation: AnimationType;
+  autoRotate: boolean;
+  paused: boolean;
 }
 
-function SkinViewer3D({ canvasRef, viewerRef, skinUrl, model }: SkinViewer3DProps) {
+function SkinViewer3D({
+  canvasRef,
+  viewerRef,
+  skinUrl,
+  model,
+  animation,
+  autoRotate,
+  paused,
+}: SkinViewer3DProps) {
   // 创建/销毁 viewer（仅在 mount 时）
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -227,6 +559,30 @@ function SkinViewer3D({ canvasRef, viewerRef, skinUrl, model }: SkinViewer3DProp
     viewerRef.current.loadSkin(skinUrl, { model });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skinUrl, model]);
+
+  // 动画切换
+  useEffect(() => {
+    if (!viewerRef.current) return;
+    const animDef = ANIMATIONS.find((a) => a.id === animation);
+    if (animDef) {
+      viewerRef.current.animation = animDef.factory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animation]);
+
+  // 自动旋转切换
+  useEffect(() => {
+    if (!viewerRef.current) return;
+    viewerRef.current.autoRotate = autoRotate;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRotate]);
+
+  // 暂停/继续动画
+  useEffect(() => {
+    if (!viewerRef.current?.animation) return;
+    viewerRef.current.animation.paused = paused;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused]);
 
   return (
     <canvas
