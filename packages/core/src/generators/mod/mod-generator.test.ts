@@ -7,7 +7,7 @@ import { Filesystem } from '../../filesystem/index.js';
 import { Orchestrator } from '../../orchestrator/orchestrator.js';
 import { MockProvider } from '../../model-provider/mock-provider.js';
 
-const SPEC: ModSpec = {
+const SPEC: ModSpec = ModSpec.parse({
   modId: 'demo',
   version: '1.0.0',
   name: 'Demo',
@@ -29,7 +29,7 @@ const SPEC: ModSpec = {
   credits: '',
   dependencies: [],
   website: '',
-};
+});
 
 describe('ModGenerator', () => {
   const gen = new ModGenerator();
@@ -137,7 +137,7 @@ describe('ModGenerator 端到端（spec-first 流程）', () => {
 });
 
 describe('ModGenerator 黄金样本快照（防 Adapter 回归）', () => {
-  const GOLDEN_SPEC: ModSpec = {
+  const GOLDEN_SPEC: ModSpec = ModSpec.parse({
     modId: 'golden',
     version: '1.0.0',
     name: 'Golden',
@@ -172,7 +172,7 @@ describe('ModGenerator 黄金样本快照（防 Adapter 回归）', () => {
     credits: '',
     dependencies: [],
     website: '',
-  };
+  });
 
   it('fabric：文件路径列表快照稳定', async () => {
     const gen = new ModGenerator();
@@ -227,7 +227,7 @@ describe('ModGenerator 黄金样本快照（防 Adapter 回归）', () => {
 });
 
 describe('ModGenerator P10：_meta.json 包含新字段', () => {
-  const META_SPEC: ModSpec = {
+  const META_SPEC: ModSpec = ModSpec.parse({
     modId: 'meta_mod',
     version: '1.0.0',
     name: 'Meta Mod',
@@ -266,7 +266,7 @@ describe('ModGenerator P10：_meta.json 包含新字段', () => {
         dropItem: 'minecraft:stick',
       },
     ],
-  };
+  });
 
   it('fabric：生成 _meta.json 含所有新字段', async () => {
     const gen = new ModGenerator();
@@ -299,7 +299,7 @@ describe('ModGenerator P10：_meta.json 包含新字段', () => {
     expect(item.maxDamage).toBe(0);
     expect(item.fuelTick).toBe(200);
     expect(item.lore).toBe('A sparkle of magic');
-    expect(item.food).toEqual({ hunger: 6, saturation: 0.8 });
+    expect(item.food).toEqual({ hunger: 6, saturation: 0.8, effects: [], canAlwaysEat: false });
 
     // 方块新字段
     const block = parsed.blocks[0];

@@ -9,18 +9,73 @@ function iconFor(path: string): { scope: 'pixel'; name: string } {
   return { scope: 'pixel', name: 'file' };
 }
 
-/** 搜索：在当前 Mod 已生成的文件里按路径检索，点击即在主区打开。 */
+/** 搜索：在当前 Mod 已生成的文件里检索（支持路径 + 内容搜索），点击即在主区打开。 */
 export function SearchPanel() {
   const files = useModStore((s) => s.files);
   const selectedFile = useModStore((s) => s.selectedFile);
   const selectFile = useModStore((s) => s.selectFile);
   const [query, setQuery] = useState('');
+  const [searchContent, setSearchContent] = useState(false);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [useRegex, setUseRegex] = useState(false);
+  const [wholeWord, setWholeWord] = useState(false);
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     if (!q) return files;
-    return files.filter((f) => f.path.toLowerCase().includes(q));
-  }, [files, query]);
+
+    // 路径搜索
+    const pathFilter = (path: string) => {
+      const target = caseSensitive ? path : path.toLowerCase();
+      const keyword = caseSensitive ? q : q.toLowerCase();
+      return target.includes(keyword);
+    };
+
+    if (!searchContent) {
+      return files.filter((f) => pathFilter(f.path));
+    }
+
+    // 内容搜索
+    let regex: RegExp | null = null;
+    if (useRegex) {
+      try {
+        regex = new RegExp(q, caseSensitive ? 'g' : 'gi');
+      } catch {
+        // 非法正则，回退为纯文本
+        regex = null;
+      }
+    }
+
+    return files.filter((f) => {
+      if (f.path.endsWith('.png')) return pathFilter(f.path);
+      if (pathFilter(f.path)) return true;
+
+      if (regex) {
+        return regex.test(f.content);
+      }
+
+      const content = caseSensitive ? f.content : f.content.toLowerCase();
+      const keyword = caseSensitive ? q : q.toLowerCase();
+
+      if (wholeWord) {
+        const wordRegex = new RegExp(
+          `\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+          caseSensitive ? '' : 'i',
+        );
+        return wordRegex.test(f.content);
+      }
+
+      return content.includes(keyword);
+    });
+  }, [files, query, searchContent, caseSensitive, useRegex, wholeWord]);
+
+  /** 生成搜索选项的 toggle 按钮样式 */
+  const toggleClass = (on: boolean) =>
+    `rounded-mc px-1.5 py-0.5 text-[10px] transition-colors ${
+      on
+        ? 'bg-mc-accent/20 text-mc-accent-bright'
+        : 'text-mc-mute hover:bg-mc-surface-2 hover:text-mc-dim'
+    }`;
 
   return (
     <div className="flex h-full flex-col">
@@ -31,7 +86,7 @@ export function SearchPanel() {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索文件（按路径）"
+            placeholder={searchContent ? '搜索文件内容…' : '搜索文件路径…'}
             className="flex-1 bg-transparent text-sm text-mc-text outline-none placeholder:text-mc-mute"
           />
           {query && (
@@ -44,14 +99,48 @@ export function SearchPanel() {
             </button>
           )}
         </div>
-        <div className="mt-1 px-1 text-xs text-mc-mute">
-          {results.length} / {files.length} 个文件
+        <div className="mt-1 flex items-center gap-1 px-1">
+          <button
+            onClick={() => setSearchContent((v) => !v)}
+            className={toggleClass(searchContent)}
+            title="搜索文件内容（默认仅搜路径）"
+          >
+            内容
+          </button>
+          <button
+            onClick={() => setCaseSensitive((v) => !v)}
+            className={toggleClass(caseSensitive)}
+            title="区分大小写"
+          >
+            Aa
+          </button>
+          <button
+            onClick={() => setUseRegex((v) => !v)}
+            className={toggleClass(useRegex)}
+            title="正则表达式"
+          >
+            .*
+          </button>
+          <button
+            onClick={() => setWholeWord((v) => !v)}
+            className={toggleClass(wholeWord)}
+            title="全词匹配"
+          >
+            W
+          </button>
+          <span className="ml-auto text-xs text-mc-mute">
+            {results.length} / {files.length}
+          </span>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-1">
         {results.length === 0 ? (
           <div className="py-8 text-center text-xs text-mc-mute">
-            {files.length === 0 ? '还没有生成文件' : '没有匹配的文件'}
+            {files.length === 0
+              ? '还没有生成文件'
+              : searchContent
+                ? '没有匹配的内容'
+                : '没有匹配的文件'}
           </div>
         ) : (
           results.map((f) => {

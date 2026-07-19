@@ -31,3 +31,10 @@ Thumbs.db
 # 日志
 *.log
 logs/
+
+# 截图（视觉效果验证用，本地保留）
+screenshots/
+
+# pnpm patch 临时目录
+node_modules/.pnpm_patches/
+

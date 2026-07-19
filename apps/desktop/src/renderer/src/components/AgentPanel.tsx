@@ -15,6 +15,7 @@ import { CurseForgeSearchPanel } from './CurseForgeSearchPanel.js';
 import { SpecHistoryPanel } from './SpecHistoryPanel.js';
 import { ModelComparePanel } from './ModelComparePanel.js';
 import { SpecFormEditor } from './SpecFormEditor.js';
+import { AgentSessionPanel } from './AgentSessionPanel.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
 
 interface Msg {
@@ -67,6 +68,7 @@ export function AgentPanel() {
   const [showHistory, setShowHistory] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [showFormEditor, setShowFormEditor] = useState(false);
+  const [agentMode, setAgentMode] = useState<'chat' | 'agent'>('agent');
 
   const [messages, setMessages] = useState<Msg[]>([
     { role: 'assistant', text: '你好！描述你想要的 mod，我来帮你生成。' },
@@ -461,73 +463,90 @@ export function AgentPanel() {
           </div>
         )}
 
-        {/* AI 助手 */}
+        {/* AI 助手 / 智能体 */}
         <div className="flex flex-col">
           <button
             onClick={() => toggleSection('chat')}
             className="mc-section-title flex w-full items-center justify-between transition-colors hover:bg-mc-surface-2/50"
           >
             <span className="flex items-center gap-1.5">
-              <McIcon scope="pixel" name="star" size={12} /> AI 助手
+              <McIcon scope="pixel" name="star" size={12} />{' '}
+              {agentMode === 'agent' ? 'AI 智能体' : 'AI 助手'}
             </span>
-            {expandedSections.chat ? (
-              <McIcon scope="pixel" name="chevron-up" size={12} />
-            ) : (
-              <McIcon scope="pixel" name="chevron-down" size={12} />
-            )}
-          </button>
-          {expandedSections.chat && (
-            <div className="flex min-h-[180px] flex-1 flex-col">
-              <div className="flex-1 space-y-2 overflow-y-auto p-3">
-                {messages.map((m, i) => (
-                  <div
-                    key={i}
-                    className={`rounded-mc-lg p-2 text-xs ${
-                      m.role === 'user'
-                        ? 'border border-mc-accent/40 bg-mc-accent/15'
-                        : 'bg-mc-surface-2'
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap text-mc-text">{m.text}</div>
-                    {m.role === 'assistant' &&
-                      sending &&
-                      i === messages.length - 1 &&
-                      m.text === '' && <span className="text-mc-mute">思考中…</span>}
-                    {m.role === 'assistant' &&
-                      sending &&
-                      i === messages.length - 1 &&
-                      m.text !== '' && (
-                        <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-mc-dim" />
-                      )}
-                  </div>
-                ))}
-                <div ref={bottomRef} />
-              </div>
-              <div className="flex gap-2 border-t border-mc-border p-3">
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-                  placeholder={apiKey ? '输入消息…' : '请先配置 API Key'}
-                  className="mc-input flex-1 !py-2"
-                  disabled={sending || !apiKey}
-                />
-                <button
-                  onClick={send}
-                  disabled={sending || !input.trim() || !apiKey}
-                  className="mc-btn-primary"
-                >
-                  {sending ? (
-                    '…'
-                  ) : (
-                    <>
-                      <Send className="h-3 w-3" /> 发送
-                    </>
-                  )}
-                </button>
-              </div>
+            <div className="flex items-center gap-1">
+              {/* 模式切换 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAgentMode((m) => (m === 'chat' ? 'agent' : 'chat'));
+                }}
+                className="rounded-mc px-1 py-0.5 text-[10px] text-mc-mute hover:text-mc-text"
+                title={agentMode === 'chat' ? '切换到智能体模式' : '切换到聊天模式'}
+              >
+                {agentMode === 'chat' ? '🤖' : '💬'}
+              </button>
+              {expandedSections.chat ? (
+                <McIcon scope="pixel" name="chevron-up" size={12} />
+              ) : (
+                <McIcon scope="pixel" name="chevron-down" size={12} />
+              )}
             </div>
-          )}
+          </button>
+          {expandedSections.chat &&
+            (agentMode === 'agent' ? (
+              <AgentSessionPanel />
+            ) : (
+              <div className="flex min-h-[180px] flex-1 flex-col">
+                <div className="flex-1 space-y-2 overflow-y-auto p-3">
+                  {messages.map((m, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-mc-lg p-2 text-xs ${
+                        m.role === 'user'
+                          ? 'border border-mc-accent/40 bg-mc-accent/15'
+                          : 'bg-mc-surface-2'
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap text-mc-text">{m.text}</div>
+                      {m.role === 'assistant' &&
+                        sending &&
+                        i === messages.length - 1 &&
+                        m.text === '' && <span className="text-mc-mute">思考中…</span>}
+                      {m.role === 'assistant' &&
+                        sending &&
+                        i === messages.length - 1 &&
+                        m.text !== '' && (
+                          <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-mc-dim" />
+                        )}
+                    </div>
+                  ))}
+                  <div ref={bottomRef} />
+                </div>
+                <div className="flex gap-2 border-t border-mc-border p-3">
+                  <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
+                    placeholder={apiKey ? '输入消息…' : '请先配置 API Key'}
+                    className="mc-input flex-1 !py-2"
+                    disabled={sending || !apiKey}
+                  />
+                  <button
+                    onClick={send}
+                    disabled={sending || !input.trim() || !apiKey}
+                    className="mc-btn-primary"
+                  >
+                    {sending ? (
+                      '…'
+                    ) : (
+                      <>
+                        <Send className="h-3 w-3" /> 发送
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
         </div>
       </div>
 

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { LegacyFabricAdapter } from './legacy-fabric-adapter.js';
 import { ModGenerator } from './mod-generator.js';
+import { ModSpec as ModSpecSchema } from '@mc-creator/shared';
 import type { GeneratorContext, ModSpec } from '@mc-creator/shared';
 
-const SPEC: ModSpec = {
+const SPEC: ModSpec = ModSpecSchema.parse({
   modId: 'ruby_tools',
   version: '1.0.0',
   name: 'Ruby Tools',
@@ -38,7 +39,7 @@ const SPEC: ModSpec = {
   credits: '',
   dependencies: [],
   website: '',
-};
+});
 
 const CTX: GeneratorContext = {
   loader: 'legacy_fabric',

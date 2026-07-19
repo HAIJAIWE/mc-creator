@@ -3,7 +3,18 @@ import { GitBranch } from 'lucide-react';
 import { McMark } from './McMark.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
 
-type Activity = 'explorer' | 'search' | 'git' | 'packages' | 'settings' | 'items' | 'blocks';
+type Activity =
+  | 'explorer'
+  | 'search'
+  | 'git'
+  | 'packages'
+  | 'items'
+  | 'blocks'
+  | 'mc'
+  | 'entity'
+  | 'audio'
+  | 'cicd'
+  | 'settings';
 
 interface ActivityBarProps {
   active: Activity;
@@ -22,10 +33,32 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
     { id: 'packages', icon: <McIcon scope="pixel" name="package" size={20} />, label: '包管理' },
     { id: 'items', icon: <McIcon scope="pixel" name="box" size={20} />, label: '物品/配方' },
     { id: 'blocks', icon: <McIcon scope="game" name="block-house" size={20} />, label: '方块编辑' },
+    { id: 'mc', icon: <McIcon scope="pixel" name="star" size={20} />, label: 'MC 启动器' },
+    { id: 'entity', icon: <McIcon scope="pixel" name="box" size={20} />, label: '实体 AI' },
+    { id: 'audio', icon: <McIcon scope="pixel" name="image" size={20} />, label: '音效管理' },
+    { id: 'cicd', icon: <McIcon scope="pixel" name="terminal" size={20} />, label: 'CI/CD' },
   ];
 
+  /** 键盘导航：上下箭头切换 Activity */
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const idx = activities.findIndex((a) => a.id === active);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const next =
+        e.key === 'ArrowDown'
+          ? (idx + 1) % activities.length
+          : (idx - 1 + activities.length) % activities.length;
+      onChange(activities[next].id);
+    }
+  };
+
   return (
-    <div className="flex w-12 flex-col items-center gap-1 bg-mc-bg py-2">
+    <div
+      className="flex w-12 flex-col items-center gap-1 bg-mc-bg py-2"
+      role="toolbar"
+      aria-label="活动栏"
+      onKeyDown={handleKeyDown}
+    >
       <div className="flex flex-col gap-1">
         {activities.map(({ id, icon: Icon, label }) => (
           <button
@@ -33,6 +66,8 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
             onClick={() => onChange(id)}
             onMouseEnter={() => setHovered(id)}
             onMouseLeave={() => setHovered(null)}
+            aria-label={label}
+            aria-pressed={active === id}
             className={`relative flex h-10 w-10 items-center justify-center rounded-mc transition-colors ${
               active === id
                 ? 'bg-mc-surface-2 text-mc-text'
@@ -58,6 +93,8 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
           onClick={() => onChange('settings')}
           onMouseEnter={() => setHovered('settings')}
           onMouseLeave={() => setHovered(null)}
+          aria-label="设置"
+          aria-pressed={active === 'settings'}
           className={`relative flex h-10 w-10 items-center justify-center rounded-mc transition-colors ${
             active === 'settings'
               ? 'bg-mc-surface-2 text-mc-text'

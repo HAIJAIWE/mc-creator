@@ -187,6 +187,36 @@ export const ExportZipResponse = z.object({
 
 export type ExportZipReq = z.infer<typeof ExportZipRequest>;
 export type ExportZipRes = z.infer<typeof ExportZipResponse>;
+// === 单文件保存到磁盘 ===
+export const SAVE_FILE = 'mod:saveFile';
+
+export const SaveFileRequest = z.object({
+  path: z.string().min(1),
+  content: z.string(),
+  defaultName: z.string().default(''),
+});
+export const SaveFileResponse = z.object({
+  ok: z.boolean(),
+  canceled: z.boolean(),
+  savedPath: z.string().nullable(),
+});
+export type SaveFileReq = z.infer<typeof SaveFileRequest>;
+export type SaveFileRes = z.infer<typeof SaveFileResponse>;
+
+// === 保存全部文件到磁盘 ===
+export const SAVE_ALL_FILES = 'mod:saveAllFiles';
+
+export const SaveAllFilesRequest = z.object({
+  files: z.array(z.object({ path: z.string(), content: z.string() })),
+});
+export const SaveAllFilesResponse = z.object({
+  ok: z.boolean(),
+  canceled: z.boolean(),
+  savedDir: z.string().nullable(),
+  count: z.number().default(0),
+});
+export type SaveAllFilesReq = z.infer<typeof SaveAllFilesRequest>;
+export type SaveAllFilesRes = z.infer<typeof SaveAllFilesResponse>;
 
 // === 准备构建目录（P22-4：构建前把内存中的 files 写入临时目录，避免硬编码路径） ===
 export const PREPARE_BUILD_DIR = 'mod:prepareBuildDir';
@@ -353,6 +383,12 @@ export const GIT_LOG = 'git:log';
 export const GIT_COMMIT = 'git:commit';
 export const GIT_PULL = 'git:pull';
 export const GIT_PUSH = 'git:push';
+export const GIT_BRANCH_LIST = 'git:branchList';
+export const GIT_BRANCH_CREATE = 'git:branchCreate';
+export const GIT_BRANCH_SWITCH = 'git:branchSwitch';
+export const GIT_ADD = 'git:add';
+export const GIT_RESET = 'git:reset';
+export const GIT_DIFF = 'git:diff';
 
 export const GitChooseRepoResponse = z.object({
   path: z.string().nullable(),
@@ -425,6 +461,74 @@ export type GitPullReq = z.infer<typeof GitPullRequest>;
 export type GitPushReq = z.infer<typeof GitPushRequest>;
 export type GitSyncRes = z.infer<typeof GitSyncResponse>;
 
+// Git 分支管理
+export const GitBranchListRequest = z.object({ repoPath: z.string().min(1) });
+export const GitBranchListResponse = z.object({
+  ok: z.boolean(),
+  branches: z
+    .array(
+      z.object({
+        name: z.string(),
+        current: z.boolean(),
+      }),
+    )
+    .default([]),
+  error: z.string().nullable().optional(),
+});
+export type GitBranchListRes = z.infer<typeof GitBranchListResponse>;
+
+export const GitBranchCreateRequest = z.object({
+  repoPath: z.string().min(1),
+  name: z.string().min(1),
+});
+export const GitBranchCreateResponse = z.object({
+  ok: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+export type GitBranchCreateRes = z.infer<typeof GitBranchCreateResponse>;
+
+export const GitBranchSwitchRequest = z.object({
+  repoPath: z.string().min(1),
+  name: z.string().min(1),
+});
+export const GitBranchSwitchResponse = z.object({
+  ok: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+export type GitBranchSwitchRes = z.infer<typeof GitBranchSwitchResponse>;
+
+// Git 暂存区操作
+export const GitAddRequest = z.object({
+  repoPath: z.string().min(1),
+  paths: z.array(z.string()),
+});
+export const GitAddResponse = z.object({
+  ok: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+
+export const GitResetRequest = z.object({
+  repoPath: z.string().min(1),
+  paths: z.array(z.string()),
+});
+export const GitResetResponse = z.object({
+  ok: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+
+// Git Diff
+export const GitDiffRequest = z.object({
+  repoPath: z.string().min(1),
+  path: z.string().min(1),
+  staged: z.boolean().default(false),
+});
+export const GitDiffResponse = z.object({
+  ok: z.boolean(),
+  diff: z.string().default(''),
+  error: z.string().nullable().optional(),
+});
+export type GitDiffRes = z.infer<typeof GitDiffResponse>;
+
 // === Minecraft 启动器（A 切片：离线账号，无需微软 OAuth）===
 export const LOCATE_MC = 'mc:locate';
 export const MC_CHOOSE_DIR = 'mc:chooseDir';
@@ -465,3 +569,69 @@ export const LaunchMcResponse = z.object({
 });
 export type LaunchMcReq = z.infer<typeof LaunchMcRequest>;
 export type LaunchMcRes = z.infer<typeof LaunchMcResponse>;
+
+// === 终端（主进程 PTY 桥接，渲染进程仅展示）===
+export const TERMINAL_SPAWN = 'terminal:spawn';
+
+// === 资源文件导入（选择本地 .png/.ogg/.json/.lang 文件，读取并 base64 编码返回）===
+export const IMPORT_RESOURCE_FILES = 'resource:importFiles';
+
+export const ImportResourceFilesRequest = z.object({
+  /** 文件选择对话框标题 */
+  title: z.string().default('导入资源文件'),
+  /** 允许的扩展名过滤，如 ['png', 'ogg', 'json'] */
+  extensions: z.array(z.string()).default(['png', 'ogg', 'json', 'lang']),
+  /** 是否允许多选（默认 true） */
+  multiSelect: z.boolean().default(true),
+});
+export const ImportedResourceFile = z.object({
+  /** 用户磁盘上的原始路径 */
+  sourcePath: z.string(),
+  /** 文件名（含扩展名） */
+  fileName: z.string(),
+  /** 扩展名（小写，无点） */
+  ext: z.string(),
+  /** base64 编码内容 */
+  base64: z.string(),
+  /** 文件大小（字节） */
+  size: z.number(),
+});
+export const ImportResourceFilesResponse = z.object({
+  ok: z.boolean(),
+  canceled: z.boolean().default(false),
+  files: z.array(ImportedResourceFile).default([]),
+  error: z.string().nullable().optional(),
+});
+export type ImportResourceFilesReq = z.infer<typeof ImportResourceFilesRequest>;
+export type ImportResourceFilesRes = z.infer<typeof ImportResourceFilesResponse>;
+export type ImportedResourceFileT = z.infer<typeof ImportedResourceFile>;
+export const TERMINAL_DATA = 'terminal:data';
+export const TERMINAL_EXIT = 'terminal:exit';
+export const TERMINAL_WRITE = 'terminal:write';
+export const TERMINAL_RESIZE = 'terminal:resize';
+export const TERMINAL_KILL = 'terminal:kill';
+
+export const TerminalSpawnRequest = z.object({
+  shell: z.string().optional(),
+  cwd: z.string().optional(),
+  cols: z.number().default(80),
+  rows: z.number().default(24),
+});
+export const TerminalSpawnResponse = z.object({
+  pid: z.number(),
+});
+export type TerminalSpawnReq = z.infer<typeof TerminalSpawnRequest>;
+export type TerminalSpawnRes = z.infer<typeof TerminalSpawnResponse>;
+
+export const TerminalWriteRequest = z.object({
+  pid: z.number(),
+  data: z.string(),
+});
+export const TerminalResizeRequest = z.object({
+  pid: z.number(),
+  cols: z.number(),
+  rows: z.number(),
+});
+export const TerminalKillRequest = z.object({
+  pid: z.number(),
+});

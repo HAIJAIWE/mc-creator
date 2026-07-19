@@ -29,6 +29,13 @@ describe('assertWithin', () => {
     expect(() => assertWithin('C:\\Users\\base', 'file.txt')).not.toThrow();
     expect(() => assertWithin('C:\\Users\\base', '..\\..\\Windows')).toThrow(/非法路径/);
   });
+
+  it('Windows 跨盘符绕过防护', () => {
+    // relative('C:\\base', 'D:\\evil') 在 Windows 返回 'D:\\evil'（绝对路径）
+    // 不以 .. 开头但 isAbsolute 为 true，必须拦截
+    expect(() => assertWithin('C:\\Users\\base', 'D:\\evil\\path')).toThrow(/非法路径/);
+    expect(() => assertWithin('C:\\Users\\base', 'E:\\')).toThrow(/非法路径/);
+  });
 });
 
 describe('parseGitStatus', () => {

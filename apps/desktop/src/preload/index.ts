@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC,
   EXPORT_ZIP,
+  SAVE_FILE,
+  SAVE_ALL_FILES,
   PREPARE_BUILD_DIR,
   EXPORT_PROJECT,
   IMPORT_PROJECT,
@@ -35,10 +37,23 @@ import {
   GIT_COMMIT,
   GIT_PULL,
   GIT_PUSH,
+  GIT_BRANCH_LIST,
+  GIT_BRANCH_CREATE,
+  GIT_BRANCH_SWITCH,
+  GIT_ADD,
+  GIT_RESET,
+  GIT_DIFF,
+  TERMINAL_SPAWN,
+  TERMINAL_DATA,
+  TERMINAL_EXIT,
+  TERMINAL_WRITE,
+  TERMINAL_RESIZE,
+  TERMINAL_KILL,
   LOCATE_MC,
   MC_CHOOSE_DIR,
   INSTALL_MOD,
   LAUNCH_MC,
+  IMPORT_RESOURCE_FILES,
   type GeneratorType,
   type BuildStreamChunkT,
 } from '../shared/ipc-channels.js';
@@ -128,6 +143,10 @@ const api = {
   },
   exportZip: (req: { files: { path: string; content: string }[]; defaultName: string }) =>
     ipcRenderer.invoke(EXPORT_ZIP, req),
+  saveFile: (req: { path: string; content: string; defaultName?: string }) =>
+    ipcRenderer.invoke(SAVE_FILE, req),
+  saveAllFiles: (req: { files: { path: string; content: string }[] }) =>
+    ipcRenderer.invoke(SAVE_ALL_FILES, req),
   prepareBuildDir: (files: { path: string; content: string }[]) =>
     ipcRenderer.invoke(PREPARE_BUILD_DIR, { files }),
   listProjects: () => ipcRenderer.invoke(LIST_PROJECTS),
@@ -155,12 +174,41 @@ const api = {
     ipcRenderer.invoke(GIT_COMMIT, { repoPath, message, all }),
   gitPull: (repoPath: string) => ipcRenderer.invoke(GIT_PULL, { repoPath }),
   gitPush: (repoPath: string) => ipcRenderer.invoke(GIT_PUSH, { repoPath }),
+  // Git 增强
+  gitBranchList: (repoPath: string) => ipcRenderer.invoke(GIT_BRANCH_LIST, { repoPath }),
+  gitBranchCreate: (repoPath: string, name: string) =>
+    ipcRenderer.invoke(GIT_BRANCH_CREATE, { repoPath, name }),
+  gitBranchSwitch: (repoPath: string, name: string) =>
+    ipcRenderer.invoke(GIT_BRANCH_SWITCH, { repoPath, name }),
+  gitAdd: (repoPath: string, paths: string[]) => ipcRenderer.invoke(GIT_ADD, { repoPath, paths }),
+  gitReset: (repoPath: string, paths: string[]) =>
+    ipcRenderer.invoke(GIT_RESET, { repoPath, paths }),
+  gitDiff: (repoPath: string, path: string, staged?: boolean) =>
+    ipcRenderer.invoke(GIT_DIFF, { repoPath, path, staged }),
+  // 终端（PTY 桥接）
+  terminalSpawn: (req: { shell?: string; cwd?: string; cols?: number; rows?: number }) =>
+    ipcRenderer.invoke(TERMINAL_SPAWN, req),
+  terminalWrite: (pid: number, data: string) => ipcRenderer.invoke(TERMINAL_WRITE, { pid, data }),
+  terminalResize: (pid: number, cols: number, rows: number) =>
+    ipcRenderer.invoke(TERMINAL_RESIZE, { pid, cols, rows }),
+  terminalKill: (pid: number) => ipcRenderer.invoke(TERMINAL_KILL, { pid }),
+  onTerminalData: (handler: (_e: unknown, data: { pid: number; data: string }) => void) => {
+    ipcRenderer.on(TERMINAL_DATA, handler);
+    return () => ipcRenderer.removeListener(TERMINAL_DATA, handler);
+  },
+  onTerminalExit: (handler: (_e: unknown, data: { pid: number; exitCode: number }) => void) => {
+    ipcRenderer.on(TERMINAL_EXIT, handler);
+    return () => ipcRenderer.removeListener(TERMINAL_EXIT, handler);
+  },
   // Minecraft 启动器（离线）
   locateMc: () => ipcRenderer.invoke(LOCATE_MC),
   chooseMcDir: () => ipcRenderer.invoke(MC_CHOOSE_DIR),
   installMod: (jarPath: string, mcDir?: string) =>
     ipcRenderer.invoke(INSTALL_MOD, { jarPath, mcDir }),
   launchMc: (mcDir?: string) => ipcRenderer.invoke(LAUNCH_MC, { mcDir }),
+  // 资源文件导入
+  importResourceFiles: (req: { title?: string; extensions?: string[]; multiSelect?: boolean }) =>
+    ipcRenderer.invoke(IMPORT_RESOURCE_FILES, req),
 };
 
 try {

@@ -6,6 +6,7 @@ import { dirname, join, basename } from 'node:path';
 import { homedir } from 'node:os';
 import JSZip from 'jszip';
 import { z } from 'zod';
+import { IPty, spawn as ptySpawn } from 'node-pty';
 import {
   Orchestrator,
   runGradleBuild,
@@ -28,6 +29,8 @@ import { loadProjects, saveProject, deleteProject, getProject } from './project-
 import {
   IPC,
   EXPORT_ZIP,
+  SAVE_FILE,
+  SAVE_ALL_FILES,
   PREPARE_BUILD_DIR,
   EXPORT_PROJECT,
   IMPORT_PROJECT,
@@ -39,6 +42,8 @@ import {
   ChatRequest,
   ChatStreamRequest,
   ExportZipRequest,
+  SaveFileRequest,
+  SaveAllFilesRequest,
   PrepareBuildDirRequest,
   ExportProjectRequest,
   ProjectSchema,
@@ -82,6 +87,18 @@ import {
   GIT_COMMIT,
   GIT_PULL,
   GIT_PUSH,
+  GIT_BRANCH_LIST,
+  GIT_BRANCH_CREATE,
+  GIT_BRANCH_SWITCH,
+  GIT_ADD,
+  GIT_RESET,
+  GIT_DIFF,
+  TERMINAL_SPAWN,
+  TERMINAL_DATA,
+  TERMINAL_EXIT,
+  TERMINAL_WRITE,
+  TERMINAL_RESIZE,
+  TERMINAL_KILL,
   GitStatusRequest,
   GitLogRequest,
   GitCommitRequest,
@@ -96,6 +113,8 @@ import {
   type GenerateFilesRes,
   type BuildRes,
   type ExportZipRes,
+  type SaveFileRes,
+  type SaveAllFilesRes,
   type PrepareBuildDirRes,
   type ExportProjectRes,
   type ImportProjectRes,
@@ -114,6 +133,9 @@ import {
   type McChooseDirRes,
   type InstallModRes,
   type LaunchMcRes,
+  IMPORT_RESOURCE_FILES,
+  ImportResourceFilesRequest,
+  type ImportResourceFilesRes,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -352,12 +374,14 @@ ${req.buildLog}
   });
 
   // 流式构建（P20）：spawn gradlew，逐行推送 stdout/stderr
+  const activeBuildProcesses = new Set<ReturnType<typeof spawn>>();
   ipcMain.handle(BUILD_STREAM, async (e, raw: unknown) => {
     const req = BuildStreamRequest.parse(raw);
     const cwd = req.projectPath;
     // Windows 用 gradlew.bat，Unix 用 ./gradlew；避免 shell:true 降低命令注入风险
     const cmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
     const child = spawn(cmd, ['build'], { cwd });
+    activeBuildProcesses.add(child);
 
     child.stdout?.on('data', (data) => {
       e.sender.send(BUILD_STREAM_CHUNK, { type: 'stdout', text: data.toString(), done: false });
@@ -366,6 +390,7 @@ ${req.buildLog}
       e.sender.send(BUILD_STREAM_CHUNK, { type: 'stderr', text: data.toString(), done: false });
     });
     child.on('close', (code) => {
+      activeBuildProcesses.delete(child);
       e.sender.send(BUILD_STREAM_CHUNK, {
         type: 'exit',
         text: `进程退出，code=${code}`,
@@ -374,6 +399,7 @@ ${req.buildLog}
       });
     });
     child.on('error', (err) => {
+      activeBuildProcesses.delete(child);
       e.sender.send(BUILD_STREAM_CHUNK, {
         type: 'stderr',
         text: `进程启动失败：${err.message}`,
@@ -381,6 +407,18 @@ ${req.buildLog}
         exitCode: -1,
       });
     });
+  });
+
+  // 应用退出时清理所有活跃的构建子进程（PTY 清理在 ptySessions 定义后追加）
+  app.on('before-quit', () => {
+    for (const child of activeBuildProcesses) {
+      try {
+        child.kill();
+      } catch {
+        /* 进程可能已退出 */
+      }
+    }
+    activeBuildProcesses.clear();
   });
 
   // 导出 zip
@@ -406,6 +444,87 @@ ${req.buildLog}
     await writeFile(result.filePath, buf);
     return { ok: true, canceled: false, savedPath: result.filePath };
   });
+
+  // 单文件保存到磁盘
+  ipcMain.handle(SAVE_FILE, async (_e, raw: unknown): Promise<SaveFileRes> => {
+    const req = SaveFileRequest.parse(raw);
+    const defaultName = req.defaultName || req.path.split('/').pop() || 'file.txt';
+    const result = await dialog.showSaveDialog({
+      defaultPath: defaultName,
+      filters: [{ name: 'All Files', extensions: ['*'] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return { ok: false, canceled: true, savedPath: null };
+    }
+    // PNG 走 base64 解码写入，其他文件按 utf-8 文本写入
+    if (req.path.endsWith('.png')) {
+      await writeFile(result.filePath, Buffer.from(req.content, 'base64'));
+    } else {
+      await writeFile(result.filePath, req.content, 'utf-8');
+    }
+    return { ok: true, canceled: false, savedPath: result.filePath };
+  });
+
+  // 保存全部文件到磁盘（选择目录后按相对路径写入）
+  ipcMain.handle(SAVE_ALL_FILES, async (_e, raw: unknown): Promise<SaveAllFilesRes> => {
+    const req = SaveAllFilesRequest.parse(raw);
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, canceled: true, savedDir: null, count: 0 };
+    }
+    const baseDir = result.filePaths[0];
+    let count = 0;
+    for (const f of req.files) {
+      // 安全：禁止 ../.. 逃逸出 baseDir
+      assertWithin(baseDir, f.path);
+      const abs = join(baseDir, f.path);
+      await mkdir(dirname(abs), { recursive: true });
+      if (f.path.endsWith('.png')) {
+        await writeFile(abs, Buffer.from(f.content, 'base64'));
+      } else {
+        await writeFile(abs, f.content, 'utf-8');
+      }
+      count++;
+    }
+    return { ok: true, canceled: false, savedDir: baseDir, count };
+  });
+
+  // 资源文件导入：弹出文件选择对话框，读取文件并 base64 编码返回
+  ipcMain.handle(
+    IMPORT_RESOURCE_FILES,
+    async (_e, raw: unknown): Promise<ImportResourceFilesRes> => {
+      const req = ImportResourceFilesRequest.parse(raw);
+      const filters = [{ name: req.title, extensions: req.extensions }];
+      const result = await dialog.showOpenDialog({
+        title: req.title,
+        properties: req.multiSelect ? ['openFile', 'multiSelections'] : ['openFile'],
+        filters,
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { ok: false, canceled: true, files: [] };
+      }
+      const files: ImportResourceFilesRes['files'] = [];
+      for (const filePath of result.filePaths) {
+        try {
+          const buf = await readFile(filePath);
+          const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+          files.push({
+            sourcePath: filePath,
+            fileName: basename(filePath),
+            ext,
+            base64: buf.toString('base64'),
+            size: buf.length,
+          });
+        } catch (err) {
+          // 单文件读取失败不阻断整体导入，跳过
+          console.warn(`导入资源文件失败: ${filePath}`, err);
+        }
+      }
+      return { ok: true, canceled: false, files };
+    },
+  );
 
   // 准备构建目录（P22-4）：把内存中的 files 写入临时目录，返回绝对路径供后续 BUILD/BUILD_STREAM/BUILD_WITH_FIX 使用
   ipcMain.handle(PREPARE_BUILD_DIR, async (_e, raw: unknown): Promise<PrepareBuildDirRes> => {
@@ -643,6 +762,152 @@ ${req.buildLog}
       stdout,
       error: code === 0 ? null : stderr || '推送失败（可能无 upstream 或需先拉取）',
     };
+  });
+
+  // === Git 增强：分支管理 + 暂存区 + Diff ===
+  ipcMain.handle(GIT_BRANCH_LIST, async (_e, raw: unknown) => {
+    const { repoPath } = z.object({ repoPath: z.string().min(1) }).parse(raw);
+    const { code, stdout, stderr } = await runGit(
+      ['branch', '--list', '--format=%(refname:short)%00%(HEAD)'],
+      repoPath,
+    );
+    if (code !== 0) return { ok: false, branches: [], error: stderr || '获取分支列表失败' };
+    const branches = stdout
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [name, head] = line.split('\0');
+        return { name, current: head === '*' };
+      });
+    return { ok: true, branches, error: null };
+  });
+
+  ipcMain.handle(GIT_BRANCH_CREATE, async (_e, raw: unknown) => {
+    const { repoPath, name } = z
+      .object({ repoPath: z.string().min(1), name: z.string().min(1) })
+      .parse(raw);
+    const { code, stderr } = await runGit(['checkout', '-b', name], repoPath);
+    if (code !== 0) return { ok: false, error: stderr || '创建分支失败' };
+    return { ok: true, error: null };
+  });
+
+  ipcMain.handle(GIT_BRANCH_SWITCH, async (_e, raw: unknown) => {
+    const { repoPath, name } = z
+      .object({ repoPath: z.string().min(1), name: z.string().min(1) })
+      .parse(raw);
+    const { code, stderr } = await runGit(['checkout', name], repoPath);
+    if (code !== 0) return { ok: false, error: stderr || '切换分支失败' };
+    return { ok: true, error: null };
+  });
+
+  ipcMain.handle(GIT_ADD, async (_e, raw: unknown) => {
+    const { repoPath, paths } = z
+      .object({ repoPath: z.string().min(1), paths: z.array(z.string()) })
+      .parse(raw);
+    // 拒绝以 - 开头的路径（防止被 git 解释为选项，构成命令注入）
+    const dangerous = paths.filter((p) => p.startsWith('-'));
+    if (dangerous.length > 0) return { ok: false, error: `非法路径: ${dangerous.join(', ')}` };
+    // -- 告诉 git 后续参数均为路径，不会被解释为选项
+    const { code, stderr } = await runGit(['add', '--', ...paths], repoPath);
+    if (code !== 0) return { ok: false, error: stderr || '暂存失败' };
+    return { ok: true, error: null };
+  });
+
+  ipcMain.handle(GIT_RESET, async (_e, raw: unknown) => {
+    const { repoPath, paths } = z
+      .object({ repoPath: z.string().min(1), paths: z.array(z.string()) })
+      .parse(raw);
+    const { code, stderr } = await runGit(['reset', 'HEAD', '--', ...paths], repoPath);
+    if (code !== 0) return { ok: false, error: stderr || '取消暂存失败' };
+    return { ok: true, error: null };
+  });
+
+  ipcMain.handle(GIT_DIFF, async (_e, raw: unknown) => {
+    const { repoPath, path, staged } = z
+      .object({
+        repoPath: z.string().min(1),
+        path: z.string().min(1),
+        staged: z.boolean().optional(),
+      })
+      .parse(raw);
+    const args = staged ? ['diff', '--cached', '--', path] : ['diff', '--', path];
+    const { code, stdout, stderr } = await runGit(args, repoPath);
+    if (code !== 0) return { ok: false, diff: '', error: stderr || '获取差异失败' };
+    return { ok: true, diff: stdout, error: null };
+  });
+
+  // === 终端（PTY 桥接）：渲染进程 ↔ 主进程 PTY ↔ 真实 shell ===
+  const ptySessions = new Map<number, IPty>();
+
+  ipcMain.handle(TERMINAL_SPAWN, async (e, raw: unknown) => {
+    const req = z
+      .object({
+        shell: z.string().optional(),
+        cwd: z.string().optional(),
+        cols: z.number().default(80),
+        rows: z.number().default(24),
+      })
+      .parse(raw);
+
+    const shell = req.shell || (process.platform === 'win32' ? 'powershell.exe' : 'bash');
+    const cwd = req.cwd || app.getPath('home');
+    const ptyProcess = ptySpawn(shell, [], {
+      name: 'xterm-256color',
+      cols: req.cols,
+      rows: req.rows,
+      cwd,
+      env: process.env as Record<string, string>,
+    });
+
+    const pid = ptyProcess.pid;
+    ptySessions.set(pid, ptyProcess);
+
+    // PTY 输出 → 渲染进程
+    ptyProcess.onData((data: string) => {
+      e.sender.send(TERMINAL_DATA, { pid, data });
+    });
+
+    ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
+      e.sender.send(TERMINAL_EXIT, { pid, exitCode });
+      ptySessions.delete(pid);
+    });
+
+    return { pid };
+  });
+
+  ipcMain.handle(TERMINAL_WRITE, async (_e, raw: unknown) => {
+    const { pid, data } = z.object({ pid: z.number(), data: z.string() }).parse(raw);
+    const pty = ptySessions.get(pid);
+    if (pty) pty.write(data);
+  });
+
+  ipcMain.handle(TERMINAL_RESIZE, async (_e, raw: unknown) => {
+    const { pid, cols, rows } = z
+      .object({ pid: z.number(), cols: z.number(), rows: z.number() })
+      .parse(raw);
+    const pty = ptySessions.get(pid);
+    if (pty) pty.resize(cols, rows);
+  });
+
+  ipcMain.handle(TERMINAL_KILL, async (_e, raw: unknown) => {
+    const { pid } = z.object({ pid: z.number() }).parse(raw);
+    const pty = ptySessions.get(pid);
+    if (pty) {
+      pty.kill();
+      ptySessions.delete(pid);
+    }
+  });
+
+  // PTY 会话退出清理：应用关闭时 kill 所有活跃 PTY
+  app.on('before-quit', () => {
+    for (const [pid, pty] of ptySessions) {
+      try {
+        pty.kill();
+      } catch {
+        /* PTY 可能已退出 */
+      }
+      ptySessions.delete(pid);
+    }
   });
 
   // === Minecraft 启动器（A 切片：离线账号，无需微软 OAuth）===

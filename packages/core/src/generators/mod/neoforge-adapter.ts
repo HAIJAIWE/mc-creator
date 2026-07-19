@@ -270,7 +270,17 @@ type ModSpecLike = {
     miningLevel: number;
     lightLevel: number;
     resistance: number;
-    soundType: 'wood' | 'stone' | 'metal' | 'grass' | 'sand' | 'glass';
+    soundType:
+      | 'wood'
+      | 'stone'
+      | 'metal'
+      | 'grass'
+      | 'sand'
+      | 'glass'
+      | 'cloth'
+      | 'ladder'
+      | 'anvil'
+      | 'slime';
     dropSelf: boolean;
     dropItem: string;
   }>;

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { QuiltAdapter } from './quilt-adapter.js';
+import { ModSpec as ModSpecSchema } from '@mc-creator/shared';
 import type { GeneratorContext, ModSpec } from '@mc-creator/shared';
 
-const SPEC: ModSpec = {
+const SPEC: ModSpec = ModSpecSchema.parse({
   modId: 'ruby_tools',
   version: '1.0.0',
   name: 'Ruby Tools',
@@ -37,7 +38,7 @@ const SPEC: ModSpec = {
   credits: '',
   dependencies: [],
   website: '',
-};
+});
 
 const CTX: GeneratorContext = {
   loader: 'quilt',

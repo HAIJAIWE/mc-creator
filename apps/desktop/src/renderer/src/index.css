@@ -229,9 +229,9 @@ body {
     box-shadow: var(--mc-sheen);
   }
 
-  /* 活动栏的草绿激活指示条 */
+  /* 活动栏的草绿激活指示条（VS Code 风格：贴合 ActivityBar 最左边缘） */
   .mc-active-bar {
-    @apply absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r bg-mc-accent;
+    @apply absolute -left-1 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-sm bg-mc-accent;
   }
 }
 

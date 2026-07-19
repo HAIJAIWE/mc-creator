@@ -8,6 +8,9 @@ import { ipcClient } from '../lib/ipc-client.js';
 import type { FileNode } from '@mc-creator/shared';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
+import { registerJsonSchemaSupport } from '../lib/mc-json-schemas.js';
+import { getFileIconName, getLang } from '../lib/file-utils.js';
+import { Breadcrumb } from './Breadcrumb.js';
 
 function parsePngSize(content: string): { width: number; height: number } | null {
   try {
@@ -63,15 +66,6 @@ function PngPreview({ file }: { file: FileNode }) {
   );
 }
 
-function getFileIcon(path: string): string {
-  if (path.endsWith('.json')) return 'file-text';
-  if (path.endsWith('.java')) return 'terminal';
-  if (path.endsWith('.gradle') || path.endsWith('.toml') || path.endsWith('.properties'))
-    return 'terminal';
-  if (path.endsWith('.png')) return 'image';
-  return 'file';
-}
-
 function computeDefaultName(generatorType: GeneratorType, spec: unknown): string {
   const s = (spec ?? {}) as Record<string, unknown>;
   let name = 'export';
@@ -87,20 +81,25 @@ function computeDefaultName(generatorType: GeneratorType, spec: unknown): string
 
 export function CodePreview() {
   // P3 性能：shallow 选择器避免 buildLog 流式更新触发重渲染
-  const { files, previousFiles, selectedFile, generatorType, spec } = useModStore(
-    (s) => ({
-      files: s.files,
-      previousFiles: s.previousFiles,
-      selectedFile: s.selectedFile,
-      generatorType: s.generatorType,
-      spec: s.spec,
-    }),
-    shallow,
-  );
+  const { files, previousFiles, selectedFile, generatorType, spec, updateFileContent, dirtyFiles } =
+    useModStore(
+      (s) => ({
+        files: s.files,
+        previousFiles: s.previousFiles,
+        selectedFile: s.selectedFile,
+        generatorType: s.generatorType,
+        spec: s.spec,
+        updateFileContent: s.updateFileContent,
+        dirtyFiles: s.dirtyFiles,
+      }),
+      shallow,
+    );
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null,
   );
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   // AI 解释代码：流式输出 + 可折叠面板
   const [isExplaining, setIsExplaining] = useState(false);
   const [explanation, setExplanation] = useState('');
@@ -111,12 +110,14 @@ export function CodePreview() {
   // P3 性能：仅 files/selectedFile 变化时重算 file，避免每次渲染都 O(n) find
   const file = useMemo(() => files.find((f) => f.path === selectedFile), [files, selectedFile]);
   const isPng = selectedFile?.endsWith('.png') ?? false;
-  const fileIconName = file ? getFileIcon(file.path) : 'file';
+  const fileIconName = file ? getFileIconName(file.path) : 'file';
   // 仅文本文件且非空时才允许解释（PNG 走预览，空文件无内容可解释）
   const canExplain = !!file && !isPng && file.content.length > 0;
   // 差异对比：仅当有 previousFiles 且当前文件不是 PNG 时可用
   const canDiff = !!file && !isPng && previousFiles.length > 0;
   const originalContent = previousFiles.find((f) => f.path === selectedFile)?.content ?? '';
+  const isDirty = file ? dirtyFiles.has(file.path) : false;
+  const lang = file && !isPng ? getLang(file.path) : 'plaintext';
 
   const handleExport = async () => {
     if (files.length === 0) return;
@@ -132,6 +133,49 @@ export function CodePreview() {
       setExportMsg({ type: 'error', text: (e as Error).message });
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    // 直接读 store 最新状态，避免 Ctrl+S 闭包捕获旧 file
+    const state = useModStore.getState();
+    const currentFile = state.files.find((f) => f.path === state.selectedFile);
+    if (!currentFile) return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const res = await ipcClient.saveFile({
+        path: currentFile.path,
+        content: currentFile.content,
+        defaultName: currentFile.path.split('/').pop() || 'file.txt',
+      });
+      if (res.ok && res.savedPath) {
+        useModStore.getState().markFileClean(currentFile.path);
+        setSaveMsg({ type: 'success', text: `已保存到：${res.savedPath}` });
+      }
+    } catch (e) {
+      setSaveMsg({ type: 'error', text: (e as Error).message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAll = async () => {
+    // 直接读 store 最新状态，避免按钮禁用后状态不一致
+    const state = useModStore.getState();
+    if (state.files.length === 0) return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const res = await ipcClient.saveAllFiles({ files: state.files });
+      if (res.ok && res.savedDir) {
+        useModStore.getState().markAllClean();
+        setSaveMsg({ type: 'success', text: `已保存 ${res.count} 个文件到：${res.savedDir}` });
+      }
+    } catch (e) {
+      setSaveMsg({ type: 'error', text: (e as Error).message });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -158,19 +202,6 @@ export function CodePreview() {
     setExplanation('');
   };
 
-  const lang =
-    file && !isPng
-      ? file.path.endsWith('.java')
-        ? 'java'
-        : file.path.endsWith('.json')
-          ? 'json'
-          : file.path.endsWith('.gradle')
-            ? 'groovy'
-            : file.path.endsWith('.toml')
-              ? 'ini'
-              : 'plaintext'
-      : 'plaintext';
-
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-mc-border bg-mc-surface px-3 py-1.5">
@@ -179,6 +210,7 @@ export function CodePreview() {
             <>
               <McIcon scope="pixel" name={fileIconName} size={16} className="text-mc-mute" />
               <span className="max-w-md truncate text-xs text-mc-dim">{file.path}</span>
+              {isDirty && <span className="text-xs text-mc-gold">●</span>}
             </>
           ) : (
             <span className="text-xs text-mc-mute">选择文件预览代码</span>
@@ -190,6 +222,34 @@ export function CodePreview() {
           )}
           {exportMsg?.type === 'error' && (
             <span className="max-w-xs truncate text-xs text-mc-redstone">{exportMsg.text}</span>
+          )}
+          {saveMsg?.type === 'success' && (
+            <span className="max-w-xs truncate text-xs text-mc-accent">{saveMsg.text}</span>
+          )}
+          {saveMsg?.type === 'error' && (
+            <span className="max-w-xs truncate text-xs text-mc-redstone">{saveMsg.text}</span>
+          )}
+          {isDirty && (
+            <button
+              onClick={handleSave}
+              disabled={saving || !file}
+              className="mc-btn-primary"
+              title="保存当前文件 (Ctrl+S)"
+            >
+              {saving && <Loader2 className="h-3 w-3 animate-spin" />}
+              <McIcon scope="pixel" name="save" size={12} />
+              保存
+            </button>
+          )}
+          {dirtyFiles.size > 0 && (
+            <button
+              onClick={handleSaveAll}
+              disabled={saving}
+              className="mc-btn-ghost"
+              title="保存所有修改的文件"
+            >
+              保存全部 ({dirtyFiles.size})
+            </button>
           )}
           {canDiff && (
             <button
@@ -227,13 +287,21 @@ export function CodePreview() {
           </button>
         </div>
       </div>
+      {/* 面包屑导航 */}
+      {file && <Breadcrumb filePath={file.path} />}
       {!file ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-mc-bg">
           <div className="flex h-16 w-16 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
             <McIcon scope="pixel" name="terminal" size={32} className="text-mc-mute" />
           </div>
           <div className="text-sm font-medium text-mc-dim">选择文件预览代码</div>
-          <div className="text-xs text-mc-mute">点击左侧文件树中的文件</div>
+          <div className="flex flex-col items-center gap-1 text-xs text-mc-mute">
+            <span>点击左侧文件树中的文件</span>
+            <span className="text-[10px]">
+              <kbd className="rounded-mc bg-mc-surface-2 px-1 py-0.5 text-mc-dim">Ctrl+P</kbd>{' '}
+              快速打开
+            </span>
+          </div>
         </div>
       ) : isPng ? (
         <PngPreview file={file} />
@@ -256,6 +324,11 @@ export function CodePreview() {
                   scrollBeyondLastLine: false,
                   fontSize: 13,
                   minimap: { enabled: false },
+                  find: {
+                    addExtraSpaceOnTop: true,
+                    autoFindInSelection: 'multiline',
+                    seedSearchStringFromSelection: 'selection',
+                  },
                 }}
               />
             ) : (
@@ -264,9 +337,24 @@ export function CodePreview() {
                 path={file.path}
                 language={lang}
                 theme={MC_MONACO_THEME}
-                onMount={defineMcMonacoTheme}
+                onMount={(editor, monaco) => {
+                  defineMcMonacoTheme(editor, monaco);
+                  // JSON Schema 补全和验证
+                  if (lang === 'json') {
+                    registerJsonSchemaSupport(editor, monaco);
+                  }
+                  // 注册 Ctrl+S 命令：handleSave 内部读 store 最新状态，避免闭包陈旧
+                  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+                    void handleSave();
+                  });
+                }}
                 value={file.content}
-                options={{ ...mcEditorOptions, readOnly: true }}
+                onChange={(value) => {
+                  if (value !== undefined && value !== file.content) {
+                    updateFileContent(file.path, value);
+                  }
+                }}
+                options={{ ...mcEditorOptions, readOnly: false }}
               />
             )}
           </div>

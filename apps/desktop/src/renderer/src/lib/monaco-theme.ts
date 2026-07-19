@@ -65,11 +65,20 @@ function buildTheme(monaco: Parameters<OnMount>[1]) {
       'editorCursor.foreground': accentBright,
       'editorIndentGuide.background': surface2,
       'editorIndentGuide.activeBackground': border,
-      'editorWidget.background': bg,
+      'editorWidget.background': surface2,
       'editorWidget.border': border,
       'editorGutter.background': bg,
       'scrollbarSlider.background': border + '99',
       'scrollbarSlider.hoverBackground': accent + '99',
+      // 补全 / 查找替换 UI
+      'editorSuggestWidget.background': surface2,
+      'editorSuggestWidget.border': border,
+      'editorSuggestWidget.selectedBackground': accent + '33',
+      findMatchHighlightBackground: gold + '44',
+      findMatchHighlightBorder: gold + '88',
+      currentFindMatchHighlightBackground: accent + '55',
+      currentFindMatchHighlightBorder: accent,
+      findRangeHighlightBackground: surface2,
     },
   });
   monaco.editor.setTheme(MC_MONACO_THEME);
@@ -87,12 +96,45 @@ export const defineMcMonacoTheme: OnMount = (_editor, monaco) => {
 /** 供 Editor 的 theme 属性直接引用（defineTheme 需在 onMount 注册） */
 export const mcEditorOptions: StandaloneEditorConstructionOptions = {
   fontSize: 13,
-  minimap: { enabled: false },
+  minimap: { enabled: true, maxColumn: 80, showSlider: 'mouseover' },
   lineNumbers: 'on',
   scrollBeyondLastLine: false,
   automaticLayout: true,
   fontFamily: "'Monocraft', 'VT323', 'Courier New', Consolas, monospace",
+  fontLigatures: true,
   smoothScrolling: true,
   cursorBlinking: 'smooth',
+  cursorSmoothCaretAnimation: 'on',
   padding: { top: 10 },
+  // 查找/替换（Ctrl+F / Ctrl+H）
+  find: {
+    addExtraSpaceOnTop: true,
+    autoFindInSelection: 'multiline',
+    seedSearchStringFromSelection: 'selection',
+  },
+  // 代码编辑增强
+  bracketPairColorization: { enabled: true },
+  autoClosingBrackets: 'always',
+  autoClosingQuotes: 'always',
+  autoIndent: 'full',
+  formatOnPaste: true,
+  formatOnType: true,
+  folding: true,
+  foldingStrategy: 'indentation',
+  showFoldingControls: 'mouseover',
+  wordWrap: 'off',
+  wordWrapColumn: 120,
+  wrappingIndent: 'same',
+  // 建议和补全
+  suggestOnTriggerCharacters: true,
+  acceptSuggestionOnEnter: 'on',
+  tabCompletion: 'on',
+  quickSuggestions: { other: true, comments: false, strings: true },
+  parameterHints: { enabled: true },
+  // 缩进
+  tabSize: 2,
+  insertSpaces: true,
+  detectIndentation: true,
+  // 无障碍和稳定性
+  accessibilitySupport: 'auto',
 };

@@ -13,11 +13,28 @@ import { SearchPanel } from './components/SearchPanel.js';
 import { PackagesPanel } from './components/PackagesPanel.js';
 import { GitPanel } from './components/GitPanel.js';
 import { BlockEditor } from './components/BlockEditor.js';
+import { McLauncherPanel } from './components/McLauncherPanel.js';
+import { EntityAiEditor } from './components/EntityAiEditor.js';
+import { AudioPanel } from './components/AudioPanel.js';
+import { CiCdPanel } from './components/CiCdPanel.js';
 import { BuildPanel } from './components/BuildPanel.js';
+import { TerminalPanel } from './components/TerminalPanel.js';
 import { Dashboard } from './components/Dashboard.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { useProjectStore } from './store/project-store.js';
 
-type Activity = 'explorer' | 'search' | 'git' | 'packages' | 'settings' | 'items' | 'blocks';
+type Activity =
+  | 'explorer'
+  | 'search'
+  | 'git'
+  | 'packages'
+  | 'settings'
+  | 'items'
+  | 'blocks'
+  | 'mc'
+  | 'entity'
+  | 'audio'
+  | 'cicd';
 
 /** 工作台视图（三栏布局） */
 function Workbench() {
@@ -51,6 +68,14 @@ function Workbench() {
         return <ItemRecipeEditor />;
       case 'blocks':
         return <BlockEditor />;
+      case 'mc':
+        return <McLauncherPanel />;
+      case 'entity':
+        return <EntityAiEditor />;
+      case 'audio':
+        return <AudioPanel />;
+      case 'cicd':
+        return <CiCdPanel />;
       case 'settings':
         return (
           <SettingsPanel
@@ -84,14 +109,17 @@ function Workbench() {
           style={{ width: leftWidth }}
           className="flex-shrink-0 overflow-hidden border-r border-mc-border bg-mc-surface"
         >
-          {renderActivityPanel()}
+          <ErrorBoundary name="侧面板">{renderActivityPanel()}</ErrorBoundary>
         </aside>
 
         <Splitter onResize={handleLeftResize} />
 
         <main className="flex flex-1 flex-col overflow-hidden">
-          <MiddlePanel />
+          <ErrorBoundary name="编辑区">
+            <MiddlePanel />
+          </ErrorBoundary>
           <BuildPanel />
+          <TerminalPanel />
         </main>
 
         <Splitter onResize={handleRightResize} />
@@ -100,7 +128,9 @@ function Workbench() {
           style={{ width: rightWidth }}
           className="flex-shrink-0 overflow-hidden border-l border-mc-border bg-mc-surface"
         >
-          <AgentPanel />
+          <ErrorBoundary name="智能体面板">
+            <AgentPanel />
+          </ErrorBoundary>
         </aside>
       </div>
 
@@ -118,6 +148,11 @@ function Workbench() {
 export default function App() {
   // P1 修复：按 view 状态切换 Dashboard 首屏与工作台
   const view = useProjectStore((s) => s.view);
-  if (view === 'dashboard') return <Dashboard />;
+  if (view === 'dashboard')
+    return (
+      <ErrorBoundary name="仪表盘">
+        <Dashboard />
+      </ErrorBoundary>
+    );
   return <Workbench />;
 }

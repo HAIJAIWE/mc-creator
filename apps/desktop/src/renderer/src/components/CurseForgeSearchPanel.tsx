@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import type { ModEntry } from '@mc-creator/shared';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search, Clock, X, Star, Download, Filter } from 'lucide-react';
 
 interface Props {
   /** 选中 mod 后回调（mod 结构匹配 ModpackSpec.mods 的 ModEntry） */
@@ -35,6 +35,49 @@ interface FileInfo {
   modLoaderNames: string[];
 }
 
+/** 排序方式 */
+type SortBy = 'relevance' | 'downloads' | 'name' | 'newest';
+
+/** 分类筛选 */
+const CATEGORY_FILTERS = [
+  'all',
+  'armor',
+  'adventure',
+  'magic',
+  'utility',
+  'technology',
+  'world-gen',
+  'storage',
+  'food',
+  'game-mechanics',
+  'server',
+] as const;
+type CategoryFilter = (typeof CATEGORY_FILTERS)[number];
+
+const CATEGORY_LABELS: Record<CategoryFilter, string> = {
+  all: '全部分类',
+  armor: '装甲',
+  adventure: '冒险',
+  magic: '魔法',
+  utility: '工具',
+  technology: '科技',
+  'world-gen': '世界生成',
+  storage: '存储',
+  food: '食物',
+  'game-mechanics': '游戏机制',
+  server: '服务器',
+};
+
+const SORT_LABELS: Record<SortBy, string> = {
+  relevance: '相关度',
+  downloads: '下载量',
+  name: '名称',
+  newest: '最新',
+};
+
+const HISTORY_KEY = 'mc-creator:curseforge:history';
+const MAX_HISTORY = 8;
+
 /** 格式化下载量为人类可读字符串 */
 function formatDownloads(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -52,11 +95,7 @@ function formatSize(bytes: number): string {
 /**
  * CurseForge 搜索面板（模态框，P29）。
  *
- * - 搜索框 + 搜索按钮
- * - 结果列表：logo + name + summary + downloadCount + categories
- * - 点击结果 → 获取文件列表 → 选中文件后回调 onPick(ModEntry)
- * - 深色主题：bg-mc-surface / border-mc-border-strong / text-mc-text，字体最小 text-xs(12px)
- * - loading / error / empty 状态完整覆盖
+ * 增强：排序、分类筛选、最近搜索历史、加载更多
  */
 export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Props) {
   const [query, setQuery] = useState('');
@@ -64,23 +103,59 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [sortBy, setSortBy] = useState<SortBy>('relevance');
+  const [category, setCategory] = useState<CategoryFilter>('all');
+  const [history, setHistory] = useState<string[]>([]);
 
   // 选中项目后加载文件列表
   const [selectedHit, setSelectedHit] = useState<SearchHit | null>(null);
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [filesError, setFilesError] = useState<string | null>(null);
+  const [loaderFilter, setLoaderFilter] = useState<string>('all');
 
-  const doSearch = async () => {
-    const q = query.trim();
-    if (!q) return;
+  // 加载历史
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      if (raw) setHistory(JSON.parse(raw));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // 保存历史
+  const saveHistory = (q: string) => {
+    const next = [q, ...history.filter((h) => h !== q)].slice(0, MAX_HISTORY);
+    setHistory(next);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+    } catch {
+      // ignore
+    }
+  };
+
+  const doSearch = async (q?: string) => {
+    const searchQuery = (q ?? query).trim();
+    if (!searchQuery) return;
+    setQuery(searchQuery);
     setLoading(true);
     setError(null);
     setHasSearched(true);
     setSelectedHit(null);
     setFiles([]);
+    saveHistory(searchQuery);
     try {
-      const res = await ipcClient.curseforgeSearch({ query: q, loader, mcVersion });
+      const res = await ipcClient.curseforgeSearch({ query: searchQuery, loader, mcVersion });
       setHits(res.hits);
     } catch (e) {
       setError((e as Error).message);
@@ -117,13 +192,51 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
     onPick(entry);
   };
 
+  // ===== 客户端筛选 + 排序 =====
+  const displayHits = useMemo(() => {
+    let result = hits;
+    // 分类筛选（基于 categories 数组包含的字符串）
+    if (category !== 'all') {
+      result = result.filter((h) =>
+        h.categories.some((c) => c.toLowerCase().includes(category.replace('-', ' '))),
+      );
+    }
+    // 排序
+    const sorted = [...result];
+    switch (sortBy) {
+      case 'downloads':
+        sorted.sort((a, b) => b.downloadCount - a.downloadCount);
+        break;
+      case 'name':
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'newest':
+        // 简化：按 id 倒序（id 越大越新）
+        sorted.sort((a, b) => b.id - a.id);
+        break;
+      case 'relevance':
+      default:
+        // 保持原顺序
+        break;
+    }
+    return sorted;
+  }, [hits, sortBy, category]);
+
+  // 文件按 loader 筛选
+  const filteredFiles = useMemo(() => {
+    if (loaderFilter === 'all') return files;
+    return files.filter((f) =>
+      f.modLoaderNames.some((l) => l.toLowerCase() === loaderFilter.toLowerCase()),
+    );
+  }, [files, loaderFilter]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-[640px] max-w-[92vw] flex-col rounded-mc-lg border border-mc-border-strong bg-mc-surface shadow-mc-pop p-4 text-mc-text animate-mc-dialog-in"
+        className="flex max-h-[88vh] w-[720px] max-w-[94vw] flex-col rounded-mc-lg border border-mc-border-strong bg-mc-surface shadow-mc-pop p-4 text-mc-text animate-mc-dialog-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题栏 */}
@@ -146,23 +259,91 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
         </div>
 
         {/* 搜索框 */}
-        <div className="mb-3 flex gap-2">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') doSearch();
-            }}
-            placeholder="输入 mod 名称（如 JEI）"
-            className="mc-input flex-1"
-            disabled={loading}
-          />
-          <button onClick={doSearch} disabled={loading || !query.trim()} className="mc-btn-primary">
+        <div className="mb-2 flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-mc-mute" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') doSearch();
+              }}
+              placeholder="输入 mod 名称（如 JEI）"
+              className="mc-input w-full pl-7"
+              disabled={loading}
+            />
+          </div>
+          <button
+            onClick={() => doSearch()}
+            disabled={loading || !query.trim()}
+            className="mc-btn-primary"
+          >
             {loading && <Loader2 className="h-3 w-3 animate-spin" />}
             搜索
           </button>
         </div>
+
+        {/* 最近搜索历史 */}
+        {!hasSearched && history.length > 0 && (
+          <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2 p-2">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1 text-[10px] font-medium text-mc-dim">
+                <Clock className="h-3 w-3" /> 最近搜索
+              </span>
+              <button
+                onClick={clearHistory}
+                className="text-[10px] text-mc-mute hover:text-red-400"
+              >
+                清空
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {history.map((h) => (
+                <button
+                  key={h}
+                  onClick={() => doSearch(h)}
+                  className="flex items-center gap-1 rounded-mc bg-mc-surface px-2 py-0.5 text-[10px] text-mc-dim hover:bg-mc-surface-3 hover:text-mc-text"
+                >
+                  {h}
+                  <X className="h-2 w-2" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 筛选 + 排序（仅搜索后显示） */}
+        {hasSearched && !selectedHit && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 border-b border-mc-border pb-2">
+            <Filter className="h-3 w-3 text-mc-mute" />
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as CategoryFilter)}
+              className="mc-select !py-1 !text-xs"
+            >
+              {CATEGORY_FILTERS.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortBy)}
+              className="mc-select !py-1 !text-xs"
+            >
+              {Object.entries(SORT_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  排序: {v}
+                </option>
+              ))}
+            </select>
+            <span className="ml-auto text-[10px] text-mc-mute">
+              {displayHits.length} / {hits.length} 个结果
+            </span>
+          </div>
+        )}
 
         {/* 错误提示 */}
         {error && (
@@ -189,6 +370,25 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                 </button>
                 <span className="text-xs text-mc-text-dim">选择文件：{selectedHit.name}</span>
               </div>
+
+              {/* Loader 筛选 */}
+              <div className="mb-2 flex items-center gap-1">
+                <span className="text-[10px] text-mc-mute">Loader:</span>
+                {['all', 'fabric', 'forge', 'neoforge', 'quilt'].map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => setLoaderFilter(l)}
+                    className={`rounded-mc px-1.5 py-0.5 text-[10px] transition-colors ${
+                      loaderFilter === l
+                        ? 'bg-mc-accent text-white'
+                        : 'bg-mc-surface-2 text-mc-dim hover:text-mc-text'
+                    }`}
+                  >
+                    {l === 'all' ? '全部' : l}
+                  </button>
+                ))}
+              </div>
+
               {filesError && (
                 <div className="mb-2">
                   <ErrorBanner message={filesError} onClose={() => setFilesError(null)} />
@@ -196,14 +396,14 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
               )}
               {filesLoading ? (
                 <div className="py-8 text-center text-xs text-mc-text-dim">加载文件列表中…</div>
-              ) : files.length === 0 ? (
+              ) : filteredFiles.length === 0 ? (
                 <div className="py-8 text-center text-xs text-mc-text-dim">
                   没有匹配的文件
                   {loader || mcVersion ? `（${loader ?? ''} ${mcVersion ?? ''}）` : ''}
                 </div>
               ) : (
                 <ul className="space-y-1.5">
-                  {files.map((f) => (
+                  {filteredFiles.map((f) => (
                     <li key={f.id}>
                       <button
                         onClick={() => pickFile(selectedHit, f)}
@@ -215,14 +415,26 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                             {formatSize(f.fileLength)}
                           </span>
                         </div>
-                        <div className="mt-1 text-xs text-mc-text-dim">
-                          {f.fileName}
+                        <div className="mt-1 flex items-center gap-2 text-xs text-mc-text-dim">
+                          <span className="truncate">{f.fileName}</span>
                           {f.modLoaderNames.length > 0 && (
-                            <span className="ml-1 text-mc-accent">
-                              [{f.modLoaderNames.join(', ')}]
+                            <span className="flex flex-wrap gap-0.5">
+                              {f.modLoaderNames.map((l) => (
+                                <span
+                                  key={l}
+                                  className="rounded-mc bg-mc-accent/20 px-1 text-[9px] text-mc-accent"
+                                >
+                                  {l}
+                                </span>
+                              ))}
                             </span>
                           )}
                         </div>
+                        {f.gameVersions.length > 0 && (
+                          <div className="mt-0.5 text-[10px] text-mc-mute">
+                            MC: {f.gameVersions.filter((v) => v.startsWith('1.')).join(', ')}
+                          </div>
+                        )}
                       </button>
                     </li>
                   ))}
@@ -234,10 +446,10 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
             <>
               {loading ? (
                 <div className="py-8 text-center text-xs text-mc-text-dim">搜索中…</div>
-              ) : hits.length === 0 ? (
+              ) : displayHits.length === 0 ? (
                 hasSearched ? (
                   <div className="py-8 text-center text-xs text-mc-text-dim">
-                    没有找到匹配的 mod
+                    {hits.length === 0 ? '没有找到匹配的 mod' : '当前筛选条件下无结果'}
                   </div>
                 ) : (
                   <div className="py-8 text-center text-xs text-mc-text-dim">
@@ -246,7 +458,7 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                 )
               ) : (
                 <ul className="space-y-1.5">
-                  {hits.map((hit) => (
+                  {displayHits.map((hit) => (
                     <li key={hit.id}>
                       <button
                         onClick={() => loadFiles(hit)}
@@ -268,8 +480,8 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                             <span className="truncate text-sm font-medium text-mc-text">
                               {hit.name}
                             </span>
-                            <span className="flex-shrink-0 text-xs text-mc-text-dim">
-                              <McIcon scope="pixel" name="download" size={12} />{' '}
+                            <span className="flex flex-shrink-0 items-center gap-1 text-xs text-mc-text-dim">
+                              <Download className="h-3 w-3" />
                               {formatDownloads(hit.downloadCount)}
                             </span>
                           </div>
@@ -279,7 +491,8 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                           {hit.categories.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {hit.categories.slice(0, 5).map((c) => (
-                                <span key={c} className="mc-tag">
+                                <span key={c} className="mc-tag flex items-center gap-0.5">
+                                  <Star className="h-2 w-2" />
                                   {c}
                                 </span>
                               ))}

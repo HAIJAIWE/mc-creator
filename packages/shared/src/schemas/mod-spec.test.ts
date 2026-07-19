@@ -140,9 +140,11 @@ describe('BlockSpec schema', () => {
   });
 
   it('material 枚举校验', () => {
-    expect(() => BlockSpec.parse({ id: 'x', name: 'x', material: 'water' })).toThrow();
+    expect(() => BlockSpec.parse({ id: 'x', name: 'x', material: 'plasma' })).toThrow(); // 不存在的材质
     expect(() => BlockSpec.parse({ id: 'x', name: 'x', material: 'wood' })).not.toThrow();
     expect(() => BlockSpec.parse({ id: 'x', name: 'x', material: 'rock' })).not.toThrow();
+    expect(() => BlockSpec.parse({ id: 'x', name: 'x', material: 'water' })).not.toThrow(); // 新增合法值
+    expect(() => BlockSpec.parse({ id: 'x', name: 'x', material: 'ice' })).not.toThrow(); // 新增合法值
   });
 
   it('dropSelf=false 时 dropItem 可指定掉落物', () => {

@@ -1,12 +1,17 @@
-import { resolve, relative } from 'node:path';
+import { resolve, relative, isAbsolute } from 'node:path';
 
 /**
  * 校验 target 解析后仍位于 base 目录内，防止路径穿越（如 ../../etc/passwd）。
  * 用于 PREPARE_BUILD_DIR / build-fixer 等把外部传入路径拼接到受控目录的场景。
+ *
+ * 注意：Windows 上跨盘符（如 base=C:\foo, target=D:\bar）时，
+ * Node.js 的 relative() 会返回目标绝对路径（不以 .. 开头），
+ * 因此需要额外检查结果是否为相对路径。
  */
 export function assertWithin(base: string, target: string): void {
   const rel = relative(resolve(base), resolve(base, target));
-  if (rel.startsWith('..')) {
+  // 跨盘符或路径逃逸：relative 结果为绝对路径或以 .. 开头
+  if (isAbsolute(rel) || rel.startsWith('..')) {
     throw new Error(`非法路径：${target} 逃逸出受控目录 ${base}`);
   }
 }

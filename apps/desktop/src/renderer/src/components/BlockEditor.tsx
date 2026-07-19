@@ -192,7 +192,8 @@ export function BlockEditor() {
     lore: '',
     attributes: [],
     defaultEnchantments: [],
-    itemCategory: creativeTab,
+    itemCategory: 'misc',
+    creativeTab,
   });
 
   const json = JSON.stringify(buildItem(), null, 2);

@@ -4,6 +4,8 @@ import type {
   BuildRes,
   BuildWithFixRes,
   ExportZipRes,
+  SaveFileRes,
+  SaveAllFilesRes,
   PrepareBuildDirRes,
   ExportProjectRes,
   ImportProjectRes,
@@ -20,10 +22,15 @@ import type {
   GitLogRes,
   GitCommitRes,
   GitSyncRes,
+  GitBranchListRes,
+  GitBranchCreateRes,
+  GitBranchSwitchRes,
+  GitDiffRes,
   LocateMcRes,
   McChooseDirRes,
   InstallModRes,
   LaunchMcRes,
+  ImportResourceFilesRes,
 } from '../../../shared/ipc-channels.js';
 
 /** 封装 window.mcApi，提供类型安全调用 */
@@ -70,6 +77,10 @@ export const ipcClient = {
     files: { path: string; content: string }[];
     defaultName: string;
   }): Promise<ExportZipRes> => window.mcApi.exportZip(req),
+  saveFile: (req: { path: string; content: string; defaultName?: string }): Promise<SaveFileRes> =>
+    window.mcApi.saveFile(req),
+  saveAllFiles: (req: { files: { path: string; content: string }[] }): Promise<SaveAllFilesRes> =>
+    window.mcApi.saveAllFiles(req),
   prepareBuildDir: (files: { path: string; content: string }[]): Promise<PrepareBuildDirRes> =>
     window.mcApi.prepareBuildDir(files),
   listProjects: (): Promise<Project[]> => window.mcApi.listProjects(),
@@ -113,10 +124,41 @@ export const ipcClient = {
     window.mcApi.gitCommit(repoPath, message, all),
   gitPull: (repoPath: string): Promise<GitSyncRes> => window.mcApi.gitPull(repoPath),
   gitPush: (repoPath: string): Promise<GitSyncRes> => window.mcApi.gitPush(repoPath),
+  // Git 增强
+  gitBranchList: (repoPath: string): Promise<GitBranchListRes> =>
+    window.mcApi.gitBranchList(repoPath),
+  gitBranchCreate: (repoPath: string, name: string): Promise<GitBranchCreateRes> =>
+    window.mcApi.gitBranchCreate(repoPath, name),
+  gitBranchSwitch: (repoPath: string, name: string): Promise<GitBranchSwitchRes> =>
+    window.mcApi.gitBranchSwitch(repoPath, name),
+  gitAdd: (repoPath: string, paths: string[]): Promise<{ ok: boolean; error?: string }> =>
+    window.mcApi.gitAdd(repoPath, paths),
+  gitReset: (repoPath: string, paths: string[]): Promise<{ ok: boolean; error?: string }> =>
+    window.mcApi.gitReset(repoPath, paths),
+  gitDiff: (repoPath: string, path: string, staged?: boolean): Promise<GitDiffRes> =>
+    window.mcApi.gitDiff(repoPath, path, staged),
   // Minecraft 启动器（离线）
   locateMc: (): Promise<LocateMcRes> => window.mcApi.locateMc(),
   chooseMcDir: (): Promise<McChooseDirRes> => window.mcApi.chooseMcDir(),
   installMod: (jarPath: string, mcDir?: string): Promise<InstallModRes> =>
     window.mcApi.installMod(jarPath, mcDir),
   launchMc: (mcDir?: string): Promise<LaunchMcRes> => window.mcApi.launchMc(mcDir),
+  // 终端（PTY 桥接）
+  terminalSpawn: (req: {
+    shell?: string;
+    cwd?: string;
+    cols?: number;
+    rows?: number;
+  }): Promise<{ pid: number }> => window.mcApi.terminalSpawn(req),
+  terminalWrite: (pid: number, data: string): Promise<void> =>
+    window.mcApi.terminalWrite(pid, data),
+  terminalResize: (pid: number, cols: number, rows: number): Promise<void> =>
+    window.mcApi.terminalResize(pid, cols, rows),
+  terminalKill: (pid: number): Promise<void> => window.mcApi.terminalKill(pid),
+  // 资源文件导入
+  importResourceFiles: (req?: {
+    title?: string;
+    extensions?: string[];
+    multiSelect?: boolean;
+  }): Promise<ImportResourceFilesRes> => window.mcApi.importResourceFiles(req ?? {}),
 };

@@ -1,0 +1,19 @@
+diff --git a/default.js b/default.js
+index 7bd408832c9c98c34e96556d1e6bc3d45b93c519..d859be1c97690efb48109f537f607208d163068d 100644
+--- a/default.js
++++ b/default.js	
+@@ -1,3 +1,14 @@
++// Patched: re-export node.js functions so bundlers picking the "default"
++// condition (e.g. esbuild during Vite preview) still get toPath/traversePathUp.
++// Required by npm-run-path@6.0.0 which is a transitive dep of execa@9.
++export {
++	toPath,
++	rootDirectory,
++	traversePathUp,
++	execFile,
++	execFileSync,
++} from './node.js';
++
+ export async function delay({seconds, milliseconds} = {}) {
+ 	let duration;
+ 	if (typeof seconds === 'number') {
