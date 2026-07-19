@@ -10,10 +10,12 @@ import {
   ConflictAlert,
   ExportView,
   FilterBar,
+  IconTabBar,
+  BatchSelectToolbar,
   findDuplicates,
   downloadBlob,
 } from './shared/index.js';
-import type { Column } from './shared/index.js';
+import type { Column, TabItem } from './shared/index.js';
 import type {
   CraftTweakerSpec,
   CraftTweakerRecipeSpec,
@@ -276,6 +278,27 @@ export function CraftTweakerPreviewPanel() {
     },
     [ct, setSpec],
   );
+
+  // ===== Tab 配置（预计算 count）=====
+  const tabs = useMemo<TabItem<CraftTweakerTab>[]>(() => {
+    return TABS.map((t) => ({
+      key: t.key,
+      label: t.label,
+      icon: t.icon,
+      hideCount: t.key === 'metadata' || t.key === 'export',
+      count:
+        ct && t.key !== 'metadata' && t.key !== 'export'
+          ? countByTab(ct, t.key, stats.langEntries)
+          : undefined,
+    }));
+  }, [ct, stats.langEntries]);
+
+  const handleTabSelect = useCallback((tab: CraftTweakerTab) => {
+    setActiveTab(tab);
+    setQuery('');
+    setRecipeTypeFilter('all');
+    setTagTypeFilter('all');
+  }, []);
 
   // ===== 导出函数 =====
   const exportData = useCallback(
@@ -745,32 +768,7 @@ export function CraftTweakerPreviewPanel() {
       />
 
       {/* Tab 切换 */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => {
-              setActiveTab(t.key);
-              setQuery('');
-              setRecipeTypeFilter('all');
-              setTagTypeFilter('all');
-            }}
-            className={`flex items-center gap-1 rounded-mc px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              activeTab === t.key
-                ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-                : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-            }`}
-          >
-            <t.icon className="h-3 w-3" />
-            {t.label}
-            {t.key !== 'metadata' && t.key !== 'export' && (
-              <span className="ml-0.5 text-mc-mute">
-                ({countByTab(ct, t.key, stats.langEntries)})
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      <IconTabBar tabs={tabs} activeTab={activeTab} onSelect={handleTabSelect} />
 
       {/* 搜索 + 筛选栏 */}
       {activeTab !== 'metadata' && activeTab !== 'export' && (
@@ -810,22 +808,12 @@ export function CraftTweakerPreviewPanel() {
       )}
 
       {/* 配方批量操作栏 */}
-      {activeTab === 'recipes' && selectedRecipeIds.size > 0 && (
-        <div className="flex items-center gap-2 border-b border-mc-border bg-mc-accent/10 px-3 py-1.5">
-          <span className="text-[11px] text-mc-text">已选 {selectedRecipeIds.size} 项</span>
-          <button
-            onClick={() => removeRecipes(Array.from(selectedRecipeIds))}
-            className="flex items-center gap-1 rounded-mc bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-500/30"
-          >
-            <Trash2 className="h-3 w-3" /> 批量移除
-          </button>
-          <button
-            onClick={() => setSelectedRecipeIds(new Set())}
-            className="ml-auto text-[10px] text-mc-dim hover:text-mc-text"
-          >
-            取消选择
-          </button>
-        </div>
+      {activeTab === 'recipes' && (
+        <BatchSelectToolbar
+          selectedCount={selectedRecipeIds.size}
+          onBatchRemove={() => removeRecipes(Array.from(selectedRecipeIds))}
+          onClearSelection={() => setSelectedRecipeIds(new Set())}
+        />
       )}
 
       {/* Tab 内容 */}

@@ -10,10 +10,12 @@ import {
   EmptyState,
   StatCard,
   MetadataView,
+  IconTabBar,
+  BatchSelectToolbar,
   findDuplicates,
   downloadBlob,
 } from './shared/index.js';
-import type { Column } from './shared/index.js';
+import type { Column, TabItem } from './shared/index.js';
 import type {
   ModSpec,
   ItemSpec,
@@ -329,6 +331,25 @@ export function ModPreviewPanel() {
     },
     [mod, setSpec],
   );
+
+  // ===== Tab 配置（预计算 count）=====
+  const tabs = useMemo<TabItem<ModTab>[]>(() => {
+    return TABS.map((t) => ({
+      key: t.key,
+      label: t.label,
+      icon: t.icon,
+      hideCount: t.key === 'metadata' || t.key === 'export',
+      count: mod && t.key !== 'metadata' && t.key !== 'export' ? countByTab(mod, t.key) : undefined,
+    }));
+  }, [mod]);
+
+  const handleTabSelect = useCallback((tab: ModTab) => {
+    setActiveTab(tab);
+    setQuery('');
+    setRarityFilter('all');
+    setCategoryFilter('all');
+    setMaterialFilter('all');
+  }, []);
 
   // ===== 导出函数 =====
   const exportData = useCallback(
@@ -756,31 +777,7 @@ export function ModPreviewPanel() {
       />
 
       {/* Tab 切换 */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => {
-              setActiveTab(t.key);
-              setQuery('');
-              setRarityFilter('all');
-              setCategoryFilter('all');
-              setMaterialFilter('all');
-            }}
-            className={`flex items-center gap-1 rounded-mc px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              activeTab === t.key
-                ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-                : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-            }`}
-          >
-            <t.icon className="h-3 w-3" />
-            {t.label}
-            {t.key !== 'metadata' && t.key !== 'export' && (
-              <span className="ml-0.5 text-mc-mute">({countByTab(mod, t.key)})</span>
-            )}
-          </button>
-        ))}
-      </div>
+      <IconTabBar tabs={tabs} activeTab={activeTab} onSelect={handleTabSelect} />
 
       {/* 搜索 + 高级筛选栏 */}
       {activeTab !== 'metadata' && activeTab !== 'export' && (
@@ -850,41 +847,21 @@ export function ModPreviewPanel() {
       )}
 
       {/* 物品批量操作栏 */}
-      {activeTab === 'items' && selectedItemIds.size > 0 && (
-        <div className="flex items-center gap-2 border-b border-mc-border bg-mc-accent/10 px-3 py-1.5">
-          <span className="text-[11px] text-mc-text">已选 {selectedItemIds.size} 项</span>
-          <button
-            onClick={() => removeItems(Array.from(selectedItemIds))}
-            className="flex items-center gap-1 rounded-mc bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-500/30"
-          >
-            <Trash2 className="h-3 w-3" /> 批量移除
-          </button>
-          <button
-            onClick={() => setSelectedItemIds(new Set())}
-            className="ml-auto text-[10px] text-mc-dim hover:text-mc-text"
-          >
-            取消选择
-          </button>
-        </div>
+      {activeTab === 'items' && (
+        <BatchSelectToolbar
+          selectedCount={selectedItemIds.size}
+          onBatchRemove={() => removeItems(Array.from(selectedItemIds))}
+          onClearSelection={() => setSelectedItemIds(new Set())}
+        />
       )}
 
       {/* 方块批量操作栏 */}
-      {activeTab === 'blocks' && selectedBlockIds.size > 0 && (
-        <div className="flex items-center gap-2 border-b border-mc-border bg-mc-accent/10 px-3 py-1.5">
-          <span className="text-[11px] text-mc-text">已选 {selectedBlockIds.size} 项</span>
-          <button
-            onClick={() => removeBlocks(Array.from(selectedBlockIds))}
-            className="flex items-center gap-1 rounded-mc bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-500/30"
-          >
-            <Trash2 className="h-3 w-3" /> 批量移除
-          </button>
-          <button
-            onClick={() => setSelectedBlockIds(new Set())}
-            className="ml-auto text-[10px] text-mc-dim hover:text-mc-text"
-          >
-            取消选择
-          </button>
-        </div>
+      {activeTab === 'blocks' && (
+        <BatchSelectToolbar
+          selectedCount={selectedBlockIds.size}
+          onBatchRemove={() => removeBlocks(Array.from(selectedBlockIds))}
+          onClearSelection={() => setSelectedBlockIds(new Set())}
+        />
       )}
 
       {/* Tab 内容 */}

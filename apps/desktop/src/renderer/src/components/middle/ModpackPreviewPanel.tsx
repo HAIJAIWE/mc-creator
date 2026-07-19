@@ -1,8 +1,16 @@
 import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
-import { DataTable, PanelHeader, FilterBar, EmptyState, StatCard } from './shared/index.js';
-import type { Column } from './shared/index.js';
+import {
+  DataTable,
+  PanelHeader,
+  FilterBar,
+  EmptyState,
+  StatCard,
+  IconTabBar,
+  BatchSelectToolbar,
+} from './shared/index.js';
+import type { Column, TabItem } from './shared/index.js';
 import type { ModpackSpec, ModEntry, OverrideFileSpec } from '@mc-creator/shared';
 import {
   Download,
@@ -185,6 +193,29 @@ export function ModpackPreviewPanel() {
     [pack],
   );
 
+  // ===== Tab 配置（预计算 count；hooks 必须在 early return 之前）=====
+  const tabs = useMemo<TabItem<SubView>[]>(() => {
+    if (!pack) {
+      return [
+        { key: 'mods', label: 'Mod 列表', hideCount: true },
+        { key: 'overrides', label: '覆盖文件', hideCount: true },
+        { key: 'server-overrides', label: '服务器覆盖', hideCount: true },
+        { key: 'export', label: '导出', hideCount: true },
+      ];
+    }
+    return [
+      { key: 'mods', label: 'Mod 列表', count: pack.mods.length },
+      { key: 'overrides', label: '覆盖文件', count: pack.overrides.length },
+      { key: 'server-overrides', label: '服务器覆盖', count: pack.serverOverrides.length },
+      { key: 'export', label: '导出', hideCount: true },
+    ];
+  }, [pack]);
+
+  const handleTabSelect = useCallback((view: SubView) => {
+    setActiveView(view);
+    // 注意：Modpack 切换 view 时不重置 query/filter（保持现有行为）
+  }, []);
+
   if (!spec || !pack) {
     return (
       <EmptyState
@@ -287,31 +318,7 @@ export function ModpackPreviewPanel() {
       />
 
       {/* 子视图切换 */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
-        {[
-          { key: 'mods' as SubView, label: 'Mod 列表', count: pack.mods.length },
-          { key: 'overrides' as SubView, label: '覆盖文件', count: pack.overrides.length },
-          {
-            key: 'server-overrides' as SubView,
-            label: '服务器覆盖',
-            count: pack.serverOverrides.length,
-          },
-          { key: 'export' as SubView, label: '导出' },
-        ].map((v) => (
-          <button
-            key={v.key}
-            onClick={() => setActiveView(v.key)}
-            className={`rounded-mc px-2 py-0.5 text-[11px] font-medium transition-colors ${
-              activeView === v.key
-                ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-                : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-            }`}
-          >
-            {v.label}
-            {v.count !== undefined && <span className="ml-0.5 text-mc-mute">({v.count})</span>}
-          </button>
-        ))}
-      </div>
+      <IconTabBar tabs={tabs} activeTab={activeView} onSelect={handleTabSelect} />
 
       {/* ===== Mod 列表视图 ===== */}
       {activeView === 'mods' && (
@@ -340,23 +347,11 @@ export function ModpackPreviewPanel() {
           </FilterBar>
 
           {/* 批量操作栏 */}
-          {selectedIds.size > 0 && (
-            <div className="flex items-center gap-2 border-b border-mc-border bg-mc-accent/10 px-3 py-1.5">
-              <span className="text-[11px] text-mc-text">已选 {selectedIds.size} 项</span>
-              <button
-                onClick={() => removeMods(Array.from(selectedIds))}
-                className="flex items-center gap-1 rounded-mc bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-500/30"
-              >
-                <Trash2 className="h-3 w-3" /> 批量移除
-              </button>
-              <button
-                onClick={deselectAll}
-                className="ml-auto text-[10px] text-mc-dim hover:text-mc-text"
-              >
-                取消选择
-              </button>
-            </div>
-          )}
+          <BatchSelectToolbar
+            selectedCount={selectedIds.size}
+            onBatchRemove={() => removeMods(Array.from(selectedIds))}
+            onClearSelection={deselectAll}
+          />
 
           {/* 表格 */}
           <div className="flex-1 overflow-y-auto">

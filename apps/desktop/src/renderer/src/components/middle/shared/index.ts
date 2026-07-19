@@ -15,3 +15,7 @@ export { ExportView } from './ExportView.js';
 export type { ExportFormat, ExportSection, ExportViewProps } from './ExportView.js';
 export { FilterBar } from './FilterBar.js';
 export type { FilterBarProps } from './FilterBar.js';
+export { IconTabBar } from './IconTabBar.js';
+export type { TabItem, IconTabBarProps } from './IconTabBar.js';
+export { BatchSelectToolbar } from './BatchSelectToolbar.js';
+export type { BatchSelectToolbarProps } from './BatchSelectToolbar.js';

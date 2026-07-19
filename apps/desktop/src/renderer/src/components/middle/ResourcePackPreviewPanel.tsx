@@ -10,10 +10,11 @@ import {
   EmptyState,
   StatCard,
   MetadataView,
+  IconTabBar,
   findDuplicates,
   downloadBlob,
 } from './shared/index.js';
-import type { Column } from './shared/index.js';
+import type { Column, TabItem } from './shared/index.js';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import type {
   ResourcePackSpec as ResourcePackSpecType,
@@ -121,6 +122,25 @@ export function ResourcePackPreviewPanel() {
     ],
     [pack],
   );
+
+  // ===== Tab 配置（预计算 count）=====
+  const tabs = useMemo<TabItem<Tab>[]>(() => {
+    return TABS.map((t) => ({
+      key: t.id,
+      label: t.label,
+      icon: t.icon,
+      hideCount: t.id === 'metadata' || t.id === 'export',
+      count:
+        pack && t.id !== 'metadata' && t.id !== 'export'
+          ? countByTab(pack, t.id, stats)
+          : undefined,
+    }));
+  }, [pack, stats]);
+
+  const handleTabSelect = useCallback((nextTab: Tab) => {
+    setTab(nextTab);
+    setQuery('');
+  }, []);
 
   // ===== 导出函数 =====
   const exportData = useCallback(
@@ -346,36 +366,8 @@ export function ResourcePackPreviewPanel() {
         ]}
       />
 
-      {/* Tab 切换栏 */}
-      <div
-        role="tablist"
-        aria-label="资源包分类"
-        className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1"
-      >
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            tabIndex={tab === t.id ? 0 : -1}
-            onClick={() => {
-              setTab(t.id);
-              setQuery('');
-            }}
-            className={`flex items-center gap-1.5 rounded-mc px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              tab === t.id
-                ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-                : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-            }`}
-          >
-            <t.icon className="h-3 w-3" />
-            {t.label}
-            {t.id !== 'metadata' && t.id !== 'export' && (
-              <span className="ml-0.5 text-mc-mute">({countByTab(pack, t.id, stats)})</span>
-            )}
-          </button>
-        ))}
-      </div>
+      {/* Tab 切换 */}
+      <IconTabBar tabs={tabs} activeTab={tab} onSelect={handleTabSelect} />
 
       {/* 搜索栏（除元数据/导出外） */}
       {tab !== 'metadata' && tab !== 'export' && (
