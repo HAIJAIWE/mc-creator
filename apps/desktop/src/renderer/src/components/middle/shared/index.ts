@@ -4,3 +4,8 @@ export { PanelHeader } from './PanelHeader.js';
 export { SearchInput } from './SearchInput.js';
 export { EmptyState } from './EmptyState.js';
 export { FieldGroup, TextField, NumberField, SelectField, ToggleField } from './FormField.js';
+export { StatCard, StatCardGrid } from './StatCard.js';
+export type { StatCardProps, StatCardGridProps } from './StatCard.js';
+export { MetadataView } from './MetadataView.js';
+export type { MetadataRow, MetadataViewProps } from './MetadataView.js';
+export { findDuplicates, downloadBlob } from './utils.js';

@@ -1,7 +1,16 @@
 import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
-import { DataTable, PanelHeader, SearchInput, EmptyState } from './shared/index.js';
+import {
+  DataTable,
+  PanelHeader,
+  SearchInput,
+  EmptyState,
+  StatCard,
+  MetadataView,
+  findDuplicates,
+  downloadBlob,
+} from './shared/index.js';
 import type { Column } from './shared/index.js';
 import type {
   ModSpec,
@@ -203,28 +212,10 @@ export function ModPreviewPanel() {
   // ===== 冲突检测：id 重复 =====
   const conflicts = useMemo(() => {
     if (!mod) return { duplicateItemIds: [], duplicateBlockIds: [], duplicateDeps: [] };
-    const itemIds = new Map<string, number>();
-    const blockIds = new Map<string, number>();
-    const depIds = new Map<string, number>();
-    for (const item of mod.items) {
-      itemIds.set(item.id, (itemIds.get(item.id) ?? 0) + 1);
-    }
-    for (const block of mod.blocks) {
-      blockIds.set(block.id, (blockIds.get(block.id) ?? 0) + 1);
-    }
-    for (const dep of mod.dependencies) {
-      depIds.set(dep.modId, (depIds.get(dep.modId) ?? 0) + 1);
-    }
     return {
-      duplicateItemIds: Array.from(itemIds.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
-      duplicateBlockIds: Array.from(blockIds.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
-      duplicateDeps: Array.from(depIds.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
+      duplicateItemIds: findDuplicates(mod.items, (i) => i.id),
+      duplicateBlockIds: findDuplicates(mod.blocks, (b) => b.id),
+      duplicateDeps: findDuplicates(mod.dependencies, (d) => d.modId),
     };
   }, [mod]);
 
@@ -444,13 +435,7 @@ export function ModPreviewPanel() {
         filename = `${mod.modId}-${scope}.md`;
       }
 
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(content, filename);
     },
     [mod],
   );
@@ -954,7 +939,20 @@ export function ModPreviewPanel() {
         )}
         {activeTab === 'tags' && <TagsTab tags={mod.tags} query={query} />}
         {activeTab === 'functions' && <FunctionsTab functions={mod.functions} query={query} />}
-        {activeTab === 'metadata' && <MetadataTab mod={mod} />}
+        {activeTab === 'metadata' && (
+          <MetadataView
+            rows={[
+              { label: 'Mod ID', value: mod.modId },
+              { label: '名称', value: mod.name },
+              { label: '版本', value: mod.version },
+              { label: 'License', value: mod.license },
+              { label: '作者', value: mod.authors.join(', ') || '—' },
+              { label: '致谢', value: mod.credits || '—' },
+              { label: '网站', value: mod.website || '—' },
+              { label: '描述', value: mod.description || '—' },
+            ]}
+          />
+        )}
         {activeTab === 'export' && (
           <ExportView
             mod={mod}
@@ -1015,30 +1013,6 @@ function countByTab(mod: ModSpec, tab: ModTab): number {
 
 function tabLabel(tab: ModTab): string {
   return TABS.find((t) => t.key === tab)?.label ?? '';
-}
-
-// ===== 统计卡片 =====
-function StatCard({
-  label,
-  value,
-  sub,
-  icon,
-}: {
-  label: string;
-  value: number | string;
-  sub?: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-mc border border-mc-border bg-mc-surface-2/60 px-2 py-1.5">
-      <div className="flex items-center gap-1 text-[10px] text-mc-mute">
-        {icon}
-        {label}
-      </div>
-      <div className="mt-0.5 font-display text-base font-bold text-mc-text">{value}</div>
-      {sub && <div className="text-[9px] text-mc-dim">{sub}</div>}
-    </div>
-  );
 }
 
 // ===== 标签 Tab =====
@@ -1114,35 +1088,6 @@ function FunctionsTab({ functions, query }: { functions: ModSpec['functions']; q
           </pre>
         </div>
       ))}
-    </div>
-  );
-}
-
-// ===== 元数据 Tab =====
-function MetadataTab({ mod }: { mod: ModSpec }) {
-  const rows: { label: string; value: string }[] = [
-    { label: 'Mod ID', value: mod.modId },
-    { label: '名称', value: mod.name },
-    { label: '版本', value: mod.version },
-    { label: 'License', value: mod.license },
-    { label: '作者', value: mod.authors.join(', ') || '—' },
-    { label: '致谢', value: mod.credits || '—' },
-    { label: '网站', value: mod.website || '—' },
-    { label: '描述', value: mod.description || '—' },
-  ];
-
-  return (
-    <div className="p-4">
-      <table className="w-full text-xs">
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.label} className="border-b border-mc-border/60">
-              <td className="w-32 px-2 py-1.5 font-medium text-mc-dim">{r.label}</td>
-              <td className="px-2 py-1.5 text-mc-text">{r.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

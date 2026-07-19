@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
-import { DataTable, PanelHeader, SearchInput, EmptyState } from './shared/index.js';
+import { DataTable, PanelHeader, SearchInput, EmptyState, StatCard } from './shared/index.js';
 import type { Column } from './shared/index.js';
 import type { ModpackSpec, ModEntry, OverrideFileSpec } from '@mc-creator/shared';
 import {
@@ -436,12 +436,20 @@ export function ModpackPreviewPanel() {
           <div className="border-t border-mc-border pt-4">
             <h3 className="mb-2 text-sm font-medium text-mc-text">整合包统计</h3>
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <StatCard label="Mod 总数" value={String(pack.mods.length)} />
-              <StatCard label="总下载大小" value={formatBytes(totalSize)} />
-              <StatCard label="Modrinth 来源" value={String(sourceStats.modrinth)} />
-              <StatCard label="CurseForge 来源" value={String(sourceStats.curseforge)} />
-              <StatCard label="客户端覆盖" value={String(pack.overrides.length)} />
-              <StatCard label="服务器覆盖" value={String(pack.serverOverrides.length)} />
+              <StatCard variant="wide" label="Mod 总数" value={String(pack.mods.length)} />
+              <StatCard variant="wide" label="总下载大小" value={formatBytes(totalSize)} />
+              <StatCard variant="wide" label="Modrinth 来源" value={String(sourceStats.modrinth)} />
+              <StatCard
+                variant="wide"
+                label="CurseForge 来源"
+                value={String(sourceStats.curseforge)}
+              />
+              <StatCard variant="wide" label="客户端覆盖" value={String(pack.overrides.length)} />
+              <StatCard
+                variant="wide"
+                label="服务器覆盖"
+                value={String(pack.serverOverrides.length)}
+              />
             </div>
           </div>
 
@@ -549,16 +557,7 @@ function OverridesView({
   );
 }
 
-// ===== 统计卡片子组件 =====
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-mc border border-mc-border bg-mc-surface-2 p-3">
-      <div className="text-[10px] text-mc-mute">{label}</div>
-      <div className="mt-1 font-display text-lg font-bold text-mc-text">{value}</div>
-    </div>
-  );
-}
+// ===== 工具函数 =====
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

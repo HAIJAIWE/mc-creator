@@ -1,7 +1,16 @@
 import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
-import { DataTable, PanelHeader, SearchInput, EmptyState } from './shared/index.js';
+import {
+  DataTable,
+  PanelHeader,
+  SearchInput,
+  EmptyState,
+  StatCard,
+  MetadataView,
+  findDuplicates,
+  downloadBlob,
+} from './shared/index.js';
 import type { Column } from './shared/index.js';
 import type {
   BehaviorPackSpec,
@@ -100,28 +109,10 @@ export function BehaviorPackPreviewPanel() {
   // ===== UUID 重复检测 =====
   const conflicts = useMemo(() => {
     if (!bp) return { duplicateEntityIds: [], duplicateRecipeIds: [], duplicateLootPaths: [] };
-    const entityIds = new Map<string, number>();
-    const recipeIds = new Map<string, number>();
-    const lootPaths = new Map<string, number>();
-    for (const e of bp.entities) {
-      entityIds.set(e.identifier, (entityIds.get(e.identifier) ?? 0) + 1);
-    }
-    for (const r of bp.recipes) {
-      recipeIds.set(r.identifier, (recipeIds.get(r.identifier) ?? 0) + 1);
-    }
-    for (const l of bp.lootTables) {
-      lootPaths.set(l.path, (lootPaths.get(l.path) ?? 0) + 1);
-    }
     return {
-      duplicateEntityIds: Array.from(entityIds.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
-      duplicateRecipeIds: Array.from(recipeIds.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
-      duplicateLootPaths: Array.from(lootPaths.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
+      duplicateEntityIds: findDuplicates(bp.entities, (e) => e.identifier),
+      duplicateRecipeIds: findDuplicates(bp.recipes, (r) => r.identifier),
+      duplicateLootPaths: findDuplicates(bp.lootTables, (l) => l.path),
     };
   }, [bp]);
 
@@ -161,6 +152,27 @@ export function BehaviorPackPreviewPanel() {
     const q = query.toLowerCase();
     return bp.lootTables.filter((l) => l.path.toLowerCase().includes(q));
   }, [bp, query]);
+
+  // ===== 元数据 rows =====
+  const metadataRows = useMemo(() => {
+    if (!bp) return [];
+    return [
+      { label: 'Pack ID', value: bp.packId },
+      { label: 'Pack Name', value: bp.packName },
+      { label: '描述', value: bp.description || '—' },
+      { label: 'packFormat', value: String(bp.packFormat) },
+      { label: 'MC 版本', value: bp.mcVersion.join('.') },
+      { label: 'Header UUID', value: bp.header.uuid || '—' },
+      {
+        label: 'Header 版本',
+        value: bp.header.version ? bp.header.version.join('.') : '—',
+      },
+      {
+        label: 'Min Engine',
+        value: bp.header.min_engine_version ? bp.header.min_engine_version.join('.') : '—',
+      },
+    ];
+  }, [bp]);
 
   // ===== 批量选择操作 =====
   const toggleEntitySelect = useCallback((id: string) => {
@@ -314,13 +326,7 @@ export function BehaviorPackPreviewPanel() {
         filename = `${bp.packId}-${scope}.md`;
       }
 
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(content, filename);
     },
     [bp],
   );
@@ -666,7 +672,7 @@ export function BehaviorPackPreviewPanel() {
           />
         )}
         {activeTab === 'dependencies' && <DepsView deps={bp.dependencies} />}
-        {activeTab === 'metadata' && <MetadataView bp={bp} />}
+        {activeTab === 'metadata' && <MetadataView rows={metadataRows} />}
         {activeTab === 'export' && (
           <ExportView
             bp={bp}
@@ -718,27 +724,6 @@ function tabLabel(tab: BehaviorPackTab): string {
   return TABS.find((t) => t.key === tab)?.label ?? '';
 }
 
-// ===== 统计卡片 =====
-function StatCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: number | string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-mc border border-mc-border bg-mc-surface-2/60 px-2 py-1.5">
-      <div className="flex items-center gap-1 text-[10px] text-mc-mute">
-        {icon}
-        {label}
-      </div>
-      <div className="mt-0.5 font-display text-base font-bold text-mc-text">{value}</div>
-    </div>
-  );
-}
-
 // ===== 依赖视图 =====
 function DepsView({ deps }: { deps: BehaviorPackSpec['dependencies'] }) {
   if (deps.length === 0) {
@@ -762,41 +747,6 @@ function DepsView({ deps }: { deps: BehaviorPackSpec['dependencies'] }) {
           <div className="mt-1 text-[10px] text-mc-mute">版本: {d.version.join('.')}</div>
         </div>
       ))}
-    </div>
-  );
-}
-
-// ===== 元数据视图 =====
-function MetadataView({ bp }: { bp: BehaviorPackSpec }) {
-  const rows: { label: string; value: string }[] = [
-    { label: 'Pack ID', value: bp.packId },
-    { label: 'Pack Name', value: bp.packName },
-    { label: '描述', value: bp.description || '—' },
-    { label: 'packFormat', value: String(bp.packFormat) },
-    { label: 'MC 版本', value: bp.mcVersion.join('.') },
-    { label: 'Header UUID', value: bp.header.uuid || '—' },
-    {
-      label: 'Header 版本',
-      value: bp.header.version ? bp.header.version.join('.') : '—',
-    },
-    {
-      label: 'Min Engine',
-      value: bp.header.min_engine_version ? bp.header.min_engine_version.join('.') : '—',
-    },
-  ];
-
-  return (
-    <div className="p-4">
-      <table className="w-full text-xs">
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.label} className="border-b border-mc-border/60">
-              <td className="w-32 px-2 py-1.5 font-medium text-mc-dim">{r.label}</td>
-              <td className="px-2 py-1.5 text-mc-text">{r.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

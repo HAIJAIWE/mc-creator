@@ -1,7 +1,16 @@
 import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
-import { DataTable, PanelHeader, SearchInput, EmptyState } from './shared/index.js';
+import {
+  DataTable,
+  PanelHeader,
+  SearchInput,
+  EmptyState,
+  StatCard,
+  MetadataView,
+  findDuplicates,
+  downloadBlob,
+} from './shared/index.js';
 import type { Column } from './shared/index.js';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import type {
@@ -94,35 +103,11 @@ export function ResourcePackPreviewPanel() {
         duplicateTexturePaths: [],
         duplicateModelPaths: [],
       };
-    const soundIds = new Map<string, number>();
-    const fontIds = new Map<string, number>();
-    const texturePaths = new Map<string, number>();
-    const modelPaths = new Map<string, number>();
-    for (const s of pack.sounds) {
-      soundIds.set(s.id, (soundIds.get(s.id) ?? 0) + 1);
-    }
-    for (const f of pack.fonts) {
-      fontIds.set(f.id, (fontIds.get(f.id) ?? 0) + 1);
-    }
-    for (const t of pack.textureOverrides) {
-      texturePaths.set(t.path, (texturePaths.get(t.path) ?? 0) + 1);
-    }
-    for (const m of pack.models) {
-      modelPaths.set(m.path, (modelPaths.get(m.path) ?? 0) + 1);
-    }
     return {
-      duplicateSoundIds: Array.from(soundIds.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
-      duplicateFontIds: Array.from(fontIds.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
-      duplicateTexturePaths: Array.from(texturePaths.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
-      duplicateModelPaths: Array.from(modelPaths.entries())
-        .filter(([, count]) => count > 1)
-        .map(([id, count]) => ({ id, count })),
+      duplicateSoundIds: findDuplicates(pack.sounds, (s) => s.id),
+      duplicateFontIds: findDuplicates(pack.fonts, (f) => f.id),
+      duplicateTexturePaths: findDuplicates(pack.textureOverrides, (t) => t.path),
+      duplicateModelPaths: findDuplicates(pack.models, (m) => m.path),
     };
   }, [pack]);
 
@@ -131,6 +116,18 @@ export function ResourcePackPreviewPanel() {
     conflicts.duplicateFontIds.length +
     conflicts.duplicateTexturePaths.length +
     conflicts.duplicateModelPaths.length;
+
+  // ===== 元数据行（供 MetadataView 使用）=====
+  const metadataRows = useMemo(
+    () => [
+      { label: 'Pack Name', value: pack?.packName ?? '' },
+      { label: '描述', value: pack?.packDescription || '—' },
+      { label: 'packFormat', value: String(pack?.packFormat ?? '') },
+      { label: 'Namespace', value: pack?.namespace ?? '' },
+      { label: 'MC 版本', value: '1.21.x' },
+    ],
+    [pack],
+  );
 
   // ===== 导出函数 =====
   const exportData = useCallback(
@@ -280,13 +277,7 @@ export function ResourcePackPreviewPanel() {
         filename = `${pack.namespace}-${scope}.md`;
       }
 
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(content, filename);
     },
     [pack, stats.langEnUs, stats.langZhCn],
   );
@@ -414,7 +405,7 @@ export function ResourcePackPreviewPanel() {
         {tab === 'models' && <ModelsTab pack={pack} query={query} />}
         {tab === 'fonts' && <FontsTab pack={pack} query={query} />}
         {tab === 'lang' && <LangTab pack={pack} query={query} />}
-        {tab === 'metadata' && <MetadataView pack={pack} />}
+        {tab === 'metadata' && <MetadataView rows={metadataRows} />}
         {tab === 'export' && <ExportView pack={pack} stats={stats} onExport={exportData} />}
       </div>
 
@@ -443,30 +434,6 @@ function countByTab(
 
 function tabLabel(tab: Tab): string {
   return TABS.find((t) => t.id === tab)?.label ?? '';
-}
-
-// ===== 统计卡片 =====
-function StatCard({
-  label,
-  value,
-  sub,
-  icon,
-}: {
-  label: string;
-  value: number | string;
-  sub?: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-mc border border-mc-border bg-mc-surface-2/60 px-2 py-1.5">
-      <div className="flex items-center gap-1 text-[10px] text-mc-mute">
-        {icon}
-        {label}
-      </div>
-      <div className="mt-0.5 font-display text-base font-bold text-mc-text">{value}</div>
-      {sub && <div className="text-[9px] text-mc-dim">{sub}</div>}
-    </div>
-  );
 }
 
 // ===== Textures tab =====
@@ -782,32 +749,6 @@ function LangTab({ pack, query }: { pack: ResourcePackSpecType; query: string })
   return (
     <div className="flex flex-col gap-2 p-2">
       <DataTable columns={columns} data={rows} rowKey={(r) => r.key} emptyHint="暂无语言条目" />
-    </div>
-  );
-}
-
-// ===== 元数据视图 =====
-function MetadataView({ pack }: { pack: ResourcePackSpecType }) {
-  const rows: { label: string; value: string }[] = [
-    { label: 'Pack Name', value: pack.packName },
-    { label: '描述', value: pack.packDescription || '—' },
-    { label: 'packFormat', value: String(pack.packFormat) },
-    { label: 'Namespace', value: pack.namespace },
-    { label: 'MC 版本', value: '1.21.x' },
-  ];
-
-  return (
-    <div className="p-4">
-      <table className="w-full text-xs">
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.label} className="border-b border-mc-border/60">
-              <td className="w-32 px-2 py-1.5 font-medium text-mc-dim">{r.label}</td>
-              <td className="px-2 py-1.5 text-mc-text">{r.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
