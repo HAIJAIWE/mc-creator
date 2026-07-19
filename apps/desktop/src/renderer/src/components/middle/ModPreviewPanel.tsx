@@ -1,26 +1,461 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
 import { DataTable, PanelHeader, SearchInput, EmptyState } from './shared/index.js';
 import type { Column } from './shared/index.js';
-import type { ModSpec, ItemSpec, BlockSpec, ModDependencySpec } from '@mc-creator/shared';
+import type {
+  ModSpec,
+  ItemSpec,
+  BlockSpec,
+  ModDependencySpec,
+  ModLootTableSpec,
+  ModAdvancementSpec,
+} from '@mc-creator/shared';
+import {
+  Download,
+  Trash2,
+  CheckSquare,
+  Square,
+  AlertTriangle,
+  FileText,
+  Boxes,
+  Package,
+  Trophy,
+  Tag,
+  FunctionSquare,
+  Layers,
+} from 'lucide-react';
 
-type ModTab = 'items' | 'blocks' | 'dependencies' | 'metadata';
+type ModTab =
+  | 'items'
+  | 'blocks'
+  | 'dependencies'
+  | 'loot'
+  | 'advancements'
+  | 'tags'
+  | 'functions'
+  | 'metadata'
+  | 'export';
 
-const TABS: { key: ModTab; label: string }[] = [
-  { key: 'items', label: '物品' },
-  { key: 'blocks', label: '方块' },
-  { key: 'dependencies', label: '依赖' },
-  { key: 'metadata', label: '元数据' },
+type ItemRarityFilter = 'all' | 'common' | 'uncommon' | 'rare' | 'epic';
+type ItemCategoryFilter =
+  | 'all'
+  | 'sword'
+  | 'pickaxe'
+  | 'axe'
+  | 'shovel'
+  | 'hoe'
+  | 'helmet'
+  | 'chestplate'
+  | 'leggings'
+  | 'boots'
+  | 'food'
+  | 'potion'
+  | 'bow'
+  | 'crossbow'
+  | 'trident'
+  | 'misc';
+type BlockMaterialFilter =
+  | 'all'
+  | 'wood'
+  | 'stone'
+  | 'metal'
+  | 'rock'
+  | 'cloth'
+  | 'plant'
+  | 'sand'
+  | 'glass'
+  | 'ice'
+  | 'water'
+  | 'lava';
+
+const TABS: { key: ModTab; label: string; icon: typeof Boxes }[] = [
+  { key: 'items', label: '物品', icon: Boxes },
+  { key: 'blocks', label: '方块', icon: Layers },
+  { key: 'dependencies', label: '依赖', icon: Package },
+  { key: 'loot', label: '战利品', icon: FileText },
+  { key: 'advancements', label: '进度', icon: Trophy },
+  { key: 'tags', label: '标签', icon: Tag },
+  { key: 'functions', label: '函数', icon: FunctionSquare },
+  { key: 'metadata', label: '元数据', icon: FileText },
+  { key: 'export', label: '导出', icon: Download },
 ];
 
-/** Mod 预览面板：4 分类 tab + 表格 + 搜索 */
+const RARITY_LABEL: Record<string, string> = {
+  common: '普通',
+  uncommon: '少见',
+  rare: '稀有',
+  epic: '史诗',
+};
+
+const RARITY_COLOR: Record<string, string> = {
+  common: 'bg-mc-surface-3 text-mc-dim',
+  uncommon: 'bg-yellow-500/20 text-yellow-400',
+  rare: 'bg-blue-500/20 text-blue-400',
+  epic: 'bg-purple-500/20 text-purple-400',
+};
+
+const ITEM_CATEGORY_LABEL: Record<string, string> = {
+  sword: '剑',
+  pickaxe: '镐',
+  axe: '斧',
+  shovel: '铲',
+  hoe: '锄',
+  helmet: '头盔',
+  chestplate: '胸甲',
+  leggings: '护腿',
+  boots: '靴子',
+  food: '食物',
+  potion: '药水',
+  bow: '弓',
+  crossbow: '弩',
+  trident: '三叉戟',
+  misc: '杂项',
+};
+
+const BLOCK_TYPE_LABEL: Record<string, string> = {
+  full_block: '完整方块',
+  slab: '半砖',
+  stairs: '楼梯',
+  fence: '栅栏',
+  fence_gate: '栅栏门',
+  wall: '墙',
+  door: '门',
+  trapdoor: '活板门',
+  button: '按钮',
+  pressure_plate: '压力板',
+  lever: '拉杆',
+  sign: '告示牌',
+  bed: '床',
+  chest: '箱子',
+  piston: '活塞',
+  torch: '火把',
+  custom: '自定义',
+};
+
+const LOOT_TYPE_LABEL: Record<string, string> = {
+  block: '方块掉落',
+  entity: '实体掉落',
+  chest: '宝箱',
+  generic: '通用',
+  empty: '空',
+};
+
+const ADVANCEMENT_FRAME_LABEL: Record<string, string> = {
+  task: '任务',
+  challenge: '挑战',
+  goal: '目标',
+};
+
+/** Mod 预览面板：9 分类 tab + 统计卡片 + 高级筛选 + 批量管理 + 导出 + 冲突检测 */
 export function ModPreviewPanel() {
-  const spec = useModStore((s) => s.spec, shallow);
+  const { spec, setSpec } = useModStore((s) => ({ spec: s.spec, setSpec: s.setSpec }), shallow);
   const [activeTab, setActiveTab] = useState<ModTab>('items');
   const [query, setQuery] = useState('');
+  const [rarityFilter, setRarityFilter] = useState<ItemRarityFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<ItemCategoryFilter>('all');
+  const [materialFilter, setMaterialFilter] = useState<BlockMaterialFilter>('all');
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
 
-  if (!spec) {
+  const mod = spec as unknown as ModSpec | null;
+
+  // ===== 统计计算（hooks 必须在 early return 之前）=====
+  const stats = useMemo(() => {
+    if (!mod) {
+      return {
+        items: 0,
+        blocks: 0,
+        deps: 0,
+        loot: 0,
+        advancements: 0,
+        tags: 0,
+        functions: 0,
+        mandatoryDeps: 0,
+        foodItems: 0,
+        fuelItems: 0,
+      };
+    }
+    return {
+      items: mod.items.length,
+      blocks: mod.blocks.length,
+      deps: mod.dependencies.length,
+      loot: mod.lootTables.length,
+      advancements: mod.advancements.length,
+      tags: mod.tags.length,
+      functions: mod.functions.length,
+      mandatoryDeps: mod.dependencies.filter((d) => d.mandatory).length,
+      foodItems: mod.items.filter((i) => i.food).length,
+      fuelItems: mod.items.filter((i) => i.fuelTick > 0).length,
+    };
+  }, [mod]);
+
+  // ===== 稀有度分布 =====
+  const rarityDistribution = useMemo(() => {
+    if (!mod) return { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    const dist = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    for (const item of mod.items) {
+      dist[item.rarity as keyof typeof dist]++;
+    }
+    return dist;
+  }, [mod]);
+
+  // ===== 冲突检测：id 重复 =====
+  const conflicts = useMemo(() => {
+    if (!mod) return { duplicateItemIds: [], duplicateBlockIds: [], duplicateDeps: [] };
+    const itemIds = new Map<string, number>();
+    const blockIds = new Map<string, number>();
+    const depIds = new Map<string, number>();
+    for (const item of mod.items) {
+      itemIds.set(item.id, (itemIds.get(item.id) ?? 0) + 1);
+    }
+    for (const block of mod.blocks) {
+      blockIds.set(block.id, (blockIds.get(block.id) ?? 0) + 1);
+    }
+    for (const dep of mod.dependencies) {
+      depIds.set(dep.modId, (depIds.get(dep.modId) ?? 0) + 1);
+    }
+    return {
+      duplicateItemIds: Array.from(itemIds.entries())
+        .filter(([, count]) => count > 1)
+        .map(([id, count]) => ({ id, count })),
+      duplicateBlockIds: Array.from(blockIds.entries())
+        .filter(([, count]) => count > 1)
+        .map(([id, count]) => ({ id, count })),
+      duplicateDeps: Array.from(depIds.entries())
+        .filter(([, count]) => count > 1)
+        .map(([id, count]) => ({ id, count })),
+    };
+  }, [mod]);
+
+  const totalConflicts =
+    conflicts.duplicateItemIds.length +
+    conflicts.duplicateBlockIds.length +
+    conflicts.duplicateDeps.length;
+
+  // ===== 物品筛选 =====
+  const filteredItems = useMemo(() => {
+    if (!mod) return [];
+    let result = mod.items;
+    if (rarityFilter !== 'all') {
+      result = result.filter((i) => i.rarity === rarityFilter);
+    }
+    if (categoryFilter !== 'all') {
+      result = result.filter((i) => i.itemCategory === categoryFilter);
+    }
+    if (query) {
+      const q = query.toLowerCase();
+      result = result.filter(
+        (i) => i.id.toLowerCase().includes(q) || i.name.toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [mod, query, rarityFilter, categoryFilter]);
+
+  // ===== 方块筛选 =====
+  const filteredBlocks = useMemo(() => {
+    if (!mod) return [];
+    let result = mod.blocks;
+    if (materialFilter !== 'all') {
+      result = result.filter((b) => b.material === materialFilter);
+    }
+    if (query) {
+      const q = query.toLowerCase();
+      result = result.filter(
+        (b) => b.id.toLowerCase().includes(q) || b.name.toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [mod, query, materialFilter]);
+
+  // ===== 依赖筛选 =====
+  const filteredDeps = useMemo(() => {
+    if (!mod) return [];
+    if (!query) return mod.dependencies;
+    const q = query.toLowerCase();
+    return mod.dependencies.filter((d) => d.modId.toLowerCase().includes(q));
+  }, [mod, query]);
+
+  // ===== 战利品筛选 =====
+  const filteredLoot = useMemo(() => {
+    if (!mod) return [];
+    if (!query) return mod.lootTables;
+    const q = query.toLowerCase();
+    return mod.lootTables.filter((l) => l.id.toLowerCase().includes(q));
+  }, [mod, query]);
+
+  // ===== 进度筛选 =====
+  const filteredAdvancements = useMemo(() => {
+    if (!mod) return [];
+    if (!query) return mod.advancements;
+    const q = query.toLowerCase();
+    return mod.advancements.filter(
+      (a) =>
+        a.id.toLowerCase().includes(q) ||
+        (a.display?.title ?? '').toLowerCase().includes(q) ||
+        (a.display?.description ?? '').toLowerCase().includes(q),
+    );
+  }, [mod, query]);
+
+  // ===== 批量选择操作（hooks 必须在 early return 之前）=====
+  const toggleItemSelect = useCallback((id: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleBlockSelect = useCallback((id: string) => {
+    setSelectedBlockIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const removeItems = useCallback(
+    (ids: string[]) => {
+      if (!mod) return;
+      const idSet = new Set(ids);
+      const updated = { ...mod, items: mod.items.filter((i) => !idSet.has(i.id)) };
+      setSpec(updated as unknown as typeof spec);
+      setSelectedItemIds(new Set());
+    },
+    [mod, setSpec],
+  );
+
+  const removeBlocks = useCallback(
+    (ids: string[]) => {
+      if (!mod) return;
+      const idSet = new Set(ids);
+      const updated = { ...mod, blocks: mod.blocks.filter((b) => !idSet.has(b.id)) };
+      setSpec(updated as unknown as typeof spec);
+      setSelectedBlockIds(new Set());
+    },
+    [mod, setSpec],
+  );
+
+  // ===== 导出函数 =====
+  const exportData = useCallback(
+    (format: 'json' | 'csv' | 'markdown', scope: 'all' | 'items' | 'blocks' | 'deps') => {
+      if (!mod) return;
+      let data: unknown;
+      let filename = '';
+      let content = '';
+
+      if (scope === 'all') {
+        data = mod;
+      } else if (scope === 'items') {
+        data = mod.items;
+      } else if (scope === 'blocks') {
+        data = mod.blocks;
+      } else {
+        data = mod.dependencies;
+      }
+
+      if (format === 'json') {
+        content = JSON.stringify(data, null, 2);
+        filename = `${mod.modId}-${scope}.json`;
+      } else if (format === 'csv') {
+        if (scope === 'items') {
+          const rows = ['ID,Name,Rarity,MaxStackSize,MaxDamage,FuelTick,Category,CreativeTab,Food'];
+          for (const i of mod.items) {
+            rows.push(
+              `"${i.id}","${i.name}","${i.rarity}",${i.maxStackSize},${i.maxDamage},${i.fuelTick},"${i.itemCategory}","${i.creativeTab}",${i.food ? 'Yes' : 'No'}`,
+            );
+          }
+          content = rows.join('\n');
+        } else if (scope === 'blocks') {
+          const rows = ['ID,Name,Material,Hardness,Resistance,LightLevel,BlockType,Transparent'];
+          for (const b of mod.blocks) {
+            rows.push(
+              `"${b.id}","${b.name}","${b.material}",${b.hardness},${b.resistance},${b.lightLevel},"${b.blockType}",${b.transparent ? 'Yes' : 'No'}`,
+            );
+          }
+          content = rows.join('\n');
+        } else if (scope === 'deps') {
+          const rows = ['ModID,Version,Mandatory'];
+          for (const d of mod.dependencies) {
+            rows.push(`"${d.modId}","${d.version}",${d.mandatory ? 'Yes' : 'No'}`);
+          }
+          content = rows.join('\n');
+        } else {
+          // all - 不适合 CSV，fallback 到 JSON
+          content = JSON.stringify(data, null, 2);
+        }
+        filename = `${mod.modId}-${scope}.csv`;
+      } else {
+        // markdown
+        const lines: string[] = [];
+        if (scope === 'all') {
+          lines.push(`# ${mod.name || mod.modId}`, '');
+          lines.push(`- **Mod ID**: ${mod.modId}`);
+          lines.push(`- **版本**: ${mod.version}`);
+          lines.push(`- **License**: ${mod.license}`);
+          lines.push(`- **作者**: ${mod.authors.join(', ') || '—'}`);
+          lines.push(`- **描述**: ${mod.description || '—'}`);
+          lines.push('');
+          lines.push('## 物品列表', '');
+          for (const i of mod.items) {
+            lines.push(
+              `- **${i.name}** (\`${i.id}\`) — 稀有度 ${RARITY_LABEL[i.rarity]} · 堆叠 ${i.maxStackSize}`,
+            );
+          }
+          lines.push('');
+          lines.push('## 方块列表', '');
+          for (const b of mod.blocks) {
+            lines.push(`- **${b.name}** (\`${b.id}\`) — 材质 ${b.material} · 硬度 ${b.hardness}`);
+          }
+          lines.push('');
+          lines.push('## 依赖', '');
+          for (const d of mod.dependencies) {
+            lines.push(`- \`${d.modId}\` ${d.version} ${d.mandatory ? '(必需)' : '(可选)'}`);
+          }
+        } else if (scope === 'items') {
+          lines.push(`# ${mod.name || mod.modId} - 物品列表`, '');
+          lines.push(`共 ${mod.items.length} 个物品`, '');
+          for (const i of mod.items) {
+            lines.push(
+              `| \`${i.id}\` | ${i.name} | ${RARITY_LABEL[i.rarity]} | ${i.maxStackSize} |`,
+            );
+            if (lines.length === 2) {
+              lines.splice(2, 0, '| ID | 名称 | 稀有度 | 堆叠 |', '|---|---|---|---|');
+            }
+          }
+        } else if (scope === 'blocks') {
+          lines.push(`# ${mod.name || mod.modId} - 方块列表`, '');
+          lines.push(`共 ${mod.blocks.length} 个方块`, '');
+          lines.push('| ID | 名称 | 材质 | 硬度 |', '|---|---|---|---|');
+          for (const b of mod.blocks) {
+            lines.push(`| \`${b.id}\` | ${b.name} | ${b.material} | ${b.hardness} |`);
+          }
+        } else if (scope === 'deps') {
+          lines.push(`# ${mod.name || mod.modId} - 依赖列表`, '');
+          lines.push(`共 ${mod.dependencies.length} 个依赖`, '');
+          lines.push('| Mod ID | 版本 | 必需 |', '|---|---|---|');
+          for (const d of mod.dependencies) {
+            lines.push(`| \`${d.modId}\` | ${d.version} | ${d.mandatory ? '是' : '否'} |`);
+          }
+        }
+        content = lines.join('\n');
+        filename = `${mod.modId}-${scope}.md`;
+      }
+
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    [mod],
+  );
+
+  if (!spec || !mod) {
     return (
       <EmptyState
         icon="box"
@@ -30,7 +465,265 @@ export function ModPreviewPanel() {
     );
   }
 
-  const mod = spec as unknown as ModSpec;
+  // ===== 物品列表列定义 =====
+  const itemColumns: Column<ItemSpec>[] = [
+    {
+      key: 'select',
+      header: '',
+      width: '4%',
+      render: (r) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleItemSelect(r.id);
+          }}
+          className="text-mc-mute hover:text-mc-accent"
+        >
+          {selectedItemIds.has(r.id) ? (
+            <CheckSquare className="h-3 w-3" />
+          ) : (
+            <Square className="h-3 w-3" />
+          )}
+        </button>
+      ),
+    },
+    { key: 'id', header: 'ID', width: '14%', sortValue: (r) => r.id },
+    { key: 'name', header: '名称', width: '16%', sortValue: (r) => r.name },
+    {
+      key: 'rarity',
+      header: '稀有度',
+      width: '10%',
+      sortValue: (r) => r.rarity,
+      render: (r) => (
+        <span
+          className={`rounded-mc px-1.5 py-0.5 text-[10px] ${RARITY_COLOR[r.rarity] ?? RARITY_COLOR.common}`}
+        >
+          {RARITY_LABEL[r.rarity] ?? r.rarity}
+        </span>
+      ),
+    },
+    {
+      key: 'itemCategory',
+      header: '类别',
+      width: '10%',
+      sortValue: (r) => r.itemCategory,
+      render: (r) => ITEM_CATEGORY_LABEL[r.itemCategory] ?? r.itemCategory,
+    },
+    {
+      key: 'maxStackSize',
+      header: '堆叠',
+      width: '8%',
+      sortValue: (r) => r.maxStackSize,
+    },
+    {
+      key: 'maxDamage',
+      header: '耐久',
+      width: '8%',
+      sortValue: (r) => r.maxDamage,
+      render: (r) => (r.maxDamage > 0 ? String(r.maxDamage) : '—'),
+    },
+    {
+      key: 'fuelTick',
+      header: '燃料',
+      width: '8%',
+      sortValue: (r) => r.fuelTick,
+      render: (r) => (r.fuelTick > 0 ? `${r.fuelTick}t` : '—'),
+    },
+    {
+      key: 'food',
+      header: '食物',
+      width: '12%',
+      render: (r) => (r.food ? `饥饿 ${r.food.hunger}/饱和 ${r.food.saturation}` : '—'),
+    },
+    {
+      key: 'actions',
+      header: '',
+      width: '4%',
+      render: (r) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            removeItems([r.id]);
+          }}
+          className="text-mc-mute hover:text-red-400"
+          title="移除"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      ),
+    },
+  ];
+
+  // ===== 方块列表列定义 =====
+  const blockColumns: Column<BlockSpec>[] = [
+    {
+      key: 'select',
+      header: '',
+      width: '4%',
+      render: (r) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleBlockSelect(r.id);
+          }}
+          className="text-mc-mute hover:text-mc-accent"
+        >
+          {selectedBlockIds.has(r.id) ? (
+            <CheckSquare className="h-3 w-3" />
+          ) : (
+            <Square className="h-3 w-3" />
+          )}
+        </button>
+      ),
+    },
+    { key: 'id', header: 'ID', width: '14%', sortValue: (r) => r.id },
+    { key: 'name', header: '名称', width: '14%', sortValue: (r) => r.name },
+    {
+      key: 'material',
+      header: '材质',
+      width: '10%',
+      sortValue: (r) => r.material,
+    },
+    {
+      key: 'blockType',
+      header: '类型',
+      width: '12%',
+      sortValue: (r) => r.blockType,
+      render: (r) => BLOCK_TYPE_LABEL[r.blockType] ?? r.blockType,
+    },
+    { key: 'hardness', header: '硬度', width: '8%', sortValue: (r) => r.hardness },
+    {
+      key: 'lightLevel',
+      header: '发光',
+      width: '8%',
+      sortValue: (r) => r.lightLevel,
+      render: (r) => (r.lightLevel > 0 ? String(r.lightLevel) : '—'),
+    },
+    {
+      key: 'resistance',
+      header: '抗性',
+      width: '8%',
+      sortValue: (r) => r.resistance,
+    },
+    {
+      key: 'transparent',
+      header: '透明',
+      width: '8%',
+      render: (r) => (r.transparent ? '是' : '否'),
+    },
+    {
+      key: 'dropSelf',
+      header: '掉落',
+      width: '10%',
+      render: (r) => (r.dropSelf ? '自身' : r.dropItem || '无'),
+    },
+    {
+      key: 'actions',
+      header: '',
+      width: '4%',
+      render: (r) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            removeBlocks([r.id]);
+          }}
+          className="text-mc-mute hover:text-red-400"
+          title="移除"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      ),
+    },
+  ];
+
+  const depColumns: Column<ModDependencySpec>[] = [
+    { key: 'modId', header: 'Mod ID', width: '40%', sortValue: (r) => r.modId },
+    { key: 'version', header: '版本', width: '30%', sortValue: (r) => r.version },
+    {
+      key: 'mandatory',
+      header: '必需',
+      width: '30%',
+      render: (r) => (
+        <span
+          className={`rounded-mc px-1.5 py-0.5 text-[10px] ${
+            r.mandatory ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+          }`}
+        >
+          {r.mandatory ? '必需' : '可选'}
+        </span>
+      ),
+    },
+  ];
+
+  const lootColumns: Column<ModLootTableSpec>[] = [
+    { key: 'id', header: 'ID', width: '30%', sortValue: (r) => r.id },
+    {
+      key: 'type',
+      header: '类型',
+      width: '12%',
+      sortValue: (r) => r.type,
+      render: (r) => LOOT_TYPE_LABEL[r.type] ?? r.type,
+    },
+    {
+      key: 'pools',
+      header: '池数',
+      width: '10%',
+      sortValue: (r) => r.pools.length,
+      render: (r) => String(r.pools.length),
+    },
+    {
+      key: 'entries',
+      header: '总条目',
+      width: '12%',
+      sortValue: (r) => r.pools.reduce((sum, p) => sum + p.entries.length, 0),
+      render: (r) => String(r.pools.reduce((sum, p) => sum + p.entries.length, 0)),
+    },
+    {
+      key: 'preview',
+      header: '前 2 个物品',
+      width: '36%',
+      render: (r) => {
+        const items = r.pools.flatMap((p) => p.entries.map((e) => e.item)).slice(0, 2);
+        return items.length > 0 ? items.join(', ') : '—';
+      },
+    },
+  ];
+
+  const advancementColumns: Column<ModAdvancementSpec>[] = [
+    { key: 'id', header: 'ID', width: '25%', sortValue: (r) => r.id },
+    {
+      key: 'title',
+      header: '标题',
+      width: '20%',
+      render: (r) => r.display?.title ?? '—',
+    },
+    {
+      key: 'frame',
+      header: '框架',
+      width: '10%',
+      render: (r) =>
+        r.display?.frame ? (ADVANCEMENT_FRAME_LABEL[r.display.frame] ?? r.display.frame) : '—',
+    },
+    {
+      key: 'parent',
+      header: '父进度',
+      width: '20%',
+      render: (r) => r.parent ?? '—',
+    },
+    {
+      key: 'criteria',
+      header: '条件数',
+      width: '10%',
+      sortValue: (r) => r.criteria.length,
+      render: (r) => String(r.criteria.length),
+    },
+    {
+      key: 'icon',
+      header: '图标',
+      width: '15%',
+      render: (r) => r.display?.icon ?? '—',
+    },
+  ];
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-mc-surface">
@@ -41,53 +734,269 @@ export function ModPreviewPanel() {
           { label: 'modId', value: mod.modId },
           { label: '版本', value: mod.version },
           { label: 'License', value: mod.license },
+          { label: '作者', value: mod.authors.join(', ') || '—' },
         ]}
         subtitle={mod.description}
       />
 
+      {/* 顶部统计卡片行 */}
+      <div className="grid grid-cols-3 gap-2 border-b border-mc-border bg-mc-surface-2/30 p-2 sm:grid-cols-4 md:grid-cols-7">
+        <StatCard label="物品" value={stats.items} icon={<Boxes className="h-3 w-3" />} />
+        <StatCard label="方块" value={stats.blocks} icon={<Layers className="h-3 w-3" />} />
+        <StatCard
+          label="依赖"
+          value={stats.deps}
+          sub={`${stats.mandatoryDeps} 必需`}
+          icon={<Package className="h-3 w-3" />}
+        />
+        <StatCard label="战利品" value={stats.loot} icon={<FileText className="h-3 w-3" />} />
+        <StatCard label="进度" value={stats.advancements} icon={<Trophy className="h-3 w-3" />} />
+        <StatCard label="标签" value={stats.tags} icon={<Tag className="h-3 w-3" />} />
+        <StatCard
+          label="函数"
+          value={stats.functions}
+          icon={<FunctionSquare className="h-3 w-3" />}
+        />
+      </div>
+
+      {/* 冲突检测告警 */}
+      {totalConflicts > 0 && (
+        <div className="flex items-start gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-yellow-400" />
+          <div className="text-[11px] text-yellow-300">
+            检测到 <strong>{totalConflicts}</strong> 处冲突：
+            {conflicts.duplicateItemIds.length > 0 &&
+              ` 物品 ID 重复 ${conflicts.duplicateItemIds.length} 处`}
+            {conflicts.duplicateBlockIds.length > 0 &&
+              ` · 方块 ID 重复 ${conflicts.duplicateBlockIds.length} 处`}
+            {conflicts.duplicateDeps.length > 0 &&
+              ` · 依赖重复 ${conflicts.duplicateDeps.length} 处`}
+          </div>
+        </div>
+      )}
+
       {/* Tab 切换 */}
-      <div className="flex items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
+      <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => {
               setActiveTab(t.key);
               setQuery('');
+              setRarityFilter('all');
+              setCategoryFilter('all');
+              setMaterialFilter('all');
             }}
-            className={`rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1 rounded-mc px-2.5 py-1 text-[11px] font-medium transition-colors ${
               activeTab === t.key
                 ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
                 : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
             }`}
           >
+            <t.icon className="h-3 w-3" />
             {t.label}
-            <span className="ml-1 text-mc-mute">({countByTab(mod, t.key)})</span>
+            {t.key !== 'metadata' && t.key !== 'export' && (
+              <span className="ml-0.5 text-mc-mute">({countByTab(mod, t.key)})</span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* 搜索框（元数据 tab 不显示） */}
-      {activeTab !== 'metadata' && (
-        <div className="border-b border-mc-border px-3 py-2">
-          <SearchInput
-            value={query}
-            onChange={setQuery}
-            placeholder={`搜索${tabLabel(activeTab)}…`}
-          />
+      {/* 搜索 + 高级筛选栏 */}
+      {activeTab !== 'metadata' && activeTab !== 'export' && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-mc-border px-3 py-2">
+          <div className="flex-1 min-w-[180px]">
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder={`搜索${tabLabel(activeTab)}…`}
+            />
+          </div>
+          {activeTab === 'items' && (
+            <>
+              <select
+                value={rarityFilter}
+                onChange={(e) => setRarityFilter(e.target.value as ItemRarityFilter)}
+                className="mc-select !py-1 !text-xs"
+              >
+                <option value="all">全部稀有度</option>
+                <option value="common">普通 ({rarityDistribution.common})</option>
+                <option value="uncommon">少见 ({rarityDistribution.uncommon})</option>
+                <option value="rare">稀有 ({rarityDistribution.rare})</option>
+                <option value="epic">史诗 ({rarityDistribution.epic})</option>
+              </select>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value as ItemCategoryFilter)}
+                className="mc-select !py-1 !text-xs"
+              >
+                <option value="all">全部类别</option>
+                {Object.entries(ITEM_CATEGORY_LABEL).map(([val, label]) => (
+                  <option key={val} value={val}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          {activeTab === 'blocks' && (
+            <select
+              value={materialFilter}
+              onChange={(e) => setMaterialFilter(e.target.value as BlockMaterialFilter)}
+              className="mc-select !py-1 !text-xs"
+            >
+              <option value="all">全部材质</option>
+              {(
+                [
+                  'wood',
+                  'stone',
+                  'metal',
+                  'rock',
+                  'cloth',
+                  'plant',
+                  'sand',
+                  'glass',
+                  'ice',
+                  'water',
+                  'lava',
+                ] as BlockMaterialFilter[]
+              )
+                .filter((m) => m !== 'all')
+                .map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      {/* 物品批量操作栏 */}
+      {activeTab === 'items' && selectedItemIds.size > 0 && (
+        <div className="flex items-center gap-2 border-b border-mc-border bg-mc-accent/10 px-3 py-1.5">
+          <span className="text-[11px] text-mc-text">已选 {selectedItemIds.size} 项</span>
+          <button
+            onClick={() => removeItems(Array.from(selectedItemIds))}
+            className="flex items-center gap-1 rounded-mc bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-500/30"
+          >
+            <Trash2 className="h-3 w-3" /> 批量移除
+          </button>
+          <button
+            onClick={() => setSelectedItemIds(new Set())}
+            className="ml-auto text-[10px] text-mc-dim hover:text-mc-text"
+          >
+            取消选择
+          </button>
+        </div>
+      )}
+
+      {/* 方块批量操作栏 */}
+      {activeTab === 'blocks' && selectedBlockIds.size > 0 && (
+        <div className="flex items-center gap-2 border-b border-mc-border bg-mc-accent/10 px-3 py-1.5">
+          <span className="text-[11px] text-mc-text">已选 {selectedBlockIds.size} 项</span>
+          <button
+            onClick={() => removeBlocks(Array.from(selectedBlockIds))}
+            className="flex items-center gap-1 rounded-mc bg-red-500/20 px-2 py-0.5 text-[10px] text-red-400 hover:bg-red-500/30"
+          >
+            <Trash2 className="h-3 w-3" /> 批量移除
+          </button>
+          <button
+            onClick={() => setSelectedBlockIds(new Set())}
+            className="ml-auto text-[10px] text-mc-dim hover:text-mc-text"
+          >
+            取消选择
+          </button>
         </div>
       )}
 
       {/* Tab 内容 */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'items' && <ItemsTab items={mod.items} query={query} />}
-        {activeTab === 'blocks' && <BlocksTab blocks={mod.blocks} query={query} />}
-        {activeTab === 'dependencies' && <DepsTab deps={mod.dependencies} query={query} />}
+        {activeTab === 'items' && (
+          <DataTable
+            columns={itemColumns}
+            data={filteredItems}
+            rowKey={(r) => r.id}
+            emptyHint="暂无物品，在 Spec 中添加 items"
+          />
+        )}
+        {activeTab === 'blocks' && (
+          <DataTable
+            columns={blockColumns}
+            data={filteredBlocks}
+            rowKey={(r) => r.id}
+            emptyHint="暂无方块，在 Spec 中添加 blocks"
+          />
+        )}
+        {activeTab === 'dependencies' && (
+          <DataTable
+            columns={depColumns}
+            data={filteredDeps}
+            rowKey={(r) => r.modId}
+            emptyHint="暂无依赖"
+          />
+        )}
+        {activeTab === 'loot' && (
+          <DataTable
+            columns={lootColumns}
+            data={filteredLoot}
+            rowKey={(r) => r.id}
+            emptyHint="暂无战利品表"
+          />
+        )}
+        {activeTab === 'advancements' && (
+          <DataTable
+            columns={advancementColumns}
+            data={filteredAdvancements}
+            rowKey={(r) => r.id}
+            emptyHint="暂无进度/成就"
+          />
+        )}
+        {activeTab === 'tags' && <TagsTab tags={mod.tags} query={query} />}
+        {activeTab === 'functions' && <FunctionsTab functions={mod.functions} query={query} />}
         {activeTab === 'metadata' && <MetadataTab mod={mod} />}
+        {activeTab === 'export' && (
+          <ExportView
+            mod={mod}
+            stats={stats}
+            rarityDistribution={rarityDistribution}
+            onExport={exportData}
+          />
+        )}
       </div>
 
       {/* Footer */}
       <div className="border-t border-mc-border px-4 py-2 text-xs text-mc-mute">
-        物品 {mod.items.length} · 方块 {mod.blocks.length} · 依赖 {mod.dependencies.length}
+        {activeTab === 'items' && (
+          <>
+            物品 {mod.items.length} · 显示 {filteredItems.length} · 食物 {stats.foodItems} · 燃料{' '}
+            {stats.fuelItems}
+          </>
+        )}
+        {activeTab === 'blocks' && (
+          <>
+            方块 {mod.blocks.length} · 显示 {filteredBlocks.length}
+          </>
+        )}
+        {activeTab === 'dependencies' && (
+          <>
+            依赖 {mod.dependencies.length} · 显示 {filteredDeps.length} · 必需 {stats.mandatoryDeps}
+          </>
+        )}
+        {activeTab === 'loot' && (
+          <>
+            战利品表 {mod.lootTables.length} · 显示 {filteredLoot.length}
+          </>
+        )}
+        {activeTab === 'advancements' && (
+          <>
+            进度 {mod.advancements.length} · 显示 {filteredAdvancements.length}
+          </>
+        )}
+        {activeTab === 'tags' && <>标签 {mod.tags.length}</>}
+        {activeTab === 'functions' && <>函数 {mod.functions.length}</>}
+        {activeTab === 'metadata' && <>元数据</>}
+        {activeTab === 'export' && <>导出</>}
       </div>
     </div>
   );
@@ -97,6 +1006,10 @@ function countByTab(mod: ModSpec, tab: ModTab): number {
   if (tab === 'items') return mod.items.length;
   if (tab === 'blocks') return mod.blocks.length;
   if (tab === 'dependencies') return mod.dependencies.length;
+  if (tab === 'loot') return mod.lootTables.length;
+  if (tab === 'advancements') return mod.advancements.length;
+  if (tab === 'tags') return mod.tags.length;
+  if (tab === 'functions') return mod.functions.length;
   return 0;
 }
 
@@ -104,91 +1017,108 @@ function tabLabel(tab: ModTab): string {
   return TABS.find((t) => t.key === tab)?.label ?? '';
 }
 
-// ===== Tab 组件 =====
-
-function ItemsTab({ items, query }: { items: ItemSpec[]; query: string }) {
-  const filtered = useMemo(() => {
-    if (!query) return items;
-    const q = query.toLowerCase();
-    return items.filter((i) => i.id.toLowerCase().includes(q) || i.name.toLowerCase().includes(q));
-  }, [items, query]);
-
-  const columns: Column<ItemSpec>[] = [
-    { key: 'id', header: 'ID', width: '20%', sortValue: (r) => r.id },
-    { key: 'name', header: '名称', width: '20%', sortValue: (r) => r.name },
-    { key: 'rarity', header: '稀有度', width: '12%', sortValue: (r) => r.rarity },
-    { key: 'maxStackSize', header: '堆叠', width: '10%', sortValue: (r) => r.maxStackSize },
-    { key: 'maxDamage', header: '耐久', width: '10%', sortValue: (r) => r.maxDamage },
-    { key: 'fuelTick', header: '燃料', width: '10%', sortValue: (r) => r.fuelTick },
-    {
-      key: 'food',
-      header: '食物',
-      width: '18%',
-      render: (r) => (r.food ? `饥饿 ${r.food.hunger}/饱和 ${r.food.saturation}` : '—'),
-    },
-  ];
-
+// ===== 统计卡片 =====
+function StatCard({
+  label,
+  value,
+  sub,
+  icon,
+}: {
+  label: string;
+  value: number | string;
+  sub?: string;
+  icon?: React.ReactNode;
+}) {
   return (
-    <DataTable
-      columns={columns}
-      data={filtered}
-      rowKey={(r) => r.id}
-      emptyHint="暂无物品，在 Spec 中添加 items"
-    />
+    <div className="rounded-mc border border-mc-border bg-mc-surface-2/60 px-2 py-1.5">
+      <div className="flex items-center gap-1 text-[10px] text-mc-mute">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-0.5 font-display text-base font-bold text-mc-text">{value}</div>
+      {sub && <div className="text-[9px] text-mc-dim">{sub}</div>}
+    </div>
   );
 }
 
-function BlocksTab({ blocks, query }: { blocks: BlockSpec[]; query: string }) {
+// ===== 标签 Tab =====
+function TagsTab({ tags, query }: { tags: ModSpec['tags']; query: string }) {
   const filtered = useMemo(() => {
-    if (!query) return blocks;
+    if (!query) return tags;
     const q = query.toLowerCase();
-    return blocks.filter((b) => b.id.toLowerCase().includes(q) || b.name.toLowerCase().includes(q));
-  }, [blocks, query]);
+    return tags.filter(
+      (t) => t.id.toLowerCase().includes(q) || t.values.some((v) => v.toLowerCase().includes(q)),
+    );
+  }, [tags, query]);
 
-  const columns: Column<BlockSpec>[] = [
-    { key: 'id', header: 'ID', width: '18%', sortValue: (r) => r.id },
-    { key: 'name', header: '名称', width: '18%', sortValue: (r) => r.name },
-    { key: 'material', header: '材质', width: '10%', sortValue: (r) => r.material },
-    { key: 'hardness', header: '硬度', width: '10%', sortValue: (r) => r.hardness },
-    { key: 'lightLevel', header: '发光', width: '10%', sortValue: (r) => r.lightLevel },
-    { key: 'resistance', header: '抗性', width: '10%', sortValue: (r) => r.resistance },
-    { key: 'soundType', header: '声音', width: '12%', sortValue: (r) => r.soundType },
+  const columns: Column<(typeof tags)[number]>[] = [
+    { key: 'id', header: '标签 ID', width: '30%', sortValue: (r) => r.id },
     {
-      key: 'dropSelf',
-      header: '掉落',
+      key: 'values',
+      header: '条目数',
+      width: '10%',
+      sortValue: (r) => r.values.length,
+      render: (r) => String(r.values.length),
+    },
+    {
+      key: 'replace',
+      header: '替换模式',
       width: '12%',
-      render: (r) => (r.dropSelf ? '自身' : r.dropItem || '无'),
+      render: (r) =>
+        r.replace ? (
+          <span className="rounded-mc bg-orange-500/20 px-1.5 py-0.5 text-[10px] text-orange-400">
+            替换
+          </span>
+        ) : (
+          <span className="rounded-mc bg-blue-500/20 px-1.5 py-0.5 text-[10px] text-blue-400">
+            追加
+          </span>
+        ),
+    },
+    {
+      key: 'preview',
+      header: '前 3 个条目',
+      width: '48%',
+      render: (r) => (r.values.length > 0 ? r.values.slice(0, 3).join(', ') : '—'),
     },
   ];
 
-  return (
-    <DataTable
-      columns={columns}
-      data={filtered}
-      rowKey={(r) => r.id}
-      emptyHint="暂无方块，在 Spec 中添加 blocks"
-    />
-  );
+  return <DataTable columns={columns} data={filtered} rowKey={(r) => r.id} emptyHint="暂无标签" />;
 }
 
-function DepsTab({ deps, query }: { deps: ModDependencySpec[]; query: string }) {
+// ===== 函数 Tab =====
+function FunctionsTab({ functions, query }: { functions: ModSpec['functions']; query: string }) {
   const filtered = useMemo(() => {
-    if (!query) return deps;
+    if (!query) return functions;
     const q = query.toLowerCase();
-    return deps.filter((d) => d.modId.toLowerCase().includes(q));
-  }, [deps, query]);
+    return functions.filter(
+      (f) => f.id.toLowerCase().includes(q) || f.commands.some((c) => c.toLowerCase().includes(q)),
+    );
+  }, [functions, query]);
 
-  const columns: Column<ModDependencySpec>[] = [
-    { key: 'modId', header: 'Mod ID', width: '40%', sortValue: (r) => r.modId },
-    { key: 'version', header: '版本', width: '30%', sortValue: (r) => r.version },
-    { key: 'mandatory', header: '必需', width: '30%', render: (r) => (r.mandatory ? '是' : '否') },
-  ];
+  if (filtered.length === 0) {
+    return <div className="px-3 py-6 text-center text-xs text-mc-mute">暂无函数</div>;
+  }
 
   return (
-    <DataTable columns={columns} data={filtered} rowKey={(r) => r.modId} emptyHint="暂无依赖" />
+    <div className="flex flex-col gap-2 p-2">
+      {filtered.map((f) => (
+        <div key={f.id} className="rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
+          <div className="mb-1 flex items-center gap-2">
+            <FunctionSquare className="h-3 w-3 text-mc-accent" />
+            <span className="font-mono text-xs font-medium text-mc-text">{f.id}</span>
+            <span className="text-[10px] text-mc-mute">· {f.commands.length} 行命令</span>
+          </div>
+          <pre className="max-h-32 overflow-auto rounded-mc bg-mc-bg p-2 text-[10px] text-mc-dim whitespace-pre-wrap">
+            {f.commands.join('\n')}
+          </pre>
+        </div>
+      ))}
+    </div>
   );
 }
 
+// ===== 元数据 Tab =====
 function MetadataTab({ mod }: { mod: ModSpec }) {
   const rows: { label: string; value: string }[] = [
     { label: 'Mod ID', value: mod.modId },
@@ -213,6 +1143,184 @@ function MetadataTab({ mod }: { mod: ModSpec }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ===== 导出视图 =====
+function ExportView({
+  mod,
+  stats,
+  rarityDistribution,
+  onExport,
+}: {
+  mod: ModSpec;
+  stats: {
+    items: number;
+    blocks: number;
+    deps: number;
+    loot: number;
+    advancements: number;
+    tags: number;
+    functions: number;
+    mandatoryDeps: number;
+    foodItems: number;
+    fuelItems: number;
+  };
+  rarityDistribution: { common: number; uncommon: number; rare: number; epic: number };
+  onExport: (
+    format: 'json' | 'csv' | 'markdown',
+    scope: 'all' | 'items' | 'blocks' | 'deps',
+  ) => void;
+}) {
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* 导出按钮组 */}
+      <div>
+        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-mc-text">
+          <Download className="h-4 w-4 text-mc-accent" />
+          导出 Mod 数据
+        </h3>
+        <p className="mb-3 text-xs text-mc-mute">
+          将当前 Mod 的 Spec 数据导出为不同格式，方便分享、文档归档或迁移
+        </p>
+
+        {/* 全量导出 */}
+        <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
+          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">完整 Spec</div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => onExport('json', 'all')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> JSON
+            </button>
+            <button
+              onClick={() => onExport('markdown', 'all')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> Markdown
+            </button>
+          </div>
+        </div>
+
+        {/* 物品列表导出 */}
+        <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
+          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
+            物品列表 ({mod.items.length})
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => onExport('json', 'items')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> JSON
+            </button>
+            <button
+              onClick={() => onExport('csv', 'items')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> CSV
+            </button>
+            <button
+              onClick={() => onExport('markdown', 'items')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> Markdown
+            </button>
+          </div>
+        </div>
+
+        {/* 方块列表导出 */}
+        <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
+          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
+            方块列表 ({mod.blocks.length})
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => onExport('json', 'blocks')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> JSON
+            </button>
+            <button
+              onClick={() => onExport('csv', 'blocks')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> CSV
+            </button>
+            <button
+              onClick={() => onExport('markdown', 'blocks')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> Markdown
+            </button>
+          </div>
+        </div>
+
+        {/* 依赖列表导出 */}
+        <div className="rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
+          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
+            依赖列表 ({mod.dependencies.length})
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => onExport('json', 'deps')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> JSON
+            </button>
+            <button
+              onClick={() => onExport('csv', 'deps')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> CSV
+            </button>
+            <button
+              onClick={() => onExport('markdown', 'deps')}
+              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
+            >
+              <Download className="h-3 w-3" /> Markdown
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 统计概览 */}
+      <div className="border-t border-mc-border pt-4">
+        <h3 className="mb-2 text-sm font-medium text-mc-text">Mod 统计</h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+          <StatCard label="物品总数" value={stats.items} />
+          <StatCard label="方块总数" value={stats.blocks} />
+          <StatCard label="依赖数" value={stats.deps} sub={`${stats.mandatoryDeps} 必需`} />
+          <StatCard label="战利品表" value={stats.loot} />
+          <StatCard label="进度/成就" value={stats.advancements} />
+          <StatCard label="标签" value={stats.tags} />
+          <StatCard label="函数" value={stats.functions} />
+          <StatCard label="食物物品" value={stats.foodItems} />
+          <StatCard label="燃料物品" value={stats.fuelItems} />
+          <StatCard
+            label="普通稀有度"
+            value={rarityDistribution.common}
+            icon={<span className="text-[8px] text-mc-dim">●</span>}
+          />
+          <StatCard
+            label="少见稀有度"
+            value={rarityDistribution.uncommon}
+            icon={<span className="text-[8px] text-yellow-400">●</span>}
+          />
+          <StatCard
+            label="稀有稀有度"
+            value={rarityDistribution.rare}
+            icon={<span className="text-[8px] text-blue-400">●</span>}
+          />
+          <StatCard
+            label="史诗稀有度"
+            value={rarityDistribution.epic}
+            icon={<span className="text-[8px] text-purple-400">●</span>}
+          />
+        </div>
+      </div>
     </div>
   );
 }
