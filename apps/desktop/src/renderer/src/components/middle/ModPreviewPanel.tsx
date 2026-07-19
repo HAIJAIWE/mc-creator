@@ -4,7 +4,9 @@ import { useModStore } from '../../store/mod-store.js';
 import {
   DataTable,
   PanelHeader,
-  SearchInput,
+  ConflictAlert,
+  ExportView,
+  FilterBar,
   EmptyState,
   StatCard,
   MetadataView,
@@ -25,7 +27,6 @@ import {
   Trash2,
   CheckSquare,
   Square,
-  AlertTriangle,
   FileText,
   Boxes,
   Package,
@@ -745,20 +746,14 @@ export function ModPreviewPanel() {
       </div>
 
       {/* 冲突检测告警 */}
-      {totalConflicts > 0 && (
-        <div className="flex items-start gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
-          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-yellow-400" />
-          <div className="text-[11px] text-yellow-300">
-            检测到 <strong>{totalConflicts}</strong> 处冲突：
-            {conflicts.duplicateItemIds.length > 0 &&
-              ` 物品 ID 重复 ${conflicts.duplicateItemIds.length} 处`}
-            {conflicts.duplicateBlockIds.length > 0 &&
-              ` · 方块 ID 重复 ${conflicts.duplicateBlockIds.length} 处`}
-            {conflicts.duplicateDeps.length > 0 &&
-              ` · 依赖重复 ${conflicts.duplicateDeps.length} 处`}
-          </div>
-        </div>
-      )}
+      <ConflictAlert
+        totalConflicts={totalConflicts}
+        conflicts={[
+          { label: '物品 ID 重复', count: conflicts.duplicateItemIds.length },
+          { label: '方块 ID 重复', count: conflicts.duplicateBlockIds.length },
+          { label: '依赖重复', count: conflicts.duplicateDeps.length },
+        ]}
+      />
 
       {/* Tab 切换 */}
       <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
@@ -789,14 +784,11 @@ export function ModPreviewPanel() {
 
       {/* 搜索 + 高级筛选栏 */}
       {activeTab !== 'metadata' && activeTab !== 'export' && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-mc-border px-3 py-2">
-          <div className="flex-1 min-w-[180px]">
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder={`搜索${tabLabel(activeTab)}…`}
-            />
-          </div>
+        <FilterBar
+          query={query}
+          onQueryChange={setQuery}
+          searchPlaceholder={`搜索${tabLabel(activeTab)}…`}
+        >
           {activeTab === 'items' && (
             <>
               <select
@@ -854,7 +846,7 @@ export function ModPreviewPanel() {
                 ))}
             </select>
           )}
-        </div>
+        </FilterBar>
       )}
 
       {/* 物品批量操作栏 */}
@@ -955,10 +947,49 @@ export function ModPreviewPanel() {
         )}
         {activeTab === 'export' && (
           <ExportView
-            mod={mod}
-            stats={stats}
-            rarityDistribution={rarityDistribution}
+            title="导出 Mod 数据"
+            description="将当前 Mod 的 Spec 数据导出为不同格式，方便分享、文档归档或迁移"
+            sections={[
+              { scope: 'all', label: '完整 Spec' },
+              { scope: 'items', label: '物品列表', count: mod.items.length },
+              { scope: 'blocks', label: '方块列表', count: mod.blocks.length },
+              { scope: 'deps', label: '依赖列表', count: mod.dependencies.length },
+            ]}
             onExport={exportData}
+            statsTitle="Mod 统计"
+            stats={
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                <StatCard label="物品总数" value={stats.items} />
+                <StatCard label="方块总数" value={stats.blocks} />
+                <StatCard label="依赖数" value={stats.deps} sub={`${stats.mandatoryDeps} 必需`} />
+                <StatCard label="战利品表" value={stats.loot} />
+                <StatCard label="进度/成就" value={stats.advancements} />
+                <StatCard label="标签" value={stats.tags} />
+                <StatCard label="函数" value={stats.functions} />
+                <StatCard label="食物物品" value={stats.foodItems} />
+                <StatCard label="燃料物品" value={stats.fuelItems} />
+                <StatCard
+                  label="普通稀有度"
+                  value={rarityDistribution.common}
+                  icon={<span className="text-[8px] text-mc-dim">●</span>}
+                />
+                <StatCard
+                  label="少见稀有度"
+                  value={rarityDistribution.uncommon}
+                  icon={<span className="text-[8px] text-yellow-400">●</span>}
+                />
+                <StatCard
+                  label="稀有稀有度"
+                  value={rarityDistribution.rare}
+                  icon={<span className="text-[8px] text-blue-400">●</span>}
+                />
+                <StatCard
+                  label="史诗稀有度"
+                  value={rarityDistribution.epic}
+                  icon={<span className="text-[8px] text-purple-400">●</span>}
+                />
+              </div>
+            }
           />
         )}
       </div>
@@ -1088,184 +1119,6 @@ function FunctionsTab({ functions, query }: { functions: ModSpec['functions']; q
           </pre>
         </div>
       ))}
-    </div>
-  );
-}
-
-// ===== 导出视图 =====
-function ExportView({
-  mod,
-  stats,
-  rarityDistribution,
-  onExport,
-}: {
-  mod: ModSpec;
-  stats: {
-    items: number;
-    blocks: number;
-    deps: number;
-    loot: number;
-    advancements: number;
-    tags: number;
-    functions: number;
-    mandatoryDeps: number;
-    foodItems: number;
-    fuelItems: number;
-  };
-  rarityDistribution: { common: number; uncommon: number; rare: number; epic: number };
-  onExport: (
-    format: 'json' | 'csv' | 'markdown',
-    scope: 'all' | 'items' | 'blocks' | 'deps',
-  ) => void;
-}) {
-  return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {/* 导出按钮组 */}
-      <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-mc-text">
-          <Download className="h-4 w-4 text-mc-accent" />
-          导出 Mod 数据
-        </h3>
-        <p className="mb-3 text-xs text-mc-mute">
-          将当前 Mod 的 Spec 数据导出为不同格式，方便分享、文档归档或迁移
-        </p>
-
-        {/* 全量导出 */}
-        <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
-          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">完整 Spec</div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => onExport('json', 'all')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> JSON
-            </button>
-            <button
-              onClick={() => onExport('markdown', 'all')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> Markdown
-            </button>
-          </div>
-        </div>
-
-        {/* 物品列表导出 */}
-        <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
-          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
-            物品列表 ({mod.items.length})
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => onExport('json', 'items')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> JSON
-            </button>
-            <button
-              onClick={() => onExport('csv', 'items')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> CSV
-            </button>
-            <button
-              onClick={() => onExport('markdown', 'items')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> Markdown
-            </button>
-          </div>
-        </div>
-
-        {/* 方块列表导出 */}
-        <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
-          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
-            方块列表 ({mod.blocks.length})
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => onExport('json', 'blocks')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> JSON
-            </button>
-            <button
-              onClick={() => onExport('csv', 'blocks')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> CSV
-            </button>
-            <button
-              onClick={() => onExport('markdown', 'blocks')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> Markdown
-            </button>
-          </div>
-        </div>
-
-        {/* 依赖列表导出 */}
-        <div className="rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
-          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
-            依赖列表 ({mod.dependencies.length})
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => onExport('json', 'deps')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> JSON
-            </button>
-            <button
-              onClick={() => onExport('csv', 'deps')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> CSV
-            </button>
-            <button
-              onClick={() => onExport('markdown', 'deps')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> Markdown
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 统计概览 */}
-      <div className="border-t border-mc-border pt-4">
-        <h3 className="mb-2 text-sm font-medium text-mc-text">Mod 统计</h3>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-          <StatCard label="物品总数" value={stats.items} />
-          <StatCard label="方块总数" value={stats.blocks} />
-          <StatCard label="依赖数" value={stats.deps} sub={`${stats.mandatoryDeps} 必需`} />
-          <StatCard label="战利品表" value={stats.loot} />
-          <StatCard label="进度/成就" value={stats.advancements} />
-          <StatCard label="标签" value={stats.tags} />
-          <StatCard label="函数" value={stats.functions} />
-          <StatCard label="食物物品" value={stats.foodItems} />
-          <StatCard label="燃料物品" value={stats.fuelItems} />
-          <StatCard
-            label="普通稀有度"
-            value={rarityDistribution.common}
-            icon={<span className="text-[8px] text-mc-dim">●</span>}
-          />
-          <StatCard
-            label="少见稀有度"
-            value={rarityDistribution.uncommon}
-            icon={<span className="text-[8px] text-yellow-400">●</span>}
-          />
-          <StatCard
-            label="稀有稀有度"
-            value={rarityDistribution.rare}
-            icon={<span className="text-[8px] text-blue-400">●</span>}
-          />
-          <StatCard
-            label="史诗稀有度"
-            value={rarityDistribution.epic}
-            icon={<span className="text-[8px] text-purple-400">●</span>}
-          />
-        </div>
-      </div>
     </div>
   );
 }

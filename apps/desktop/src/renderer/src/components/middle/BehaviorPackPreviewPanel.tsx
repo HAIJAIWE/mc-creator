@@ -4,10 +4,12 @@ import { useModStore } from '../../store/mod-store.js';
 import {
   DataTable,
   PanelHeader,
-  SearchInput,
   EmptyState,
   StatCard,
   MetadataView,
+  ConflictAlert,
+  ExportView,
+  FilterBar,
   findDuplicates,
   downloadBlob,
 } from './shared/index.js';
@@ -23,7 +25,6 @@ import {
   Trash2,
   CheckSquare,
   Square,
-  AlertTriangle,
   FileText,
   Boxes,
   Package,
@@ -540,20 +541,14 @@ export function BehaviorPackPreviewPanel() {
       </div>
 
       {/* 冲突检测告警 */}
-      {totalConflicts > 0 && (
-        <div className="flex items-start gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
-          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-yellow-400" />
-          <div className="text-[11px] text-yellow-300">
-            检测到 <strong>{totalConflicts}</strong> 处冲突：
-            {conflicts.duplicateEntityIds.length > 0 &&
-              ` 实体标识符重复 ${conflicts.duplicateEntityIds.length} 处`}
-            {conflicts.duplicateRecipeIds.length > 0 &&
-              ` · 配方标识符重复 ${conflicts.duplicateRecipeIds.length} 处`}
-            {conflicts.duplicateLootPaths.length > 0 &&
-              ` · 战利品表路径重复 ${conflicts.duplicateLootPaths.length} 处`}
-          </div>
-        </div>
-      )}
+      <ConflictAlert
+        totalConflicts={totalConflicts}
+        conflicts={[
+          { label: '实体标识符重复', count: conflicts.duplicateEntityIds.length },
+          { label: '配方标识符重复', count: conflicts.duplicateRecipeIds.length },
+          { label: '战利品表路径重复', count: conflicts.duplicateLootPaths.length },
+        ]}
+      />
 
       {/* Tab 切换 */}
       <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
@@ -582,14 +577,11 @@ export function BehaviorPackPreviewPanel() {
 
       {/* 搜索 + 筛选栏 */}
       {activeTab !== 'metadata' && activeTab !== 'export' && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-mc-border px-3 py-2">
-          <div className="flex-1 min-w-[180px]">
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder={`搜索${tabLabel(activeTab)}…`}
-            />
-          </div>
+        <FilterBar
+          query={query}
+          onQueryChange={setQuery}
+          searchPlaceholder={`搜索${tabLabel(activeTab)}…`}
+        >
           {activeTab === 'recipes' && (
             <select
               value={recipeTypeFilter}
@@ -604,7 +596,7 @@ export function BehaviorPackPreviewPanel() {
               <option value="furnace">熔炼 ({recipeTypeStats.furnace})</option>
             </select>
           )}
-        </div>
+        </FilterBar>
       )}
 
       {/* 实体批量操作栏 */}
@@ -675,10 +667,30 @@ export function BehaviorPackPreviewPanel() {
         {activeTab === 'metadata' && <MetadataView rows={metadataRows} />}
         {activeTab === 'export' && (
           <ExportView
-            bp={bp}
-            stats={stats}
-            recipeTypeStats={recipeTypeStats}
+            title="导出行为包数据"
+            description="将当前行为包的 Spec 数据导出为不同格式，方便分享、文档归档或迁移"
+            sections={[
+              { scope: 'all', label: '完整 Spec' },
+              { scope: 'entities', label: '实体列表', count: bp.entities.length },
+              { scope: 'recipes', label: '配方列表', count: bp.recipes.length },
+              { scope: 'loot', label: '战利品表', count: bp.lootTables.length },
+            ]}
             onExport={exportData}
+            statsTitle="行为包统计"
+            stats={
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                <StatCard label="实体总数" value={stats.entities} />
+                <StatCard label="配方总数" value={stats.recipes} />
+                <StatCard label="战利品表" value={stats.loot} />
+                <StatCard label="UUID 依赖" value={stats.deps} />
+                <StatCard label="组件总数" value={stats.totalComponents} />
+                <StatCard label="事件总数" value={stats.totalEvents} />
+                <StatCard label="战利品条目" value={stats.totalLootEntries} />
+                <StatCard label="有序合成" value={recipeTypeStats.shaped_crafting} />
+                <StatCard label="无序合成" value={recipeTypeStats.shapeless_crafting} />
+                <StatCard label="熔炼配方" value={recipeTypeStats.furnace} />
+              </div>
+            }
           />
         )}
       </div>
@@ -747,162 +759,6 @@ function DepsView({ deps }: { deps: BehaviorPackSpec['dependencies'] }) {
           <div className="mt-1 text-[10px] text-mc-mute">版本: {d.version.join('.')}</div>
         </div>
       ))}
-    </div>
-  );
-}
-
-// ===== 导出视图 =====
-function ExportView({
-  bp,
-  stats,
-  recipeTypeStats,
-  onExport,
-}: {
-  bp: BehaviorPackSpec;
-  stats: {
-    entities: number;
-    recipes: number;
-    loot: number;
-    deps: number;
-    totalComponents: number;
-    totalEvents: number;
-    totalLootEntries: number;
-    hasUuid: boolean;
-  };
-  recipeTypeStats: { shaped_crafting: number; shapeless_crafting: number; furnace: number };
-  onExport: (
-    format: 'json' | 'csv' | 'markdown',
-    scope: 'all' | 'entities' | 'recipes' | 'loot',
-  ) => void;
-}) {
-  return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-mc-text">
-          <Download className="h-4 w-4 text-mc-accent" />
-          导出行为包数据
-        </h3>
-        <p className="mb-3 text-xs text-mc-mute">
-          将当前行为包的 Spec 数据导出为不同格式，方便分享、文档归档或迁移
-        </p>
-
-        {/* 完整 Spec */}
-        <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
-          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">完整 Spec</div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => onExport('json', 'all')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> JSON
-            </button>
-            <button
-              onClick={() => onExport('markdown', 'all')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> Markdown
-            </button>
-          </div>
-        </div>
-
-        {/* 实体列表 */}
-        <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
-          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
-            实体列表 ({bp.entities.length})
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => onExport('json', 'entities')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> JSON
-            </button>
-            <button
-              onClick={() => onExport('csv', 'entities')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> CSV
-            </button>
-            <button
-              onClick={() => onExport('markdown', 'entities')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> Markdown
-            </button>
-          </div>
-        </div>
-
-        {/* 配方列表 */}
-        <div className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
-          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
-            配方列表 ({bp.recipes.length})
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => onExport('json', 'recipes')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> JSON
-            </button>
-            <button
-              onClick={() => onExport('csv', 'recipes')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> CSV
-            </button>
-            <button
-              onClick={() => onExport('markdown', 'recipes')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> Markdown
-            </button>
-          </div>
-        </div>
-
-        {/* 战利品表 */}
-        <div className="rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
-          <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
-            战利品表 ({bp.lootTables.length})
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={() => onExport('json', 'loot')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> JSON
-            </button>
-            <button
-              onClick={() => onExport('csv', 'loot')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> CSV
-            </button>
-            <button
-              onClick={() => onExport('markdown', 'loot')}
-              className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-            >
-              <Download className="h-3 w-3" /> Markdown
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 统计概览 */}
-      <div className="border-t border-mc-border pt-4">
-        <h3 className="mb-2 text-sm font-medium text-mc-text">行为包统计</h3>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-          <StatCard label="实体总数" value={stats.entities} />
-          <StatCard label="配方总数" value={stats.recipes} />
-          <StatCard label="战利品表" value={stats.loot} />
-          <StatCard label="UUID 依赖" value={stats.deps} />
-          <StatCard label="组件总数" value={stats.totalComponents} />
-          <StatCard label="事件总数" value={stats.totalEvents} />
-          <StatCard label="战利品条目" value={stats.totalLootEntries} />
-          <StatCard label="有序合成" value={recipeTypeStats.shaped_crafting} />
-          <StatCard label="无序合成" value={recipeTypeStats.shapeless_crafting} />
-          <StatCard label="熔炼配方" value={recipeTypeStats.furnace} />
-        </div>
-      </div>
     </div>
   );
 }

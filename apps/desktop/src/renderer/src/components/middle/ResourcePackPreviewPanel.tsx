@@ -4,7 +4,9 @@ import { useModStore } from '../../store/mod-store.js';
 import {
   DataTable,
   PanelHeader,
-  SearchInput,
+  ConflictAlert,
+  ExportView,
+  FilterBar,
   EmptyState,
   StatCard,
   MetadataView,
@@ -20,16 +22,7 @@ import type {
   ModelEntry,
   FontEntry,
 } from '@mc-creator/shared';
-import {
-  Download,
-  AlertTriangle,
-  FileText,
-  Image,
-  Music,
-  Box,
-  Type,
-  Languages,
-} from 'lucide-react';
+import { Download, FileText, Image, Music, Box, Type, Languages } from 'lucide-react';
 
 type Tab = 'textures' | 'sounds' | 'models' | 'fonts' | 'lang' | 'metadata' | 'export';
 
@@ -343,22 +336,15 @@ export function ResourcePackPreviewPanel() {
       </div>
 
       {/* 冲突检测告警 */}
-      {totalConflicts > 0 && (
-        <div className="flex items-start gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
-          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-yellow-400" />
-          <div className="text-[11px] text-yellow-300">
-            检测到 <strong>{totalConflicts}</strong> 处冲突：
-            {conflicts.duplicateTexturePaths.length > 0 &&
-              ` 材质路径重复 ${conflicts.duplicateTexturePaths.length} 处`}
-            {conflicts.duplicateSoundIds.length > 0 &&
-              ` · 音效 ID 重复 ${conflicts.duplicateSoundIds.length} 处`}
-            {conflicts.duplicateModelPaths.length > 0 &&
-              ` · 模型路径重复 ${conflicts.duplicateModelPaths.length} 处`}
-            {conflicts.duplicateFontIds.length > 0 &&
-              ` · 字体 ID 重复 ${conflicts.duplicateFontIds.length} 处`}
-          </div>
-        </div>
-      )}
+      <ConflictAlert
+        totalConflicts={totalConflicts}
+        conflicts={[
+          { label: '材质路径重复', count: conflicts.duplicateTexturePaths.length },
+          { label: '音效 ID 重复', count: conflicts.duplicateSoundIds.length },
+          { label: '模型路径重复', count: conflicts.duplicateModelPaths.length },
+          { label: '字体 ID 重复', count: conflicts.duplicateFontIds.length },
+        ]}
+      />
 
       {/* Tab 切换栏 */}
       <div
@@ -393,9 +379,11 @@ export function ResourcePackPreviewPanel() {
 
       {/* 搜索栏（除元数据/导出外） */}
       {tab !== 'metadata' && tab !== 'export' && (
-        <div className="border-b border-mc-border px-3 py-2">
-          <SearchInput value={query} onChange={setQuery} placeholder={`搜索${tabLabel(tab)}…`} />
-        </div>
+        <FilterBar
+          query={query}
+          onQueryChange={setQuery}
+          searchPlaceholder={`搜索${tabLabel(tab)}…`}
+        />
       )}
 
       {/* Tab 内容 */}
@@ -406,7 +394,46 @@ export function ResourcePackPreviewPanel() {
         {tab === 'fonts' && <FontsTab pack={pack} query={query} />}
         {tab === 'lang' && <LangTab pack={pack} query={query} />}
         {tab === 'metadata' && <MetadataView rows={metadataRows} />}
-        {tab === 'export' && <ExportView pack={pack} stats={stats} onExport={exportData} />}
+        {tab === 'export' && (
+          <ExportView
+            title="导出资源包数据"
+            description="将当前资源包的 Spec 数据导出为不同格式，方便分享、文档归档或迁移"
+            sections={[
+              { scope: 'all', label: '完整 Spec' },
+              { scope: 'textures', label: '材质覆盖', count: pack.textureOverrides.length },
+              { scope: 'sounds', label: '音效', count: pack.sounds.length },
+              { scope: 'models', label: '模型', count: pack.models.length },
+              { scope: 'fonts', label: '字体', count: pack.fonts.length },
+              {
+                scope: 'lang',
+                label: '语言',
+                count: stats.langEnUs + stats.langZhCn,
+              },
+            ]}
+            onExport={exportData}
+            statsTitle="资源包统计"
+            stats={
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                <StatCard label="材质总数" value={stats.textures} />
+                <StatCard
+                  label="音效总数"
+                  value={stats.sounds}
+                  sub={`${stats.streamSounds} 流式`}
+                />
+                <StatCard
+                  label="模型总数"
+                  value={stats.models}
+                  sub={`${stats.cubeAllModels} cube_all`}
+                />
+                <StatCard label="字体总数" value={stats.fonts} />
+                <StatCard label="en_us 条目" value={stats.langEnUs} />
+                <StatCard label="zh_cn 条目" value={stats.langZhCn} />
+                <StatCard label="渐变材质" value={stats.gradientTextures} />
+                <StatCard label="棋盘材质" value={stats.checkerTextures} />
+              </div>
+            }
+          />
+        )}
       </div>
 
       {/* Footer */}
@@ -749,111 +776,6 @@ function LangTab({ pack, query }: { pack: ResourcePackSpecType; query: string })
   return (
     <div className="flex flex-col gap-2 p-2">
       <DataTable columns={columns} data={rows} rowKey={(r) => r.key} emptyHint="暂无语言条目" />
-    </div>
-  );
-}
-
-// ===== 导出视图 =====
-function ExportView({
-  pack,
-  stats,
-  onExport,
-}: {
-  pack: ResourcePackSpecType;
-  stats: {
-    textures: number;
-    sounds: number;
-    models: number;
-    fonts: number;
-    langEnUs: number;
-    langZhCn: number;
-    streamSounds: number;
-    cubeAllModels: number;
-    gradientTextures: number;
-    checkerTextures: number;
-  };
-  onExport: (
-    format: 'json' | 'csv' | 'markdown',
-    scope: 'all' | 'textures' | 'sounds' | 'models' | 'fonts' | 'lang',
-  ) => void;
-}) {
-  const exportSections: {
-    scope: 'all' | 'textures' | 'sounds' | 'models' | 'fonts' | 'lang';
-    label: string;
-    count: number;
-  }[] = [
-    { scope: 'all', label: '完整 Spec', count: 0 },
-    { scope: 'textures', label: '材质覆盖', count: pack.textureOverrides.length },
-    { scope: 'sounds', label: '音效', count: pack.sounds.length },
-    { scope: 'models', label: '模型', count: pack.models.length },
-    { scope: 'fonts', label: '字体', count: pack.fonts.length },
-    {
-      scope: 'lang',
-      label: '语言',
-      count: stats.langEnUs + stats.langZhCn,
-    },
-  ];
-
-  return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-mc-text">
-          <Download className="h-4 w-4 text-mc-accent" />
-          导出资源包数据
-        </h3>
-        <p className="mb-3 text-xs text-mc-mute">
-          将当前资源包的 Spec 数据导出为不同格式，方便分享、文档归档或迁移
-        </p>
-
-        {exportSections.map((section) => (
-          <div
-            key={section.scope}
-            className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2"
-          >
-            <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
-              {section.label}
-              {section.scope !== 'all' && ` (${section.count})`}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => onExport('json', section.scope)}
-                className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-              >
-                <Download className="h-3 w-3" /> JSON
-              </button>
-              {section.scope !== 'all' && (
-                <button
-                  onClick={() => onExport('csv', section.scope)}
-                  className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-                >
-                  <Download className="h-3 w-3" /> CSV
-                </button>
-              )}
-              <button
-                onClick={() => onExport('markdown', section.scope)}
-                className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-              >
-                <Download className="h-3 w-3" /> Markdown
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* 统计概览 */}
-      <div className="border-t border-mc-border pt-4">
-        <h3 className="mb-2 text-sm font-medium text-mc-text">资源包统计</h3>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-          <StatCard label="材质总数" value={stats.textures} />
-          <StatCard label="音效总数" value={stats.sounds} sub={`${stats.streamSounds} 流式`} />
-          <StatCard label="模型总数" value={stats.models} sub={`${stats.cubeAllModels} cube_all`} />
-          <StatCard label="字体总数" value={stats.fonts} />
-          <StatCard label="en_us 条目" value={stats.langEnUs} />
-          <StatCard label="zh_cn 条目" value={stats.langZhCn} />
-          <StatCard label="渐变材质" value={stats.gradientTextures} />
-          <StatCard label="棋盘材质" value={stats.checkerTextures} />
-        </div>
-      </div>
     </div>
   );
 }

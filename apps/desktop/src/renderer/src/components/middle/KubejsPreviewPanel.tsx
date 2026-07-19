@@ -4,10 +4,12 @@ import { useModStore } from '../../store/mod-store.js';
 import {
   DataTable,
   PanelHeader,
-  SearchInput,
   EmptyState,
   StatCard,
   MetadataView,
+  ConflictAlert,
+  ExportView,
+  FilterBar,
   findDuplicates,
   downloadBlob,
 } from './shared/index.js';
@@ -25,7 +27,6 @@ import {
   Trash2,
   CheckSquare,
   Square,
-  AlertTriangle,
   FileText,
   Boxes,
   Tag,
@@ -851,24 +852,16 @@ export function KubejsPreviewPanel() {
       </div>
 
       {/* 冲突检测告警 */}
-      {totalConflicts > 0 && (
-        <div className="flex items-start gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-3 py-2">
-          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-yellow-400" />
-          <div className="text-[11px] text-yellow-300">
-            检测到 <strong>{totalConflicts}</strong> 处冲突：
-            {conflicts.duplicateRecipeIds.length > 0 &&
-              ` 配方 ID 重复 ${conflicts.duplicateRecipeIds.length} 处`}
-            {conflicts.duplicateTagIds.length > 0 &&
-              ` · 标签 ID 重复 ${conflicts.duplicateTagIds.length} 处`}
-            {conflicts.duplicateEventIds.length > 0 &&
-              ` · 事件 ID 重复 ${conflicts.duplicateEventIds.length} 处`}
-            {conflicts.duplicateTooltipIds.length > 0 &&
-              ` · 工具提示 ID 重复 ${conflicts.duplicateTooltipIds.length} 处`}
-            {conflicts.duplicateRegistryIds.length > 0 &&
-              ` · 注册表 ID 重复 ${conflicts.duplicateRegistryIds.length} 处`}
-          </div>
-        </div>
-      )}
+      <ConflictAlert
+        totalConflicts={totalConflicts}
+        conflicts={[
+          { label: '配方 ID 重复', count: conflicts.duplicateRecipeIds.length },
+          { label: '标签 ID 重复', count: conflicts.duplicateTagIds.length },
+          { label: '事件 ID 重复', count: conflicts.duplicateEventIds.length },
+          { label: '工具提示 ID 重复', count: conflicts.duplicateTooltipIds.length },
+          { label: '注册表 ID 重复', count: conflicts.duplicateRegistryIds.length },
+        ]}
+      />
 
       {/* Tab 切换 */}
       <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
@@ -901,14 +894,11 @@ export function KubejsPreviewPanel() {
 
       {/* 搜索 + 筛选栏 */}
       {activeTab !== 'metadata' && activeTab !== 'export' && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-mc-border px-3 py-2">
-          <div className="flex-1 min-w-[180px]">
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder={`搜索${tabLabel(activeTab)}…`}
-            />
-          </div>
+        <FilterBar
+          query={query}
+          onQueryChange={setQuery}
+          searchPlaceholder={`搜索${tabLabel(activeTab)}…`}
+        >
           {activeTab === 'recipes' && (
             <select
               value={recipeTypeFilter}
@@ -950,7 +940,7 @@ export function KubejsPreviewPanel() {
               <option value="fluid">流体 ({countRegistryType(kj, 'fluid')})</option>
             </select>
           )}
-        </div>
+        </FilterBar>
       )}
 
       {/* 配方批量操作栏 */}
@@ -1036,10 +1026,43 @@ export function KubejsPreviewPanel() {
         )}
         {activeTab === 'export' && (
           <ExportView
-            kj={kj}
-            stats={stats}
-            recipeTypeStats={recipeTypeStats}
+            title="导出 KubeJS 数据"
+            description="将当前 KubeJS 脚本的 Spec 数据导出为不同格式，方便分享、文档归档或迁移"
+            sections={[
+              { scope: 'all', label: '完整 Spec' },
+              { scope: 'recipes', label: '配方列表', count: kj.recipes.length },
+              { scope: 'tags', label: '标签列表', count: kj.tags.length },
+              { scope: 'events', label: '事件列表', count: kj.events.length },
+              { scope: 'tooltips', label: '工具提示', count: kj.tooltips.length },
+              { scope: 'registry', label: '注册表', count: kj.registry.length },
+              { scope: 'lang', label: '语言条目', count: stats.langEntries },
+            ]}
             onExport={exportData}
+            statsTitle="KubeJS 统计"
+            stats={
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                <StatCard label="配方总数" value={stats.recipes} />
+                <StatCard label="标签总数" value={stats.tags} sub={`${stats.replaceTags} 替换`} />
+                <StatCard label="事件总数" value={stats.events} />
+                <StatCard
+                  label="工具提示"
+                  value={stats.tooltips}
+                  sub={`${stats.advancedTooltips} 高级`}
+                />
+                <StatCard
+                  label="注册表"
+                  value={stats.registry}
+                  sub={`${stats.totalRegistryEntries} 条目`}
+                />
+                <StatCard label="语言种类" value={stats.langCount} />
+                <StatCard label="翻译条目" value={stats.langEntries} />
+                <StatCard label="有序合成" value={recipeTypeStats.shaped} />
+                <StatCard label="无序合成" value={recipeTypeStats.shapeless} />
+                <StatCard label="熔炼配方" value={recipeTypeStats.smelting} />
+                <StatCard label="切石配方" value={recipeTypeStats.stonecutting} />
+                <StatCard label="自定义配方" value={recipeTypeStats.custom} />
+              </div>
+            }
           />
         )}
       </div>
@@ -1107,127 +1130,4 @@ function countRegistryType(kj: KubejsSpec, type: string): number {
 
 function tabLabel(tab: KubejsTab): string {
   return TABS.find((t) => t.key === tab)?.label ?? '';
-}
-
-// ===== 导出视图 =====
-function ExportView({
-  kj,
-  stats,
-  recipeTypeStats,
-  onExport,
-}: {
-  kj: KubejsSpec;
-  stats: {
-    recipes: number;
-    tags: number;
-    events: number;
-    tooltips: number;
-    registry: number;
-    langCount: number;
-    langEntries: number;
-    advancedTooltips: number;
-    replaceTags: number;
-    customRecipes: number;
-    totalRegistryEntries: number;
-  };
-  recipeTypeStats: {
-    shaped: number;
-    shapeless: number;
-    smelting: number;
-    stonecutting: number;
-    custom: number;
-  };
-  onExport: (
-    format: 'json' | 'csv' | 'markdown',
-    scope: 'all' | 'recipes' | 'tags' | 'events' | 'tooltips' | 'registry' | 'lang',
-  ) => void;
-}) {
-  const exportSections: {
-    scope: 'all' | 'recipes' | 'tags' | 'events' | 'tooltips' | 'registry' | 'lang';
-    label: string;
-    count: number;
-  }[] = [
-    { scope: 'all', label: '完整 Spec', count: 0 },
-    { scope: 'recipes', label: '配方列表', count: kj.recipes.length },
-    { scope: 'tags', label: '标签列表', count: kj.tags.length },
-    { scope: 'events', label: '事件列表', count: kj.events.length },
-    { scope: 'tooltips', label: '工具提示', count: kj.tooltips.length },
-    { scope: 'registry', label: '注册表', count: kj.registry.length },
-    { scope: 'lang', label: '语言条目', count: stats.langEntries },
-  ];
-
-  return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-mc-text">
-          <Download className="h-4 w-4 text-mc-accent" />
-          导出 KubeJS 数据
-        </h3>
-        <p className="mb-3 text-xs text-mc-mute">
-          将当前 KubeJS 脚本的 Spec 数据导出为不同格式，方便分享、文档归档或迁移
-        </p>
-
-        {exportSections.map((section) => (
-          <div
-            key={section.scope}
-            className="mb-3 rounded-mc border border-mc-border bg-mc-surface-2/40 p-2"
-          >
-            <div className="mb-1.5 text-[11px] font-medium text-mc-dim">
-              {section.label}
-              {section.scope !== 'all' && ` (${section.count})`}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => onExport('json', section.scope)}
-                className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-              >
-                <Download className="h-3 w-3" /> JSON
-              </button>
-              {section.scope !== 'all' && (
-                <button
-                  onClick={() => onExport('csv', section.scope)}
-                  className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-                >
-                  <Download className="h-3 w-3" /> CSV
-                </button>
-              )}
-              <button
-                onClick={() => onExport('markdown', section.scope)}
-                className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2.5 py-1 text-[11px] text-mc-text hover:border-mc-accent"
-              >
-                <Download className="h-3 w-3" /> Markdown
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* 统计概览 */}
-      <div className="border-t border-mc-border pt-4">
-        <h3 className="mb-2 text-sm font-medium text-mc-text">KubeJS 统计</h3>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-          <StatCard label="配方总数" value={stats.recipes} />
-          <StatCard label="标签总数" value={stats.tags} sub={`${stats.replaceTags} 替换`} />
-          <StatCard label="事件总数" value={stats.events} />
-          <StatCard
-            label="工具提示"
-            value={stats.tooltips}
-            sub={`${stats.advancedTooltips} 高级`}
-          />
-          <StatCard
-            label="注册表"
-            value={stats.registry}
-            sub={`${stats.totalRegistryEntries} 条目`}
-          />
-          <StatCard label="语言种类" value={stats.langCount} />
-          <StatCard label="翻译条目" value={stats.langEntries} />
-          <StatCard label="有序合成" value={recipeTypeStats.shaped} />
-          <StatCard label="无序合成" value={recipeTypeStats.shapeless} />
-          <StatCard label="熔炼配方" value={recipeTypeStats.smelting} />
-          <StatCard label="切石配方" value={recipeTypeStats.stonecutting} />
-          <StatCard label="自定义配方" value={recipeTypeStats.custom} />
-        </div>
-      </div>
-    </div>
-  );
 }

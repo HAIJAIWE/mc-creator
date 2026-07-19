@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
-import { DataTable, PanelHeader, SearchInput, EmptyState, StatCard } from './shared/index.js';
+import { DataTable, PanelHeader, FilterBar, EmptyState, StatCard } from './shared/index.js';
 import type { Column } from './shared/index.js';
 import type { ModpackSpec, ModEntry, OverrideFileSpec } from '@mc-creator/shared';
 import {
@@ -317,10 +317,7 @@ export function ModpackPreviewPanel() {
       {activeView === 'mods' && (
         <>
           {/* 搜索 + 筛选 + 排序 */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-mc-border px-3 py-2">
-            <div className="flex-1 min-w-[180px]">
-              <SearchInput value={query} onChange={setQuery} placeholder="搜索 mod…" />
-            </div>
+          <FilterBar query={query} onQueryChange={setQuery} searchPlaceholder="搜索 mod…">
             <select
               value={formatFilter}
               onChange={(e) => setFormatFilter(e.target.value as FormatFilter)}
@@ -340,7 +337,7 @@ export function ModpackPreviewPanel() {
               <option value="size">按大小</option>
               <option value="source">按来源</option>
             </select>
-          </div>
+          </FilterBar>
 
           {/* 批量操作栏 */}
           {selectedIds.size > 0 && (
