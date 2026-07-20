@@ -8,6 +8,10 @@ export interface TabItem<K extends string> {
   count?: number;
   /** 即使 count 已知也不显示计数（用于 metadata/export 等非列表 tab） */
   hideCount?: boolean;
+  /** 校验错误数；> 0 时在 tab 按钮右侧显示 ✗ 标记 */
+  error?: number;
+  /** 校验警告数；> 0 且 error <= 0 时在 tab 按钮右侧显示 ⚠ 标记 */
+  warning?: number;
 }
 
 export interface IconTabBarProps<K extends string> {
@@ -21,7 +25,8 @@ export interface IconTabBarProps<K extends string> {
 /**
  * 图标 Tab 栏：横向排列的 tab 按钮，支持图标 + 计数。
  *
- * 5 个预览面板共用（Mod/BehaviorPack/CraftTweaker/Kubejs/ResourcePack）。
+ * 6 个预览面板共用（Mod/BehaviorPack/CraftTweaker/Kubejs/ResourcePack/Modpack）。
+ * Datapack 面板额外使用 error/warning 指示器显示校验结果。
  * Modpack 的子视图切换样式略不同（无图标、按钮更紧凑），可通过 className 覆盖。
  *
  * 调用方需把 `setActiveTab + setQuery('') + setXxxFilter('all')` 包装到 onSelect handler。
@@ -50,6 +55,12 @@ export function IconTabBar<K extends string>({
             {Icon && <Icon className="h-3 w-3" />}
             {t.label}
             {showCount && <span className="ml-0.5 text-mc-mute">({t.count})</span>}
+            {t.error && t.error > 0 && (
+              <span className="ml-1 text-red-500 text-[9px]">✗{t.error}</span>
+            )}
+            {t.warning && t.warning > 0 && !(t.error && t.error > 0) && (
+              <span className="ml-1 text-yellow-500 text-[9px]">⚠{t.warning}</span>
+            )}
           </button>
         );
       })}

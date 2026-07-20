@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
-import { DataTable, PanelHeader, SearchInput, EmptyState } from './shared/index.js';
-import type { Column } from './shared/index.js';
+import { DataTable, PanelHeader, FilterBar, EmptyState, IconTabBar } from './shared/index.js';
+import type { Column, TabItem } from './shared/index.js';
 import type {
   DatapackSpec,
   FunctionSpec,
@@ -112,6 +112,33 @@ export function DatapackPreviewPanel() {
     return map;
   }, [validationResult]);
 
+  // ===== Tab 配置（预计算 count + error/warning；hooks 必须在 early return 之前）=====
+  const tabs = useMemo<TabItem<DatapackTab>[]>(() => {
+    if (!spec) return TABS.map((t) => ({ key: t.key, label: t.label }));
+    const dp = spec as unknown as DatapackSpec;
+    const lootCount = dp.lootTables.length + dp.predicates.length;
+    const tagCount = dp.tags.length + dp.itemTags.length + dp.blockTags.length;
+    const trimCount = dp.trimPatterns.length + dp.trimMaterials.length;
+    const issueCount = validationResult.issues.length;
+    return TABS.map((t) => {
+      const tabIssues = issuesByTab.get(t.key);
+      const tabErrors = tabIssues?.filter((i) => i.level === 'error').length ?? 0;
+      const tabWarnings = tabIssues?.filter((i) => i.level === 'warning').length ?? 0;
+      return {
+        key: t.key,
+        label: t.label,
+        count: countByTab(dp, lootCount, tagCount, trimCount, issueCount, t.key),
+        error: tabErrors > 0 ? tabErrors : undefined,
+        warning: tabWarnings > 0 && tabErrors === 0 ? tabWarnings : undefined,
+      };
+    });
+  }, [spec, issuesByTab, validationResult.issues.length]);
+
+  const handleTabSelect = useCallback((tab: DatapackTab) => {
+    setActiveTab(tab);
+    setQuery('');
+  }, []);
+
   if (!spec) {
     return (
       <EmptyState
@@ -121,10 +148,6 @@ export function DatapackPreviewPanel() {
       />
     );
   }
-
-  const lootAll = [...dp.lootTables, ...dp.predicates];
-  const tagsAll = [...dp.tags, ...dp.itemTags, ...dp.blockTags];
-  const trimsAll = [...dp.trimPatterns, ...dp.trimMaterials];
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-mc-surface">
@@ -145,53 +168,13 @@ export function DatapackPreviewPanel() {
       />
 
       {/* Tab 栏 - 两行排列 */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
-        {TABS.map((t) => {
-          const tabIssues = issuesByTab.get(t.key);
-          const tabErrors = tabIssues?.filter((i) => i.level === 'error').length ?? 0;
-          const tabWarnings = tabIssues?.filter((i) => i.level === 'warning').length ?? 0;
-          return (
-            <button
-              key={t.key}
-              onClick={() => {
-                setActiveTab(t.key);
-                setQuery('');
-              }}
-              className={`rounded-mc px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                activeTab === t.key
-                  ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-                  : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-              }`}
-            >
-              {t.label}
-              <span className="ml-0.5 text-mc-mute">
-                (
-                {countByTab(
-                  dp,
-                  lootAll.length,
-                  tagsAll.length,
-                  trimsAll.length,
-                  validationResult.issues.length,
-                  t.key,
-                )}
-                )
-              </span>
-              {tabErrors > 0 && <span className="ml-1 text-red-500 text-[9px]">✗{tabErrors}</span>}
-              {tabWarnings > 0 && tabErrors === 0 && (
-                <span className="ml-1 text-yellow-500 text-[9px]">⚠{tabWarnings}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <IconTabBar tabs={tabs} activeTab={activeTab} onSelect={handleTabSelect} />
 
-      <div className="border-b border-mc-border px-3 py-1">
-        <SearchInput
-          value={query}
-          onChange={setQuery}
-          placeholder={`搜索${tabLabel(activeTab)}…`}
-        />
-      </div>
+      <FilterBar
+        query={query}
+        onQueryChange={setQuery}
+        searchPlaceholder={`搜索${tabs.find((t) => t.key === activeTab)?.label ?? ''}…`}
+      />
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'recipes' && <RecipesTab items={dp.recipes} query={query} />}
@@ -279,10 +262,6 @@ function countByTab(
     default:
       return 0;
   }
-}
-
-function tabLabel(tab: DatapackTab): string {
-  return TABS.find((t) => t.key === tab)?.label ?? '';
 }
 
 // ===== 原有 Tab 组件（函数/战利品/进度/配方/标签）=====
