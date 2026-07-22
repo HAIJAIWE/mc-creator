@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { Connection, Edge } from 'reactflow';
 import type { ModNode, NodeGraph, NodePort, PortType } from '@mc-creator/shared';
-import { findPort, arePortTypesCompatible, isValidConnection } from './connectionRules.js';
+import {
+  findPort,
+  arePortTypesCompatible,
+  isValidConnection,
+  validateConnection,
+} from './connectionRules.js';
 
 /**
  * connectionRules 单元测试
@@ -600,5 +605,224 @@ describe('isValidConnection', () => {
       targetHandle: 'in',
     };
     expect(isValidConnection(graph, conn)).toBe(false);
+  });
+});
+
+// === validateConnection 测试（带失败原因 + multiple 限制） ===
+
+describe('validateConnection (带失败原因)', () => {
+  const makeGraph = (nodes: ModNode[]): NodeGraph => ({
+    version: 1,
+    modId: 'test',
+    viewport: { x: 0, y: 0, zoom: 1 },
+    nodes,
+    edges: [],
+  });
+
+  const makePort = (
+    id: string,
+    type: PortType,
+    direction: 'in' | 'out',
+    multiple = false,
+  ): NodePort => ({
+    id,
+    label: id,
+    type,
+    direction,
+    required: false,
+    multiple,
+  });
+
+  it('multiple=false 目标端口已有连线时返回失败', () => {
+    const source: ModNode = {
+      id: 's',
+      type: 'item',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 's',
+        label: 's',
+        note: '',
+        disabled: false,
+        collapsed: false,
+        kind: 'item',
+        itemId: 's',
+        displayName: 'S',
+        category: 'misc',
+        maxStackSize: 64,
+        maxDamage: 0,
+        rarity: 'common',
+        glow: false,
+      },
+      ports: [makePort('out', 'item_stack', 'out')],
+      selected: false,
+    };
+    const target: ModNode = {
+      id: 't',
+      type: 'item',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 't',
+        label: 't',
+        note: '',
+        disabled: false,
+        collapsed: false,
+        kind: 'item',
+        itemId: 't',
+        displayName: 'T',
+        category: 'misc',
+        maxStackSize: 64,
+        maxDamage: 0,
+        rarity: 'common',
+        glow: false,
+      },
+      ports: [makePort('in', 'item_stack', 'in', false)],
+      selected: false,
+    };
+    const graph = makeGraph([source, target]);
+    graph.edges.push({
+      id: 'e1',
+      source: 's2',
+      target: 't',
+      sourceHandle: undefined,
+      targetHandle: 'in',
+      kind: 'craft',
+      disabled: false,
+    });
+
+    const result = validateConnection(graph, {
+      source: 's',
+      target: 't',
+      sourceHandle: 'out',
+      targetHandle: 'in',
+    } as Connection);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain('单连线');
+    }
+  });
+
+  it('multiple=true 目标端口允许多连线', () => {
+    const source: ModNode = {
+      id: 's',
+      type: 'item',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 's',
+        label: 's',
+        note: '',
+        disabled: false,
+        collapsed: false,
+        kind: 'item',
+        itemId: 's',
+        displayName: 'S',
+        category: 'misc',
+        maxStackSize: 64,
+        maxDamage: 0,
+        rarity: 'common',
+        glow: false,
+      },
+      ports: [makePort('out', 'item_stack', 'out')],
+      selected: false,
+    };
+    const target: ModNode = {
+      id: 't',
+      type: 'recipe',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 't',
+        label: 't',
+        note: '',
+        disabled: false,
+        collapsed: false,
+        kind: 'recipe',
+        recipeId: 't',
+        recipeType: 'crafting_shaped',
+        outputCount: 1,
+        cookTime: 200,
+        experience: 0,
+        pattern: [],
+      },
+      ports: [makePort('in', 'item_stack', 'in', true)],
+      selected: false,
+    };
+    const graph = makeGraph([source, target]);
+    graph.edges.push({
+      id: 'e1',
+      source: 's2',
+      target: 't',
+      sourceHandle: undefined,
+      targetHandle: 'in',
+      kind: 'craft',
+      disabled: false,
+    });
+
+    const result = validateConnection(graph, {
+      source: 's',
+      target: 't',
+      sourceHandle: 'out',
+      targetHandle: 'in',
+    } as Connection);
+    expect(result.ok).toBe(true);
+  });
+
+  it('类型不兼容时返回失败原因', () => {
+    const source: ModNode = {
+      id: 's',
+      type: 'item',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 's',
+        label: 's',
+        note: '',
+        disabled: false,
+        collapsed: false,
+        kind: 'item',
+        itemId: 's',
+        displayName: 'S',
+        category: 'misc',
+        maxStackSize: 64,
+        maxDamage: 0,
+        rarity: 'common',
+        glow: false,
+      },
+      ports: [makePort('out', 'item_stack', 'out')],
+      selected: false,
+    };
+    const target: ModNode = {
+      id: 't',
+      type: 'block',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 't',
+        label: 't',
+        note: '',
+        disabled: false,
+        collapsed: false,
+        kind: 'block',
+        blockId: 't',
+        displayName: 'T',
+        hardness: 1,
+        blastResistance: 3,
+        luminance: 0,
+        transparent: false,
+        solid: true,
+        modelType: 'cube_all',
+        isBlockEntity: false,
+      },
+      ports: [makePort('in', 'block_state', 'in')],
+      selected: false,
+    };
+    const graph = makeGraph([source, target]);
+
+    const result = validateConnection(graph, {
+      source: 's',
+      target: 't',
+      sourceHandle: 'out',
+      targetHandle: 'in',
+    } as Connection);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain('类型');
+    }
   });
 });
