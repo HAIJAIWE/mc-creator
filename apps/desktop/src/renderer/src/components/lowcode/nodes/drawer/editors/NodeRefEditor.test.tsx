@@ -31,7 +31,7 @@ function makeNode(id: string, kind: string, label: string, portType: PortType): 
     },
     ports: [makePort(portType)],
     selected: false,
-  } as ModNode;
+  } as unknown as ModNode;
 }
 
 const graph: NodeGraph = {
