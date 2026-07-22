@@ -11,6 +11,8 @@ import { ColorEditor } from './editors/ColorEditor.js';
 import { ResourceIdEditor } from './editors/ResourceIdEditor.js';
 import { NbtEditor } from './editors/NbtEditor.js';
 import { NodeRefEditor } from './editors/NodeRefEditor.js';
+import { FieldLabel } from './FieldLabel.js';
+import { getTooltip } from './fieldTooltips.js';
 
 /** 根据 field.type 渲染对应编辑器 */
 function renderEditor(
@@ -115,12 +117,10 @@ function NodeDetailFormComponent() {
         .filter((f) => shouldShow(f, draft))
         .map((field) => {
           const value = (draft as Record<string, unknown>)[field.key];
+          const tooltip = getTooltip(draft.kind, field.key);
           return (
             <div key={field.key} className="space-y-0.5">
-              <label className="text-[11px] text-mc-dim">
-                {field.label}
-                {field.required && <span className="text-red-400"> *</span>}
-              </label>
+              <FieldLabel label={field.label} required={field.required} tooltip={tooltip} />
               {renderEditor(field, value, (v) => updateField(field.key, v), graph)}
             </div>
           );
