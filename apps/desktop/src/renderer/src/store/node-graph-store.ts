@@ -9,6 +9,7 @@ import type {
 } from '@mc-creator/shared';
 import type { CompileResult } from '../lib/compileNodeGraph.js';
 import { serializeGraph, safeDeserializeGraph } from '../lib/nodeGraphSerializer.js';
+import { getPorts } from '../components/lowcode/nodes/portSchemas.js';
 
 /**
  * 节点图状态管理
@@ -226,181 +227,11 @@ function createDefaultNodeData(kind: NodeKind, modId: string): NodeData {
   }
 }
 
-/** 根据节点类型返回默认端口 */
+/** 根据节点类型返回默认端口（委托给 portSchemas.getPorts） */
 function createDefaultPorts(kind: NodeKind): NodeGraphState['graph']['nodes'][number]['ports'] {
-  switch (kind) {
-    case 'item':
-      return [
-        {
-          id: 'out',
-          label: '物品',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'block':
-      return [
-        {
-          id: 'out',
-          label: '方块',
-          type: 'block_state',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'entity':
-      return [
-        {
-          id: 'out',
-          label: '实体',
-          type: 'entity',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'recipe':
-      return [
-        {
-          id: 'in',
-          label: '材料',
-          type: 'item_stack',
-          direction: 'in',
-          required: true,
-          multiple: true,
-        },
-        {
-          id: 'out',
-          label: '产物',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'machine':
-      return [
-        {
-          id: 'in_item',
-          label: '输入物品',
-          type: 'item_stack',
-          direction: 'in',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'in_energy',
-          label: '能源输入',
-          type: 'energy',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out_item',
-          label: '输出物品',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'multiblock':
-      return [
-        {
-          id: 'controller',
-          label: '控制器',
-          type: 'block_state',
-          direction: 'in',
-          required: true,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '结构',
-          type: 'block_state',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'event':
-      return [
-        {
-          id: 'trigger',
-          label: '触发',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'condition':
-      return [
-        {
-          id: 'in',
-          label: '输入',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'true',
-          label: '真',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'false',
-          label: '假',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'action':
-      return [
-        {
-          id: 'in',
-          label: '执行',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '完成',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'code':
-      return [
-        { id: 'in', label: '输入', type: 'any', direction: 'in', required: false, multiple: false },
-        {
-          id: 'out',
-          label: '输出',
-          type: 'any',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'comment':
-      return [];
-    default:
-      return [];
-  }
+  // 构造最小默认 data 以调用 getPorts（端口定义不依赖 data 具体值，只依赖 kind）
+  const data = createDefaultNodeData(kind, '');
+  return getPorts(data);
 }
 
 const EMPTY_GRAPH: NodeGraph = {
