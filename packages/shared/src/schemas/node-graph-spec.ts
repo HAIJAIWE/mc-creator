@@ -28,6 +28,10 @@ export const NodeKind = z.enum([
   // 高级节点
   'code', // 代码节点（L2 模式核心）
   'comment', // 注释节点（仅文档用途）
+  // 阶段 C 新增：上限提升节点
+  'variable',
+  'subgraph',
+  'loop',
 ]);
 export type NodeKind = z.infer<typeof NodeKind>;
 
@@ -348,6 +352,21 @@ export const CommentNodeData = BaseNodeData.extend({
   color: z.enum(['yellow', 'green', 'blue', 'pink', 'gray']).default('yellow'),
 });
 export type CommentNodeData = z.infer<typeof CommentNodeData>;
+
+// === 阶段 C：变量节点 ===
+
+export const VariableNodeData = BaseNodeData.extend({
+  kind: z.literal('variable'),
+  /** 变量名（Java 标识符） */
+  varName: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+  /** 变量类型 */
+  varType: z.enum(['int', 'double', 'string', 'boolean', 'item', 'block']),
+  /** 值（类型按 varType，运行时校验） */
+  value: z.unknown(),
+  /** true=常量（static final），false=变量（实例字段） */
+  isConstant: z.boolean().default(false),
+});
+export type VariableNodeData = z.infer<typeof VariableNodeData>;
 
 // === 节点数据联合类型 ===
 
