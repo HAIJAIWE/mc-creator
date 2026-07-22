@@ -16,9 +16,34 @@ import { useLiveRegion } from '../../lib/useLiveRegion.js';
 import { RecentGraphsMenu } from './RecentGraphsMenu.js';
 import { DebuggerPanel } from './DebuggerPanel.js';
 import { McIcon } from '../../assets/mc-ui/McIcon';
+import { OnboardingTour } from './onboarding/OnboardingTour.js';
 
 /** 编译消息占位（Plan C 接入编译器输出后替换为真实消息） */
 const EMPTY_COMPILE_MESSAGES: { type: 'error' | 'warning'; nodeId: string; message: string }[] = [];
+
+/** localStorage key：完成引导标记 */
+const ONBOARDING_KEY = 'mc-creator:onboarding-completed';
+/** 引导总步数（与 ONBOARDING_STEPS 长度一致） */
+const ONBOARDING_TOTAL = 5;
+
+/** 安全访问 localStorage（测试环境/non-browser 下可能不存在） */
+function readOnboardingCompleted(): boolean {
+  try {
+    return typeof localStorage !== 'undefined'
+      ? localStorage.getItem(ONBOARDING_KEY) === '1'
+      : false;
+  } catch {
+    return false;
+  }
+}
+
+function writeOnboardingCompleted(): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(ONBOARDING_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
 
 interface LowcodeWorkspaceProps {
   /** 是否只读（预览模式） */
@@ -48,6 +73,35 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   const importInputRef = useRef<HTMLInputElement>(null);
   /** 是否展开「最近打开」下拉 */
   const [showRecent, setShowRecent] = useState(false);
+  /** 当前引导步骤索引（null 表示未启动） */
+  const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
+
+  // 首次打开自动启动引导（localStorage 无完成标记时启动）
+  useEffect(() => {
+    if (!readOnboardingCompleted()) {
+      setOnboardingStep(0);
+    }
+  }, []);
+
+  const handleOnboardingNext = useCallback(() => {
+    setOnboardingStep((prev) => {
+      if (prev === null) return null;
+      if (prev >= ONBOARDING_TOTAL - 1) {
+        writeOnboardingCompleted();
+        return null;
+      }
+      return prev + 1;
+    });
+  }, []);
+
+  const handleOnboardingSkip = useCallback(() => {
+    writeOnboardingCompleted();
+    setOnboardingStep(null);
+  }, []);
+
+  const handleOnboardingRestart = useCallback(() => {
+    setOnboardingStep(0);
+  }, []);
   /** 最近打开的节点图列表 + 刷新操作 */
   const { recent, refresh: refreshRecent } = useRecentGraphs();
   /** 屏幕阅读器动态通知（保存/加载/导入/导出状态） */
@@ -400,6 +454,17 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
         )}
 
         <div className="ml-auto flex items-center gap-2">
+          {/* 新手引导 ? 按钮（手动重启引导） */}
+          <button
+            type="button"
+            onClick={handleOnboardingRestart}
+            aria-label="启动新手引导"
+            title="新手引导"
+            className="rounded-mc px-2 py-1 text-[11px] text-mc-mute transition-colors hover:bg-mc-surface-2 hover:text-mc-text"
+          >
+            ?
+          </button>
+
           {/* 节点统计 */}
           <span
             className="rounded-mc bg-mc-surface-2 px-2 py-0.5 text-[10px] text-mc-mute"
@@ -440,6 +505,7 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
           <button
             type="button"
             onClick={handleCompile}
+            data-onboarding="compile"
             aria-label="编译节点图"
             title="编译节点图为 ModSpec"
             className="flex items-center gap-1 rounded-mc bg-mc-accent px-3 py-1 text-[11px] font-medium text-white transition-colors hover:bg-mc-accent/80"
@@ -454,19 +520,26 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
       <div className="flex flex-1 overflow-hidden">
         {/* 左侧：节点库 */}
         {!readOnly && (
-          <div style={{ width: paletteWidth }} className="shrink-0 border-r border-mc-border">
+          <div
+            style={{ width: paletteWidth }}
+            className="shrink-0 border-r border-mc-border"
+            data-onboarding="palette"
+          >
             <NodePalette onNodeClick={handleNodeClick} disableCodeNode={disableCodeNode} />
           </div>
         )}
 
         {/* 中间：画布 */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden" data-onboarding="canvas">
           <NodeGraphEditor readOnly={readOnly} onNodeDoubleClick={handleNodeDoubleClick} />
         </div>
 
         {/* 右侧：工具栏（折叠/展开按钮） */}
         {!readOnly && (
-          <aside className="flex w-12 flex-col items-center gap-2 border-l-2 border-l-black border-t-white border-r-white border-b-white bg-mc-surface py-2">
+          <aside
+            className="flex w-12 flex-col items-center gap-2 border-l-2 border-l-black border-t-white border-r-white border-b-white bg-mc-surface py-2"
+            data-onboarding="drawer"
+          >
             <button
               type="button"
               aria-label="全部折叠"
@@ -513,6 +586,15 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
 
       {/* 节点详情抽屉（覆盖层，由 drawer-store 控制显隐） */}
       {!readOnly && <NodeDetailDrawer compileMessages={EMPTY_COMPILE_MESSAGES} />}
+
+      {/* 新手引导浮层（首次打开或点 ? 按钮触发） */}
+      {onboardingStep !== null && (
+        <OnboardingTour
+          step={onboardingStep}
+          onNext={handleOnboardingNext}
+          onSkip={handleOnboardingSkip}
+        />
+      )}
 
       {/* 屏幕阅读器动态通知区域（保存/加载状态朗读，3 秒后自动清空） */}
       <LiveRegion id="lowcode-workspace-status" />

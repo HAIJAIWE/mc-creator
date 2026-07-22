@@ -77,7 +77,8 @@ describe('LowcodeWorkspace', () => {
     // NodeGraphEditor 有 role="application" + aria-label "节点图画布"
     expect(screen.getByRole('application', { name: /节点图画布/ })).toBeTruthy();
     // NodeDetailDrawer 是覆盖层，默认不渲染（无节点被打开）
-    expect(screen.queryByRole('dialog')).toBeNull();
+    // 注：OnboardingTour 也会渲染 role=dialog，故按 aria-label 精确匹配节点详情抽屉
+    expect(screen.queryByRole('dialog', { name: '节点详情' })).toBeNull();
     // 右侧工具栏有全部折叠/展开按钮
     expect(screen.getByLabelText('全部折叠')).toBeTruthy();
     expect(screen.getByLabelText('全部展开')).toBeTruthy();
