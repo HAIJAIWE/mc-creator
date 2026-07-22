@@ -368,6 +368,41 @@ export const VariableNodeData = BaseNodeData.extend({
 });
 export type VariableNodeData = z.infer<typeof VariableNodeData>;
 
+// === 阶段 C：子图 ===
+
+/** 端口映射：子图内部边界节点端口 ↔ 子图节点对外端口 */
+export const SubgraphPortMapping = z.object({
+  internalPortId: z.string(),
+  externalPortId: z.string(),
+  label: z.string(),
+  direction: z.enum(['in', 'out']),
+  type: PortType,
+});
+export type SubgraphPortMapping = z.infer<typeof SubgraphPortMapping>;
+
+/**
+ * 子图节点数据。
+ * 也用于自定义节点：customTypeId 非空时为自定义节点，
+ * 由 SubgraphNode 组件路由到 CustomNodeContent 渲染。
+ */
+export const SubgraphNodeData = BaseNodeData.extend({
+  kind: z.literal('subgraph'),
+  /** 引用的子图 ID（自定义节点为空字符串） */
+  subgraphId: z.string().default(''),
+  /** 子图显示名（缓存，避免每次查注册表） */
+  subgraphName: z.string().default(''),
+  /** 自定义节点类型 ID（如 'mymod:custom_crafter'），普通子图为 null */
+  customTypeId: z.string().nullable().default(null),
+  /**
+   * 自定义节点字段值（仅 customTypeId 非空时使用）。
+   * key 对应 CustomNodeSchema.fields[].key，value 为用户输入。
+   * compileCustomNode 读取此字段渲染 codeTemplate。
+   * 普通子图为空对象。
+   */
+  customFields: z.record(z.string(), z.unknown()).default({}),
+});
+export type SubgraphNodeData = z.infer<typeof SubgraphNodeData>;
+
 // === 节点数据联合类型 ===
 
 export const NodeData = z.discriminatedUnion('kind', [
@@ -417,6 +452,19 @@ export const ModEdge = z.object({
   disabled: z.boolean().default(false),
 });
 export type ModEdge = z.infer<typeof ModEdge>;
+
+/** 子图定义（存储在 NodeGraph.subgraphs，须在 ModNode/ModEdge 之后定义以避免 TDZ） */
+export const SubgraphDefinition = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** 子图内部节点（结构同主图节点，节点 id 在子图内唯一） */
+  nodes: z.array(ModNode),
+  /** 子图内部连线 */
+  edges: z.array(ModEdge),
+  /** 对外端口映射（在 SubgraphDefinition 内，不在 SubgraphNodeData 内） */
+  portMappings: z.array(SubgraphPortMapping).default([]),
+});
+export type SubgraphDefinition = z.infer<typeof SubgraphDefinition>;
 
 // === 完整节点图 ===
 
