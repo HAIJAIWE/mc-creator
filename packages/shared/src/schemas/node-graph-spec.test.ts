@@ -5,6 +5,8 @@ import {
   SubgraphDefinition,
   SubgraphNodeData,
   SubgraphPortMapping,
+  LoopNodeData,
+  NodeGraph,
 } from './node-graph-spec.js';
 
 describe('NodeKind 扩展（阶段 C：variable）', () => {
@@ -200,5 +202,96 @@ describe('SubgraphNodeData', () => {
       customFields: { speed: 10, name: 'fast' },
     });
     expect(n.customFields).toEqual({ speed: 10, name: 'fast' });
+  });
+});
+
+describe('NodeKind 扩展（阶段 C：loop）', () => {
+  it('包含 loop', () => {
+    expect(NodeKind.options).toContain('loop');
+  });
+});
+
+describe('LoopNodeData', () => {
+  it('forEach 循环解析', () => {
+    const l = LoopNodeData.parse({
+      nodeId: 'l1',
+      label: '遍历物品',
+      kind: 'loop',
+      loopType: 'forEach',
+      condition: '',
+      loopVarName: 'item',
+      loopVarType: 'item',
+      iterable: 'itemList',
+    });
+    expect(l.loopType).toBe('forEach');
+    expect(l.iterable).toBe('itemList');
+  });
+
+  it('for 循环解析（init/condition/update）', () => {
+    const l = LoopNodeData.parse({
+      nodeId: 'l2',
+      label: '计数循环',
+      kind: 'loop',
+      loopType: 'for',
+      init: 'int i = 0',
+      condition: 'i < 10',
+      update: 'i++',
+      loopVarName: 'i',
+      loopVarType: 'int',
+    });
+    expect(l.init).toBe('int i = 0');
+    expect(l.condition).toBe('i < 10');
+  });
+
+  it('while 循环解析', () => {
+    const l = LoopNodeData.parse({
+      nodeId: 'l3',
+      label: 'while',
+      kind: 'loop',
+      loopType: 'while',
+      condition: 'running',
+      loopVarName: '',
+      loopVarType: 'int',
+    });
+    expect(l.loopType).toBe('while');
+  });
+
+  it('init/update/iterable/bodySubgraphId 可选', () => {
+    const l = LoopNodeData.parse({
+      nodeId: 'l4',
+      label: 'x',
+      kind: 'loop',
+      loopType: 'while',
+      condition: 'true',
+      loopVarName: '',
+      loopVarType: 'int',
+    });
+    expect(l.init).toBeUndefined();
+    expect(l.bodySubgraphId).toBeUndefined();
+  });
+});
+
+describe('NodeGraph.subgraphs 字段', () => {
+  it('默认空对象（向后兼容旧 JSON）', () => {
+    const graph = NodeGraph.parse({
+      version: 1,
+      modId: 'test',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [],
+      edges: [],
+    });
+    expect(graph.subgraphs).toEqual({});
+  });
+
+  it('可解析 subgraphs 字段', () => {
+    const graph = NodeGraph.parse({
+      version: 1,
+      modId: 'test',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [],
+      edges: [],
+      subgraphs: { sg_1: { id: 'sg_1', name: '测试', nodes: [], edges: [], portMappings: [] } },
+    });
+    expect(Object.keys(graph.subgraphs)).toEqual(['sg_1']);
   });
 });

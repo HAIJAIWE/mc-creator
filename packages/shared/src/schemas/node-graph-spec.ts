@@ -403,6 +403,29 @@ export const SubgraphNodeData = BaseNodeData.extend({
 });
 export type SubgraphNodeData = z.infer<typeof SubgraphNodeData>;
 
+// === 阶段 C：循环节点 ===
+
+export const LoopNodeData = BaseNodeData.extend({
+  kind: z.literal('loop'),
+  /** 循环类型 */
+  loopType: z.enum(['for', 'forEach', 'while']),
+  /** for 的初始化表达式（如 'int i = 0'） */
+  init: z.string().optional(),
+  /** 循环条件表达式（如 'i < 10'） */
+  condition: z.string().default(''),
+  /** for 的更新表达式（如 'i++'） */
+  update: z.string().optional(),
+  /** forEach 的可迭代对象（变量引用或表达式） */
+  iterable: z.string().optional(),
+  /** 循环变量名（如 i / item） */
+  loopVarName: z.string().default(''),
+  /** 循环变量类型 */
+  loopVarType: z.enum(['int', 'item', 'block', 'string']).default('int'),
+  /** 循环体子图 ID（复杂循环体用子图，可选） */
+  bodySubgraphId: z.string().optional(),
+});
+export type LoopNodeData = z.infer<typeof LoopNodeData>;
+
 // === 节点数据联合类型 ===
 
 export const NodeData = z.discriminatedUnion('kind', [
@@ -417,6 +440,10 @@ export const NodeData = z.discriminatedUnion('kind', [
   ActionNodeData,
   CodeNodeData,
   CommentNodeData,
+  // 阶段 C 新增
+  VariableNodeData,
+  SubgraphNodeData,
+  LoopNodeData,
 ]);
 export type NodeData = z.infer<typeof NodeData>;
 
@@ -483,6 +510,8 @@ export const NodeGraph = z.object({
     .default({ x: 0, y: 0, zoom: 1 }),
   nodes: z.array(ModNode),
   edges: z.array(ModEdge),
+  /** 子图注册表（阶段 C）：id → SubgraphDefinition，旧 JSON 无此字段默认空对象 */
+  subgraphs: z.record(z.string(), SubgraphDefinition).default({}),
 });
 export type NodeGraph = z.infer<typeof NodeGraph>;
 
