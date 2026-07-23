@@ -6,10 +6,12 @@ import type {
   NodeKind,
   NodeData,
   EditorMode,
+  SubgraphDefinition,
 } from '@mc-creator/shared';
 import type { CompileResult } from '../lib/compileNodeGraph.js';
 import { serializeGraph, safeDeserializeGraph } from '../lib/nodeGraphSerializer.js';
 import { getPorts } from '../components/lowcode/nodes/portSchemas.js';
+import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
 
 /**
  * 节点图状态管理
@@ -37,6 +39,8 @@ interface NodeGraphState {
   redoStack: NodeGraph[];
   /** 最近一次编译结果（null 表示尚未编译），用于节点图错误高亮与属性面板详情 */
   compileResult: CompileResult | null;
+  /** 阶段 C：当前正在编辑的子图 ID（null 表示编辑主图） */
+  editingSubgraphId: string | null;
 
   // === 节点操作 ===
   addNode: (
@@ -78,6 +82,14 @@ interface NodeGraphState {
   // === 编译 ===
   /** 存储编译结果（供 NodeGraphEditor 高亮错误节点、PropertyPanel 显示详情） */
   setCompileResult: (result: CompileResult | null) => void;
+
+  // === 阶段 C：子图/自定义节点 ===
+  /** 把选中节点封装为子图，返回新 SubgraphNode id（失败返回 null） */
+  encapsulateSubgraph: (nodeIds: string[], name: string) => string | null;
+  /** 设置当前编辑的子图 ID（null 回到主图） */
+  setEditingSubgraphId: (subgraphId: string | null) => void;
+  /** 添加自定义节点（基于 customNodeRegistry 中已注册的 schema） */
+  addCustomNode: (typeId: string, position: { x: number; y: number }) => string;
 
   // === 导出/导入 ===
   /** 导出当前节点图为序列化 JSON 字符串（含 format/version/exportedAt 元信息） */
@@ -222,6 +234,35 @@ function createDefaultNodeData(kind: NodeKind, modId: string): NodeData {
         text: '备注',
         color: 'yellow',
       } as NodeData;
+    case 'variable':
+      return {
+        ...base,
+        kind: 'variable',
+        varName: 'var1',
+        varType: 'int',
+        value: 0,
+        isConstant: false,
+      } as NodeData;
+    case 'subgraph':
+      return {
+        ...base,
+        kind: 'subgraph',
+        subgraphId: '',
+        subgraphName: '',
+        customTypeId: null,
+        customFields: {},
+      } as NodeData;
+    case 'loop':
+      return {
+        ...base,
+        kind: 'loop',
+        loopType: 'for',
+        init: 'int i = 0',
+        condition: 'i < 10',
+        update: 'i++',
+        loopVarName: 'i',
+        loopVarType: 'int',
+      } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);
   }
@@ -229,9 +270,63 @@ function createDefaultNodeData(kind: NodeKind, modId: string): NodeData {
 
 /** 根据节点类型返回默认端口（委托给 portSchemas.getPorts） */
 function createDefaultPorts(kind: NodeKind): NodeGraphState['graph']['nodes'][number]['ports'] {
-  // 构造最小默认 data 以调用 getPorts（端口定义不依赖 data 具体值，只依赖 kind）
-  const data = createDefaultNodeData(kind, '');
-  return getPorts(data);
+  // 阶段 C 新节点：variable/subgraph/loop 的端口直接生成（Task 9 会同步到 getPorts）
+  switch (kind) {
+    case 'variable':
+      return [
+        {
+          id: 'value',
+          label: '变量',
+          type: 'integer',
+          direction: 'out',
+          required: false,
+          multiple: true,
+        },
+      ];
+    case 'subgraph':
+      // 子图节点端口由 portMappings 动态生成，默认空（getPorts 在 Task 9 处理）
+      return [];
+    case 'loop':
+      return [
+        {
+          id: 'input',
+          label: '输入',
+          type: 'void',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+        {
+          id: 'loop_var',
+          label: '循环变量',
+          type: 'integer',
+          direction: 'out',
+          required: false,
+          multiple: true,
+        },
+        {
+          id: 'body',
+          label: '循环体',
+          type: 'void',
+          direction: 'out',
+          required: false,
+          multiple: false,
+        },
+        {
+          id: 'done',
+          label: '完成',
+          type: 'void',
+          direction: 'out',
+          required: false,
+          multiple: true,
+        },
+      ];
+    default: {
+      // 原 11 种节点：构造最小默认 data 以调用 getPorts
+      const data = createDefaultNodeData(kind, '');
+      return getPorts(data);
+    }
+  }
 }
 
 const EMPTY_GRAPH: NodeGraph = {
@@ -240,6 +335,7 @@ const EMPTY_GRAPH: NodeGraph = {
   viewport: { x: 0, y: 0, zoom: 1 },
   nodes: [],
   edges: [],
+  subgraphs: {},
 };
 
 export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
@@ -249,6 +345,7 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
   undoStack: [],
   redoStack: [],
   compileResult: null,
+  editingSubgraphId: null,
 
   addNode: (kind, position, partial) => {
     const nodeId = genId(kind);
@@ -479,6 +576,136 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
       compileResult: null,
     });
     return { ok: true };
+  },
+
+  // === 阶段 C：子图/自定义节点 ===
+
+  encapsulateSubgraph: (nodeIds, name) => {
+    if (nodeIds.length === 0) return null;
+    const state = get();
+    const { graph } = state;
+    const selectedNodes = graph.nodes.filter((n) => nodeIds.includes(n.id));
+    if (selectedNodes.length === 0) return null;
+
+    // 收集选中节点之间的内部连线
+    const selectedIdSet = new Set(nodeIds);
+    const internalEdges = graph.edges.filter(
+      (e) => selectedIdSet.has(e.source) && selectedIdSet.has(e.target),
+    );
+    // 外部连线 → portMappings
+    const portMappings: SubgraphDefinition['portMappings'] = [];
+    let inPortIdx = 0;
+    let outPortIdx = 0;
+    for (const edge of graph.edges) {
+      if (selectedIdSet.has(edge.source) && !selectedIdSet.has(edge.target)) {
+        // 内 → 外：输出端口
+        portMappings.push({
+          internalPortId: `${edge.source}:${edge.sourceHandle ?? 'out'}`,
+          externalPortId: `out_${outPortIdx++}`,
+          label: `输出${outPortIdx}`,
+          direction: 'out' as const,
+          type: 'any',
+        });
+      } else if (!selectedIdSet.has(edge.source) && selectedIdSet.has(edge.target)) {
+        // 外 → 内：输入端口
+        portMappings.push({
+          internalPortId: `${edge.target}:${edge.targetHandle ?? 'in'}`,
+          externalPortId: `in_${inPortIdx++}`,
+          label: `输入${inPortIdx}`,
+          direction: 'in' as const,
+          type: 'any',
+        });
+      }
+    }
+
+    const sgId = genId('sg');
+    const sgDef: SubgraphDefinition = {
+      id: sgId,
+      name,
+      nodes: selectedNodes,
+      edges: internalEdges,
+      portMappings,
+    };
+
+    // 新 SubgraphNode 位置：选中节点质心
+    const cx = selectedNodes.reduce((s, n) => s + n.position.x, 0) / selectedNodes.length;
+    const cy = selectedNodes.reduce((s, n) => s + n.position.y, 0) / selectedNodes.length;
+    const sgNodeId = genId('subgraph');
+    const sgNode: ModNode = {
+      id: sgNodeId,
+      type: 'subgraph',
+      position: { x: cx, y: cy },
+      data: {
+        nodeId: sgNodeId,
+        label: name,
+        note: '',
+        disabled: false,
+        collapsed: false,
+        kind: 'subgraph',
+        subgraphId: sgId,
+        subgraphName: name,
+        customTypeId: null,
+        customFields: {},
+      },
+      ports: portMappings.map((m) => ({
+        id: m.externalPortId,
+        label: m.label,
+        type: m.type,
+        direction: m.direction,
+        required: false,
+        multiple: m.direction === 'in',
+      })),
+      selected: true,
+    };
+
+    // 从主图移除选中节点 + 相关连线，添加 SubgraphNode，注册子图
+    set((s) => ({
+      graph: {
+        ...s.graph,
+        nodes: [...s.graph.nodes.filter((n) => !selectedIdSet.has(n.id)), sgNode],
+        edges: s.graph.edges.filter(
+          (e) => !(selectedIdSet.has(e.source) || selectedIdSet.has(e.target)),
+        ),
+        subgraphs: { ...s.graph.subgraphs, [sgId]: sgDef },
+      },
+      selectedNodeId: sgNodeId,
+    }));
+    return sgNodeId;
+  },
+
+  setEditingSubgraphId: (subgraphId) => set({ editingSubgraphId: subgraphId }),
+
+  addCustomNode: (typeId, position) => {
+    const schema = customNodeRegistry.get(typeId);
+    if (!schema) {
+      throw new Error(`自定义节点类型未注册：${typeId}`);
+    }
+    const nodeId = genId('custom');
+    const data = {
+      nodeId,
+      label: schema.label,
+      note: '',
+      disabled: false,
+      collapsed: false,
+      kind: 'subgraph' as const,
+      subgraphId: '',
+      subgraphName: schema.label,
+      customTypeId: typeId,
+      customFields: {},
+    };
+    const node: ModNode = {
+      id: nodeId,
+      type: 'subgraph',
+      position,
+      data,
+      ports: schema.ports,
+      selected: false,
+    };
+    set((s) => ({
+      graph: { ...s.graph, nodes: [...s.graph.nodes, node] },
+      selectedNodeId: nodeId,
+    }));
+    return nodeId;
   },
 }));
 

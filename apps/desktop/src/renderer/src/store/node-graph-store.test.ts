@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeGraphStore } from './node-graph-store.js';
+import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
 import type { NodeGraph, NodeKind, NodeData } from '@mc-creator/shared';
 
 // 重置用的初始空图（与 store 内 EMPTY_GRAPH 结构一致）
@@ -9,6 +10,7 @@ const EMPTY_GRAPH: NodeGraph = {
   viewport: { x: 0, y: 0, zoom: 1 },
   nodes: [],
   edges: [],
+  subgraphs: {},
 };
 
 // 每个测试前用于重置 store 的初始状态
@@ -777,6 +779,7 @@ describe('node-graph-store', () => {
           },
         ],
         edges: [],
+        subgraphs: {},
       };
 
       useNodeGraphStore.getState().loadGraph(newGraph);
@@ -865,6 +868,7 @@ describe('node-graph-store', () => {
             disabled: false,
           },
         ],
+        subgraphs: {},
       };
 
       useNodeGraphStore.getState().loadGraph(newGraph);
@@ -909,5 +913,129 @@ describe('node-graph-store', () => {
       expect(useNodeGraphStore.getState().graph.nodes).toBe(nodesBefore); // 引用不变
       expect(useNodeGraphStore.getState().graph.nodes).toHaveLength(1);
     });
+  });
+});
+
+// ============================================================
+// 阶段 C：createDefaultNodeData/Ports 新节点 + 子图/自定义节点
+// ============================================================
+
+describe('createDefaultNodeData/Ports（阶段 C 新节点）', () => {
+  beforeEach(() => {
+    useNodeGraphStore.getState().clear();
+    useNodeGraphStore.setState({
+      graph: { ...useNodeGraphStore.getState().graph, modId: 'testmod' },
+    });
+  });
+
+  it('addNode variable 创建默认数据 + 端口', () => {
+    const id = useNodeGraphStore.getState().addNode('variable', { x: 0, y: 0 });
+    const node = useNodeGraphStore.getState().graph.nodes.find((n) => n.id === id)!;
+    expect(node.data.kind).toBe('variable');
+    if (node.data.kind === 'variable') {
+      expect(node.data.varName).toBe('var1');
+      expect(node.data.varType).toBe('int');
+      expect(node.data.isConstant).toBe(false);
+    }
+    expect(node.ports).toHaveLength(1);
+    expect(node.ports[0]!.direction).toBe('out');
+  });
+
+  it('addNode subgraph 创建默认数据 + 端口', () => {
+    const id = useNodeGraphStore.getState().addNode('subgraph', { x: 0, y: 0 });
+    const node = useNodeGraphStore.getState().graph.nodes.find((n) => n.id === id)!;
+    expect(node.data.kind).toBe('subgraph');
+    if (node.data.kind === 'subgraph') {
+      expect(node.data.subgraphId).toBe('');
+      expect(node.data.customTypeId).toBeNull();
+    }
+  });
+
+  it('addNode loop 创建默认数据 + 端口', () => {
+    const id = useNodeGraphStore.getState().addNode('loop', { x: 0, y: 0 });
+    const node = useNodeGraphStore.getState().graph.nodes.find((n) => n.id === id)!;
+    expect(node.data.kind).toBe('loop');
+    if (node.data.kind === 'loop') {
+      expect(node.data.loopType).toBe('for');
+      expect(node.data.loopVarName).toBe('i');
+    }
+    expect(node.ports.some((p) => p.id === 'loop_var')).toBe(true);
+    expect(node.ports.some((p) => p.id === 'body')).toBe(true);
+    expect(node.ports.some((p) => p.id === 'done')).toBe(true);
+  });
+});
+
+describe('encapsulateSubgraph', () => {
+  beforeEach(() => {
+    useNodeGraphStore.getState().clear();
+    useNodeGraphStore.setState({
+      graph: { ...useNodeGraphStore.getState().graph, modId: 'testmod' },
+    });
+  });
+
+  it('把选中节点封装为子图，返回新 SubgraphNode id', () => {
+    const id1 = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
+    const id2 = useNodeGraphStore.getState().addNode('item', { x: 100, y: 0 });
+    const sgNodeId = useNodeGraphStore.getState().encapsulateSubgraph([id1, id2], '我的子图');
+    expect(sgNodeId).not.toBeNull();
+    const sgNode = useNodeGraphStore.getState().graph.nodes.find((n) => n.id === sgNodeId)!;
+    expect(sgNode.data.kind).toBe('subgraph');
+    if (sgNode.data.kind === 'subgraph') {
+      expect(sgNode.data.subgraphName).toBe('我的子图');
+    }
+    // 原节点移出主图
+    expect(useNodeGraphStore.getState().graph.nodes.find((n) => n.id === id1)).toBeUndefined();
+    expect(useNodeGraphStore.getState().graph.nodes.find((n) => n.id === id2)).toBeUndefined();
+    // 子图注册到 graph.subgraphs
+    expect(Object.keys(useNodeGraphStore.getState().graph.subgraphs)).toHaveLength(1);
+  });
+
+  it('空节点列表返回 null', () => {
+    expect(useNodeGraphStore.getState().encapsulateSubgraph([], 'x')).toBeNull();
+  });
+});
+
+describe('setEditingSubgraphId + editingSubgraphId', () => {
+  it('setEditingSubgraphId 设置/清除', () => {
+    useNodeGraphStore.getState().setEditingSubgraphId('sg_1');
+    expect(useNodeGraphStore.getState().editingSubgraphId).toBe('sg_1');
+    useNodeGraphStore.getState().setEditingSubgraphId(null);
+    expect(useNodeGraphStore.getState().editingSubgraphId).toBeNull();
+  });
+});
+
+describe('addCustomNode', () => {
+  beforeEach(() => {
+    customNodeRegistry.clear();
+    useNodeGraphStore.getState().clear();
+    useNodeGraphStore.setState({
+      graph: { ...useNodeGraphStore.getState().graph, modId: 'testmod' },
+    });
+  });
+
+  it('注册 schema 后 addCustomNode 创建带 customTypeId 的 subgraph 节点', () => {
+    customNodeRegistry.register({
+      typeId: 'mymod:crafter',
+      label: '合成台',
+      description: '',
+      icon: '',
+      color: 'mc-code',
+      ports: [],
+      fields: [],
+      codeTemplate: '',
+    });
+    const id = useNodeGraphStore.getState().addCustomNode('mymod:crafter', { x: 50, y: 50 });
+    const node = useNodeGraphStore.getState().graph.nodes.find((n) => n.id === id)!;
+    expect(node.data.kind).toBe('subgraph');
+    if (node.data.kind === 'subgraph') {
+      expect(node.data.customTypeId).toBe('mymod:crafter');
+      expect(node.data.subgraphName).toBe('合成台');
+    }
+  });
+
+  it('未注册的 typeId 抛错', () => {
+    expect(() =>
+      useNodeGraphStore.getState().addCustomNode('unregistered', { x: 0, y: 0 }),
+    ).toThrow();
   });
 });
