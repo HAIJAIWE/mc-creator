@@ -16,6 +16,9 @@ import { ConditionNode } from './ConditionNode.js';
 import { ActionNode } from './ActionNode.js';
 import { CodeNode } from './CodeNode.js';
 import { CommentNode } from './CommentNode.js';
+import { VariableNode } from './VariableNode.js';
+import { SubgraphNode } from './SubgraphNode.js';
+import { LoopNode } from './LoopNode.js';
 
 const NODE_COMPONENTS: Record<NodeKind, React.ComponentType<any>> = {
   item: ItemNode,
@@ -29,6 +32,9 @@ const NODE_COMPONENTS: Record<NodeKind, React.ComponentType<any>> = {
   action: ActionNode,
   code: CodeNode,
   comment: CommentNode,
+  variable: VariableNode,
+  subgraph: SubgraphNode,
+  loop: LoopNode,
 };
 
 function renderWithProvider(ui: ReactElement) {
