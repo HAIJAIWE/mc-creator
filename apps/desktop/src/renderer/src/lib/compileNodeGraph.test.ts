@@ -1326,4 +1326,104 @@ describe('compileNodeGraph 阶段 C 集成', () => {
     // 清理缓存，避免影响后续测试
     preloadExternalMods([{ namespace: 'create', installed: true }]);
   });
+
+  // === 问题 13：modId 净化为合法命名空间 ===
+  it('modId 含大写/空格/特殊字符时被净化为合法命名空间（问题 13）', () => {
+    const graph: NodeGraph = {
+      version: 1,
+      modId: 'My Cool Mod!',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [],
+      edges: [],
+      subgraphs: {},
+    };
+    const result = compileNodeGraph(graph);
+    // modId 应被净化为小写、下划线形式
+    expect(result.spec.modId).toBe('my_cool_mod');
+    // 不应产生 modId 缺失 error（因为有值，只是格式不规范）
+    expect(result.errors.some((e) => e.includes('modId'))).toBe(false);
+  });
+
+  // === 问题 14：命名空间检测使用净化后的 modId ===
+  it('命名空间检测使用净化后的 modId，不误报当前 mod 的引用（问题 14）', () => {
+    // modId 含大写和空格，净化后为 my_mod
+    // 物品 id 用 my_mod:item 不应被误报为外部命名空间
+    preloadExternalMods([{ namespace: 'my_mod', installed: false }]);
+    const itemNode: ModNode = {
+      id: 'i1',
+      type: 'item',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 'i1',
+        label: 'x',
+        note: '',
+        disabled: false,
+        kind: 'item',
+        itemId: 'my_mod:item',
+        displayName: 'Item',
+        category: 'misc',
+        maxStackSize: 64,
+        maxDamage: 0,
+        rarity: 'common',
+        glow: false,
+        collapsed: false,
+      },
+      ports: [],
+      selected: false,
+    };
+    const graph: NodeGraph = {
+      version: 1,
+      modId: 'My Mod',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [itemNode],
+      edges: [],
+      subgraphs: {},
+    };
+    const result = compileNodeGraph(graph);
+    // my_mod:item 与净化后的 modId(my_mod) 一致，不应产生外部依赖 warning
+    expect(result.warnings.some((w) => w.includes('my_mod'))).toBe(false);
+    // 清理缓存
+    preloadExternalMods([]);
+  });
+
+  // === 问题 19：边数量统计只计入未禁用边 ===
+  it('description 中边数量只计入未禁用边（问题 19）', () => {
+    const n1 = makeNode('n1', 'item', { itemId: 'a' });
+    const n2 = makeNode('n2', 'item', { itemId: 'b' });
+    const n3 = makeNode('n3', 'item', { itemId: 'c' });
+    // 2 条启用边 + 1 条禁用边
+    const edges = [
+      makeEdge('e1', 'n1', 'n2'),
+      makeEdge('e2', 'n2', 'n3'),
+      makeEdge('e3', 'n1', 'n3', { disabled: true }),
+    ];
+    const result = compileNodeGraph(makeGraph([n1, n2, n3], edges));
+    // description 应显示 2 条连线（不含禁用边）
+    expect(result.spec.description).toContain('2 条连线');
+    expect(result.spec.description).not.toContain('3 条连线');
+  });
+
+  // === 问题 24：customCode 按 snippetId 去重 ===
+  it('customCode 按 snippetId 去重，重复项产生 warning（问题 24）', () => {
+    // 构造两个 variable 节点使用相同 nodeId（模拟子图内联后 ID 碰撞场景）
+    // 正常情况下 ReactFlow 不允许重复 ID，但子图内联展开可能引入重复
+    const graph: NodeGraph = {
+      version: 1,
+      modId: 'testmod',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [makeVariable('dup', 'VAR_A'), makeVariable('dup', 'VAR_B')],
+      edges: [],
+      subgraphs: {},
+    };
+    const result = compileNodeGraph(graph);
+    // customCode 中 snippetId='dup' 只应出现一次
+    const dupSnippets = result.spec.customCode.filter((c) => c.snippetId === 'dup');
+    expect(dupSnippets).toHaveLength(1);
+    // 应产生去重 warning
+    expect(
+      result.warnings.some(
+        (w) => w.includes('dup') && (w.includes('去重') || w.includes('duplicate')),
+      ),
+    ).toBe(true);
+  });
 });

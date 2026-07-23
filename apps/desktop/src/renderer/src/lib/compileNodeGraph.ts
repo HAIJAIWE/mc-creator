@@ -69,7 +69,12 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // 过滤禁用节点
   const activeNodes = inlinedGraph.nodes.filter((n) => !n.data.disabled);
 
-  // 校验：modId 必须有
+  // === 问题 13：modId 净化为合法命名空间 ===
+  // modId 用作 Java 包名/资源命名空间，必须为小写字母/数字/下划线。
+  // 净化规则：转小写 → 非法字符替换为下划线 → 折叠连续下划线 → 去除首尾下划线。
+  const sanitizedModId = sanitizeModId(inlinedGraph.modId);
+
+  // 校验：modId 必须有（净化前为空才报错）
   if (!inlinedGraph.modId) {
     errors.push('节点图缺少 modId，无法编译');
   }
@@ -239,12 +244,13 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // 与已安装外部 mod 列表比对，未安装的加 warning（不阻断编译）。
   // 注意：listExternalMods 是异步函数，但编译器同步执行——此处用同步缓存，
   // 真正的已安装列表由 preload 阶段异步预取并缓存到 module-level 变量。
+  // 问题 14：使用净化后的 modId 做命名空间比较，避免大小写不一致误报当前 mod 引用。
   const externalNamespaces = collectExternalNamespaces(
     items,
     blocks,
     recipes,
     customCode,
-    inlinedGraph.modId,
+    sanitizedModId,
   );
   for (const ns of externalNamespaces) {
     if (!isExternalModInstalled(ns)) {
@@ -252,11 +258,19 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     }
   }
 
+  // === 问题 24：customCode 按 snippetId 去重 ===
+  // 子图内联展开后可能引入重复 snippetId（虽然 inlineSubgraphNodes 已做 ID 碰撞处理，
+  // 但仍可能出现用户手动构造的重复或边界情况）。保留首次出现的 snippet，重复项加 warning。
+  const dedupedCustomCode = deduplicateCustomCode(customCode, warnings);
+
+  // === 问题 19：边数量统计只计入未禁用边 ===
+  const activeEdgeCount = inlinedGraph.edges.filter((e) => !e.disabled).length;
+
   const spec: ModSpec = {
-    modId: inlinedGraph.modId || 'unnamed_mod',
+    modId: sanitizedModId || 'unnamed_mod',
     version: '1.0.0',
-    name: inlinedGraph.modId || '未命名 Mod',
-    description: `由节点图编译生成（${activeNodes.length} 个节点，${inlinedGraph.edges.length} 条连线）`,
+    name: sanitizedModId || '未命名 Mod',
+    description: `由节点图编译生成（${activeNodes.length} 个节点，${activeEdgeCount} 条连线）`,
     items,
     blocks,
     license: 'MIT',
@@ -271,7 +285,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     recipes,
     entities,
     machines,
-    customCode,
+    customCode: dedupedCustomCode,
     multiblocks,
     eventHandlers,
     conditions,
@@ -706,4 +720,43 @@ export function preloadExternalMods(mods: Array<{ namespace: string; installed: 
 function isExternalModInstalled(namespace: string): boolean {
   if (!installedExternalModsCache) return true; // 未 preload，不误报
   return installedExternalModsCache.has(namespace);
+}
+
+/**
+ * 净化 modId 为合法的 Java 包名/资源命名空间（问题 13）。
+ *
+ * 规则：转小写 → 非 [a-z0-9_] 字符替换为下划线 → 折叠连续下划线 → 去除首尾下划线。
+ * 空字符串或净化后为空时返回空字符串（由调用方决定回退值）。
+ */
+function sanitizeModId(modId: string): string {
+  return modId
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+/**
+ * 按 snippetId 去重 customCode 数组（问题 24）。
+ *
+ * 保留首次出现的 snippet，后续重复项被丢弃并产生 warning。
+ * 子图内联展开后可能引入重复 snippetId，去重避免生成重复的 Java 方法/字段声明。
+ */
+function deduplicateCustomCode(
+  snippets: CustomCodeSnippetSpec[],
+  warnings: string[],
+): CustomCodeSnippetSpec[] {
+  const seen = new Set<string>();
+  const result: CustomCodeSnippetSpec[] = [];
+  for (const snippet of snippets) {
+    if (seen.has(snippet.snippetId)) {
+      warnings.push(
+        `customCode snippet「${snippet.snippetId}」重复，已去重保留首次出现的片段（duplicate snippetId）`,
+      );
+      continue;
+    }
+    seen.add(snippet.snippetId);
+    result.push(snippet);
+  }
+  return result;
 }
