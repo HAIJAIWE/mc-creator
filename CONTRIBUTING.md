@@ -22,9 +22,10 @@ pnpm --filter @mc-creator/desktop dev   # 启动开发服务器
 ```
 mc-creator/
 ├── apps/desktop/         # Electron 桌面应用（main + preload + renderer）
-├── packages/shared/      # 共享 Zod schema 与类型
+│   └── renderer/src/components/lowcode/  # 低代码节点图编辑器（14 节点 + 子图 + 编译器）
+├── packages/shared/      # 共享 Zod schema 与类型（node-graph-spec / mod-spec）
 ├── packages/core/        # 核心引擎（生成器 + 构建器 + AI 编排）
-└── docs/superpowers/     # 设计规格与实现计划
+└── docs/superpowers/     # 设计规格与实现计划（含低代码 Phase A/B/C 计划）
 ```
 
 详见 [README.md](README.md) 的「项目结构」章节。
