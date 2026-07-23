@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { type NodeProps } from 'reactflow';
 import { type ReactNode } from 'react';
-import { SubgraphBoundaryNode } from './SubgraphBoundaryNode.js';
+import { SubgraphBoundaryNode, type SubgraphBoundaryNodeData } from './SubgraphBoundaryNode.js';
 
 vi.mock('../nodes/base/McNodeShell.js', () => ({
   McNodeShell: ({
@@ -34,20 +35,23 @@ describe('SubgraphBoundaryNode', () => {
   it('input 边界节点渲染 badge=in', () => {
     render(
       <SubgraphBoundaryNode
-        data={{
-          nodeId: 'b1',
-          label: '输入',
-          note: '',
-          disabled: false,
-          kind: 'comment',
-          text: '',
-          color: 'yellow',
-          boundaryType: 'in',
-          portLabel: '材料',
-          portType: 'item_stack',
-          collapsed: false,
-        }}
-        selected={false}
+        {...({
+          id: 'b1',
+          data: {
+            nodeId: 'b1',
+            label: '输入',
+            note: '',
+            disabled: false,
+            kind: 'comment',
+            text: '',
+            color: 'yellow',
+            boundaryType: 'in',
+            portLabel: '材料',
+            portType: 'item_stack',
+            collapsed: false,
+          },
+          selected: false,
+        } as unknown as NodeProps<SubgraphBoundaryNodeData>)}
       />,
     );
     expect(screen.getByTestId('badge').textContent).toBe('in');
@@ -57,20 +61,23 @@ describe('SubgraphBoundaryNode', () => {
   it('output 边界节点渲染 badge=out', () => {
     render(
       <SubgraphBoundaryNode
-        data={{
-          nodeId: 'b2',
-          label: '输出',
-          note: '',
-          disabled: false,
-          kind: 'comment',
-          text: '',
-          color: 'yellow',
-          boundaryType: 'out',
-          portLabel: '产物',
-          portType: 'item_stack',
-          collapsed: false,
-        }}
-        selected={false}
+        {...({
+          id: 'b2',
+          data: {
+            nodeId: 'b2',
+            label: '输出',
+            note: '',
+            disabled: false,
+            kind: 'comment',
+            text: '',
+            color: 'yellow',
+            boundaryType: 'out',
+            portLabel: '产物',
+            portType: 'item_stack',
+            collapsed: false,
+          },
+          selected: false,
+        } as unknown as NodeProps<SubgraphBoundaryNodeData>)}
       />,
     );
     expect(screen.getByTestId('badge').textContent).toBe('out');

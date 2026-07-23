@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { type NodeProps } from 'reactflow';
 import { type ReactNode } from 'react';
 import { VariableNode } from './VariableNode.js';
 import type { VariableNodeData } from '@mc-creator/shared';
@@ -51,7 +52,11 @@ describe('VariableNode', () => {
       isConstant: true,
       collapsed: false,
     };
-    render(<VariableNode data={data} selected={false} />);
+    render(
+      <VariableNode
+        {...({ id: 'v1', data, selected: false } as unknown as NodeProps<VariableNodeData>)}
+      />,
+    );
     expect(screen.getByTestId('title').textContent).toBe('最大伤害');
     expect(screen.getByTestId('badge').textContent).toBe('const');
     expect(screen.getByTestId('children').textContent).toContain('MAX_DAMAGE');
@@ -72,7 +77,11 @@ describe('VariableNode', () => {
       isConstant: false,
       collapsed: false,
     };
-    render(<VariableNode data={data} selected={false} />);
+    render(
+      <VariableNode
+        {...({ id: 'v2', data, selected: false } as unknown as NodeProps<VariableNodeData>)}
+      />,
+    );
     expect(screen.queryByTestId('badge')).toBeNull();
   });
 });

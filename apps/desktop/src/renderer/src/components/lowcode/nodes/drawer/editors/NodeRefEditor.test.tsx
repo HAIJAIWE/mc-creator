@@ -90,16 +90,16 @@ describe('NodeRefEditor 变量引用', () => {
     nodes: [
       {
         id: 'v1',
-        type: 'variable',
+        type: 'variable' as const,
         position: { x: 0, y: 0 },
         data: {
           nodeId: 'v1',
           label: '最大伤害',
           note: '',
           disabled: false,
-          kind: 'variable',
+          kind: 'variable' as const,
           varName: 'MAX_DAMAGE',
-          varType: 'int',
+          varType: 'int' as const,
           value: 10,
           isConstant: true,
           collapsed: false,
@@ -109,20 +109,20 @@ describe('NodeRefEditor 变量引用', () => {
       },
       {
         id: 'i1',
-        type: 'item',
+        type: 'item' as const,
         position: { x: 0, y: 0 },
         data: {
           nodeId: 'i1',
           label: '铁剑',
           note: '',
           disabled: false,
-          kind: 'item',
+          kind: 'item' as const,
           itemId: 'iron_sword',
           displayName: '铁剑',
           category: 'sword',
           maxStackSize: 1,
           maxDamage: 250,
-          rarity: 'common',
+          rarity: 'common' as const,
           glow: false,
           collapsed: false,
         },
@@ -132,7 +132,7 @@ describe('NodeRefEditor 变量引用', () => {
     ],
     edges: [],
     subgraphs: {},
-  };
+  } as NodeGraph;
 
   it('schema.dataType 指定类型时列出匹配的变量节点', () => {
     render(

@@ -1821,6 +1821,378 @@ exports[`节点迁移快照测试 > item 节点选中状态快照 1`] = `
 </div>
 `;
 
+exports[`节点迁移快照测试 > loop 节点展开状态快照 1`] = `
+<div
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      循环
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      for
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-[10px] text-mc-mute"
+    >
+      <div
+        class="font-mono text-mc-text"
+      >
+        for (
+        int i = 0
+        ; 
+        i &lt; 10
+        ; 
+        i++
+        )
+      </div>
+    </div>
+  </div>
+  <div
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+  >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="input"
+          data-handlepos="left"
+          data-id="null-input-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          输入
+        </span>
+      </div>
+    </div>
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          循环变量
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="loop_var"
+          data-handlepos="right"
+          data-id="null-loop_var-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(122, 138, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          循环体
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="body"
+          data-handlepos="right"
+          data-id="null-body-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          完成
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="done"
+          data-handlepos="right"
+          data-id="null-done-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > loop 节点折叠状态快照 1`] = `
+<div
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      循环
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      for
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▸
+    </button>
+  </div>
+  <div
+    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+  >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          循环变量
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="loop_var"
+          data-handlepos="right"
+          data-id="null-loop_var-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(122, 138, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          循环体
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="body"
+          data-handlepos="right"
+          data-id="null-body-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          完成
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="done"
+          data-handlepos="right"
+          data-id="null-done-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > loop 节点选中状态快照 1`] = `
+<div
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      循环
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      for
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-[10px] text-mc-mute"
+    >
+      <div
+        class="font-mono text-mc-text"
+      >
+        for (
+        int i = 0
+        ; 
+        i &lt; 10
+        ; 
+        i++
+        )
+      </div>
+    </div>
+  </div>
+  <div
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+  >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="input"
+          data-handlepos="left"
+          data-id="null-input-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          输入
+        </span>
+      </div>
+    </div>
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          循环变量
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="loop_var"
+          data-handlepos="right"
+          data-id="null-loop_var-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(122, 138, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          循环体
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="body"
+          data-handlepos="right"
+          data-id="null-body-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          完成
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="done"
+          data-handlepos="right"
+          data-id="null-done-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
 exports[`节点迁移快照测试 > machine 节点展开状态快照 1`] = `
 <div
   class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
@@ -2726,6 +3098,384 @@ exports[`节点迁移快照测试 > recipe 节点选中状态快照 1`] = `
           data-handlepos="right"
           data-id="null-out-source"
           style="width: 8px; height: 8px; border-radius: 0; background: rgb(216, 138, 138); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > subgraph 节点展开状态快照 1`] = `
+<div
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      子图
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-[10px] text-yellow-400"
+    >
+      子图未找到：
+      （空）
+    </div>
+    <span
+      aria-label="双击进入子图"
+      class="sr-only"
+      data-testid="subgraph-enter-hint"
+    >
+      双击进入子图
+    </span>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > subgraph 节点折叠状态快照 1`] = `
+<div
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      子图
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▸
+    </button>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > subgraph 节点选中状态快照 1`] = `
+<div
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      子图
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-[10px] text-yellow-400"
+    >
+      子图未找到：
+      （空）
+    </div>
+    <span
+      aria-label="双击进入子图"
+      class="sr-only"
+      data-testid="subgraph-enter-hint"
+    >
+      双击进入子图
+    </span>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > variable 节点展开状态快照 1`] = `
+<div
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      var1
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-[10px] text-mc-mute"
+    >
+      <span
+        class="font-mono text-mc-text"
+      >
+        var1
+      </span>
+       : 
+      <span
+        class="text-mc-dim"
+      >
+        int
+      </span>
+       = 
+      <span
+        class="font-mono text-mc-text"
+      >
+        0
+      </span>
+    </div>
+  </div>
+  <div
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+  >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          变量
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="value"
+          data-handlepos="right"
+          data-id="null-value-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(122, 138, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > variable 节点折叠状态快照 1`] = `
+<div
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      var1
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▸
+    </button>
+  </div>
+  <div
+    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+  >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          变量
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="value"
+          data-handlepos="right"
+          data-id="null-value-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(122, 138, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > variable 节点选中状态快照 1`] = `
+<div
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      var1
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-[10px] text-mc-mute"
+    >
+      <span
+        class="font-mono text-mc-text"
+      >
+        var1
+      </span>
+       : 
+      <span
+        class="text-mc-dim"
+      >
+        int
+      </span>
+       = 
+      <span
+        class="font-mono text-mc-text"
+      >
+        0
+      </span>
+    </div>
+  </div>
+  <div
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+  >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          变量
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="value"
+          data-handlepos="right"
+          data-id="null-value-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(122, 138, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
         />
       </div>
     </div>

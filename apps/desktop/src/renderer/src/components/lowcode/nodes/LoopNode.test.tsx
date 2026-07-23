@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { type NodeProps } from 'reactflow';
 import { type ReactNode } from 'react';
 import { LoopNode } from './LoopNode.js';
 import type { LoopNodeData } from '@mc-creator/shared';
@@ -63,7 +64,9 @@ describe('LoopNode', () => {
       loopVarType: 'int',
       collapsed: false,
     };
-    render(<LoopNode data={data} selected={false} />);
+    render(
+      <LoopNode {...({ id: 'l1', data, selected: false } as unknown as NodeProps<LoopNodeData>)} />,
+    );
     expect(screen.getByTestId('title').textContent).toBe('计数');
     expect(screen.getByTestId('badge').textContent).toBe('for');
     expect(screen.getByTestId('children').textContent).toContain('i < 10');
@@ -83,7 +86,9 @@ describe('LoopNode', () => {
       iterable: 'itemList',
       collapsed: false,
     };
-    render(<LoopNode data={data} selected={false} />);
+    render(
+      <LoopNode {...({ id: 'l2', data, selected: false } as unknown as NodeProps<LoopNodeData>)} />,
+    );
     expect(screen.getByTestId('badge').textContent).toBe('forEach');
     expect(screen.getByTestId('children').textContent).toContain('itemList');
   });
@@ -101,7 +106,9 @@ describe('LoopNode', () => {
       loopVarType: 'int',
       collapsed: false,
     };
-    render(<LoopNode data={data} selected={false} />);
+    render(
+      <LoopNode {...({ id: 'l3', data, selected: false } as unknown as NodeProps<LoopNodeData>)} />,
+    );
     expect(screen.getByTestId('badge').textContent).toBe('while');
     expect(screen.getByTestId('children').textContent).toContain('running');
   });
