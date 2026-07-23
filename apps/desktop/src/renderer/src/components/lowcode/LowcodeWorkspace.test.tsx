@@ -18,6 +18,23 @@ import { useEditorModeStore } from '../../store/editor-mode-store.js';
  * Monaco 编辑器内（.monaco-editor）不应触发快捷键。
  */
 
+// 阶段 C：mock NodeGraphEditor 与 SubgraphWorkspace 以隔离画布渲染。
+// mock 保留现有冒烟测试依赖的 role="application" + aria-label + 只读文本，
+// 同时暴露 data-testid 供子图集成测试做条件渲染断言。
+vi.mock('./NodeGraphEditor.js', () => ({
+  NodeGraphEditor: ({ readOnly }: { readOnly?: boolean }) =>
+    readOnly ? (
+      <div data-testid="main-editor" role="application" aria-label="节点图画布">
+        只读预览模式
+      </div>
+    ) : (
+      <div data-testid="main-editor" role="application" aria-label="节点图画布" />
+    ),
+}));
+vi.mock('./subgraph/SubgraphWorkspace.js', () => ({
+  SubgraphWorkspace: () => <div data-testid="subgraph-workspace" />,
+}));
+
 beforeEach(() => {
   // 重置 store 到初始空状态
   useNodeGraphStore.setState({
@@ -227,5 +244,27 @@ describe('LowcodeWorkspace', () => {
     render(<LowcodeWorkspace />);
     expect(screen.getByTitle('撤销 (Ctrl+Z)')).toBeTruthy();
     expect(screen.getByTitle('重做 (Ctrl+Y)')).toBeTruthy();
+  });
+});
+
+describe('LowcodeWorkspace SubgraphWorkspace 集成', () => {
+  beforeEach(() => {
+    useNodeGraphStore.getState().clear();
+    // clear() 不重置 editingSubgraphId，需显式重置
+    useNodeGraphStore.setState({ editingSubgraphId: null });
+  });
+
+  it('editingSubgraphId 为 null 时显示主编辑器', () => {
+    useNodeGraphStore.setState({ editingSubgraphId: null });
+    render(<LowcodeWorkspace />);
+    expect(screen.getByTestId('main-editor')).toBeTruthy();
+    expect(screen.queryByTestId('subgraph-workspace')).toBeNull();
+  });
+
+  it('editingSubgraphId 非 null 时显示 SubgraphWorkspace', () => {
+    useNodeGraphStore.setState({ editingSubgraphId: 'sg_1' });
+    render(<LowcodeWorkspace />);
+    expect(screen.getByTestId('subgraph-workspace')).toBeTruthy();
+    expect(screen.queryByTestId('main-editor')).toBeNull();
   });
 });
