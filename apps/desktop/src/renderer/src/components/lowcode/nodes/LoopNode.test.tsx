@@ -63,6 +63,7 @@ describe('LoopNode', () => {
       loopVarName: 'i',
       loopVarType: 'int',
       collapsed: false,
+      codeLocked: false,
     };
     render(
       <LoopNode {...({ id: 'l1', data, selected: false } as unknown as NodeProps<LoopNodeData>)} />,
@@ -85,6 +86,7 @@ describe('LoopNode', () => {
       loopVarType: 'item',
       iterable: 'itemList',
       collapsed: false,
+      codeLocked: false,
     };
     render(
       <LoopNode {...({ id: 'l2', data, selected: false } as unknown as NodeProps<LoopNodeData>)} />,
@@ -105,6 +107,7 @@ describe('LoopNode', () => {
       loopVarName: '',
       loopVarType: 'int',
       collapsed: false,
+      codeLocked: false,
     };
     render(
       <LoopNode {...({ id: 'l3', data, selected: false } as unknown as NodeProps<LoopNodeData>)} />,

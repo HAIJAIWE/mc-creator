@@ -51,6 +51,7 @@ describe('VariableNode', () => {
       value: 10,
       isConstant: true,
       collapsed: false,
+      codeLocked: false,
     };
     render(
       <VariableNode
@@ -76,6 +77,7 @@ describe('VariableNode', () => {
       value: 20,
       isConstant: false,
       collapsed: false,
+      codeLocked: false,
     };
     render(
       <VariableNode

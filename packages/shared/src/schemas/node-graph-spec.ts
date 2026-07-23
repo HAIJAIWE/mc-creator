@@ -96,6 +96,18 @@ export const BaseNodeData = z.object({
   disabled: z.boolean().default(false),
   /** 是否折叠（UI 状态，序列化到 JSON） */
   collapsed: z.boolean().default(false),
+  /**
+   * 是否锁定代码（对标 MCreator codeLock）。
+   * 锁定后编译器跳过该节点的常规编译，直接使用 lockedCode 字段存储的用户手改代码，
+   * 保护用户修改不被重新生成覆盖。锁定节点仍会 push 一条 CustomCodeSnippetSpec 到 customCode。
+   */
+  codeLocked: z.boolean().default(false),
+  /**
+   * 锁定代码内容（codeLocked=true 时生效）。
+   * 用户在代码节点/物品节点等手动编辑后保存的源码，编译时原样使用。
+   * 为空时（即使 codeLocked=true）回退到常规编译并产生 warning。
+   */
+  lockedCode: z.string().optional(),
 });
 export type BaseNodeData = z.infer<typeof BaseNodeData>;
 

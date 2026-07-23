@@ -95,6 +95,7 @@ const SIMPLE_GRAPH: NodeGraph = {
         note: '',
         disabled: false,
         collapsed: false,
+        codeLocked: false,
         itemId: 'test_item',
         displayName: '测试物品',
         category: 'misc',

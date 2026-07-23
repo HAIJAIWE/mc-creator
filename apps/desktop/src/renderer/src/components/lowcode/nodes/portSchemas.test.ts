@@ -9,7 +9,14 @@ import type {
 } from '@mc-creator/shared';
 
 function makeData(kind: NodeData['kind']): NodeData {
-  const base = { nodeId: 'n1', label: 'test', note: '', disabled: false, collapsed: false };
+  const base = {
+    nodeId: 'n1',
+    label: 'test',
+    note: '',
+    disabled: false,
+    collapsed: false,
+    codeLocked: false,
+  };
   switch (kind) {
     case 'item':
       return {
@@ -117,6 +124,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       value: 10,
       isConstant: true,
       collapsed: false,
+      codeLocked: false,
     };
     const ports = getPorts(data);
     expect(ports).toHaveLength(1);
@@ -137,6 +145,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       value: '',
       isConstant: false,
       collapsed: false,
+      codeLocked: false,
     };
     const ports = getPorts(data);
     expect(ports[0]!.type).toBe('string');
@@ -154,6 +163,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       customTypeId: null,
       customFields: {},
       collapsed: false,
+      codeLocked: false,
     };
     // getPorts 第二参数可选传 graph（含 subgraphs）
     const graph = {
@@ -205,6 +215,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       customTypeId: null,
       customFields: {},
       collapsed: false,
+      codeLocked: false,
     };
     expect(getPorts(data)).toEqual([]);
   });
@@ -222,6 +233,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       loopVarType: 'item',
       iterable: 'items',
       collapsed: false,
+      codeLocked: false,
     };
     const ports = getPorts(data);
     expect(ports.find((p) => p.id === 'loop_var')?.label).toBe('item');

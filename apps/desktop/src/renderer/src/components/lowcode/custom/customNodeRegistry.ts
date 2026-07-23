@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   CustomNodeSchema,
   type CustomNodeSchema as CustomNodeSchemaType,
@@ -10,12 +11,21 @@ import {
  * - register/get/has/list/clear 基础操作
  * - importJSON：从 JSON 字符串导入并注册（含 Zod 校验）
  * - export/exportAll：导出为 JSON 字符串（可分享给其他用户）
+ *
+ * P0-3 升级：register 接受 input 类型（templateParts 等带 default 的字段可省略），
+ * 内部用 CustomNodeSchema.parse() 填充默认值后再存储，保证读取到的 schema 字段完整。
  */
 export class CustomNodeRegistry {
   private map = new Map<string, CustomNodeSchemaType>();
 
-  register(schema: CustomNodeSchemaType): void {
-    this.map.set(schema.typeId, schema);
+  /**
+   * 注册自定义节点类型。
+   * 接受 input 类型参数（带 default 的字段如 templateParts 可省略），
+   * 内部 parse 后存储为完整 output 类型，保证后续读取字段完整。
+   */
+  register(schema: z.input<typeof CustomNodeSchema>): void {
+    const parsed = CustomNodeSchema.parse(schema);
+    this.map.set(parsed.typeId, parsed);
   }
 
   get(typeId: string): CustomNodeSchemaType | undefined {

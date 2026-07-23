@@ -114,6 +114,7 @@ function createDefaultNodeData(kind: NodeKind, modId: string): NodeData {
     note: '',
     disabled: false,
     collapsed: false,
+    codeLocked: false,
   };
 
   switch (kind) {
@@ -641,6 +642,7 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
         note: '',
         disabled: false,
         collapsed: false,
+        codeLocked: false,
         kind: 'subgraph',
         subgraphId: sgId,
         subgraphName: name,
@@ -687,6 +689,7 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
       note: '',
       disabled: false,
       collapsed: false,
+      codeLocked: false,
       kind: 'subgraph' as const,
       subgraphId: '',
       subgraphName: schema.label,

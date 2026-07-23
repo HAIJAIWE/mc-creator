@@ -55,6 +55,7 @@ describe('CustomNodeContent', () => {
       subgraphName: '',
       customTypeId: 'mymod:crafter',
       collapsed: false,
+      codeLocked: false,
       customFields: {},
     };
     render(<CustomNodeContent data={data} selected={false} ports={[]} />);
@@ -73,6 +74,7 @@ describe('CustomNodeContent', () => {
       subgraphName: '',
       customTypeId: 'unregistered:type',
       collapsed: false,
+      codeLocked: false,
       customFields: {},
     };
     render(<CustomNodeContent data={data} selected={false} ports={[]} />);

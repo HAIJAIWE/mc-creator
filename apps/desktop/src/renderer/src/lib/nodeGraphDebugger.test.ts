@@ -34,6 +34,7 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
     note: '',
     disabled: false,
     collapsed: false,
+    codeLocked: false,
   };
   switch (kind) {
     case 'item':

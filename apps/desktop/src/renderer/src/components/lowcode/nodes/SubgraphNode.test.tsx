@@ -58,6 +58,7 @@ describe('SubgraphNode', () => {
       subgraphName: '合成铁剑',
       customTypeId: null,
       collapsed: false,
+      codeLocked: false,
       customFields: {},
     };
     render(
@@ -91,6 +92,7 @@ describe('SubgraphNode', () => {
       subgraphName: '',
       customTypeId: 'mymod:crafter',
       collapsed: false,
+      codeLocked: false,
       customFields: {},
     };
     render(
@@ -113,6 +115,7 @@ describe('SubgraphNode', () => {
       subgraphName: '已删',
       customTypeId: null,
       collapsed: false,
+      codeLocked: false,
       customFields: {},
     };
     render(

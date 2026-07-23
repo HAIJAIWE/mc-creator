@@ -70,7 +70,14 @@ const X_STEP = 250;
 // 确保降级生成的节点能通过 validateGraph 校验。
 
 function createDefaultNodeData(kind: NodeKind, id: string): NodeData {
-  const base = { nodeId: id, label: id, note: '', disabled: false, collapsed: false };
+  const base = {
+    nodeId: id,
+    label: id,
+    note: '',
+    disabled: false,
+    collapsed: false,
+    codeLocked: false,
+  };
   switch (kind) {
     case 'item':
       return {

@@ -30,6 +30,7 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
     note: '',
     disabled: false,
     collapsed: false,
+    codeLocked: false,
   };
   switch (kind) {
     case 'item':
@@ -967,6 +968,76 @@ describe('compileNodeGraph', () => {
     expect(result.spec.items[0].id).toBe('active_item');
   });
 
+  // === P0-1: 节点级 codeLock 测试 ===
+
+  it('锁定节点（codeLocked + lockedCode）使用手改代码，跳过常规编译', () => {
+    const userCode = 'public class LockedItem { /* 用户手改 */ }';
+    const nodes = [
+      makeNode('n1', 'item', { itemId: 'normal_item' }),
+      makeNode('n2', 'item', {
+        nodeId: 'n2',
+        itemId: 'locked_item',
+        codeLocked: true,
+        lockedCode: userCode,
+      }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes));
+    // 锁定节点不出现在 items 数组（跳过常规编译）
+    expect(result.spec.items).toHaveLength(1);
+    expect(result.spec.items[0].id).toBe('normal_item');
+    // 锁定代码出现在 customCode 数组
+    const lockedSnippet = result.spec.customCode.find((c) => c.snippetId === 'n2');
+    expect(lockedSnippet).toBeTruthy();
+    expect(lockedSnippet?.code).toBe(userCode);
+    expect(lockedSnippet?.language).toBe('java');
+  });
+
+  it('锁定节点无 lockedCode 时回退到常规编译并产生 warning', () => {
+    const nodes = [
+      makeNode('n1', 'item', {
+        nodeId: 'n1',
+        itemId: 'empty_locked_item',
+        codeLocked: true,
+        // lockedCode 缺省
+      }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes));
+    // 回退到常规编译：items 数组有该节点
+    expect(result.spec.items).toHaveLength(1);
+    expect(result.spec.items[0].id).toBe('empty_locked_item');
+    // 产生 warning 提示用户
+    expect(result.warnings.some((w) => w.includes('n1') && w.toLowerCase().includes('lock'))).toBe(
+      true,
+    );
+  });
+
+  it('锁定 code 节点使用 lockedCode 而非节点原始 code 字段', () => {
+    const originalCode = 'System.out.println("original");';
+    const userModifiedCode = 'System.out.println("user modified");';
+    const nodes = [
+      makeNode('n1', 'code', {
+        nodeId: 'n1',
+        code: originalCode,
+        codeLocked: true,
+        lockedCode: userModifiedCode,
+      }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes));
+    // customCode 只有一条（来自锁定代码），不含原始 code
+    expect(result.spec.customCode).toHaveLength(1);
+    expect(result.spec.customCode[0].code).toBe(userModifiedCode);
+    expect(result.spec.customCode[0].snippetId).toBe('n1');
+  });
+
+  it('未锁定节点（codeLocked=false）正常编译不受影响', () => {
+    const nodes = [makeNode('n1', 'item', { itemId: 'unlocked_item', codeLocked: false })];
+    const result = compileNodeGraph(makeGraph(nodes));
+    expect(result.spec.items).toHaveLength(1);
+    expect(result.spec.items[0].id).toBe('unlocked_item');
+    // 不应产生 lock 相关 warning
+    expect(result.warnings.some((w) => w.toLowerCase().includes('lock'))).toBe(false);
+  });
+
   it('modId 缺失时产生 error', () => {
     const graph: NodeGraph = {
       version: 1,
@@ -1097,6 +1168,7 @@ function makeVariable(id: string, varName: string): ModNode {
       value: 10,
       isConstant: true,
       collapsed: false,
+      codeLocked: false,
     },
     ports: [],
     selected: false,
@@ -1121,6 +1193,7 @@ function makeLoop(id: string): ModNode {
       loopVarName: 'i',
       loopVarType: 'int',
       collapsed: false,
+      codeLocked: false,
     },
     ports: [],
     selected: false,
@@ -1143,6 +1216,7 @@ function makeCustom(id: string, typeId: string, fields: Record<string, unknown> 
       customTypeId: typeId,
       customFields: fields,
       collapsed: false,
+      codeLocked: false,
     },
     ports: [],
     selected: false,
@@ -1190,6 +1264,7 @@ describe('compileNodeGraph 阶段 C 集成', () => {
         rarity: 'common',
         glow: false,
         collapsed: false,
+        codeLocked: false,
       },
       ports: [],
       selected: false,
@@ -1217,6 +1292,7 @@ describe('compileNodeGraph 阶段 C 集成', () => {
         customTypeId: null,
         customFields: {},
         collapsed: false,
+        codeLocked: false,
       },
       ports: [],
       selected: false,
@@ -1309,6 +1385,7 @@ describe('compileNodeGraph 阶段 C 集成', () => {
         rarity: 'common',
         glow: false,
         collapsed: false,
+        codeLocked: false,
       },
       ports: [],
       selected: false,
@@ -1367,6 +1444,7 @@ describe('compileNodeGraph 阶段 C 集成', () => {
         rarity: 'common',
         glow: false,
         collapsed: false,
+        codeLocked: false,
       },
       ports: [],
       selected: false,

@@ -12,6 +12,7 @@ function makeSchema(typeId: string): CustomNodeSchema {
     ports: [],
     fields: [],
     codeTemplate: '',
+    templateParts: [],
   };
 }
 

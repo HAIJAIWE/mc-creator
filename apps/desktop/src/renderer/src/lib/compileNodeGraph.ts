@@ -69,6 +69,22 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // 过滤禁用节点
   const activeNodes = inlinedGraph.nodes.filter((n) => !n.data.disabled);
 
+  // === P0-1: 节点级 codeLock（对标 MCreator codeLock）===
+  // 锁定节点（codeLocked=true 且 lockedCode 非空）跳过常规编译，直接使用用户手改代码。
+  // 锁定但 lockedCode 为空的节点回退到常规编译并产生 warning（提示用户补全或解锁）。
+  // comment 节点即使锁定也不产生 customCode（本就跳过编译）。
+  const lockedNodes = activeNodes.filter(
+    (n) => n.data.codeLocked && n.data.lockedCode && n.data.kind !== 'comment',
+  );
+  const compilableNodes = activeNodes.filter((n) => !lockedNodes.includes(n));
+  for (const n of activeNodes) {
+    if (n.data.codeLocked && !n.data.lockedCode && n.data.kind !== 'comment') {
+      warnings.push(
+        `节点 ${n.id} 已锁定代码但 lockedCode 为空，回退到常规编译（请补全锁定代码或解锁节点）`,
+      );
+    }
+  }
+
   // === 问题 13：modId 净化为合法命名空间 ===
   // modId 用作 Java 包名/资源命名空间，必须为小写字母/数字/下划线。
   // 净化规则：转小写 → 非法字符替换为下划线 → 折叠连续下划线 → 去除首尾下划线。
@@ -81,7 +97,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
 
   // === 编译物品 ===
   const items: ItemSpec[] = [];
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'item') continue;
     try {
       items.push(compileItemNode(node));
@@ -92,7 +108,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
 
   // === 编译方块 ===
   const blocks: BlockSpec[] = [];
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'block') continue;
     try {
       blocks.push(compileBlockNode(node));
@@ -106,7 +122,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // 输出连线指向产物物品节点（recipe.out → item）。
   // P1.3：编译到 ModSpec.recipes 顶层字段。
   const recipes: ModRecipeSpec[] = [];
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'recipe') continue;
     try {
       recipes.push(compileRecipeNode(inlinedGraph, node));
@@ -118,7 +134,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // === 编译实体 ===
   // P1.3：编译到 ModSpec.entities 顶层字段。
   const entities: EntitySpec[] = [];
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'entity') continue;
     try {
       entities.push(compileEntityNode(node));
@@ -130,7 +146,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // === 编译机器 ===
   // P1.3：编译到 ModSpec.machines 顶层字段。
   const machines: MachineSpec[] = [];
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'machine') continue;
     try {
       machines.push(compileMachineNode(node));
@@ -142,7 +158,22 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // === 编译代码节点 ===
   // CodeNode 的代码原样收集到 spec.customCode（保留端口签名，由 mod-generator 决定嵌入位置）。
   const customCode: CustomCodeSnippetSpec[] = [];
-  for (const node of activeNodes) {
+
+  // === P0-1: 锁定节点的手改代码直接 push 到 customCode（跳过常规编译）===
+  // 锁定节点不经过 compileXxxNode，直接用用户保存的 lockedCode 包装为 snippet。
+  // language 固定为 java（MC mod 主体语言）；methodName/snippetId 用节点 id 保持可追溯。
+  for (const node of lockedNodes) {
+    customCode.push({
+      snippetId: node.id,
+      language: 'java',
+      code: node.data.lockedCode ?? '',
+      inputSignature: {},
+      outputSignature: {},
+      methodName: `locked_${node.id}`,
+    });
+  }
+
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'code') continue;
     try {
       customCode.push(compileCodeNode(node));
@@ -153,7 +184,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
 
   // === 阶段 C：编译变量节点 ===
   // variable → Java 字段声明，push 到 customCode 数组（不覆盖 code 节点结果）
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'variable') continue;
     try {
       const { snippet } = compileVariable(node.data);
@@ -165,7 +196,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
 
   // === 阶段 C：编译循环节点 ===
   // loop → Java 循环代码，bodyCode 从 bodySubgraphId 子图编译（无则空体）
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'loop') continue;
     try {
       const bodyCode = compileLoopBody(inlinedGraph, node.data.bodySubgraphId);
@@ -179,7 +210,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // === 编译多方块结构 ===
   // P1.4：编译到 ModSpec.multiblocks 顶层字段。
   const multiblocks: MultiBlockSpec[] = [];
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'multiblock') continue;
     try {
       multiblocks.push(compileMultiblockNode(node));
@@ -193,7 +224,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // P1.5：通过 control 边建立引用（event → condition → action），
   //       EventHandlerSpec.conditionIds/actionIds 记录该事件处理器关联的节点 id。
   const eventHandlers: EventHandlerSpec[] = [];
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'event') continue;
     try {
       eventHandlers.push(compileEventNode(inlinedGraph, node));
@@ -203,7 +234,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   }
 
   const conditions: ConditionSpec[] = [];
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'condition') continue;
     try {
       conditions.push(compileConditionNode(node));
@@ -213,7 +244,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   }
 
   const actions: ActionSpec[] = [];
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'action') continue;
     try {
       actions.push(compileActionNode(node));
@@ -227,7 +258,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // === 阶段 C：编译自定义节点 ===
   // subgraph 节点中 customTypeId 非空的为自定义节点，用 compileCustomNode 渲染 codeTemplate。
   // customTypeId 为 null 的 subgraph 节点已在前面内联展开，此处不应再出现。
-  for (const node of activeNodes) {
+  for (const node of compilableNodes) {
     if (node.data.kind !== 'subgraph') continue;
     if (node.data.customTypeId) {
       const result = compileCustomNode(node.data, node.data.customFields);

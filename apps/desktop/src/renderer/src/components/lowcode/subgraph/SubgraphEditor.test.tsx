@@ -41,6 +41,7 @@ function makeInnerItem(id: string): ModNode {
       rarity: 'common',
       glow: false,
       collapsed: false,
+      codeLocked: false,
     },
     ports: [],
     selected: false,

@@ -49,6 +49,7 @@ describe('SubgraphBoundaryNode', () => {
             portLabel: '材料',
             portType: 'item_stack',
             collapsed: false,
+            codeLocked: false,
           },
           selected: false,
         } as unknown as NodeProps<SubgraphBoundaryNodeData>)}
@@ -75,6 +76,7 @@ describe('SubgraphBoundaryNode', () => {
             portLabel: '产物',
             portType: 'item_stack',
             collapsed: false,
+            codeLocked: false,
           },
           selected: false,
         } as unknown as NodeProps<SubgraphBoundaryNodeData>)}
