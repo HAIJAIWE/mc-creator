@@ -21,9 +21,31 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 | **皮肤**       | 64×64 玩家皮肤（classic / slim 模型）                   | `<playerName>.png` + 可选 `preview.png`                                                                                        |
 | **资源包**     | 贴图覆盖 / 模型 / 字体 / 音效 / 语言                    | `pack.mcmeta` + `assets/<ns>/textures/` + `models/` + `font/` + `sounds/` + `lang/`                                            |
 
+### 低代码节点编辑器
+
+内置 **Coze 风格的可视化节点图编辑器**，采用纯 MC 视觉美学（3D 凸起边框、像素字体、石头纹理、内嵌端口），支持 **14 种节点类型**：
+
+| 分类     | 节点类型                                              | 说明                                |
+| -------- | ----------------------------------------------------- | ----------------------------------- |
+| 内容节点 | item / block / entity / recipe / machine / multiblock | MC 内容定义                         |
+| 逻辑节点 | event / condition / action                            | 事件驱动控制流                      |
+| 代码节点 | code / comment                                        | 自定义 Java 代码 / 备注             |
+| 高级节点 | **variable** / **subgraph** / **loop** / **custom**   | 变量 / 子图封装 / 循环 / 自定义节点 |
+
+**高级功能：**
+
+- **变量节点**：声明 int/double/string/boolean/item/block 类型变量，编译为 Java 字段
+- **子图系统**：右键选中节点 → 封装为子图 → 独立画布编辑 → 端口映射 → 内联展开编译
+- **循环节点**：for / forEach / while 三种循环模式，循环体引用子图编译
+- **自定义节点**：JSON Schema 定义节点类型 → Mustache 模板渲染 → 导入/导出/分享
+- **外部 Mod API**：引用外部 mod 命名空间 → 编译时依赖检测 → 运行时缺失警告
+- **新手引导**：5 步交互式引导流程 + 模板搜索/分类筛选
+- **调试面板**：节点状态高亮 / 错误恢复 / 字段级校验提示
+
 ### 核心能力
 
 - **Spec-first 工作流**：自然语言描述 → AI 生成结构化 Spec → 用户审阅 → 生成代码 → 编译
+- **低代码节点图**：可视化拖拽编辑 → 编译为 ModSpec → 生成 Java 代码（支持 14 种节点 + 子图内联 + 自定义节点模板）
 - **Spec 编辑器**：生成 Spec 后可直接在 Monaco 编辑器中修改 JSON 再生成代码
 - **Loader Adapter 抽象**：同一 ModSpec 按 Fabric / NeoForge 产出不同源码
 - **AI prompt 按类型优化**：每种生成器有独立的 schema 约束提示，提升 Spec 质量
@@ -43,6 +65,7 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 | -------------- | ---------------------------------------- |
 | 桌面框架       | Electron 31 + electron-vite 2.3          |
 | 前端           | React 18 + TypeScript 5 + Tailwind CSS 3 |
+| 节点图编辑器   | React Flow 11                            |
 | 状态管理       | Zustand 4                                |
 | 代码编辑器     | Monaco Editor                            |
 | AI 编排        | Vercel AI SDK 4 + `@ai-sdk/openai` 1.x   |
@@ -62,11 +85,12 @@ mc-creator/
 │       ├── src/
 │       │   ├── main/             # 主进程（IPC handler / 模型配置 / 构建调用）
 │       │   ├── preload/          # contextBridge 桥接
-│       │   ├── renderer/         # 渲染进程（React UI）
-│       │   │   └── src/
-│       │   │       ├── components/   # TopBar / ChatPanel / AiChat / CodePreview / BuildPanel / SettingsPanel / ErrorBanner / FileTree
-│       │   │       ├── store/        # Zustand stores（mod-store / model-config-store）
-│       │   │       └── lib/          # ipc-client 封装
+│       │   │   ├── renderer/         # 渲染进程（React UI）
+│       │   │   │   └── src/
+│       │   │   │       ├── components/   # TopBar / ChatPanel / AiChat / CodePreview / BuildPanel / SettingsPanel
+│       │   │   │       │   └── lowcode/  # 低代码节点图编辑器（14 节点 + 子图 + 自定义节点 + 编译器）
+│       │   │   │       ├── store/        # Zustand stores（node-graph-store / drawer-store / debugger-store）
+│       │   │   │       └── lib/          # compileNodeGraph + 4 编译器 + ipc-client
 │       │   └── shared/           # IPC 通道常量 + zod schema（main/preload/renderer 共享）
 │       └── electron.vite.config.ts
 ├── packages/
@@ -327,13 +351,15 @@ runGradleBuild
 
 ## 测试覆盖
 
-当前共 **197 个测试**通过：
+当前共 **1146+ 个测试**通过：
 
 | 包                    | 测试文件 | 测试用例 |
 | --------------------- | -------- | -------- |
-| `@mc-creator/shared`  | 1        | 6        |
-| `@mc-creator/core`    | 23       | 169      |
-| `@mc-creator/desktop` | 4        | 22       |
+| `@mc-creator/shared`  | 3+       | 30+      |
+| `@mc-creator/core`    | 23+      | 169+     |
+| `@mc-creator/desktop` | 98       | 1146     |
+
+低代码模块测试覆盖：377 个测试（55 个文件），覆盖全部 14 种节点组件、4 个编译器、子图系统、自定义节点系统。
 
 ## 路线图
 
@@ -373,6 +399,10 @@ runGradleBuild
 - ✅ P32：Toast 通知系统（ToastProvider + useToast，4 种类型 success/error/warning/info，替换 window.alert）
 - ✅ P33：Dashboard 视觉增强（统计栏：总项目数/总文件数/各类型分布 + 卡片缩略图：类型图标/描述/文件数）
 - ✅ P34：可拖拽分割条（Splitter 组件，三栏布局宽度可调：左栏 160-480px / 右栏 200-600px）
+- ✅ **低代码 Phase A**：节点图编辑器 UI 重构（McNodeShell 3D MC 风格 + 11 种节点迁移 + React Flow 画布）
+- ✅ **低代码 Phase B**：用户体验增强（字段工具提示 + 错误恢复 + 5 个预设模板 + 搜索筛选 + 5 步新手引导）
+- ✅ **低代码 Phase C**：高级功能（variable/subgraph/loop/custom 4 种新节点 + 4 个编译器 + 子图内联 + 自定义节点 Mustache 模板 + 外部 Mod API 依赖检测 + 7 个端到端集成测试）
+- ✅ **代码审查修复**：25 个问题修复（代码注入防护 + 子图内联边重映射 + 子图编辑器交互回调 + Java 标识符校验）
 
 ### 未来可能
 
