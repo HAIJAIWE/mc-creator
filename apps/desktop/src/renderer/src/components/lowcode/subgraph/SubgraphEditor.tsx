@@ -97,7 +97,7 @@ export function SubgraphEditor({ subgraph, onChange }: SubgraphEditorProps) {
           updatedInnerNodes.push({
             ...original,
             position: fn.position,
-            selected: fn.selected,
+            selected: fn.selected ?? false,
           });
         }
       }
@@ -137,6 +137,8 @@ export function SubgraphEditor({ subgraph, onChange }: SubgraphEditorProps) {
 
   const onConnect = useCallback(
     (conn: Connection) => {
+      // Connection 的 source/target 可能为 null（未完成连线），跳过无效连接
+      if (!conn.source || !conn.target) return;
       // 边界节点之间的连接不允许（应通过内部节点连接）
       const newEdge: ModEdge = {
         id: `e_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
