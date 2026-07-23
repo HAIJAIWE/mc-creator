@@ -3,6 +3,20 @@ import type { EditorProps } from './types.js';
 
 type NbtValue = string | number | boolean | null | NbtValue[] | { [key: string]: NbtValue };
 
+/** 空 NBT 对象（类型注解避免 `as` 断言） */
+const EMPTY_PARSED: Record<string, NbtValue> = {};
+
+/**
+ * 类型守卫：判断 JSON.parse 结果是否为 NBT 编辑器期望的「对象记录」结构。
+ *
+ * 拒绝数组、原始值（string/number/boolean/null）——这些虽然合法 JSON，
+ * 但 NBT 编辑器只处理 compound 类型（键值对对象）。原本直接 `as Record`
+ * 会让数组被错误地当成记录渲染（Object.entries(['a']) 产出 [['0','a']]）。
+ */
+function isNbtRecord(v: unknown): v is Record<string, NbtValue> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 /**
  * NBT 树编辑器（基础版）：支持 string/int/compound 三种类型。
  * - 输入为 JSON 字符串
@@ -13,11 +27,14 @@ type NbtValue = string | number | boolean | null | NbtValue[] | { [key: string]:
 function NbtEditorComponent({ value, onChange, error }: EditorProps<string>) {
   // 同步派生 parseError，避免渲染期间 setState
   const { parsed, parseError } = useMemo(() => {
-    if (value.trim() === '') return { parsed: {} as Record<string, NbtValue>, parseError: null };
+    if (value.trim() === '') return { parsed: EMPTY_PARSED, parseError: null };
     try {
-      return { parsed: JSON.parse(value) as Record<string, NbtValue>, parseError: null };
+      const raw: unknown = JSON.parse(value);
+      // 类型守卫替代 `as Record`：非对象结构（数组/原始值）视为格式错误
+      if (isNbtRecord(raw)) return { parsed: raw, parseError: null };
+      return { parsed: EMPTY_PARSED, parseError: 'JSON 必须为对象' };
     } catch {
-      return { parsed: {} as Record<string, NbtValue>, parseError: 'JSON 格式错误' };
+      return { parsed: EMPTY_PARSED, parseError: 'JSON 格式错误' };
     }
   }, [value]);
 

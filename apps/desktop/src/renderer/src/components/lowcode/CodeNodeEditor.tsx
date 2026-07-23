@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Editor from '@monaco-editor/react';
-import type { CodeNodeData, FileNode } from '@mc-creator/shared';
+import type { CodeNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 import { useModStore } from '../../store/mod-store.js';
 import { useEditorModeStore } from '../../store/editor-mode-store.js';
@@ -179,7 +179,8 @@ export function CodeNodeEditor({ nodeId, onClose }: CodeNodeEditorProps) {
       // store 调用失败时兜底
     }
     // 同时写入 window.__promotedFiles，便于 PurecodeWorkspace 在集成步骤读取
-    (window as unknown as { __promotedFiles?: FileNode[] }).__promotedFiles = result.files;
+    // 类型已在 preload/api.d.ts 声明（FileNode[] 可选），无需 as 断言
+    window.__promotedFiles = result.files;
 
     // 切换到 L3 纯代码模式
     useEditorModeStore.getState().setMode('purecode');

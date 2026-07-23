@@ -249,15 +249,8 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
 
   // 从磁盘加载节点图（弹打开对话框 → 读取 → 反序列化 → 写入 store）
   const handleLoadFromDisk = useCallback(async () => {
-    const bridge = (
-      window as unknown as {
-        api?: {
-          nodeGraph?: {
-            showOpenDialog(): Promise<{ ok: true; filePath: string } | { ok: false }>;
-          };
-        };
-      }
-    ).api?.nodeGraph;
+    // window.api 类型在 preload/api.d.ts 声明为可选（jsdom 测试环境可能未注入）
+    const bridge = window.api?.nodeGraph;
     if (!bridge) {
       window.alert('持久化桥接未注入，无法加载');
       return;
