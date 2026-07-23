@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { NodeDetailDrawer } from './NodeDetailDrawer.js';
 import { useNodeGraphStore } from '../../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../../store/drawer-store.js';
+import type { ItemNodeData } from '@mc-creator/shared';
 
 describe('NodeDetailDrawer', () => {
   beforeEach(() => {
@@ -49,7 +50,7 @@ describe('NodeDetailDrawer', () => {
     expect(useDrawerStore.getState().open).toBe(false);
     // 节点 displayName 应未被保存（仍为默认值「新物品」）
     const node = useNodeGraphStore.getState().graph.nodes[0];
-    expect(node.data.displayName).toBe('新物品');
+    expect((node.data as ItemNodeData).displayName).toBe('新物品');
   });
 
   it('显示编译消息（错误/警告）', () => {
