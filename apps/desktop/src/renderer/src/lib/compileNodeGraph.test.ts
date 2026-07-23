@@ -1,12 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   compileNodeGraph,
+  preloadExternalMods,
   getIncomingEdges,
   getOutgoingEdges,
   findSourceNode,
   findTargetNode,
 } from './compileNodeGraph.js';
-import type { NodeGraph, ModNode, ModEdge, NodeData, NodeKind, NodePort } from '@mc-creator/shared';
+import { subgraphManager } from '../components/lowcode/subgraph/subgraphManager.js';
+import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
+import type {
+  NodeGraph,
+  ModNode,
+  ModEdge,
+  NodeData,
+  NodeKind,
+  NodePort,
+  SubgraphDefinition,
+} from '@mc-creator/shared';
 
 // === 测试辅助函数 ===
 // node-graph-store.ts 中的 createDefaultNodeData / createDefaultPorts 未导出，
@@ -1065,5 +1076,254 @@ describe('findTargetNode', () => {
     const edge = makeEdge('e1', 'n1', 'missing');
     const graph = makeGraph([n1], [edge]);
     expect(findTargetNode(graph, edge)).toBeNull();
+  });
+});
+
+// === 阶段 C 集成测试（Task 32） ===
+
+function makeVariable(id: string, varName: string): ModNode {
+  return {
+    id,
+    type: 'variable',
+    position: { x: 0, y: 0 },
+    data: {
+      nodeId: id,
+      label: varName,
+      note: '',
+      disabled: false,
+      kind: 'variable',
+      varName,
+      varType: 'int',
+      value: 10,
+      isConstant: true,
+      collapsed: false,
+    },
+    ports: [],
+    selected: false,
+  };
+}
+
+function makeLoop(id: string): ModNode {
+  return {
+    id,
+    type: 'loop',
+    position: { x: 0, y: 0 },
+    data: {
+      nodeId: id,
+      label: 'loop',
+      note: '',
+      disabled: false,
+      kind: 'loop',
+      loopType: 'for',
+      init: 'int i = 0',
+      condition: 'i < 3',
+      update: 'i++',
+      loopVarName: 'i',
+      loopVarType: 'int',
+      collapsed: false,
+    },
+    ports: [],
+    selected: false,
+  };
+}
+
+function makeCustom(id: string, typeId: string, fields: Record<string, unknown> = {}): ModNode {
+  return {
+    id,
+    type: 'subgraph',
+    position: { x: 0, y: 0 },
+    data: {
+      nodeId: id,
+      label: 'custom',
+      note: '',
+      disabled: false,
+      kind: 'subgraph',
+      subgraphId: '',
+      subgraphName: '',
+      customTypeId: typeId,
+      customFields: fields,
+      collapsed: false,
+    },
+    ports: [],
+    selected: false,
+  };
+}
+
+describe('compileNodeGraph 阶段 C 集成', () => {
+  beforeEach(() => {
+    subgraphManager.clear();
+    customNodeRegistry.clear();
+  });
+
+  it('变量节点编译后 customCode 数组含变量 snippet', () => {
+    const graph: NodeGraph = {
+      version: 1,
+      modId: 'testmod',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [makeVariable('v1', 'MAX')],
+      edges: [],
+      subgraphs: {},
+    };
+    const result = compileNodeGraph(graph);
+    expect(result.errors).toHaveLength(0);
+    const varSnippet = result.spec.customCode.find((c) => c.snippetId === 'v1');
+    expect(varSnippet).toBeDefined();
+    expect(varSnippet!.code).toContain('MAX');
+  });
+
+  it('子图节点先内联展开再编译（customTypeId 为 null）', () => {
+    const innerItem: ModNode = {
+      id: 'inner_1',
+      type: 'item',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 'inner_1',
+        label: 'inner',
+        note: '',
+        disabled: false,
+        kind: 'item',
+        itemId: 'inner_item',
+        displayName: 'Inner',
+        category: 'misc',
+        maxStackSize: 64,
+        maxDamage: 0,
+        rarity: 'common',
+        glow: false,
+        collapsed: false,
+      },
+      ports: [],
+      selected: false,
+    };
+    const sgDef: SubgraphDefinition = {
+      id: 'sg_1',
+      name: '内层',
+      nodes: [innerItem],
+      edges: [],
+      portMappings: [],
+    };
+    subgraphManager.register(sgDef);
+    const sgNode: ModNode = {
+      id: 's1',
+      type: 'subgraph',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 's1',
+        label: 'sg',
+        note: '',
+        disabled: false,
+        kind: 'subgraph',
+        subgraphId: 'sg_1',
+        subgraphName: '内层',
+        customTypeId: null,
+        customFields: {},
+        collapsed: false,
+      },
+      ports: [],
+      selected: false,
+    };
+    const graph: NodeGraph = {
+      version: 1,
+      modId: 'testmod',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [sgNode],
+      edges: [],
+      subgraphs: { sg_1: sgDef },
+    };
+    const result = compileNodeGraph(graph);
+    // 内联后 inner_1 被编译为 item
+    expect(result.spec.items.some((i) => i.id === 'inner_item')).toBe(true);
+  });
+
+  it('循环节点编译后 customCode 含循环代码', () => {
+    const graph: NodeGraph = {
+      version: 1,
+      modId: 'testmod',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [makeLoop('l1')],
+      edges: [],
+      subgraphs: {},
+    };
+    const result = compileNodeGraph(graph);
+    const loopSnippet = result.spec.customCode.find((c) => c.snippetId === 'l1');
+    expect(loopSnippet).toBeDefined();
+    expect(loopSnippet!.code).toContain('for (');
+  });
+
+  it('自定义节点编译后 customCode 含 Mustache 渲染结果', () => {
+    customNodeRegistry.register({
+      typeId: 'mymod:crafter',
+      label: 'x',
+      description: '',
+      icon: '',
+      color: '',
+      ports: [],
+      fields: [{ key: 'speed', label: '速度', type: 'number', required: false }],
+      codeTemplate: 'int s = {{field:speed}};',
+    });
+    const graph: NodeGraph = {
+      version: 1,
+      modId: 'testmod',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [makeCustom('c1', 'mymod:crafter', { speed: 99 })],
+      edges: [],
+      subgraphs: {},
+    };
+    const result = compileNodeGraph(graph);
+    const customSnippet = result.spec.customCode.find((c) => c.snippetId === 'c1');
+    expect(customSnippet).toBeDefined();
+    expect(customSnippet!.code).toBe('int s = 99;');
+  });
+
+  it('自定义节点 schema 未注册时报 error', () => {
+    const graph: NodeGraph = {
+      version: 1,
+      modId: 'testmod',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [makeCustom('c2', 'unregistered:type')],
+      edges: [],
+      subgraphs: {},
+    };
+    const result = compileNodeGraph(graph);
+    expect(result.errors.some((e) => e.includes('未注册'))).toBe(true);
+  });
+
+  it('外部 mod 命名空间引用检测（installed=false 加 warning）', () => {
+    // 预加载外部 mod 缓存：create 标记为未安装
+    preloadExternalMods([{ namespace: 'create', installed: false }]);
+    // 物品 itemId 引用 create:cog
+    const itemNode: ModNode = {
+      id: 'i1',
+      type: 'item',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: 'i1',
+        label: 'x',
+        note: '',
+        disabled: false,
+        kind: 'item',
+        itemId: 'create:cog',
+        displayName: 'Cog',
+        category: 'misc',
+        maxStackSize: 64,
+        maxDamage: 0,
+        rarity: 'common',
+        glow: false,
+        collapsed: false,
+      },
+      ports: [],
+      selected: false,
+    };
+    const graph: NodeGraph = {
+      version: 1,
+      modId: 'testmod',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [itemNode],
+      edges: [],
+      subgraphs: {},
+    };
+    const result = compileNodeGraph(graph);
+    expect(result.warnings.some((w) => w.includes('create'))).toBe(true);
+    // 清理缓存，避免影响后续测试
+    preloadExternalMods([{ namespace: 'create', installed: true }]);
   });
 });
