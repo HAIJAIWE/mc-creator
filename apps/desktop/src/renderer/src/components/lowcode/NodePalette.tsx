@@ -8,6 +8,8 @@ import {
   type NodeGraphTemplate,
 } from '../../lib/nodeGraphTemplates.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
+import { customNodeRegistry } from './custom/customNodeRegistry.js';
+import { CustomNodeImporter } from './custom/CustomNodeImporter.js';
 
 const COLOR_TEXT_CLASSES: Record<string, string> = {
   pink: 'text-pink-400 border-pink-400/40 hover:bg-pink-400/10',
@@ -52,6 +54,17 @@ function NodePaletteComponent({
   const [templateSearch, setTemplateSearch] = useState('');
   /** 模板分类筛选（'all' 或 TEMPLATE_CATEGORIES 中的 id） */
   const [templateCategory, setTemplateCategory] = useState<string>('all');
+  /** 自定义节点导入对话框显隐（阶段 C） */
+  const [showImporter, setShowImporter] = useState(false);
+  /** 自定义节点列表（从注册表读取，渲染时实时获取） */
+  const [customNodes, setCustomNodes] = useState(() => customNodeRegistry.list());
+
+  const addCustomNode = useNodeGraphStore((s) => s.addCustomNode);
+
+  // 刷新自定义节点列表（导入后调用）
+  const refreshCustomNodes = useCallback(() => {
+    setCustomNodes(customNodeRegistry.list());
+  }, []);
 
   const filtered = NODE_METADATA.filter(
     (m) =>
@@ -200,6 +213,55 @@ function NodePaletteComponent({
           <div className="py-2 text-center text-[10px] text-mc-mute">无匹配模板</div>
         )}
       </div>
+
+      {/* 自定义节点分区（阶段 C） */}
+      <div className="border-t border-mc-border p-2" role="group" aria-label="自定义节点">
+        <div className="mb-1 flex items-center justify-between">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-mc-mute">
+            🧩 自定义节点
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowImporter(true)}
+            className="rounded-mc bg-mc-surface-2 px-2 py-0.5 text-[10px] text-mc-text hover:bg-mc-surface-3"
+          >
+            导入自定义节点
+          </button>
+        </div>
+        {customNodes.length === 0 ? (
+          <div className="text-[10px] text-mc-dim">未导入自定义节点</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-1">
+            {customNodes.map((schema) => (
+              <button
+                key={schema.typeId}
+                type="button"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/custom-node-typeid', schema.typeId);
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                onClick={() => addCustomNode(schema.typeId, { x: 100, y: 100 })}
+                className="flex items-center gap-2 rounded-mc border border-mc-border bg-mc-surface-2 px-2 py-1.5 text-left text-xs text-mc-text hover:border-mc-accent"
+              >
+                <McIcon scope="pixel" name={schema.icon || 'custom'} size={14} aria-hidden="true" />
+                <div className="flex-1">
+                  <div className="font-medium text-mc-text">{schema.label}</div>
+                  <div className="truncate text-[10px] text-mc-mute">{schema.typeId}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {showImporter && (
+        <CustomNodeImporter
+          onClose={() => {
+            setShowImporter(false);
+            refreshCustomNodes();
+          }}
+        />
+      )}
 
       {/* 提示 */}
       <div className="border-t border-mc-border p-2 text-[10px] text-mc-mute">
