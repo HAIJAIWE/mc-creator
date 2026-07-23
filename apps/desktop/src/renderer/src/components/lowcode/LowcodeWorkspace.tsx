@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { NodeKind } from '@mc-creator/shared';
 import { NodePalette } from './NodePalette';
 import { NodeGraphEditor } from './NodeGraphEditor';
+import { SubgraphWorkspace } from './subgraph/SubgraphWorkspace.js';
 import { NodeDetailDrawer } from './nodes/drawer/NodeDetailDrawer.js';
 import { CodeNodeEditor } from './CodeNodeEditor';
 import { ModeSwitcher } from './ModeSwitcher';
@@ -123,6 +124,8 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   const compileResult = useNodeGraphStore((s) => s.compileResult);
   const exportGraph = useNodeGraphStore((s) => s.exportGraph);
   const importGraph = useNodeGraphStore((s) => s.importGraph);
+  // 阶段 C：当前正在编辑的子图 id（非 null 时用 SubgraphWorkspace 替代主画布）
+  const editingSubgraphId = useNodeGraphStore((s) => s.editingSubgraphId);
 
   // 键盘快捷键：撤销/重做/复制/取消选中
   useEffect(() => {
@@ -531,7 +534,12 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
 
         {/* 中间：画布 */}
         <div className="flex-1 overflow-hidden" data-onboarding="canvas">
-          <NodeGraphEditor readOnly={readOnly} onNodeDoubleClick={handleNodeDoubleClick} />
+          {/* 阶段 C：编辑子图时用 SubgraphWorkspace 替代主画布 */}
+          {editingSubgraphId ? (
+            <SubgraphWorkspace />
+          ) : (
+            <NodeGraphEditor readOnly={readOnly} onNodeDoubleClick={handleNodeDoubleClick} />
+          )}
         </div>
 
         {/* 右侧：工具栏（折叠/展开按钮） */}
