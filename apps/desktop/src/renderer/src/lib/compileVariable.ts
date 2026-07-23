@@ -1,4 +1,5 @@
 import type { VariableNodeData, CustomCodeSnippetSpec } from '@mc-creator/shared';
+import { escapeJavaStringLiteral } from './javaEscape.js';
 
 /**
  * 编译变量节点为 Java 字段声明，包装为 CustomCodeSnippetSpec。
@@ -45,11 +46,6 @@ export function validateJavaIdentifier(name: string): string {
     throw new Error(`变量名「${name}」不是合法的 Java 标识符`);
   }
   return name;
-}
-
-/** Java 字符串字面量转义：先转义反斜杠再转义引号，避免 \" 被错误解析为关闭字符串 */
-function escapeJavaStringLiteral(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
 function varTypeToJava(varType: VariableNodeData['varType']): string {
