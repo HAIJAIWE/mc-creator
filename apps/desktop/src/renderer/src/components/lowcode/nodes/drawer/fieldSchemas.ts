@@ -220,6 +220,65 @@ const COMMENT_FIELDS: FieldSchema[] = [
   },
 ];
 
+/** variable 节点字段（阶段 C） */
+const VARIABLE_FIELDS: FieldSchema[] = [
+  { key: 'varName', label: '变量名', type: 'text', required: true },
+  {
+    key: 'varType',
+    label: '变量类型',
+    type: 'dropdown',
+    required: true,
+    options: ['int', 'double', 'string', 'boolean', 'item', 'block'],
+  },
+  { key: 'value', label: '初始值', type: 'text' },
+  { key: 'isConstant', label: '常量', type: 'segmented', options: ['false', 'true'] },
+];
+
+/** subgraph 节点字段（阶段 C） */
+const SUBGRAPH_FIELDS: FieldSchema[] = [
+  { key: 'label', label: '显示名', type: 'text', required: true },
+  { key: 'subgraphName', label: '子图名', type: 'text' },
+  { key: 'subgraphId', label: '子图 ID', type: 'text' },
+];
+
+/** loop 节点字段（阶段 C） */
+const LOOP_FIELDS: FieldSchema[] = [
+  {
+    key: 'loopType',
+    label: '循环类型',
+    type: 'segmented',
+    required: true,
+    options: ['for', 'forEach', 'while'],
+  },
+  { key: 'loopVarName', label: '循环变量名', type: 'text' },
+  {
+    key: 'loopVarType',
+    label: '循环变量类型',
+    type: 'dropdown',
+    options: ['int', 'item', 'block', 'string'],
+  },
+  {
+    key: 'init',
+    label: '初始化',
+    type: 'text',
+    condition: { field: 'loopType', equals: 'for' },
+  },
+  { key: 'condition', label: '条件', type: 'text', required: true },
+  {
+    key: 'update',
+    label: '更新',
+    type: 'text',
+    condition: { field: 'loopType', equals: 'for' },
+  },
+  {
+    key: 'iterable',
+    label: '可迭代对象',
+    type: 'text',
+    condition: { field: 'loopType', equals: 'forEach' },
+  },
+  { key: 'bodySubgraphId', label: '循环体子图', type: 'noderef' },
+];
+
 /** 按 kind 获取字段 schema 列表 */
 export function getFieldSchemas(kind: NodeKind): FieldSchema[] {
   const specific: Record<NodeData['kind'], FieldSchema[]> = {
@@ -234,6 +293,9 @@ export function getFieldSchemas(kind: NodeKind): FieldSchema[] {
     action: ACTION_FIELDS,
     code: CODE_FIELDS,
     comment: COMMENT_FIELDS,
+    variable: VARIABLE_FIELDS,
+    subgraph: SUBGRAPH_FIELDS,
+    loop: LOOP_FIELDS,
   };
   return [...COMMON_FIELDS, ...(specific[kind] ?? [])];
 }

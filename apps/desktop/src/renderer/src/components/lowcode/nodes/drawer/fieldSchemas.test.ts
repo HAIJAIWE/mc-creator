@@ -74,3 +74,37 @@ describe('getFieldSchemas', () => {
     expect(glow?.type).toBe('segmented');
   });
 });
+
+describe('getFieldSchemas（阶段 C 新节点）', () => {
+  it('variable 含 varName/varType/value/isConstant 字段', () => {
+    const fields = getFieldSchemas('variable');
+    const keys = fields.map((f) => f.key);
+    expect(keys).toContain('varName');
+    expect(keys).toContain('varType');
+    expect(keys).toContain('value');
+    expect(keys).toContain('isConstant');
+  });
+
+  it('subgraph 含 subgraphName 字段', () => {
+    const fields = getFieldSchemas('subgraph');
+    const keys = fields.map((f) => f.key);
+    expect(keys).toContain('subgraphName');
+  });
+
+  it('loop 含 loopType/condition/loopVarName/loopVarType 字段', () => {
+    const fields = getFieldSchemas('loop');
+    const keys = fields.map((f) => f.key);
+    expect(keys).toContain('loopType');
+    expect(keys).toContain('condition');
+    expect(keys).toContain('loopVarName');
+    expect(keys).toContain('loopVarType');
+  });
+
+  it('loop init/update/iterable 字段有条件显示', () => {
+    const fields = getFieldSchemas('loop');
+    const initField = fields.find((f) => f.key === 'init');
+    expect(initField?.condition).toBeDefined();
+    const iterableField = fields.find((f) => f.key === 'iterable');
+    expect(iterableField?.condition).toBeDefined();
+  });
+});
