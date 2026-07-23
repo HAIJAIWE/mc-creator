@@ -81,3 +81,83 @@ describe('NodeRefEditor', () => {
     expect(screen.getByText('石头')).toBeTruthy();
   });
 });
+
+describe('NodeRefEditor 变量引用', () => {
+  const graph = {
+    version: 1 as const,
+    modId: 'test',
+    viewport: { x: 0, y: 0, zoom: 1 },
+    nodes: [
+      {
+        id: 'v1',
+        type: 'variable',
+        position: { x: 0, y: 0 },
+        data: {
+          nodeId: 'v1',
+          label: '最大伤害',
+          note: '',
+          disabled: false,
+          kind: 'variable',
+          varName: 'MAX_DAMAGE',
+          varType: 'int',
+          value: 10,
+          isConstant: true,
+          collapsed: false,
+        },
+        ports: [],
+        selected: false,
+      },
+      {
+        id: 'i1',
+        type: 'item',
+        position: { x: 0, y: 0 },
+        data: {
+          nodeId: 'i1',
+          label: '铁剑',
+          note: '',
+          disabled: false,
+          kind: 'item',
+          itemId: 'iron_sword',
+          displayName: '铁剑',
+          category: 'sword',
+          maxStackSize: 1,
+          maxDamage: 250,
+          rarity: 'common',
+          glow: false,
+          collapsed: false,
+        },
+        ports: [],
+        selected: false,
+      },
+    ],
+    edges: [],
+    subgraphs: {},
+  };
+
+  it('schema.dataType 指定类型时列出匹配的变量节点', () => {
+    render(
+      <NodeRefEditor
+        value=""
+        onChange={() => {}}
+        schema={{ key: 'dmg', label: '伤害', type: 'noderef', dataType: 'integer' }}
+        graph={graph}
+      />,
+    );
+    const select = screen.getByTestId('noderef-select') as HTMLSelectElement;
+    expect(select.innerHTML).toContain('MAX_DAMAGE');
+  });
+
+  it('未指定 dataType 时列出所有节点', () => {
+    render(
+      <NodeRefEditor
+        value=""
+        onChange={() => {}}
+        schema={{ key: 'ref', label: '引用', type: 'noderef' }}
+        graph={graph}
+      />,
+    );
+    const select = screen.getByTestId('noderef-select') as HTMLSelectElement;
+    expect(select.innerHTML).toContain('铁剑');
+    expect(select.innerHTML).toContain('MAX_DAMAGE');
+  });
+});
