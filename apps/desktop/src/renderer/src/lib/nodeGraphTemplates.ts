@@ -177,6 +177,35 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         text: '备注',
         color: 'yellow',
       } as NodeData;
+    case 'variable':
+      return {
+        ...base,
+        kind: 'variable',
+        varName: 'var1',
+        varType: 'int',
+        value: 0,
+        isConstant: false,
+      } as NodeData;
+    case 'subgraph':
+      return {
+        ...base,
+        kind: 'subgraph',
+        subgraphId: '',
+        subgraphName: '',
+        customTypeId: null,
+        customFields: {},
+      } as NodeData;
+    case 'loop':
+      return {
+        ...base,
+        kind: 'loop',
+        loopType: 'for',
+        init: 'int i = 0',
+        condition: 'i < 10',
+        update: 'i++',
+        loopVarName: 'i',
+        loopVarType: 'int',
+      } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);
   }
@@ -433,6 +462,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
       viewport: { x: 0, y: 0, zoom: 1 },
       nodes: [],
       edges: [],
+      subgraphs: {},
     },
   },
 
@@ -467,6 +497,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
         ),
       ],
       edges: [],
+      subgraphs: {},
     },
   },
 
@@ -523,6 +554,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
           kind: 'craft',
         }),
       ],
+      subgraphs: {},
     },
   },
 
@@ -622,6 +654,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
           kind: 'flow',
         }),
       ],
+      subgraphs: {},
     },
   },
 
@@ -687,6 +720,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
           kind: 'control',
         }),
       ],
+      subgraphs: {},
     },
   },
 
@@ -742,6 +776,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
           kind: 'data',
         }),
       ],
+      subgraphs: {},
     },
   },
 
@@ -776,6 +811,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
         ),
       ],
       edges: [],
+      subgraphs: {},
     },
   },
 
@@ -810,6 +846,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
         ),
       ],
       edges: [],
+      subgraphs: {},
     },
   },
 
@@ -844,6 +881,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
         ),
       ],
       edges: [],
+      subgraphs: {},
     },
   },
 
@@ -900,6 +938,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
           kind: 'craft',
         }),
       ],
+      subgraphs: {},
     },
   },
 
@@ -997,6 +1036,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
           kind: 'flow',
         }),
       ],
+      subgraphs: {},
     },
   },
 ];
