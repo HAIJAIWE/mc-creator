@@ -190,6 +190,35 @@ function createDefaultNodeData(kind: NodeKind, id: string): NodeData {
         text: '',
         color: 'yellow',
       } as NodeData;
+    case 'variable':
+      return {
+        ...base,
+        kind: 'variable',
+        varName: 'var1',
+        varType: 'int',
+        value: 0,
+        isConstant: false,
+      } as NodeData;
+    case 'subgraph':
+      return {
+        ...base,
+        kind: 'subgraph',
+        subgraphId: '',
+        subgraphName: '',
+        customTypeId: null,
+        customFields: {},
+      } as NodeData;
+    case 'loop':
+      return {
+        ...base,
+        kind: 'loop',
+        loopType: 'for',
+        init: 'int i = 0',
+        condition: 'i < 10',
+        update: 'i++',
+        loopVarName: 'i',
+        loopVarType: 'int',
+      } as NodeData;
     default: {
       // 类型安全：穷尽性检查
       const _exhaustive: never = kind;
@@ -1021,6 +1050,7 @@ export function demoteJavaToNodeGraph(files: FileNode[], modId?: string): Demote
     viewport: { x: 0, y: 0, zoom: 1 },
     nodes,
     edges,
+    subgraphs: {},
   };
 
   return { graph, warnings, stats };
@@ -1601,6 +1631,7 @@ export function demoteJavaToNodeGraphSimple(files: FileNode[]): DemotionResult {
     viewport: { x: 0, y: 0, zoom: 1 },
     nodes,
     edges: [],
+    subgraphs: {},
   };
 
   // 5. 汇总提取摘要

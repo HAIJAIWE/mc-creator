@@ -43,6 +43,7 @@ const graph: NodeGraph = {
     makeNode('n2', 'block', '石头', 'block_state'),
   ],
   edges: [],
+  subgraphs: {},
 };
 
 describe('NodeRefEditor', () => {

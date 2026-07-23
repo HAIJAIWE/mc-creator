@@ -76,6 +76,7 @@ const EMPTY_GRAPH: NodeGraph = {
   viewport: { x: 0, y: 0, zoom: 1 },
   nodes: [],
   edges: [],
+  subgraphs: {},
 };
 
 const SIMPLE_GRAPH: NodeGraph = {
@@ -107,6 +108,7 @@ const SIMPLE_GRAPH: NodeGraph = {
     },
   ],
   edges: [],
+  subgraphs: {},
 };
 
 const DEMO_SPEC: ModSpec = {

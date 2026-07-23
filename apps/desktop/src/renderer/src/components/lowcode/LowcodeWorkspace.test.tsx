@@ -27,6 +27,7 @@ beforeEach(() => {
       viewport: { x: 0, y: 0, zoom: 1 },
       nodes: [],
       edges: [],
+      subgraphs: {},
     },
     selectedNodeId: null,
     selectedEdgeId: null,

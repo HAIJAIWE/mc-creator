@@ -72,6 +72,7 @@ function makeGraph(nodes: ModNode[]): NodeGraph {
     viewport: { x: 0, y: 0, zoom: 1 },
     nodes,
     edges: [],
+    subgraphs: {},
   };
 }
 
@@ -617,6 +618,7 @@ describe('validateConnection (带失败原因)', () => {
     viewport: { x: 0, y: 0, zoom: 1 },
     nodes,
     edges: [],
+    subgraphs: {},
   });
 
   const makePort = (
