@@ -109,7 +109,11 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   const { announce, LiveRegion } = useLiveRegion({ clearAfterMs: 3000 });
 
   const mode = useEditorModeStore((s) => s.mode);
-  const graph = useNodeGraphStore((s) => s.graph);
+  // 性能：拆分 graph 订阅为细粒度原子选择器，避免节点拖动等高频 graph 变更
+  // 触发整个工作区重渲染。回调内需要完整 graph 时用 useNodeGraphStore.getState()
+  // 取最新值，避免在 useCallback 依赖项中引用整个 graph 对象。
+  const nodeCount = useNodeGraphStore((s) => s.graph.nodes.length);
+  const edgeCount = useNodeGraphStore((s) => s.graph.edges.length);
   const addNode = useNodeGraphStore((s) => s.addNode);
   const undo = useNodeGraphStore((s) => s.undo);
   const redo = useNodeGraphStore((s) => s.redo);
@@ -118,8 +122,9 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   const selectNode = useNodeGraphStore((s) => s.selectNode);
   const collapseAll = useNodeGraphStore((s) => s.collapseAll);
   const expandAll = useNodeGraphStore((s) => s.expandAll);
-  const undoStack = useNodeGraphStore((s) => s.undoStack);
-  const redoStack = useNodeGraphStore((s) => s.redoStack);
+  // 性能：仅订阅 length（原始数字），避免 undoStack/redoStack 引用变化触发重渲染
+  const undoStackLength = useNodeGraphStore((s) => s.undoStack.length);
+  const redoStackLength = useNodeGraphStore((s) => s.redoStack.length);
   const setCompileResult = useNodeGraphStore((s) => s.setCompileResult);
   const compileResult = useNodeGraphStore((s) => s.compileResult);
   const exportGraph = useNodeGraphStore((s) => s.exportGraph);
@@ -181,24 +186,26 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
       if (readOnly) return;
       commit();
       // 随机位置（避免重叠），实际可基于视口中心计算
-      const offset = graph.nodes.length * 30;
+      // 性能：用 getState() 取最新 nodes.length，避免订阅整个 graph 触发 handler 重建
+      const offset = useNodeGraphStore.getState().graph.nodes.length * 30;
       addNode(kind, { x: 200 + offset, y: 150 + offset });
     },
-    [readOnly, commit, graph.nodes.length, addNode],
+    [readOnly, commit, addNode],
   );
 
   // 编译节点图：结果存入 store，由 NodeGraphEditor 高亮错误节点、工具栏徽章显示状态
   const handleCompile = useCallback(() => {
-    const result = compileNodeGraph(graph);
+    // 性能：用 getState() 取最新 graph，避免订阅整个 graph 触发 handler 重建
+    const result = compileNodeGraph(useNodeGraphStore.getState().graph);
     setCompileResult(result);
-  }, [graph, setCompileResult]);
+  }, [setCompileResult]);
 
   // 导出节点图为 JSON 文件（触发浏览器下载）
   const handleExport = useCallback(() => {
     const json = exportGraph();
-    const filename = `${graph.modId || 'untitled'}-node-graph.json`;
+    const filename = `${useNodeGraphStore.getState().graph.modId || 'untitled'}-node-graph.json`;
     downloadGraphAsJson(json, filename);
-  }, [exportGraph, graph.modId]);
+  }, [exportGraph]);
 
   // 点击导入按钮 → 触发隐藏的 file input
   const handleImportClick = useCallback(() => {
@@ -230,14 +237,15 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
 
   // 保存节点图到磁盘（通过 IPC 调用主进程 fs，弹保存对话框）
   const handleSaveToDisk = useCallback(async () => {
-    const res = await saveGraphToDisk(graph);
+    // 性能：用 getState() 取最新 graph，避免订阅整个 graph 触发 handler 重建
+    const res = await saveGraphToDisk(useNodeGraphStore.getState().graph);
     if (res.ok) {
       announce(`已保存到 ${res.path}`);
       refreshRecent();
     } else if (res.error !== 'canceled') {
       window.alert(`保存失败：${res.error}`);
     }
-  }, [graph, announce, refreshRecent]);
+  }, [announce, refreshRecent]);
 
   // 从磁盘加载节点图（弹打开对话框 → 读取 → 反序列化 → 写入 store）
   const handleLoadFromDisk = useCallback(async () => {
@@ -340,7 +348,7 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
             <button
               type="button"
               onClick={undo}
-              disabled={undoStack.length === 0}
+              disabled={undoStackLength === 0}
               aria-label="撤销"
               title="撤销 (Ctrl+Z)"
               className="rounded-mc p-1 text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text disabled:cursor-not-allowed disabled:opacity-40"
@@ -350,7 +358,7 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
             <button
               type="button"
               onClick={redo}
-              disabled={redoStack.length === 0}
+              disabled={redoStackLength === 0}
               aria-label="重做"
               title="重做 (Ctrl+Y)"
               className="rounded-mc p-1 text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text disabled:cursor-not-allowed disabled:opacity-40"
@@ -473,7 +481,7 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
             className="rounded-mc bg-mc-surface-2 px-2 py-0.5 text-[10px] text-mc-mute"
             role="status"
           >
-            {graph.nodes.length} 节点 · {graph.edges.length} 连线
+            {nodeCount} 节点 · {edgeCount} 连线
           </span>
 
           {/* 实时预览切换按钮 */}
@@ -583,9 +591,10 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
       </div>
 
       {/* 节点图调试器（底部水平面板，仅可编辑模式显示） */}
+      {/* 性能：不传 graph prop，DebuggerPanel 自行从 store 订阅，避免父组件订阅整个 graph */}
       {!readOnly && (
         <div className="shrink-0 border-t border-mc-border">
-          <DebuggerPanel graph={graph} />
+          <DebuggerPanel />
         </div>
       )}
 
