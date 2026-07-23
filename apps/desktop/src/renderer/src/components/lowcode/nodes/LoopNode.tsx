@@ -2,8 +2,7 @@ import { memo } from 'react';
 import { type NodeProps } from 'reactflow';
 import type { LoopNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
-import { useNodeGraphStore } from '../../../store/node-graph-store.js';
-import { useDrawerStore } from '../../../store/drawer-store.js';
+import { useNodeActions } from './hooks/useNodeActions.js';
 
 /**
  * 循环节点：for/forEach/while 批量逻辑。
@@ -13,9 +12,7 @@ import { useDrawerStore } from '../../../store/drawer-store.js';
  * 徽章：循环类型（for/forEach/while）
  */
 function LoopNodeComponent({ data, selected }: NodeProps<LoopNodeData>) {
-  const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
-  const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const node = useNodeGraphStore((s) => s.graph.nodes.find((n) => n.id === data.nodeId));
+  const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
 
   return (
     <McNodeShell
@@ -26,8 +23,8 @@ function LoopNodeComponent({ data, selected }: NodeProps<LoopNodeData>) {
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
       selected={selected}
-      onToggleCollapse={() => toggleCollapse(data.nodeId)}
-      onOpenDrawer={() => openDrawer(data.nodeId)}
+      onToggleCollapse={toggleCollapse}
+      onOpenDrawer={openDrawer}
     >
       <div className="text-[10px] text-mc-mute">
         {data.loopType === 'for' && (

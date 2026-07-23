@@ -16,8 +16,12 @@ vi.mock('./base/McNodeShell.js', () => ({
 }));
 
 vi.mock('../../../store/node-graph-store.js', () => ({
-  useNodeGraphStore: (sel: (s: { toggleCollapse: () => void }) => unknown) =>
-    sel({ toggleCollapse: () => {} }),
+  useNodeGraphStore: (
+    sel: (s: {
+      toggleCollapse: () => void;
+      graph: { nodes: { id: string; ports: unknown[] }[] };
+    }) => unknown,
+  ) => sel({ toggleCollapse: () => {}, graph: { nodes: [{ id: 'c1', ports: [] }] } }),
 }));
 
 vi.mock('../../../store/drawer-store.js', () => ({

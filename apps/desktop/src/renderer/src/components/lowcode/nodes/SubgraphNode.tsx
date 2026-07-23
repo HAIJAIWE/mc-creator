@@ -3,8 +3,8 @@ import type { NodeProps } from 'reactflow';
 import type { SubgraphNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { CustomNodeContent } from './CustomNode.js';
+import { useNodeActions } from './hooks/useNodeActions.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
-import { useDrawerStore } from '../../../store/drawer-store.js';
 
 /**
  * 子图节点：封装复用子图。
@@ -15,10 +15,9 @@ import { useDrawerStore } from '../../../store/drawer-store.js';
  * 数据上 kind 始终是 'subgraph'，不新增 'custom' NodeKind。
  */
 function SubgraphNodeComponent({ data, selected }: NodeProps<SubgraphNodeData>) {
-  const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
+  const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
+  // 子图节点特有：进入子图编辑 + 子图定义查找，不属于通用 useNodeActions 范畴
   const setEditingSubgraphId = useNodeGraphStore((s) => s.setEditingSubgraphId);
-  const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const node = useNodeGraphStore((s) => s.graph.nodes.find((n) => n.id === data.nodeId));
   const sg = useNodeGraphStore((s) =>
     data.subgraphId ? s.graph.subgraphs[data.subgraphId] : undefined,
   );
@@ -39,8 +38,8 @@ function SubgraphNodeComponent({ data, selected }: NodeProps<SubgraphNodeData>) 
       collapsed={data.collapsed}
       selected={selected}
       errorState={!subgraphFound && data.subgraphId ? 'warning' : undefined}
-      onToggleCollapse={() => toggleCollapse(data.nodeId)}
-      onOpenDrawer={() => openDrawer(data.nodeId)}
+      onToggleCollapse={toggleCollapse}
+      onOpenDrawer={openDrawer}
     >
       {subgraphFound ? (
         <div className="text-[10px] text-mc-mute">

@@ -2,8 +2,7 @@ import { memo } from 'react';
 import { type NodeProps } from 'reactflow';
 import type { VariableNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
-import { useNodeGraphStore } from '../../../store/node-graph-store.js';
-import { useDrawerStore } from '../../../store/drawer-store.js';
+import { useNodeActions } from './hooks/useNodeActions.js';
 
 /**
  * 变量节点：定义全局变量/常量，可被其他节点引用。
@@ -13,9 +12,7 @@ import { useDrawerStore } from '../../../store/drawer-store.js';
  * 徽章：常量显示 'const'
  */
 function VariableNodeComponent({ data, selected }: NodeProps<VariableNodeData>) {
-  const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
-  const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const node = useNodeGraphStore((s) => s.graph.nodes.find((n) => n.id === data.nodeId));
+  const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
 
   return (
     <McNodeShell
@@ -26,8 +23,8 @@ function VariableNodeComponent({ data, selected }: NodeProps<VariableNodeData>) 
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
       selected={selected}
-      onToggleCollapse={() => toggleCollapse(data.nodeId)}
-      onOpenDrawer={() => openDrawer(data.nodeId)}
+      onToggleCollapse={toggleCollapse}
+      onOpenDrawer={openDrawer}
     >
       <div className="text-[10px] text-mc-mute">
         <span className="font-mono text-mc-text">{data.varName}</span>
