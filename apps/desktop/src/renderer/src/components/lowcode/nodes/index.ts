@@ -1,18 +1,18 @@
 import type { NodeKind } from '@mc-creator/shared';
-import { ItemNode } from './ItemNode';
-import { BlockNode } from './BlockNode';
-import { EntityNode } from './EntityNode';
-import { RecipeNode } from './RecipeNode';
-import { MachineNode } from './MachineNode';
-import { MultiBlockNode } from './MultiBlockNode';
-import { EventNode } from './EventNode';
-import { ConditionNode } from './ConditionNode';
-import { ActionNode } from './ActionNode';
-import { CodeNode } from './CodeNode';
-import { CommentNode } from './CommentNode';
-import { VariableNode } from './VariableNode';
-import { SubgraphNode } from './SubgraphNode';
-import { LoopNode } from './LoopNode';
+import { ItemNode } from './ItemNode.js';
+import { BlockNode } from './BlockNode.js';
+import { EntityNode } from './EntityNode.js';
+import { RecipeNode } from './RecipeNode.js';
+import { MachineNode } from './MachineNode.js';
+import { MultiBlockNode } from './MultiBlockNode.js';
+import { EventNode } from './EventNode.js';
+import { ConditionNode } from './ConditionNode.js';
+import { ActionNode } from './ActionNode.js';
+import { CodeNode } from './CodeNode.js';
+import { CommentNode } from './CommentNode.js';
+import { VariableNode } from './VariableNode.js';
+import { SubgraphNode } from './SubgraphNode.js';
+import { LoopNode } from './LoopNode.js';
 
 /**
  * 节点类型注册表
