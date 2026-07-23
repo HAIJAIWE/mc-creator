@@ -1,16 +1,28 @@
-import type { NodeData, NodePort } from '@mc-creator/shared';
+import type {
+  NodeData,
+  NodePort,
+  NodeGraph,
+  VariableNodeData,
+  SubgraphNodeData,
+  LoopNodeData,
+} from '@mc-creator/shared';
 
 /**
  * 根据节点 data 返回端口列表（数据驱动）。
  *
  * - 静态端口节点（item/block/entity/event 等）：端口固定，不依赖 data 具体值
  * - 动态端口节点（Plan C 的 variable/loop）：端口标签随 data 字段变化
+ * - subgraph 节点：端口来自 graph.subgraphs[portMappings]，需传入 graph 参数
  *
  * createDefaultPorts(kind) 在 store 中保留（向后兼容），内部改为调用 getPorts。
  * 所有节点组件渲染端口时用 node.ports（已由 store 初始化），不运行时调 getPorts。
+ *
+ * @param data 节点数据
+ * @param graph 可选，子图节点需要查 graph.subgraphs 获取 portMappings
  */
-export function getPorts(data: NodeData): NodePort[] {
+export function getPorts(data: NodeData, graph?: NodeGraph): NodePort[] {
   switch (data.kind) {
+    // === Plan A 原 11 分支保持不变 ===
     case 'item':
       return [
         {
@@ -180,7 +192,105 @@ export function getPorts(data: NodeData): NodePort[] {
       ];
     case 'comment':
       return [];
+
+    // === 阶段 C 新增 3 分支 ===
+    case 'variable': {
+      const v = data as VariableNodeData;
+      return [
+        {
+          id: 'value',
+          label: v.varName || '变量',
+          type: varTypeToPortType(v.varType),
+          direction: 'out',
+          required: false,
+          multiple: true,
+        },
+      ];
+    }
+    case 'subgraph': {
+      const s = data as SubgraphNodeData;
+      if (!s.subgraphId || !graph) return [];
+      const sg = graph.subgraphs[s.subgraphId];
+      if (!sg) return [];
+      return sg.portMappings.map((m) => ({
+        id: m.externalPortId,
+        label: m.label,
+        type: m.type,
+        direction: m.direction,
+        required: false,
+        multiple: m.direction === 'in',
+      }));
+    }
+    case 'loop': {
+      const l = data as LoopNodeData;
+      return [
+        {
+          id: 'input',
+          label: '输入',
+          type: 'void',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+        {
+          id: 'loop_var',
+          label: l.loopVarName || '循环变量',
+          type: loopVarTypeToPortType(l.loopVarType),
+          direction: 'out',
+          required: false,
+          multiple: true,
+        },
+        {
+          id: 'body',
+          label: '循环体',
+          type: 'void',
+          direction: 'out',
+          required: false,
+          multiple: false,
+        },
+        {
+          id: 'done',
+          label: '完成',
+          type: 'void',
+          direction: 'out',
+          required: false,
+          multiple: true,
+        },
+      ];
+    }
     default:
       return [];
+  }
+}
+
+/** VariableNodeData.varType → NodePort['type'] 映射 */
+function varTypeToPortType(varType: VariableNodeData['varType']): NodePort['type'] {
+  switch (varType) {
+    case 'int':
+      return 'integer';
+    case 'double':
+      return 'number';
+    case 'string':
+      return 'string';
+    case 'boolean':
+      return 'boolean';
+    case 'item':
+      return 'item_stack';
+    case 'block':
+      return 'block_state';
+  }
+}
+
+/** LoopNodeData.loopVarType → NodePort['type'] 映射 */
+function loopVarTypeToPortType(loopVarType: LoopNodeData['loopVarType']): NodePort['type'] {
+  switch (loopVarType) {
+    case 'int':
+      return 'integer';
+    case 'item':
+      return 'item_stack';
+    case 'block':
+      return 'block_state';
+    case 'string':
+      return 'string';
   }
 }

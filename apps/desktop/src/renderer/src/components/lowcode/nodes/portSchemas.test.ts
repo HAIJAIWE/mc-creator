@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { getPorts } from './portSchemas.js';
-import type { NodeData } from '@mc-creator/shared';
+import type {
+  NodeData,
+  VariableNodeData,
+  SubgraphNodeData,
+  LoopNodeData,
+  NodeGraph,
+} from '@mc-creator/shared';
 
 function makeData(kind: NodeData['kind']): NodeData {
   const base = { nodeId: 'n1', label: 'test', note: '', disabled: false, collapsed: false };
@@ -95,5 +101,131 @@ describe('getPorts', () => {
     expect(ports).toHaveLength(3);
     expect(ports.filter((p) => p.direction === 'in')).toHaveLength(2);
     expect(ports.filter((p) => p.direction === 'out')).toHaveLength(1);
+  });
+});
+
+describe('getPorts（阶段 C 新节点）', () => {
+  it('variable 端口标签随 varName 变化', () => {
+    const data: VariableNodeData = {
+      nodeId: 'v1',
+      label: 'x',
+      note: '',
+      disabled: false,
+      kind: 'variable',
+      varName: 'MAX_DAMAGE',
+      varType: 'int',
+      value: 10,
+      isConstant: true,
+      collapsed: false,
+    };
+    const ports = getPorts(data);
+    expect(ports).toHaveLength(1);
+    expect(ports[0]!.label).toBe('MAX_DAMAGE');
+    expect(ports[0]!.direction).toBe('out');
+    expect(ports[0]!.multiple).toBe(true);
+  });
+
+  it('variable 端口 type 随 varType 变化', () => {
+    const data: VariableNodeData = {
+      nodeId: 'v1',
+      label: 'x',
+      note: '',
+      disabled: false,
+      kind: 'variable',
+      varName: 'x',
+      varType: 'string',
+      value: '',
+      isConstant: false,
+      collapsed: false,
+    };
+    const ports = getPorts(data);
+    expect(ports[0]!.type).toBe('string');
+  });
+
+  it('subgraph 端口从 graph.subgraphs 的 portMappings 生成', () => {
+    const data: SubgraphNodeData = {
+      nodeId: 's1',
+      label: '子图',
+      note: '',
+      disabled: false,
+      kind: 'subgraph',
+      subgraphId: 'sg_1',
+      subgraphName: '测试',
+      customTypeId: null,
+      customFields: {},
+      collapsed: false,
+    };
+    // getPorts 第二参数可选传 graph（含 subgraphs）
+    const graph = {
+      version: 1 as const,
+      modId: 'test',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [],
+      edges: [],
+      subgraphs: {
+        sg_1: {
+          id: 'sg_1',
+          name: '测试',
+          nodes: [],
+          edges: [],
+          portMappings: [
+            {
+              internalPortId: 'in_1',
+              externalPortId: 'input',
+              label: '材料',
+              direction: 'in' as const,
+              type: 'item_stack' as const,
+            },
+            {
+              internalPortId: 'out_1',
+              externalPortId: 'output',
+              label: '产物',
+              direction: 'out' as const,
+              type: 'item_stack' as const,
+            },
+          ],
+        },
+      },
+    } as NodeGraph;
+    const ports = getPorts(data, graph);
+    expect(ports).toHaveLength(2);
+    expect(ports.find((p) => p.id === 'input')?.label).toBe('材料');
+    expect(ports.find((p) => p.id === 'output')?.direction).toBe('out');
+  });
+
+  it('subgraph 子图未找到时返回空数组', () => {
+    const data: SubgraphNodeData = {
+      nodeId: 's1',
+      label: 'x',
+      note: '',
+      disabled: false,
+      kind: 'subgraph',
+      subgraphId: 'missing',
+      subgraphName: '',
+      customTypeId: null,
+      customFields: {},
+      collapsed: false,
+    };
+    expect(getPorts(data)).toEqual([]);
+  });
+
+  it('loop 端口含 loop_var/body/done，loop_var 标签随 loopVarName 变化', () => {
+    const data: LoopNodeData = {
+      nodeId: 'l1',
+      label: 'x',
+      note: '',
+      disabled: false,
+      kind: 'loop',
+      loopType: 'forEach',
+      condition: '',
+      loopVarName: 'item',
+      loopVarType: 'item',
+      iterable: 'items',
+      collapsed: false,
+    };
+    const ports = getPorts(data);
+    expect(ports.find((p) => p.id === 'loop_var')?.label).toBe('item');
+    expect(ports.find((p) => p.id === 'body')).toBeDefined();
+    expect(ports.find((p) => p.id === 'done')).toBeDefined();
   });
 });
