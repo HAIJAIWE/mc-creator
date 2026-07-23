@@ -131,7 +131,12 @@ describe('compileCustomNode', () => {
     };
     const result = compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeDefined();
-    expect(result.snippet!.code).not.toContain('evil()');
+    // 字段值作为字符串内容保留（evil() 在字符串字面量内是数据，不是代码注入）
+    expect(result.snippet!.code).toContain('evil()');
     expect(result.snippet!.code).toContain('\\"');
+    // 不应产生非法 Java 转义序列
+    expect(result.snippet!.code).not.toContain('\\(');
+    expect(result.snippet!.code).not.toContain('\\)');
+    expect(result.snippet!.code).not.toContain('\\;');
   });
 });
