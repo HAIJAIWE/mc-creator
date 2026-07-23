@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -189,6 +189,29 @@ export function NodeGraphEditor({
   const compileResult = useNodeGraphStore((s) => s.compileResult);
   // a11y：当前选中节点 id，用于 aria-activedescendant（屏幕阅读器朗读当前聚焦节点）
   const selectedNodeId = useNodeGraphStore((s) => s.selectedNodeId);
+
+  // 阶段 C：右键封装子图
+  const encapsulateSubgraph = useNodeGraphStore((s) => s.encapsulateSubgraph);
+  const selectedNodes = useNodeGraphStore((s) => s.graph.nodes.filter((n) => n.selected));
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    visible: boolean;
+  } | null>(null);
+
+  const handleNodeContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, visible: true });
+  }, []);
+
+  const handleEncapsulate = useCallback(() => {
+    const ids = selectedNodes.map((n) => n.id);
+    if (ids.length === 0) return;
+    const name = window.prompt('输入子图名称：', '新子图');
+    if (!name) return;
+    encapsulateSubgraph(ids, name);
+    setContextMenu(null);
+  }, [selectedNodes, encapsulateSubgraph]);
 
   // 调试器状态：当前执行节点（青色高亮）+ 断点集合（红色边框装饰）
   const isDebugMode = useDebuggerStore((s) => s.state !== null);
@@ -398,6 +421,7 @@ export function NodeGraphEditor({
         onEdgeDoubleClick={onEdgeDoubleClick}
         onMoveEnd={onMoveEnd}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onNodeContextMenu={handleNodeContextMenu}
         onNodeClick={(_e, node) => selectNode(node.id)}
         onEdgeClick={(_e, edge) => selectEdge(edge.id)}
         onPaneClick={() => {
@@ -453,6 +477,23 @@ export function NodeGraphEditor({
           />
         )}
       </ReactFlow>
+
+      {contextMenu?.visible && (
+        <div
+          className="fixed z-50 rounded-mc border border-mc-border bg-mc-surface py-1 shadow-lg"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            type="button"
+            onClick={handleEncapsulate}
+            disabled={selectedNodes.length === 0}
+            className="block w-full px-3 py-1 text-left text-[11px] text-mc-text hover:bg-mc-surface-2 disabled:opacity-40"
+          >
+            封装为子图
+            {selectedNodes.length > 0 ? `（${selectedNodes.length} 节点）` : '（需先选中节点）'}
+          </button>
+        </div>
+      )}
 
       {readOnly && (
         <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-mc bg-mc-surface/80 px-3 py-1 text-[11px] text-mc-mute backdrop-blur">
