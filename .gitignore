@@ -14,7 +14,13 @@ release/
 # IDE
 .idea/
 .vscode/
+.trae/
 *.tsbuildinfo
+
+# 外部工具二进制（MCreator 等）
+MCreator.*.zip
+MCreator.*.Windows.*/
+
 
 # 系统
 .DS_Store
