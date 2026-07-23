@@ -114,7 +114,7 @@ describe('compileCustomNode', () => {
       icon: '',
       color: '',
       ports: [],
-      fields: [],
+      fields: [{ key: 'name', label: '名称', type: 'text', required: false }],
       codeTemplate: 'String x = "{{field:name}}";',
     });
     const data: SubgraphNodeData = {
@@ -138,5 +138,98 @@ describe('compileCustomNode', () => {
     expect(result.snippet!.code).not.toContain('\\(');
     expect(result.snippet!.code).not.toContain('\\)');
     expect(result.snippet!.code).not.toContain('\\;');
+  });
+
+  it('fields 净化：未在 schema 中定义的额外字段不参与渲染（问题 12）', () => {
+    customNodeRegistry.register({
+      typeId: 'mymod:filter',
+      label: 'x',
+      description: '',
+      icon: '',
+      color: '',
+      ports: [],
+      fields: [{ key: 'speed', label: '速度', type: 'number', required: true }],
+      // 模板故意引用未在 schema 中定义的 extra 字段
+      codeTemplate: 'int speed = {{field:speed}}; String extra = "{{field:extra}}";',
+    });
+    const data: SubgraphNodeData = {
+      nodeId: 'c6',
+      label: 'x',
+      note: '',
+      disabled: false,
+      kind: 'subgraph',
+      subgraphId: '',
+      subgraphName: '',
+      customTypeId: 'mymod:filter',
+      // 用户传入了 schema 未定义的 extra 字段
+      customFields: { speed: 42, extra: 'LEAKED' },
+      collapsed: false,
+    };
+    const result = compileCustomNode(data, data.customFields);
+    expect(result.snippet).toBeDefined();
+    expect(result.snippet!.code).toContain('int speed = 42');
+    // extra 未在 schema 中定义，即使 customFields 提供了也不应被渲染（保留占位符）
+    expect(result.snippet!.code).toContain('{{field:extra}}');
+    expect(result.snippet!.code).not.toContain('LEAKED');
+  });
+
+  it('fields 净化：number 类型字段非数字值回退为 0（问题 20）', () => {
+    customNodeRegistry.register({
+      typeId: 'mymod:coerce',
+      label: 'x',
+      description: '',
+      icon: '',
+      color: '',
+      ports: [],
+      fields: [{ key: 'speed', label: '速度', type: 'number', required: true }],
+      codeTemplate: 'int speed = {{field:speed}};',
+    });
+    const data: SubgraphNodeData = {
+      nodeId: 'c7',
+      label: 'x',
+      note: '',
+      disabled: false,
+      kind: 'subgraph',
+      subgraphId: '',
+      subgraphName: '',
+      customTypeId: 'mymod:coerce',
+      // 传入非数字字符串，应被强制回退为 0 而非注入原始文本
+      customFields: { speed: 'not-a-number' },
+      collapsed: false,
+    };
+    const result = compileCustomNode(data, data.customFields);
+    expect(result.snippet).toBeDefined();
+    // 非数字应回退为 0，避免注入非法 Java 标识符
+    expect(result.snippet!.code).toBe('int speed = 0;');
+    expect(result.snippet!.code).not.toContain('not-a-number');
+  });
+
+  it('fields 净化：number 类型字段字符串数字被强制转为数字（问题 20）', () => {
+    customNodeRegistry.register({
+      typeId: 'mymod:coerce2',
+      label: 'x',
+      description: '',
+      icon: '',
+      color: '',
+      ports: [],
+      fields: [{ key: 'count', label: '数量', type: 'number', required: true }],
+      codeTemplate: 'int count = {{field:count}};',
+    });
+    const data: SubgraphNodeData = {
+      nodeId: 'c8',
+      label: 'x',
+      note: '',
+      disabled: false,
+      kind: 'subgraph',
+      subgraphId: '',
+      subgraphName: '',
+      customTypeId: 'mymod:coerce2',
+      // 字符串形式的数字应被转为数字
+      customFields: { count: '42' },
+      collapsed: false,
+    };
+    const result = compileCustomNode(data, data.customFields);
+    expect(result.snippet).toBeDefined();
+    expect(result.snippet!.code).toBe('int count = 42;');
   });
 });

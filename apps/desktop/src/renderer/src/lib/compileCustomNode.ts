@@ -1,4 +1,8 @@
-import type { SubgraphNodeData, CustomCodeSnippetSpec } from '@mc-creator/shared';
+import type {
+  SubgraphNodeData,
+  CustomCodeSnippetSpec,
+  CustomNodeFieldSchema,
+} from '@mc-creator/shared';
 import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
 import { renderMustache } from '../components/lowcode/custom/mustacheRender.js';
 
@@ -8,8 +12,11 @@ import { renderMustache } from '../components/lowcode/custom/mustacheRender.js';
  * 流程：
  * 1. 从 data.customTypeId 查 customNodeRegistry 取 schema
  * 2. 校验 required 字段（fields 中 required=true 的 key 必须在 fields 参数中存在且非空）
- * 3. 用 renderMustache 把 schema.codeTemplate 与 fields 合并渲染
- * 4. 包装为 CustomCodeSnippetSpec 返回
+ * 3. 净化 fields：仅保留 schema 中定义的 key，并按字段类型强制转换值
+ *    - number 类型：Number() 转换，NaN 回退为 0（防止注入非法 Java 标识符）
+ *    - 其他类型：保留原值（renderMustache 会做 String() 转换 + Java 字符串转义）
+ * 4. 用 renderMustache 把 schema.codeTemplate 与净化后的 fields 合并渲染
+ * 5. 包装为 CustomCodeSnippetSpec 返回
  *
  * 失败时返回 { error }（不抛异常，由调用方收集到 errors）：
  * - customTypeId 为 null：非自定义节点，不应调此函数
@@ -41,7 +48,10 @@ export function compileCustomNode(
     }
   }
 
-  const code = renderMustache(schema.codeTemplate, fields);
+  // 净化 fields：仅保留 schema 中定义的 key，并按类型强制转换值
+  const sanitizedFields = sanitizeFields(fields, schema.fields);
+
+  const code = renderMustache(schema.codeTemplate, sanitizedFields);
 
   return {
     snippet: {
@@ -53,4 +63,30 @@ export function compileCustomNode(
       methodName: `custom_${data.nodeId}`,
     },
   };
+}
+
+/**
+ * 净化字段值：仅保留 schema 中定义的 key，并按字段类型强制转换。
+ *
+ * - number 类型：用 Number() 转换；NaN/Infinity 回退为 0，防止注入非法 Java 标识符
+ * - 其他类型：保留原值，由 renderMustache 负责 String() 转换与 Java 字符串转义
+ *
+ * 未在 schema 中定义的 key 会被丢弃，防止额外字段泄露到模板渲染。
+ */
+function sanitizeFields(
+  fields: Record<string, unknown>,
+  schemaFields: CustomNodeFieldSchema[],
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const field of schemaFields) {
+    if (!(field.key in fields)) continue;
+    const raw = fields[field.key];
+    if (field.type === 'number') {
+      const n = Number(raw);
+      result[field.key] = Number.isFinite(n) ? n : 0;
+    } else {
+      result[field.key] = raw;
+    }
+  }
+  return result;
 }
