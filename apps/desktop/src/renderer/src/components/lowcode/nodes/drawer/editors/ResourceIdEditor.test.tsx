@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ResourceIdEditor } from './ResourceIdEditor.js';
 import type { FieldSchema } from './types.js';
 import type { NodeGraph } from '@mc-creator/shared';
@@ -69,5 +69,54 @@ describe('ResourceIdEditor', () => {
       />,
     );
     expect(screen.getByText('格式错误')).toBeTruthy();
+  });
+});
+
+describe('ResourceIdEditor 外部 mod 命名空间', () => {
+  const schema: FieldSchema = { key: 'id', label: 'ID', type: 'resourceId' };
+  const originalMcApi = (window as { mcApi?: unknown }).mcApi;
+
+  beforeEach(() => {
+    (window as { mcApi?: unknown }).mcApi = undefined;
+  });
+
+  afterEach(() => {
+    (window as { mcApi?: unknown }).mcApi = originalMcApi;
+  });
+
+  it('命名空间下拉含 minecraft + mock 外部 mod', async () => {
+    render(
+      <ResourceIdEditor
+        value="minecraft:iron_ingot"
+        onChange={() => {}}
+        schema={schema}
+        graph={graph}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('namespace-select')).toBeTruthy();
+    });
+    const select = screen.getByTestId('namespace-select') as HTMLSelectElement;
+    expect(select.innerHTML).toContain('minecraft');
+    expect(select.innerHTML).toContain('create');
+  });
+
+  it('切换命名空间更新 value', async () => {
+    let value = 'minecraft:iron_ingot';
+    render(
+      <ResourceIdEditor
+        value={value}
+        onChange={(v) => {
+          value = v;
+        }}
+        schema={schema}
+        graph={graph}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('namespace-select')).toBeTruthy();
+    });
+    fireEvent.change(screen.getByTestId('namespace-select'), { target: { value: 'create' } });
+    expect(value.startsWith('create:')).toBe(true);
   });
 });

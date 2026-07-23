@@ -1,5 +1,6 @@
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useCallback, type ChangeEvent } from 'react';
 import type { EditorProps } from './types.js';
+import { listExternalMods, type ExternalMod } from '../../../custom/externalModList.js';
 
 /** 解析 modid:path 格式 */
 function parseResourceId(value: string): { modid: string; path: string } {
@@ -13,11 +14,28 @@ function parseResourceId(value: string): { modid: string; path: string } {
 /**
  * 资源 ID 编辑器：命名空间下拉 + path 输入 + 实时格式校验。
  * 格式：^[a-z0-9_]+:[a-z0-9_/]+$
+ *
+ * 阶段 C：命名空间下拉加载外部 mod 列表（listExternalMods），
+ * 支持 minecraft / forge / create 等命名空间切换。
  */
 function ResourceIdEditorComponent({ value, onChange, error }: EditorProps<string>) {
+  const [mods, setMods] = useState<ExternalMod[]>([
+    { namespace: 'minecraft', name: 'Minecraft', version: '', installed: true },
+  ]);
   const { modid, path } = parseResourceId(value);
   const [modidValue, setModidValue] = useState(modid);
   const [pathValue, setPathValue] = useState(path);
+
+  // 加载外部 mod 列表
+  useEffect(() => {
+    let mounted = true;
+    listExternalMods().then((m) => {
+      if (mounted) setMods(m);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const parsed = parseResourceId(value);
@@ -25,29 +43,46 @@ function ResourceIdEditorComponent({ value, onChange, error }: EditorProps<strin
     setPathValue(parsed.path);
   }, [value]);
 
-  const handleModidChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newModid = e.target.value;
-    setModidValue(newModid);
-    onChange(`${newModid}:${pathValue}`);
-  };
+  const handleModidChange = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      const newModid = e.target.value;
+      setModidValue(newModid);
+      onChange(`${newModid}:${pathValue}`);
+    },
+    [pathValue, onChange],
+  );
 
-  const handlePathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPath = e.target.value;
-    setPathValue(newPath);
-    onChange(`${modidValue}:${newPath}`);
-  };
+  const handlePathChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const newPath = e.target.value;
+      setPathValue(newPath);
+      onChange(`${modidValue}:${newPath}`);
+    },
+    [modidValue, onChange],
+  );
+
+  // 合并外部 mod 列表与当前 modid（若当前值不在列表中，动态追加）
+  const visibleMods: ExternalMod[] =
+    mods.some((m) => m.namespace === modidValue) || !modidValue
+      ? mods
+      : [...mods, { namespace: modidValue, name: modidValue, version: '', installed: true }];
 
   return (
     <div className="space-y-1">
       <div className="flex gap-1">
         <select
+          data-testid="namespace-select"
           value={modidValue}
           onChange={handleModidChange}
           aria-label="命名空间"
           className="w-24 border border-t-black border-l-black border-b-white border-r-white bg-mc-bg px-1 py-0.5 text-[11px] text-mc-text outline-none focus:border-mc-accent"
         >
-          <option value="minecraft">minecraft</option>
-          <option value="mymod">mymod</option>
+          {visibleMods.map((m) => (
+            <option key={m.namespace} value={m.namespace}>
+              {m.namespace}
+              {m.installed ? '' : ' (未安装)'}
+            </option>
+          ))}
         </select>
         <span className="self-center text-mc-dim">:</span>
         <input
