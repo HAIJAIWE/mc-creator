@@ -548,3 +548,71 @@ describe('NeoForgeAdapter P1.5 真实事件处理逻辑生成', () => {
     expect(paths).not.toContain('src/main/java/com/example/ruby_tools/ModEvents.java');
   });
 });
+
+// === P40 过程输入参数测试（NeoForge 侧） ===
+
+const SPEC_P40_PROC: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Procedure inputs test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  eventHandlers: [
+    {
+      handlerId: 'evt_1',
+      eventType: 'player_join',
+      eventArgs: {},
+      conditionIds: [],
+      actionIds: [],
+      procedureCallIds: ['proc_1'],
+      // P40：amount 传 5，item 缺省回退 ""
+      procedureCallArgs: { proc_1: ['5', ''] },
+    },
+  ],
+  conditions: [],
+  actions: [],
+  procedures: [
+    {
+      procedureId: 'proc_1',
+      procedureName: 'grantReward',
+      displayName: '发放奖励',
+      inputs: [
+        { name: 'amount', type: 'int' },
+        { name: 'item', type: 'string' },
+      ],
+      conditionIds: [],
+      actionIds: [],
+      procedureCallIds: [],
+    },
+  ],
+});
+
+describe('NeoForgeAdapter P40 过程输入参数', () => {
+  const adapter = new NeoForgeAdapter();
+  const files = adapter.translate({
+    loader: 'neoforge',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_PROC,
+    projectPath: '/proj',
+  });
+  const events = files.find(
+    (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+  );
+
+  it('过程方法签名携带类型化输入参数（string → String）', () => {
+    expect(events!.content).toContain(
+      'private static void procedure_grantReward(EventContext ctx, int amount, String item)',
+    );
+  });
+
+  it('事件处理器按 procedureCallArgs 传参（缺省回退 ""）', () => {
+    expect(events!.content).toContain('procedure_grantReward(ctx, 5, "");');
+  });
+});

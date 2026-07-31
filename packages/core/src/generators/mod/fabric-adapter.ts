@@ -6,6 +6,73 @@ import { BuildCache, hashCategory, type IncrementalResult } from '../../builder/
 import { conditionCheckBody, actionExecuteBody } from './event-logic.js';
 
 /**
+ * P40：按 Java 类型返回默认值表达式（过程调用参数缺省时回退）。
+ */
+function defaultValueFor(type: string): string {
+  switch ((type ?? '').toLowerCase()) {
+    case 'int':
+    case 'integer':
+      return '0';
+    case 'float':
+      return '0f';
+    case 'double':
+    case 'number':
+      return '0d';
+    case 'long':
+      return '0L';
+    case 'boolean':
+    case 'bool':
+      return 'false';
+    case 'string':
+    case 'text':
+    case 'item':
+    case 'itemstack':
+    case 'block':
+    case 'blockstate':
+    case 'entity':
+    case 'player':
+    default:
+      return '""';
+  }
+}
+
+/**
+ * P40：把低代码类型名映射为 Java 形参类型（spec 可能写 int/string/boolean/item 等）。
+ */
+function javaTypeFor(type: string): string {
+  switch ((type ?? '').toLowerCase()) {
+    case 'int':
+    case 'integer':
+      return 'int';
+    case 'float':
+      return 'float';
+    case 'double':
+    case 'number':
+      return 'double';
+    case 'long':
+      return 'long';
+    case 'boolean':
+    case 'bool':
+      return 'boolean';
+    case 'string':
+    case 'text':
+      return 'String';
+    case 'item':
+    case 'itemstack':
+      return 'net.minecraft.world.item.ItemStack';
+    case 'block':
+    case 'blockstate':
+      return 'net.minecraft.world.level.block.state.BlockState';
+    case 'entity':
+      return 'net.minecraft.world.entity.Entity';
+    case 'player':
+      return 'net.minecraft.server.level.ServerPlayer';
+    default:
+      return type;
+  }
+}
+
+/**
  * Fabric Loader Adapter（规格 §3.2）。
  * 生成 fabric.mod.json + Fabric Loom build.gradle（用 officialMojangMappings，非 Yarn）
  * + ModInitializer 入口 + Registry.register 注册代码 + 资源文件。
@@ -796,10 +863,13 @@ ${this.fabricEventRegistration(h.eventType, handlerMethod)}`;
 
     // 生成方法体（conditionIds → AND 合取 if 块 + actionIds/procedureCallIds 调用）。
     // handle_ 与 procedure_ 共用此逻辑，区别仅在方法签名与注释。
+    // P40：callArgs 为 procedureCallId → 表达式数组（与被调过程 inputs 顺序对应），
+    // 缺省表达式由 defaultValueFor 回退为该参数类型的默认值。
     const buildBody = (
       conditionIds: string[],
       actionIds: string[],
       procCallIds: string[],
+      callArgs?: Record<string, string[]>,
     ): string => {
       // 过滤 dangling 引用：conditionId/actionId 必须在对应 spec 中存在
       const validCondIds = conditionIds.filter((cid) => {
@@ -815,14 +885,19 @@ ${this.fabricEventRegistration(h.eventType, handlerMethod)}`;
         return true;
       });
 
-      // 把过程调用 id 列表解析为 procedure_<name>(ctx); 调用语句（缩进由调用方决定）
+      // 把过程调用 id 列表解析为 procedure_<name>(ctx, args...) 调用语句（缩进由调用方决定）
       const resolveProcCalls = (indent: string): string =>
         procCallIds.length
           ? procCallIds
               .map((pid) => {
                 const name = procedureNameMap.get(pid);
                 if (!name) return `${indent}// (未知过程: ${pid})`;
-                return `${indent}procedure_${this.sanitizeIdent(name)}(ctx);`;
+                const args = callArgs?.[pid] ?? [];
+                const proc = procedures.find((p) => p.procedureId === pid);
+                const defaults = (proc?.inputs ?? []).map((inp) => defaultValueFor(inp.type));
+                const exprs = (proc?.inputs ?? []).map((inp, i) => args[i] || defaults[i]);
+                const argList = exprs?.length ? `, ${exprs.join(', ')}` : '';
+                return `${indent}procedure_${this.sanitizeIdent(name)}(ctx${argList});`;
               })
               .join('\n')
           : '';
@@ -867,7 +942,12 @@ ${[
     const handlerMethods = handlers
       .map((h) => {
         const handlerName = `handle_${this.sanitizeIdent(h.handlerId)}`;
-        const body = buildBody(h.conditionIds ?? [], h.actionIds ?? [], h.procedureCallIds ?? []);
+        const body = buildBody(
+          h.conditionIds ?? [],
+          h.actionIds ?? [],
+          h.procedureCallIds ?? [],
+          h.procedureCallArgs,
+        );
         return `    // 事件处理器: ${h.handlerId} (eventType: ${h.eventType})
     // eventArgs: ${JSON.stringify(h.eventArgs)}
     private static void ${handlerName}(EventContext ctx) {
@@ -877,13 +957,24 @@ ${body}
       .join('\n\n');
 
     // P1-3：过程方法（命名的可复用逻辑单元，可被 event/procedure 调用）
+    // P40：inputs 参数生成方法签名（procedure_<name>(ctx, type name, ...)）
     const procedureMethods = procedures
       .map((p) => {
         const methodName = `procedure_${this.sanitizeIdent(p.procedureName)}`;
-        const body = buildBody(p.conditionIds, p.actionIds, p.procedureCallIds);
+        const body = buildBody(
+          p.conditionIds,
+          p.actionIds,
+          p.procedureCallIds,
+          p.procedureCallArgs,
+        );
+        const paramList = (p.inputs ?? [])
+          .map((inp) => `${javaTypeFor(inp.type)} ${inp.name}`)
+          .join(', ');
+        const signature = paramList ? `EventContext ctx, ${paramList}` : 'EventContext ctx';
         return `    // 过程: ${p.procedureId} (name: ${p.procedureName})
+    // inputs: ${JSON.stringify(p.inputs ?? [])}
     // 可被 event/procedure 调用，复用此方法
-    private static void ${methodName}(EventContext ctx) {
+    private static void ${methodName}(${signature}) {
 ${body}
     }`;
       })
@@ -1150,6 +1241,9 @@ public class ModBlockPlaceMixin {
    *
    * P1 dogfood 修复：空字符串/纯特殊字符 → 返回 "unknown"（而非空标识符导致编译错误）。
    */
+  /**
+   * P40：按 Java 类型返回默认值表达式（过程调用参数缺省时回退）。
+   */
   private sanitizeIdent(s: string): string {
     if (!s) return 'unknown';
     let sanitized = s.replace(/[^a-zA-Z0-9_]/g, '_');
@@ -1405,6 +1499,8 @@ type ModSpecLike = {
     actionIds?: string[];
     /** P1-3：关联的 procedure 节点 id 列表（事件调用过程） */
     procedureCallIds?: string[];
+    /** P40：过程调用参数（procedureId → 表达式数组，与被调过程 inputs 顺序对应） */
+    procedureCallArgs?: Record<string, string[]>;
   }>;
   conditions?: Array<{
     conditionId: string;
@@ -1422,10 +1518,14 @@ type ModSpecLike = {
     procedureId: string;
     procedureName: string;
     displayName: string;
+    /** P40：输入参数定义（name + Java 类型） */
+    inputs?: Array<{ name: string; type: string }>;
     conditionIds: string[];
     actionIds: string[];
     /** 嵌套调用的过程节点 id 列表 */
     procedureCallIds: string[];
+    /** P40：嵌套过程调用参数（procedureId → 表达式数组） */
+    procedureCallArgs?: Record<string, string[]>;
   }>;
 };
 

@@ -261,9 +261,18 @@ export function getPorts(data: NodeData, graph?: NodeGraph): NodePort[] {
     }
     case 'procedure': {
       // P1-3：过程节点端口
-      // - in：调用入口（event/procedure → procedure 的 control 边）
-      // - trigger：过程体出口（procedure → condition/action 的 control 边）
-      const _p = data as ProcedureNodeData;
+      // - in：调用入口（event/procedure 连到 procedure 的 control 边）
+      // - trigger：调用出口（procedure 连到 condition/action 的 control 边）
+      // P40：inputs 每个参数生成一个 `in_<name>` 数据端口（供 data 边绑定参数值）
+      const p = data as ProcedureNodeData;
+      const inputPorts = (p.inputs ?? []).map((input) => ({
+        id: `in_${input.name}`,
+        label: input.name,
+        type: input.type as NodePort['type'],
+        direction: 'in' as const,
+        required: false,
+        multiple: false,
+      }));
       return [
         {
           id: 'in',
@@ -275,12 +284,13 @@ export function getPorts(data: NodeData, graph?: NodeGraph): NodePort[] {
         },
         {
           id: 'trigger',
-          label: '过程体',
+          label: '触发',
           type: 'void',
           direction: 'out',
           required: false,
           multiple: true,
         },
+        ...inputPorts,
       ];
     }
     default:

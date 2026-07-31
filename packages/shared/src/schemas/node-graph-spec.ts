@@ -463,13 +463,22 @@ export type LoopNodeData = z.infer<typeof LoopNodeData>;
  */
 export const ProcedureNodeData = BaseNodeData.extend({
   kind: z.literal('procedure'),
-  /** 过程名（Java 标识符，编译为方法名 procedure_<procedureName>） */
+  /** 过程名（Java 标识符，生成方法名 procedure_<procedureName>） */
   procedureName: z
     .string()
     .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
     .default('myProcedure'),
   /** 显示名（UI 展示用，默认同 procedureName） */
   displayName: z.string().default('新过程'),
+  /** P40：输入参数列表（name + Java 类型，生成方法签名参数） */
+  inputs: z
+    .array(
+      z.object({
+        name: z.string().default(''),
+        type: z.string().default('int'),
+      }),
+    )
+    .default([]),
 });
 export type ProcedureNodeData = z.infer<typeof ProcedureNodeData>;
 

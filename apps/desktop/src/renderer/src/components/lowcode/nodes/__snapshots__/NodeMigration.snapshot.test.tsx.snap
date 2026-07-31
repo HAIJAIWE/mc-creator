@@ -3187,7 +3187,7 @@ exports[`节点迁移快照测试 > procedure 节点展开状态快照 1`] = `
         <span
           class="select-none"
         >
-          过程体
+          触发
         </span>
         <div
           class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
@@ -3285,7 +3285,7 @@ exports[`节点迁移快照测试 > procedure 节点折叠状态快照 1`] = `
         <span
           class="select-none"
         >
-          过程体
+          触发
         </span>
         <div
           class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
@@ -3399,7 +3399,7 @@ exports[`节点迁移快照测试 > procedure 节点选中状态快照 1`] = `
         <span
           class="select-none"
         >
-          过程体
+          触发
         </span>
         <div
           class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"

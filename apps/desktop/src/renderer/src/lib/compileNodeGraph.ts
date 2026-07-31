@@ -588,7 +588,59 @@ function compileEventNode(
     conditionIds: [...conditionIds],
     actionIds: [...actionIds],
     procedureCallIds: [...procedureCallIds],
+    procedureCallArgs: collectProcedureCallArgs(graph, node.id, procedureCallIds, nodeMap),
   };
+}
+
+/**
+ * P40：解析过程调用的参数表达式。
+ * 对每个被调用过程，按 inputs 顺序收集表达式：
+ * - 查找指向过程节点对应输入端口（id 形如 `in_<name>`）的 data 边
+ * - 源节点表达式：variable 节点 → varName；item 节点 → itemLookup 表达式；其他 → ''（生成器回退默认值）
+ * 返回 procedureId → 表达式数组（长度与过程 inputs 对齐，缺省补 ''）。
+ */
+function collectProcedureCallArgs(
+  graph: NodeGraph,
+  _callerNodeId: string,
+  procedureCallIds: Set<string>,
+  nodeMap?: Map<string, ModNode>,
+): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  const idToNode = nodeMap ?? new Map(graph.nodes.map((n) => [n.id, n]));
+
+  for (const procId of procedureCallIds) {
+    const procNode = idToNode.get(procId);
+    if (!procNode || procNode.data.kind !== 'procedure') continue;
+    const inputs = procNode.data.inputs ?? [];
+    const args: string[] = [];
+    for (const input of inputs) {
+      // 输入端口 id 约定：`in_<name>`（与 ProcedureNode 端口定义一致）
+      const portId = `in_${input.name}`;
+      const edge = graph.edges.find(
+        (e) => e.target === procId && e.targetHandle === portId && e.kind === 'data' && !e.disabled,
+      );
+      if (!edge) {
+        args.push('');
+        continue;
+      }
+      const src = idToNode.get(edge.source);
+      if (!src) {
+        args.push('');
+        continue;
+      }
+      if (src.data.kind === 'variable' && src.data.varName) {
+        args.push(src.data.varName);
+      } else if (src.data.kind === 'item' && src.data.itemId) {
+        args.push(
+          `net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse("minecraft:${src.data.itemId}"))`,
+        );
+      } else {
+        args.push('');
+      }
+    }
+    result[procId] = args;
+  }
+  return result;
 }
 
 /** 编译条件节点：解析 conditionArgs JSON，扁平映射到 ConditionSpec。P2-4：warnings 报告解析失败 */
@@ -684,9 +736,13 @@ function compileProcedureNode(
     procedureId: node.id,
     procedureName: data.procedureName,
     displayName: data.displayName,
+    inputs: (data.inputs ?? [])
+      .filter((i) => i.name)
+      .map((i) => ({ name: i.name, type: i.type || 'int' })),
     conditionIds: [...conditionIds],
     actionIds: [...actionIds],
     procedureCallIds: [...procedureCallIds],
+    procedureCallArgs: collectProcedureCallArgs(graph, node.id, procedureCallIds, nodeMap),
   };
 }
 

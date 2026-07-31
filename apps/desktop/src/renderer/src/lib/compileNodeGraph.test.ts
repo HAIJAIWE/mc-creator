@@ -1034,6 +1034,69 @@ describe('compileNodeGraph', () => {
     expect(proc.procedureCallIds).toEqual([]);
   });
 
+  it('P40: procedure 节点 inputs 编译进 ProcedureSpec', () => {
+    const nodes = [
+      makeNode('p1', 'procedure', {
+        procedureName: 'grantReward',
+        inputs: [
+          { name: 'amount', type: 'int' },
+          { name: 'item', type: 'string' },
+        ],
+      }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes));
+    expect(result.spec.procedures).toHaveLength(1);
+    expect(result.spec.procedures[0].inputs).toEqual([
+      { name: 'amount', type: 'int' },
+      { name: 'item', type: 'string' },
+    ]);
+  });
+
+  it('P40: 调用方 data 边 → procedureCallArgs（variable 透传 varName）', () => {
+    const nodes = [
+      makeNode('e1', 'event', { eventType: 'player_join' }),
+      makeNode('p1', 'procedure', {
+        procedureName: 'grantReward',
+        inputs: [
+          { name: 'amount', type: 'int' },
+          { name: 'item', type: 'string' },
+        ],
+      }),
+      makeNode('v1', 'variable', { varName: 'count' }),
+      makeNode('i1', 'item', { itemId: 'diamond' }),
+    ];
+    const edges = [
+      makeEdge('ep1', 'e1', 'p1', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+      // variable → in_amount，item → in_item（data 边）
+      makeEdge('va1', 'v1', 'p1', { kind: 'data', sourceHandle: 'out', targetHandle: 'in_amount' }),
+      makeEdge('ii1', 'i1', 'p1', { kind: 'data', sourceHandle: 'out', targetHandle: 'in_item' }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes, edges));
+
+    const handler = result.spec.eventHandlers[0];
+    expect(handler.procedureCallArgs).toEqual({
+      p1: [
+        'count',
+        'net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse("minecraft:diamond"))',
+      ],
+    });
+  });
+
+  it('P40: 未连 data 边的 input 回退为空字符串', () => {
+    const nodes = [
+      makeNode('e1', 'event', { eventType: 'player_join' }),
+      makeNode('p1', 'procedure', {
+        procedureName: 'grantReward',
+        inputs: [{ name: 'amount', type: 'int' }],
+      }),
+    ];
+    const edges = [
+      makeEdge('ep1', 'e1', 'p1', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes, edges));
+    expect(result.spec.eventHandlers[0].procedureCallArgs).toEqual({ p1: [''] });
+  });
+
   it('comment 节点被跳过（不产生 spec/warning/unsupported）', () => {
     const commentNode = makeNode('n1', 'comment', { text: '这是个备注', color: 'blue' });
     const result = compileNodeGraph(makeGraph([commentNode]));

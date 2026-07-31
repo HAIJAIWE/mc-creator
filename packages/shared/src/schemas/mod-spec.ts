@@ -435,6 +435,12 @@ export const EventHandlerSpec = z.object({
    * 归属过程本身（在 ProcedureSpec 中维护），不在此 handler 内联。
    */
   procedureCallIds: z.array(z.string()).default([]),
+  /**
+   * P40：过程调用的参数（procedureId → 表达式数组，与被调过程的 inputs 顺序对应）。
+   * 表达式解析自指向 procedure 节点输入端口的 data 边源节点（如变量名）；
+   * 缺省/无绑定时由生成器回退为该参数类型的默认值。
+   */
+  procedureCallArgs: z.record(z.array(z.string())).default({}),
 });
 
 /** 条件（由 ConditionNode 编译而来，扁平结构） */
@@ -493,6 +499,14 @@ export const ActionSpec = z.object({
  * - procedureCallIds：嵌套调用的其他过程节点 id（过程调用过程）
  * - 同一 procedure 可被多个 event/procedure 引用 → 单一方法定义 + 多处调用
  */
+/** procedure 输入参数定义（P40 过程封装：参数化过程） */
+export const ProcedureInputSpec = z.object({
+  /** 参数名（Java 标识符，生成方法签名参数） */
+  name: z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
+  /** 参数类型（Java 类型名：int/float/double/boolean/String 等） */
+  type: z.string(),
+});
+
 export const ProcedureSpec = z.object({
   /** 过程 id（使用节点 nodeId） */
   procedureId: z.string(),
@@ -500,12 +514,16 @@ export const ProcedureSpec = z.object({
   procedureName: z.string(),
   /** 显示名 */
   displayName: z.string().default(''),
+  /** P40：输入参数列表（生成方法签名参数，调用处按序传参） */
+  inputs: z.array(ProcedureInputSpec).default([]),
   /** 过程体内的条件节点 id 列表（通过 control 边从 procedure 节点可达） */
   conditionIds: z.array(z.string()).default([]),
   /** 过程体内的动作节点 id 列表（通过 control 边从 procedure 节点可达） */
   actionIds: z.array(z.string()).default([]),
   /** 嵌套调用的过程节点 id 列表（过程→过程的 control 边） */
   procedureCallIds: z.array(z.string()).default([]),
+  /** P40：嵌套过程调用的参数（procedureId → 表达式数组，与 inputs 顺序对应） */
+  procedureCallArgs: z.record(z.array(z.string())).default({}),
 });
 
 /** ModSpec：loader 无关的结构化规格 */

@@ -609,6 +609,110 @@ describe('FabricAdapter P1-3 过程系统（procedure 编译为 Java 方法）',
   });
 });
 
+// === P40 过程输入参数测试（procedure inputs + procedureCallArgs） ===
+
+const SPEC_P40_PROC: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Procedure inputs test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  eventHandlers: [
+    {
+      handlerId: 'evt_1',
+      eventType: 'player_join',
+      eventArgs: {},
+      conditionIds: [],
+      actionIds: [],
+      procedureCallIds: ['proc_1', 'proc_2'],
+      // P40：proc_1 传 2 个参数（amount=5、item 缺省），proc_2 不传
+      procedureCallArgs: { proc_1: ['5', ''] },
+    },
+  ],
+  conditions: [],
+  actions: [
+    {
+      actionId: 'act_1',
+      actionType: 'give_item',
+      args: { item: 'minecraft:diamond' },
+    },
+  ],
+  procedures: [
+    {
+      procedureId: 'proc_1',
+      procedureName: 'grantReward',
+      displayName: '发放奖励',
+      inputs: [
+        { name: 'amount', type: 'int' },
+        { name: 'item', type: 'string' },
+      ],
+      conditionIds: [],
+      actionIds: ['act_1'],
+      procedureCallIds: [],
+    },
+    {
+      procedureId: 'proc_2',
+      procedureName: 'nestedCall',
+      displayName: '嵌套调用',
+      conditionIds: [],
+      actionIds: [],
+      // 嵌套调用 proc_1 并传参
+      procedureCallIds: ['proc_1'],
+      procedureCallArgs: { proc_1: ['count', 'item'] },
+    },
+  ],
+});
+
+const CTX_P40_PROC: GeneratorContext = {
+  loader: 'fabric',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P40_PROC,
+  projectPath: '/proj',
+};
+
+describe('FabricAdapter P40 过程输入参数', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate(CTX_P40_PROC);
+  const events = files.find(
+    (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+  );
+
+  it('过程方法签名携带输入参数（ctx + 各 input 的类型化形参）', () => {
+    expect(events!.content).toContain(
+      'private static void procedure_grantReward(EventContext ctx, int amount, String item)',
+    );
+  });
+
+  it('过程方法签名带 inputs 注释', () => {
+    expect(events!.content).toContain('// inputs: ');
+    expect(events!.content).toContain('"name":"amount","type":"int"');
+  });
+
+  it('事件处理器按 procedureCallArgs 传参（item 缺省回退 ""）', () => {
+    expect(events!.content).toContain('procedure_grantReward(ctx, 5, "");');
+  });
+
+  it('无 inputs 的过程仍为旧签名 (EventContext ctx)', () => {
+    expect(events!.content).toContain('private static void procedure_nestedCall(EventContext ctx)');
+  });
+
+  it('嵌套过程调用传参（变量表达式原样透传）', () => {
+    // nestedCall 方法体内调用 grantReward(ctx, count, item);
+    const content = events!.content;
+    const nestedIdx = content.indexOf('private static void procedure_nestedCall(EventContext ctx)');
+    expect(nestedIdx).toBeGreaterThan(-1);
+    const body = content.slice(nestedIdx, content.indexOf('// === ', nestedIdx));
+    expect(body).toContain('procedure_grantReward(ctx, count, item);');
+  });
+});
+
 describe('FabricAdapter P1.4 字段为空时不生成新文件', () => {
   const adapter = new FabricAdapter();
   const files = adapter.translate(CTX);
