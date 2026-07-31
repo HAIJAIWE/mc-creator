@@ -9,28 +9,31 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 
 ## 功能特性
 
-支持 **7 种生成器类型**，覆盖 Minecraft 内容创作的主要场景：
+支持 **10 种生成器类型**，覆盖 Minecraft 内容创作的主要场景：
 
-| 类型           | 说明                                                    | 产物                                                                                                                           |
-| -------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Mod**        | Fabric / NeoForge 模组源码                              | 完整 Gradle 项目 + `.jar` + `_meta.json` 元数据                                                                                |
-| **数据包**     | 原版数据包（配方 / 标签 / 函数 / 进度 / 战利品 / 谓词） | `pack.mcmeta` + `data/<ns>/`                                                                                                   |
-| **整合包**     | Modrinth / CurseForge 格式                              | `modrinth.index.json` 或 `manifest.json` + overrides + server-overrides                                                        |
-| **服务器配置** | 服务端配置包 + 一键部署脚本                             | `server.properties` / `eula.txt` / 启动脚本 / `ops.json` / `whitelist.json` / `mods/` + `deploy/`（systemd / Docker / backup） |
-| **材质包**     | 资源包（纯色 / 渐变 / 棋盘格 PNG）                      | `pack.mcmeta` + `assets/<modId>/textures/`                                                                                     |
-| **皮肤**       | 64×64 玩家皮肤（classic / slim 模型）                   | `<playerName>.png` + 可选 `preview.png`                                                                                        |
-| **资源包**     | 贴图覆盖 / 模型 / 字体 / 音效 / 语言                    | `pack.mcmeta` + `assets/<ns>/textures/` + `models/` + `font/` + `sounds/` + `lang/`                                            |
+| 类型             | 说明                                                                   | 产物                                                                                                                           |
+| ---------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Mod**          | Fabric / NeoForge 模组源码                                             | 完整 Gradle 项目 + `.jar` + `_meta.json` 元数据                                                                                |
+| **数据包**       | 原版数据包（配方 / 标签 / 函数 / 进度 / 战利品 / 谓词）                | `pack.mcmeta` + `data/<ns>/`                                                                                                   |
+| **整合包**       | Modrinth / CurseForge 格式                                             | `modrinth.index.json` 或 `manifest.json` + overrides + server-overrides                                                        |
+| **服务器配置**   | 服务端配置包 + 一键部署脚本                                            | `server.properties` / `eula.txt` / 启动脚本 / `ops.json` / `whitelist.json` / `mods/` + `deploy/`（systemd / Docker / backup） |
+| **资源包**       | 贴图覆盖（含纯色 / 渐变 / 棋盘格 PNG 生成）/ 模型 / 字体 / 音效 / 语言 | `pack.mcmeta` + `assets/<ns>/textures/` + `models/` + `font/` + `sounds/` + `lang/`                                            |
+| **皮肤**         | 64×64 玩家皮肤（classic / slim 模型）                                  | `<playerName>.png` + 可选 `preview.png`                                                                                        |
+| **启动器配置**   | 官方 / PCL2 / HMCL 三型启动器配置                                      | `launcher.json` + `profiles.json` + 启动脚本（bat/sh/ps1）+ `versions.json` + `config/theme.json`                              |
+| **KubeJS 脚本**  | KubeJS mod 脚本包（配方 / 标签 / 事件 / 工具提示 / 注册）              | `pack.mcmeta` + `kubejs/server_scripts/` + `startup_scripts/` + `client_scripts/` + `lang/`                                    |
+| **CraftTweaker** | ZenScript 脚本包（配方 / 标签 / 事件 / 工具提示）                      | `pack.mcmeta` + `scripts/*.zs` + `lang/`                                                                                       |
+| **行为包**       | 基岩版 Behavior Pack（实体 / 配方 / 战利品表）                         | `manifest.json` + `entities/` + `recipes/` + `loot_tables/`                                                                    |
 
 ### 低代码节点编辑器
 
-内置 **Coze 风格的可视化节点图编辑器**，采用纯 MC 视觉美学（3D 凸起边框、像素字体、石头纹理、内嵌端口），支持 **14 种节点类型**：
+内置 **Coze 风格的可视化节点图编辑器**，采用纯 MC 视觉美学（3D 凸起边框、像素字体、石头纹理、内嵌端口），支持 **15 种节点类型**：
 
-| 分类     | 节点类型                                              | 说明                                |
-| -------- | ----------------------------------------------------- | ----------------------------------- |
-| 内容节点 | item / block / entity / recipe / machine / multiblock | MC 内容定义                         |
-| 逻辑节点 | event / condition / action                            | 事件驱动控制流                      |
-| 代码节点 | code / comment                                        | 自定义 Java 代码 / 备注             |
-| 高级节点 | **variable** / **subgraph** / **loop** / **custom**   | 变量 / 子图封装 / 循环 / 自定义节点 |
+| 分类     | 节点类型                                              | 说明                                                |
+| -------- | ----------------------------------------------------- | --------------------------------------------------- |
+| 内容节点 | item / block / entity / recipe / machine / multiblock | MC 内容定义                                         |
+| 逻辑节点 | event / condition / action                            | 事件驱动控制流                                      |
+| 代码节点 | code / comment / **procedure**                        | 自定义 Java 代码 / 备注 / 过程封装（PureCode 模式） |
+| 高级节点 | **variable** / **subgraph** / **loop** / **custom**   | 变量 / 子图封装 / 循环 / 自定义节点                 |
 
 **高级功能：**
 
@@ -44,37 +47,41 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 
 ### 核心能力
 
+- **Agent 双模式**：AgentPanel 支持 agent / chat 双模式 —— agent 模式走「描述 → Spec → 代码」生成链路，chat 模式与模型自由对话；内置 Spec 历史回滚 / 模板 / 多模型对比
 - **Spec-first 工作流**：自然语言描述 → AI 生成结构化 Spec → 用户审阅 → 生成代码 → 编译
-- **低代码节点图**：可视化拖拽编辑 → 编译为 ModSpec → 生成 Java 代码（支持 14 种节点 + 子图内联 + 自定义节点模板）
+- **低代码节点图**：可视化拖拽编辑 → 编译为 ModSpec → 生成 Java 代码（支持 15 种节点 + 子图内联 + 自定义节点模板 + 过程封装/PureCode 模式）
 - **Spec 编辑器**：生成 Spec 后可直接在 Monaco 编辑器中修改 JSON 再生成代码
-- **Loader Adapter 抽象**：同一 ModSpec 按 Fabric / NeoForge 产出不同源码
+- **Spec 模板库**：10 种生成器类型共 36 个预置模板（TemplatePicker UI），点击即预填描述
+- **Loader Adapter 抽象**：同一 ModSpec 按 Fabric / NeoForge / Quilt / Legacy Fabric 产出不同源码
 - **AI prompt 按类型优化**：每种生成器有独立的 schema 约束提示，提升 Spec 质量
 - **AI 模型接入**：基于 Vercel AI SDK，兼容 OpenAI 接口（云端 / 本地模型均可）
 - **模型预设**：内置 OpenAI / DeepSeek / 通义千问 / 智谱 GLM / Ollama / LM Studio 六种预设
 - **流式输出**：AI 回复逐字显示 + 构建日志实时流式输出
-- **构建修复循环**：Gradle 构建失败 → 解析错误 → AI 修复源码 → 重新构建（最多 3 次）
+- **构建修复循环**：Gradle 构建失败 → 解析错误 → AI 修复源码 → 重新构建（最多 3 次）+ BuildCache 增量缓存
 - **构建日志高亮**：error 红色 / warning 黄色，自动提取 jar 路径
-- **PNG 预览**：材质 / 皮肤生成后直接在应用内预览（棋盘格透明背景）
+- **PNG 预览**：材质 / 皮肤生成后直接在应用内预览（棋盘格透明背景 / skinview3d 3D 预览）
 - **导出 zip**：一键打包所有生成文件（PNG 自动解码为二进制）
-- **项目管理**：Dashboard 视图，项目持久化到本地，支持保存 / 加载 / 删除
+- **项目管理**：Dashboard 视图，项目持久化到本地，支持保存 / 加载 / 删除 / 导入 / 导出（zip 备份迁移）
+- **Mod 市场接入**：Modrinth / CurseForge 搜索与版本获取，直接挑选 mod 生成整合包
 - **服务器一键部署**：生成 systemd service / Dockerfile / docker-compose.yml / 自动备份脚本
 
 ## 技术栈
 
-| 层             | 技术                                     |
-| -------------- | ---------------------------------------- |
-| 桌面框架       | Electron 31 + electron-vite 2.3          |
-| 前端           | React 18 + TypeScript 5 + Tailwind CSS 3 |
-| 节点图编辑器   | React Flow 11                            |
-| 状态管理       | Zustand 4                                |
-| 代码编辑器     | Monaco Editor                            |
-| AI 编排        | Vercel AI SDK 4 + `@ai-sdk/openai` 1.x   |
-| Schema 校验    | Zod 3                                    |
-| 打包           | JSZip 3                                  |
-| 测试           | Vitest 2                                 |
-| 包管理         | pnpm 9 workspaces                        |
-| Minecraft 版本 | 1.21.1 / 1.21.11                         |
-| Loader         | Fabric + NeoForge                        |
+| 层             | 技术                                      |
+| -------------- | ----------------------------------------- |
+| 桌面框架       | Electron 31 + electron-vite 2.3           |
+| 前端           | React 18 + TypeScript 5 + Tailwind CSS 3  |
+| 节点图编辑器   | React Flow 11                             |
+| 状态管理       | Zustand 4                                 |
+| 代码编辑器     | Monaco Editor                             |
+| 3D 皮肤预览    | skinview3d                                |
+| AI 编排        | Vercel AI SDK 4 + `@ai-sdk/openai` 1.x    |
+| Schema 校验    | Zod 3                                     |
+| 打包           | JSZip 3                                   |
+| 测试           | Vitest 2 + Testing Library                |
+| 包管理         | pnpm 9 workspaces                         |
+| Minecraft 版本 | 1.21.1 / 1.21.11                          |
+| Loader         | Fabric / NeoForge / Quilt / Legacy Fabric |
 
 ## 项目结构
 
@@ -87,36 +94,45 @@ mc-creator/
 │       │   ├── preload/          # contextBridge 桥接
 │       │   │   ├── renderer/         # 渲染进程（React UI）
 │       │   │   │   └── src/
-│       │   │   │       ├── components/   # TopBar / ChatPanel / AiChat / CodePreview / BuildPanel / SettingsPanel
-│       │   │   │       │   └── lowcode/  # 低代码节点图编辑器（14 节点 + 子图 + 自定义节点 + 编译器）
-│       │   │   │       ├── store/        # Zustand stores（node-graph-store / drawer-store / debugger-store）
-│       │   │   │       └── lib/          # compileNodeGraph + 4 编译器 + ipc-client
+│       │   │   │       ├── components/   # AgentPanel / TemplatePicker / SpecFormEditor / PreviewPanel 系列 / BuildPanel / SettingsPanel
+│       │   │   │       │   ├── lowcode/  # 低代码节点图编辑器（15 节点 + 子图 + 自定义节点 + 编译器）
+│       │   │   │       │   └── middle/   # 各生成器类型预览面板（Mod / Datapack / Modpack / Server / Launcher / ResourcePack / Skin）
+│       │   │   │       ├── store/        # Zustand stores（mod-store / node-graph-store / drawer-store / debugger-store）
+│       │   │   │       └── lib/          # compileNodeGraph + 4 编译器 + ipc-client + monaco-theme
 │       │   └── shared/           # IPC 通道常量 + zod schema（main/preload/renderer 共享）
 │       └── electron.vite.config.ts
 ├── packages/
 │   ├── shared/                   # 共享 schema 与类型
 │   │   └── src/
-│   │       ├── schemas/          # mod-spec / datapack-spec / modpack-spec / server-spec / texture-spec / generator
+│   │       ├── schemas/          # mod-spec / datapack-spec / modpack-spec / server-spec / resource-pack-spec / skin-spec / launcher-spec / kubejs-spec / crafttweaker-spec / behavior-pack-spec / node-graph-spec
+│   │       ├── templates/        # 10 种生成器类型的 Spec 模板库（36 个模板，TEMPLATES_BY_TYPE）
+│   │       ├── presets/          # 数据包内容模板（矿石 / 食物 / 维度 / 附魔 / 效果 / 结构 / 生物群系）
 │   │       └── types/            # Loader / McVersion
 │   └── core/                     # 核心引擎（独立 TS 库）
 │       └── src/
-│           ├── generators/       # 生成器
-│           │   ├── mod/          # ModGenerator + fabric-adapter + neoforge-adapter + templates
+│           ├── generators/       # 生成器（按 type 注册路由）
+│           │   ├── mod/          # ModGenerator + fabric/neoforge/quilt/legacy-fabric adapters
 │           │   ├── datapack/     # DatapackGenerator
 │           │   ├── modpack/      # ModpackGenerator（Modrinth + CurseForge）
 │           │   ├── server/       # ServerGenerator
-│           │   ├── texture/      # TextureGenerator + SkinGenerator
+│           │   ├── resource-pack/ # ResourcePackGenerator（贴图 / 模型 / 字体 / 音效 / 语言）
+│           │   ├── skin/         # SkinGenerator + PNG 编码器
+│           │   ├── launcher/     # LauncherGenerator（官方 / PCL2 / HMCL）
+│           │   ├── kubejs/       # KubejsGenerator
+│           │   ├── crafttweaker/ # CraftTweakerGenerator（ZenScript）
+│           │   ├── behavior-pack/ # BehaviorPackGenerator（基岩版）
 │           │   ├── registry.ts   # 生成器注册表（按 type 路由）
 │           │   └── types.ts      # Generator 接口
-│           ├── builder/          # Gradle 构建 + BuildFixer 修复循环 + log-parser
+│           ├── builder/          # Gradle 构建 + BuildFixer 修复循环 + BuildCache + log-parser
 │           ├── model-provider/   # ModelProvider 抽象 + VercelAiProvider + MockProvider
-│           ├── orchestrator/     # AI 编排器（描述 → Spec）
+│           ├── orchestrator/     # AI 编排器（描述 → Spec，10 种类型独立 prompt）
 │           ├── filesystem/       # 文件系统抽象（用于测试）
 │           └── utils/            # PNG 编码器（基于 zlib，无原生依赖）
 ├── docs/
-│   └── superpowers/
-│       ├── specs/                # 设计规格
-│       └── plans/                # 实现计划（P1-P5）
+│   ├── superpowers/
+│   │   ├── specs/                # 设计规格
+│   │   └── plans/                # 实现计划
+│   └── a11y-guidelines.md        # 无障碍设计规范
 ├── pnpm-workspace.yaml
 └── package.json
 ```
@@ -191,28 +207,31 @@ pnpm --filter @mc-creator/desktop build
 
 ### 2. 选择生成器类型
 
-顶部工具栏「类型」下拉框选择：
+顶部工具栏「类型」下拉框选择（共 10 种）：
 
 - Mod（默认）
 - 数据包
 - 整合包
 - 服务器配置
-- 材质包
-- 皮肤
 - 资源包
+- 皮肤
+- 启动器配置
+- KubeJS 脚本
+- CraftTweaker 脚本
+- 行为包
 
 ### 3. 选择 Loader 和 MC 版本
 
-- **Loader**：Fabric / NeoForge（Mod 类型必选；材质 / 皮肤不依赖 loader 但仍需选）
+- **Loader**：Fabric / NeoForge / Quilt / Legacy Fabric / Vanilla（Mod 类型必选；脚本 / 皮肤 / 行为包等不依赖 loader 但仍需选）
 - **MC 版本**：1.21.11（默认）/ 1.21.1
 
 ### 4. 生成流程
 
-1. 在左侧描述框输入自然语言需求
+1. 在 AgentPanel 左侧描述框输入自然语言需求（或从模板库选择预置模板预填）
 2. 点击「生成 Spec」→ AI 返回结构化规格（JSON）
-3. 审阅 Spec，必要时修改描述重新生成
+3. 审阅 Spec，必要时修改描述重新生成，或用 Monaco 直接编辑 Spec JSON / Spec 表单微调字段
 4. 点击「生成代码」→ 调用对应 Generator 产出文件树
-5. 在右侧 CodePreview 查看文件（PNG 文件会显示图片预览）
+5. 在中部预览面板查看生成内容（PNG 图片预览 / 3D 皮肤 / 表格等）
 6. 点击「导出 zip」保存到本地
 
 ### 5. 编译 Mod（仅 Mod 类型）
@@ -229,8 +248,8 @@ pnpm --filter @mc-creator/desktop build
 ```
 ┌─────────────────────────────────────────┐
 │  Renderer（React UI）                   │
-│  TopBar / ChatPanel / AiChat /          │
-│  CodePreview / BuildPanel               │
+│  AgentPanel / TemplatePicker /          │
+│  PreviewPanels / BuildPanel             │
 └──────────────┬──────────────────────────┘
                │ IPC（zod 校验）
 ┌──────────────┴──────────────────────────┐
@@ -328,19 +347,20 @@ runGradleBuild
 
 1. **定义 Schema**：在 `packages/shared/src/schemas/` 新建 `<type>-spec.ts`，用 zod 定义规格
 2. **实现 Generator**：在 `packages/core/src/generators/<type>/` 新建 `<type>-generator.ts`，实现 `Generator` 接口
-3. **导出**：在 `packages/core/src/generators/index.ts` 追加导出
-4. **测试**：编写 `<type>-generator.test.ts`（TDD：先写测试 → 实现 → 通过）
-5. **接入 UI**：
+3. **注册**：在 `packages/core/src/generators/index.ts` 的 registry 注册，并导出
+4. **配置 Prompt**：在 `packages/core/src/orchestrator/orchestrator.ts` 的 PROMPTS 映射加类型专属 prompt
+5. **模板**：在 `packages/shared/src/templates/` 新建 `<type>-templates.ts` 并挂到 `TEMPLATES_BY_TYPE`
+6. **测试**：编写 `<type>-generator.test.ts`（TDD：先写测试 → 实现 → 通过）
+7. **接入 UI**：
    - `apps/desktop/src/shared/ipc-channels.ts`：`GENERATOR_TYPES` 数组追加新类型
    - `apps/desktop/src/main/ipc.ts`：`GENERATE_FILES` handler 加 case 分支
-   - `apps/desktop/src/renderer/src/components/TopBar.tsx`：加 `<option>`
-   - `apps/desktop/src/renderer/src/components/ChatPanel.tsx`：加 placeholder
+   - `apps/desktop/src/renderer/src/components/AgentPanel.tsx`：placeholder 映射表补新类型
 
 ### 内部命名规范
 
 - Mod ID：小写下划线 `^[a-z0-9_]+$`
 - MC 版本：内部使用 Mojang 官方版本号（如 `1.21.1` / `1.21.11`）
-- Loader：`'fabric' | 'neoforge'`（小写）
+- Loader：`'fabric' | 'neoforge' | 'quilt' | 'legacy_fabric' | 'vanilla'`（小写）
 
 ### 测试策略
 
@@ -351,15 +371,15 @@ runGradleBuild
 
 ## 测试覆盖
 
-当前共 **1146+ 个测试**通过：
+当前共 **1699+ 个测试**通过（本地实测 `pnpm -r test`）：
 
 | 包                    | 测试文件 | 测试用例 |
 | --------------------- | -------- | -------- |
-| `@mc-creator/shared`  | 3+       | 30+      |
-| `@mc-creator/core`    | 23+      | 169+     |
-| `@mc-creator/desktop` | 98       | 1146     |
+| `@mc-creator/shared`  | 9        | 82       |
+| `@mc-creator/core`    | 30       | 381      |
+| `@mc-creator/desktop` | 99       | 1236     |
 
-低代码模块测试覆盖：377 个测试（55 个文件），覆盖全部 14 种节点组件、4 个编译器、子图系统、自定义节点系统。
+低代码模块测试覆盖：432 个测试（55 个文件），覆盖全部 15 种节点组件、4 个编译器、子图系统、自定义节点系统、过程节点 / PureCode 模式。
 
 ## 路线图
 
@@ -403,6 +423,14 @@ runGradleBuild
 - ✅ **低代码 Phase B**：用户体验增强（字段工具提示 + 错误恢复 + 5 个预设模板 + 搜索筛选 + 5 步新手引导）
 - ✅ **低代码 Phase C**：高级功能（variable/subgraph/loop/custom 4 种新节点 + 4 个编译器 + 子图内联 + 自定义节点 Mustache 模板 + 外部 Mod API 依赖检测 + 7 个端到端集成测试）
 - ✅ **代码审查修复**：25 个问题修复（代码注入防护 + 子图内联边重映射 + 子图编辑器交互回调 + Java 标识符校验）
+- ✅ P35：启动器配置生成器（官方 / PCL2 / HMCL 三型 + bat/sh/ps1 启动脚本 + 注入防护转义）
+- ✅ P36：KubeJS 脚本生成器（server_scripts / startup_scripts / client_scripts + 注册表 + 语言文件）
+- ✅ P37：CraftTweaker 脚本生成器（ZenScript 配方 / 标签 / 事件 / 工具提示，不含注册表）
+- ✅ P38：行为包生成器（基岩版 manifest + 实体 / 配方 / 战利品表）
+- ✅ P39：AgentPanel agent/chat 双模式（Spec 历史回滚 / 模板库 / 多模型对比 / Spec 表单编辑器 / Agent 会话面板）
+- ✅ P40：低代码增强（ProcedureNode 过程封装 + PureCode 模式切换 + codeLock 代码锁定 + 条件代码生成）
+- ✅ P41：核心增强（BuildCache 构建缓存 + recipe-adapter 配方适配 + 增量生成测试 + 数据包模板库扩展）
+- ✅ P42：文档同步（README 与实际代码状态对齐，10 种生成器 / 15 种节点 / 实测测试数）
 
 ### 未来可能
 
