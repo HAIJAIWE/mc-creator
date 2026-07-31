@@ -252,18 +252,54 @@ describe('NeoForgeAdapter P1.4 字段消费（spec 非空时生成新文件）',
     expect(events).toBeDefined();
     // 事件处理器方法（handle_<handlerId>）
     expect(events!.content).toContain('事件处理器: evt_1');
-    expect(events!.content).toContain('private static void handle_evt_1(Object event)');
+    expect(events!.content).toContain('private static void handle_evt_1(EventContext ctx)');
     // 条件检查方法（check_<conditionId>）+ 动作执行方法（execute_<actionId>）
     expect(events!.content).toContain('条件: cond_1');
-    expect(events!.content).toContain('private static boolean check_cond_1(Object event)');
+    expect(events!.content).toContain('private static boolean check_cond_1(EventContext ctx)');
     expect(events!.content).toContain('动作: act_1');
-    expect(events!.content).toContain('private static void execute_act_1(Object event)');
+    expect(events!.content).toContain('private static void execute_act_1(EventContext ctx)');
     // 真实 if 语句（非纯注释占位）
-    expect(events!.content).toContain('if (check_cond_1(event))');
-    expect(events!.content).toContain('execute_act_1(event);');
+    expect(events!.content).toContain('if (check_cond_1(ctx))');
+    expect(events!.content).toContain('execute_act_1(ctx);');
     // NeoForge 事件注册：真实 IEventBus.addListener 调用（非占位注释）
     expect(events!.content).toContain('modEventBus.addListener');
     expect(events!.content).toContain('PlayerInteractEvent.RightClickBlock');
+    // 事件参数绑定：EventContext 类 + getter 绑定
+    expect(events!.content).toContain('private static class EventContext');
+    expect(events!.content).toContain(
+      'ctx.player = (net.minecraft.server.level.ServerPlayer) event.getEntity();',
+    );
+    expect(events!.content).toContain('ctx.pos = event.getPos();');
+  });
+
+  it('NeoForge 事件参数绑定：block_place/entity_death/item_pickup 绑定对应 getter', () => {
+    const SPEC_BIND: ModSpec = ModSpecSchema.parse({
+      modId: 'ruby_tools',
+      version: '1.0.0',
+      name: 'Ruby Tools',
+      description: 'Event binding test',
+      items: [],
+      blocks: [],
+      license: 'MIT',
+      authors: [],
+      eventHandlers: [
+        { handlerId: 'evt_place', eventType: 'block_place', eventArgs: {} },
+        { handlerId: 'evt_death', eventType: 'entity_death', eventArgs: {} },
+        { handlerId: 'evt_pickup', eventType: 'item_pickup', eventArgs: {} },
+        { handlerId: 'evt_tick', eventType: 'tick', eventArgs: {} },
+      ],
+      conditions: [],
+      actions: [],
+    });
+    const files = adapter.translate({ ...CTX_P14, spec: SPEC_BIND });
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    expect(events!.content).toContain('ctx.state = event.getBlockSnapshot().getReplacedBlock();');
+    expect(events!.content).toContain('ctx.target = event.getEntity();');
+    expect(events!.content).toContain('ctx.stack = event.getItem();');
+    expect(events!.content).toContain('ctx.level = event.getServer().overworld();');
   });
 
   it('mainClass 构造函数调用新的 initialize 方法', () => {
@@ -496,11 +532,11 @@ describe('NeoForgeAdapter P1.5 真实事件处理逻辑生成', () => {
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
     );
     expect(events).toBeDefined();
-    // invert: true → if (!check_cond_inv(event))
-    expect(events!.content).toContain('if (!check_cond_inv(event))');
-    expect(events!.content).toContain('execute_act_inv(event);');
+    // invert: true → if (!check_cond_inv(ctx))
+    expect(events!.content).toContain('if (!check_cond_inv(ctx))');
+    expect(events!.content).toContain('execute_act_inv(ctx);');
     // 同时验证正向 if 不存在（避免误判）
-    expect(events!.content).not.toContain('if (check_cond_inv(event))');
+    expect(events!.content).not.toContain('if (check_cond_inv(ctx))');
     // NeoForge tick 事件类名占位
     expect(events!.content).toContain('ServerTickEvent');
   });

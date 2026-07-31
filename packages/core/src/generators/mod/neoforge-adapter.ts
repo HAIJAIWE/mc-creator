@@ -701,12 +701,17 @@ ${constants}
 
     // initialize() 中的事件注册调用（NeoForge: 用 IEventBus.addListener 注册）
     // P2 dogfood：从注释占位升级为实际 addListener 调用代码
+    // P2.1 事件参数绑定：事件对象 getter 绑定为 EventContext 字段
     const registrations = handlers
       .map((h) => {
         const handlerMethod = `handle_${this.sanitizeIdent(h.handlerId)}`;
         const eventClass = this.neoforgeEventClass(h.eventType);
         return `        // handlerId: ${h.handlerId} (eventType: ${h.eventType})
-        modEventBus.addListener(${eventClass}.class, event -> ${handlerMethod}(event));`;
+        modEventBus.addListener(${eventClass}.class, event -> {
+            EventContext ctx = new EventContext();
+${this.neoforgeEventBindings(h.eventType)}
+            ${handlerMethod}(ctx);
+        });`;
       })
       .join('\n');
 
@@ -721,14 +726,14 @@ ${constants}
       const validCondIds = conditionIds.filter((cid) => conditionMap.has(cid));
       const validActionIds = actionIds.filter((aid) => actionIdSet.has(aid));
 
-      // 把过程调用 id 列表解析为 procedure_<name>(event); 调用语句（缩进由调用方决定）
+      // 把过程调用 id 列表解析为 procedure_<name>(ctx); 调用语句（缩进由调用方决定）
       const resolveProcCalls = (indent: string): string =>
         procCallIds.length
           ? procCallIds
               .map((pid) => {
                 const name = procedureNameMap.get(pid);
                 if (!name) return `${indent}// (未知过程: ${pid})`;
-                return `${indent}procedure_${this.sanitizeIdent(name)}(event);`;
+                return `${indent}procedure_${this.sanitizeIdent(name)}(ctx);`;
               })
               .join('\n')
           : '';
@@ -740,12 +745,12 @@ ${constants}
           .map((cid) => {
             const cond = conditionMap.get(cid);
             const invert = cond?.invert ?? false;
-            return `${invert ? '!' : ''}check_${this.sanitizeIdent(cid)}(event)`;
+            return `${invert ? '!' : ''}check_${this.sanitizeIdent(cid)}(ctx)`;
           })
           .join(' && ');
         const actionCalls = validActionIds.length
           ? validActionIds
-              .map((aid) => `            execute_${this.sanitizeIdent(aid)}(event);`)
+              .map((aid) => `            execute_${this.sanitizeIdent(aid)}(ctx);`)
               .join('\n')
           : '';
         const innerProcCalls = resolveProcCalls('            ');
@@ -761,7 +766,7 @@ ${innerBody}
       if (validActionIds.length || procCallIds.length) {
         return `        // (无关联 condition，直接执行)
 ${[
-  ...validActionIds.map((aid) => `        execute_${this.sanitizeIdent(aid)}(event);`),
+  ...validActionIds.map((aid) => `        execute_${this.sanitizeIdent(aid)}(ctx);`),
   ...resolveProcCalls('        ').split('\n').filter(Boolean),
 ].join('\n')}`;
       }
@@ -776,7 +781,7 @@ ${[
         const body = buildBody(h.conditionIds ?? [], h.actionIds ?? [], h.procedureCallIds ?? []);
         return `    // 事件处理器: ${h.handlerId} (eventType: ${h.eventType})
     // eventArgs: ${JSON.stringify(h.eventArgs)}
-    private static void ${handlerName}(Object event) {
+    private static void ${handlerName}(EventContext ctx) {
 ${body}
     }`;
       })
@@ -789,7 +794,7 @@ ${body}
         const body = buildBody(p.conditionIds, p.actionIds, p.procedureCallIds);
         return `    // 过程: ${p.procedureId} (name: ${p.procedureName})
     // 可被 event/procedure 调用，复用此方法
-    private static void ${methodName}(Object event) {
+    private static void ${methodName}(EventContext ctx) {
 ${body}
     }`;
       })
@@ -807,7 +812,7 @@ ${body}
         return `    // 条件: ${c.conditionId} (invert: ${c.invert})
     // conditionType: ${c.conditionType}
     // args: ${JSON.stringify(c.args)}
-    private static boolean ${methodName}(Object event) {
+    private static boolean ${methodName}(EventContext ctx) {
 ${body}
     }`;
       })
@@ -822,7 +827,7 @@ ${body}
         return `    // 动作: ${a.actionId}
     // actionType: ${a.actionType}
     // args: ${JSON.stringify(a.args)}
-    private static void ${methodName}(Object event) {
+    private static void ${methodName}(EventContext ctx) {
 ${body}
     }`;
       })
@@ -832,12 +837,24 @@ ${body}
       .filter(Boolean)
       .join('\n\n');
 
+    // 事件上下文：承载回调参数（NeoForge 事件 getter 在此绑定），供条件/动作逻辑读取
+    const eventContextClass = `    // 事件上下文：回调参数绑定字段（事件未提供时保持 null，逻辑侧判空保护）
+    private static class EventContext {
+        net.minecraft.server.level.ServerPlayer player = null;
+        net.minecraft.server.level.ServerLevel level = null;
+        net.minecraft.core.BlockPos pos = null;
+        net.minecraft.world.level.block.state.BlockState state = null;
+        net.minecraft.world.item.ItemStack stack = null;
+        net.minecraft.world.entity.Entity target = null;
+    }`;
+
     const content = `package ${pkg};
 
 import net.neoforged.bus.api.IEventBus;
 
 public class ModEvents {
     public static final String MOD_ID = "${spec.modId}";
+${eventContextClass}
 
 ${allMethods}
 
@@ -1009,6 +1026,73 @@ ${registrations || '        // (无事件处理器)'}
       case 'custom':
       default:
         return 'net.neoforged.neoforge.event.GenericEvent';
+    }
+  }
+
+  /**
+   * 根据 eventType 生成 NeoForge 事件对象 → EventContext 字段绑定语句（缩进 12 空格）。
+   * P2.1 事件参数绑定：事件 getter 绑定到上下文，条件/动作逻辑从中读取。
+   */
+  private neoforgeEventBindings(eventType: string): string {
+    const bind = (assignments: string[]): string =>
+      assignments.map((a) => `            ${a}`).join('\n');
+    switch (eventType) {
+      case 'tick':
+        return bind(['ctx.level = event.getServer().overworld();']);
+      case 'player_join':
+      case 'player_quit':
+        return bind([
+          'ctx.player = (net.minecraft.server.level.ServerPlayer) event.getEntity();',
+          'ctx.level = (net.minecraft.server.level.ServerLevel) event.getEntity().level();',
+        ]);
+      case 'player_right_click_block':
+        return bind([
+          'ctx.player = (net.minecraft.server.level.ServerPlayer) event.getEntity();',
+          'ctx.level = (net.minecraft.server.level.ServerLevel) event.getLevel();',
+          'ctx.pos = event.getPos();',
+        ]);
+      case 'player_right_click_item':
+      case 'item_use':
+        return bind([
+          'ctx.player = (net.minecraft.server.level.ServerPlayer) event.getEntity();',
+          'ctx.level = (net.minecraft.server.level.ServerLevel) event.getLevel();',
+          'ctx.stack = event.getItemStack();',
+        ]);
+      case 'player_left_click':
+        return bind([
+          'ctx.player = (net.minecraft.server.level.ServerPlayer) event.getEntity();',
+          'ctx.level = (net.minecraft.server.level.ServerLevel) event.getLevel();',
+          'ctx.pos = event.getPos();',
+        ]);
+      case 'block_break':
+        return bind([
+          'ctx.player = (net.minecraft.server.level.ServerPlayer) event.getPlayer();',
+          'ctx.level = (net.minecraft.server.level.ServerLevel) event.getLevel();',
+          'ctx.pos = event.getPos();',
+          'ctx.state = event.getState();',
+        ]);
+      case 'block_place':
+        return bind([
+          'ctx.target = event.getEntity();',
+          'ctx.level = (net.minecraft.server.level.ServerLevel) event.getLevel();',
+          'ctx.pos = event.getPos();',
+          'ctx.state = event.getBlockSnapshot().getReplacedBlock();',
+        ]);
+      case 'entity_death':
+      case 'entity_hurt':
+        return bind([
+          'ctx.target = event.getEntity();',
+          'ctx.level = (net.minecraft.server.level.ServerLevel) event.getEntity().level();',
+        ]);
+      case 'item_pickup':
+        return bind([
+          'ctx.player = (net.minecraft.server.level.ServerPlayer) event.getEntity();',
+          'ctx.level = (net.minecraft.server.level.ServerLevel) event.getEntity().level();',
+          'ctx.stack = event.getItem();',
+        ]);
+      case 'custom':
+      default:
+        return '            // (custom 事件无标准绑定)';
     }
   }
 

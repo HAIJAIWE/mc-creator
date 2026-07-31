@@ -277,18 +277,18 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
     // 事件处理器方法（handle_<handlerId>）
     expect(events!.content).toContain('事件处理器: evt_1');
     expect(events!.content).toContain('eventType: player_right_click_block');
-    expect(events!.content).toContain('private static void handle_evt_1(Object event)');
+    expect(events!.content).toContain('private static void handle_evt_1(EventContext ctx)');
     // 条件检查方法（check_<conditionId>）
     expect(events!.content).toContain('条件: cond_1');
     expect(events!.content).toContain('has_item');
-    expect(events!.content).toContain('private static boolean check_cond_1(Object event)');
+    expect(events!.content).toContain('private static boolean check_cond_1(EventContext ctx)');
     // 动作执行方法（execute_<actionId>）
     expect(events!.content).toContain('动作: act_1');
     expect(events!.content).toContain('give_item');
-    expect(events!.content).toContain('private static void execute_act_1(Object event)');
+    expect(events!.content).toContain('private static void execute_act_1(EventContext ctx)');
     // 真实 if/else 逻辑（非纯注释占位）
-    expect(events!.content).toContain('if (check_cond_1(event))');
-    expect(events!.content).toContain('execute_act_1(event);');
+    expect(events!.content).toContain('if (check_cond_1(ctx))');
+    expect(events!.content).toContain('execute_act_1(ctx);');
     // P1-7：has_item 条件生成真实检查逻辑（countItem），give_item 动作生成真实执行逻辑（place）
     expect(events!.content).toContain('countItem(');
     expect(events!.content).toContain('getInventory().place(');
@@ -338,6 +338,47 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
     expect(events!.content).not.toContain('TODO: 注册 player_left_click 事件');
     expect(events!.content).not.toContain('TODO: 注册 item_use 事件');
     expect(events!.content).not.toContain('TODO: 注册 item_pickup 事件');
+  });
+
+  it('事件参数绑定：回调多参数绑定为 EventContext 字段', () => {
+    const SPEC_BIND: ModSpec = ModSpecSchema.parse({
+      modId: 'ruby_tools',
+      version: '1.0.0',
+      name: 'Ruby Tools',
+      description: 'Event binding test',
+      items: [],
+      blocks: [],
+      license: 'MIT',
+      authors: [],
+      eventHandlers: [
+        { handlerId: 'evt_break', eventType: 'block_break', eventArgs: {} },
+        { handlerId: 'evt_click', eventType: 'player_right_click_block', eventArgs: {} },
+        { handlerId: 'evt_use', eventType: 'item_use', eventArgs: {} },
+        { handlerId: 'evt_pickup', eventType: 'item_pickup', eventArgs: {} },
+        { handlerId: 'evt_tick', eventType: 'tick', eventArgs: {} },
+      ],
+      conditions: [],
+      actions: [],
+    });
+    const files = adapter.translate({ ...CTX_P14, spec: SPEC_BIND });
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    // EventContext 内部类定义
+    expect(events!.content).toContain('private static class EventContext');
+    expect(events!.content).toContain('net.minecraft.server.level.ServerPlayer player = null;');
+    // 调用签名统一为 EventContext ctx
+    expect(events!.content).toContain('handle_evt_break(EventContext ctx)');
+    expect(events!.content).toContain('handle_evt_tick(EventContext ctx)');
+    // 各回调绑定字段（不再只传 player）
+    expect(events!.content).toContain('ctx.pos = pos;');
+    expect(events!.content).toContain('ctx.state = state;');
+    expect(events!.content).toContain('ctx.pos = hitResult.getBlockPos();');
+    expect(events!.content).toContain('ctx.stack = player.getItemInHand(hand);');
+    expect(events!.content).toContain('ctx.stack = itemEntity.getItem();');
+    expect(events!.content).toContain('ctx.target = itemEntity;');
+    expect(events!.content).toContain('ctx.level = server.overworld();');
   });
 
   it('mainClass 的 onInitialize 调用新的 initialize 方法', () => {
@@ -434,29 +475,33 @@ describe('FabricAdapter P1-3 过程系统（procedure 编译为 Java 方法）',
 
   it('过程编译为独立 Java 方法 procedure_<name>', () => {
     // grantReward 过程 → procedure_grantReward 方法
-    expect(events!.content).toContain('private static void procedure_grantReward(Object event)');
+    expect(events!.content).toContain(
+      'private static void procedure_grantReward(EventContext ctx)',
+    );
     // logEvent 过程 → procedure_logEvent 方法
-    expect(events!.content).toContain('private static void procedure_logEvent(Object event)');
+    expect(events!.content).toContain('private static void procedure_logEvent(EventContext ctx)');
   });
 
   it('过程方法体含条件检查与动作执行调用', () => {
     // grantReward 过程体：check_cond_1 → execute_act_1
-    expect(events!.content).toContain('if (check_cond_1(event))');
-    expect(events!.content).toContain('execute_act_1(event);');
+    expect(events!.content).toContain('if (check_cond_1(ctx))');
+    expect(events!.content).toContain('execute_act_1(ctx);');
   });
 
   it('事件处理器调用过程方法（procedureCallIds 解析为方法调用）', () => {
     // handle_evt_1 内调用 procedure_grantReward(event)
-    expect(events!.content).toContain('procedure_grantReward(event);');
+    expect(events!.content).toContain('procedure_grantReward(ctx);');
   });
 
   it('过程嵌套调用（procedure 调用 procedure）', () => {
     // logEvent 过程内调用 grantReward
-    // 验证 procedure_logEvent 方法体内含 procedure_grantReward(event);
+    // 验证 procedure_logEvent 方法体内含 procedure_grantReward(ctx);
     const content = events!.content;
-    const logMethodIdx = content.indexOf('private static void procedure_logEvent(Object event)');
+    const logMethodIdx = content.indexOf(
+      'private static void procedure_logEvent(EventContext ctx)',
+    );
     const grantMethodIdx = content.indexOf(
-      'private static void procedure_grantReward(Object event)',
+      'private static void procedure_grantReward(EventContext ctx)',
     );
     expect(logMethodIdx).toBeGreaterThan(-1);
     expect(grantMethodIdx).toBeGreaterThan(-1);
@@ -466,7 +511,7 @@ describe('FabricAdapter P1-3 过程系统（procedure 编译为 Java 方法）',
       logMethodIdx,
       logMethodIdx < grantMethodIdx ? grantMethodIdx : content.length,
     );
-    expect(logMethodBody).toContain('procedure_grantReward(event);');
+    expect(logMethodBody).toContain('procedure_grantReward(ctx);');
   });
 
   it('过程方法有复用注释（可被 event/procedure 调用）', () => {
@@ -727,11 +772,11 @@ describe('FabricAdapter P1.5 真实事件处理逻辑生成', () => {
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
     );
     expect(events).toBeDefined();
-    // invert: true → if (!check_cond_inv(event))
-    expect(events!.content).toContain('if (!check_cond_inv(event))');
-    expect(events!.content).toContain('execute_act_inv(event);');
+    // invert: true → if (!check_cond_inv(ctx))
+    expect(events!.content).toContain('if (!check_cond_inv(ctx))');
+    expect(events!.content).toContain('execute_act_inv(ctx);');
     // 同时验证正向 if 不存在（避免误判）
-    expect(events!.content).not.toContain('if (check_cond_inv(event))');
+    expect(events!.content).not.toContain('if (check_cond_inv(ctx))');
   });
 
   it('eventType=tick 注册到 ServerTickEvents.END_SERVER_TICK 并调用 handle_<handlerId>', () => {
@@ -744,7 +789,7 @@ describe('FabricAdapter P1.5 真实事件处理逻辑生成', () => {
     expect(events!.content).toContain(
       'net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register',
     );
-    expect(events!.content).toContain('handle_evt_inv(server)');
+    expect(events!.content).toContain('handle_evt_inv(ctx)');
   });
 
   it('eventHandlers/conditions/actions 全为空时不生成 ModEvents.java', () => {
@@ -777,6 +822,77 @@ describe('FabricAdapter P1.5 真实事件处理逻辑生成', () => {
     );
     expect(events).toBeDefined();
     // 即使无 handler，check_<conditionId> 方法仍生成
-    expect(events!.content).toContain('private static boolean check_solo_cond(Object event)');
+    expect(events!.content).toContain('private static boolean check_solo_cond(EventContext ctx)');
+  });
+
+  it('位置/状态类条件与动作生成真实逻辑（EventContext 字段读取）', () => {
+    const specCtxLogic = ModSpecSchema.parse({
+      ...SPEC,
+      conditions: [
+        {
+          conditionId: 'c_dist',
+          conditionType: 'distance_less',
+          args: { x: 100, y: 64, z: 0, distance: 10 },
+          invert: false,
+        },
+        {
+          conditionId: 'c_biome',
+          conditionType: 'biome_is',
+          args: { biome: 'minecraft:plains' },
+          invert: false,
+        },
+        {
+          conditionId: 'c_block',
+          conditionType: 'block_is',
+          args: { block: 'minecraft:stone' },
+          invert: false,
+        },
+      ],
+      actions: [
+        {
+          actionId: 'a_set',
+          actionType: 'set_block',
+          args: { block: 'minecraft:stone' },
+        },
+        {
+          actionId: 'a_remove',
+          actionType: 'remove_block',
+          args: {},
+        },
+        {
+          actionId: 'a_spawn',
+          actionType: 'spawn_entity',
+          args: { entity: 'minecraft:zombie' },
+        },
+        {
+          actionId: 'a_sound',
+          actionType: 'play_sound',
+          args: { sound: 'block.note_block.pling', volume: 1, pitch: 1 },
+        },
+      ],
+    });
+    const adapter = new FabricAdapter();
+    const files = adapter.translate({ ...CTX, spec: specCtxLogic });
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    // 位置条件：从 ctx.pos 计算距离（不再是「无法提供位置上下文」TODO）
+    expect(events!.content).toContain('double dx = ctx.pos.getX() - 100.0;');
+    expect(events!.content).toContain('Math.sqrt(dx * dx + dy * dy + dz * dz) < 10.0');
+    expect(events!.content).not.toContain('需要位置上下文');
+    // 生物群系/方块条件：ctx.level.getBiome / ctx.state.is
+    expect(events!.content).toContain('ctx.level.getBiome(ctx.pos).is(');
+    expect(events!.content).toContain(
+      'ctx.state.is(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get',
+    );
+    // 方块操作动作：ctx.level.setBlock
+    expect(events!.content).toContain('ctx.level.setBlock(ctx.pos,');
+    expect(events!.content).toContain('Blocks.AIR.defaultBlockState(), 3)');
+    // 实体生成/音效：ctx.level + ctx.pos
+    expect(events!.content).toContain('ctx.level.addFreshEntity(');
+    expect(events!.content).toContain('ctx.level.playSound(null, ctx.pos,');
+    // 所有逻辑不再依赖 event instanceof 转型
+    expect(events!.content).not.toContain('event instanceof');
   });
 });

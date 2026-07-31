@@ -248,7 +248,7 @@ describe('NeoForgeAdapter P1-4 增量构建（translateWithCache）', () => {
     expect(modEvents).toBeDefined();
     // 验证 AND 合取：条件用 && 连接
     expect(modEvents!.content).toContain('&&');
-    expect(modEvents!.content).toContain('!check_cond_2(event)');
+    expect(modEvents!.content).toContain('!check_cond_2(ctx)');
     // 验证不会有多余的独立 if 块
     expect(modEvents!.content).not.toMatch(
       /if \(check_cond_1\(event\)\)\s*\{[^}]*execute_act_1[^}]*\}\s*if \(!check_cond_2\(event\)\)\s*\{/,
@@ -285,10 +285,10 @@ describe('NeoForgeAdapter P1-4 增量构建（translateWithCache）', () => {
     const modEvents = result.files.find((f) => f.path.endsWith('ModEvents.java'));
     expect(modEvents).toBeDefined();
     // 事件调用过程
-    expect(modEvents!.content).toContain('procedure_giveReward(event)');
+    expect(modEvents!.content).toContain('procedure_giveReward(ctx)');
     // 过程方法含条件合取
     expect(modEvents!.content).toContain('procedure_giveReward');
-    expect(modEvents!.content).toContain('check_cond_1(event)');
+    expect(modEvents!.content).toContain('check_cond_1(ctx)');
   });
 
   it('sanitizeIdent：连续下划线合并、数字前缀加_', () => {

@@ -638,27 +638,28 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
       expect(eventsFile!.content).toContain('if (');
       expect(eventsFile!.content).toContain('check_c1');
       // invert=false 时不应出现 !check_
-      expect(eventsFile!.content).toContain('if (check_c1(event))');
+      expect(eventsFile!.content).toContain('if (check_c1(ctx))');
     });
 
     it('ModEvents.java 包含 execute_ 调用（动作执行）', () => {
       expect(eventsFile!.content).toContain('execute_a1');
-      expect(eventsFile!.content).toContain('execute_a1(event);');
+      expect(eventsFile!.content).toContain('execute_a1(ctx);');
     });
 
     it('ModEvents.java 包含 check_ 方法定义（条件检查，has_item 生成真实逻辑）', () => {
       expect(eventsFile!.content).toMatch(
-        /private\s+static\s+boolean\s+check_c1\s*\(\s*Object\s+event\s*\)/,
+        /private\s+static\s+boolean\s+check_c1\s*\(\s*EventContext\s+ctx\s*\)/,
       );
       expect(eventsFile!.content).toContain('countItem(');
       expect(eventsFile!.content).not.toContain('// TODO: 实现 has_item 检查逻辑');
     });
 
-    it('ModEvents.java 包含 execute_ 方法定义（TODO 占位）', () => {
+    it('ModEvents.java 包含 execute_ 方法定义（spawn_entity 生成真实逻辑）', () => {
       expect(eventsFile!.content).toMatch(
-        /private\s+static\s+void\s+execute_a1\s*\(\s*Object\s+event\s*\)/,
+        /private\s+static\s+void\s+execute_a1\s*\(\s*EventContext\s+ctx\s*\)/,
       );
-      expect(eventsFile!.content).toContain('TODO');
+      expect(eventsFile!.content).toContain('ctx.level.addFreshEntity(');
+      expect(eventsFile!.content).not.toContain('// TODO: 实现 spawn_entity 执行逻辑');
     });
 
     it('condition 的 invert=true 时，if 中有 !check_ 调用', () => {
@@ -690,8 +691,8 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
         (f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java',
       )!;
       expect(invertEvents).toBeDefined();
-      expect(invertEvents!.content).toContain('!check_c1(event)');
-      expect(invertEvents!.content).toContain('if (!check_c1(event))');
+      expect(invertEvents!.content).toContain('!check_c1(ctx)');
+      expect(invertEvents!.content).toContain('if (!check_c1(ctx))');
     });
   });
 
@@ -832,14 +833,14 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
       expect(eventsFile!.content).toContain('procedure_loopProc');
     });
 
-    it('loop 生成的 Java 代码包含 if (check_lc1(event)) 与 execute_la1 调用', () => {
+    it('loop 生成的 Java 代码包含 if (check_lc1(ctx)) 与 execute_la1 调用', () => {
       const codeFile = generateFiles(compileResult.spec).find(
         (f) => f.path === 'src/main/java/com/example/test_mod/ModCustomCode.java',
       );
       expect(codeFile).toBeDefined();
-      expect(codeFile!.content).toContain('if (check_lc1(event))');
-      expect(codeFile!.content).toContain('execute_la1(event);');
-      expect(codeFile!.content).toContain('procedure_loopProc(event);');
+      expect(codeFile!.content).toContain('if (check_lc1(ctx))');
+      expect(codeFile!.content).toContain('execute_la1(ctx);');
+      expect(codeFile!.content).toContain('procedure_loopProc(ctx);');
       expect(codeFile!.content).not.toContain('TODO: loop body');
     });
   });

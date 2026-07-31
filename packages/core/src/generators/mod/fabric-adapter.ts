@@ -790,14 +790,14 @@ ${this.fabricEventRegistration(h.eventType, handlerMethod)}`;
         return true;
       });
 
-      // 把过程调用 id 列表解析为 procedure_<name>(event); 调用语句（缩进由调用方决定）
+      // 把过程调用 id 列表解析为 procedure_<name>(ctx); 调用语句（缩进由调用方决定）
       const resolveProcCalls = (indent: string): string =>
         procCallIds.length
           ? procCallIds
               .map((pid) => {
                 const name = procedureNameMap.get(pid);
                 if (!name) return `${indent}// (未知过程: ${pid})`;
-                return `${indent}procedure_${this.sanitizeIdent(name)}(event);`;
+                return `${indent}procedure_${this.sanitizeIdent(name)}(ctx);`;
               })
               .join('\n')
           : '';
@@ -809,12 +809,12 @@ ${this.fabricEventRegistration(h.eventType, handlerMethod)}`;
           .map((cid) => {
             const cond = conditionMap.get(cid);
             const invert = cond?.invert ?? false;
-            return `${invert ? '!' : ''}check_${this.sanitizeIdent(cid)}(event)`;
+            return `${invert ? '!' : ''}check_${this.sanitizeIdent(cid)}(ctx)`;
           })
           .join(' && ');
         const actionCalls = validActionIds.length
           ? validActionIds
-              .map((aid) => `            execute_${this.sanitizeIdent(aid)}(event);`)
+              .map((aid) => `            execute_${this.sanitizeIdent(aid)}(ctx);`)
               .join('\n')
           : '';
         const innerProcCalls = resolveProcCalls('            ');
@@ -830,7 +830,7 @@ ${innerBody}
       if (validActionIds.length || procCallIds.length) {
         return `        // (无关联 condition，直接执行)
 ${[
-  ...validActionIds.map((aid) => `        execute_${this.sanitizeIdent(aid)}(event);`),
+  ...validActionIds.map((aid) => `        execute_${this.sanitizeIdent(aid)}(ctx);`),
   ...resolveProcCalls('        ').split('\n').filter(Boolean),
 ].join('\n')}`;
       }
@@ -845,7 +845,7 @@ ${[
         const body = buildBody(h.conditionIds ?? [], h.actionIds ?? [], h.procedureCallIds ?? []);
         return `    // 事件处理器: ${h.handlerId} (eventType: ${h.eventType})
     // eventArgs: ${JSON.stringify(h.eventArgs)}
-    private static void ${handlerName}(Object event) {
+    private static void ${handlerName}(EventContext ctx) {
 ${body}
     }`;
       })
@@ -858,7 +858,7 @@ ${body}
         const body = buildBody(p.conditionIds, p.actionIds, p.procedureCallIds);
         return `    // 过程: ${p.procedureId} (name: ${p.procedureName})
     // 可被 event/procedure 调用，复用此方法
-    private static void ${methodName}(Object event) {
+    private static void ${methodName}(EventContext ctx) {
 ${body}
     }`;
       })
@@ -876,7 +876,7 @@ ${body}
         return `    // 条件: ${c.conditionId} (invert: ${c.invert})
     // conditionType: ${c.conditionType}
     // args: ${JSON.stringify(c.args)}
-    private static boolean ${methodName}(Object event) {
+    private static boolean ${methodName}(EventContext ctx) {
 ${body}
     }`;
       })
@@ -891,7 +891,7 @@ ${body}
         return `    // 动作: ${a.actionId}
     // actionType: ${a.actionType}
     // args: ${JSON.stringify(a.args)}
-    private static void ${methodName}(Object event) {
+    private static void ${methodName}(EventContext ctx) {
 ${body}
     }`;
       })
@@ -901,9 +901,22 @@ ${body}
       .filter(Boolean)
       .join('\n\n');
 
+    // 事件上下文：承载回调参数（Fabric 回调多参数在此绑定），供条件/动作逻辑读取
+    const eventContextClass = `    // 事件上下文：回调参数绑定字段（事件未提供时保持 null，逻辑侧判空保护）
+    private static class EventContext {
+        net.minecraft.server.level.ServerPlayer player = null;
+        net.minecraft.server.level.ServerLevel level = null;
+        net.minecraft.core.BlockPos pos = null;
+        net.minecraft.world.level.block.state.BlockState state = null;
+        net.minecraft.world.item.ItemStack stack = null;
+        net.minecraft.world.entity.Entity target = null;
+    }`;
+
     const content = `package ${pkg};
 
 public class ModEvents {
+${eventContextClass}
+
 ${allMethods}
 
     public static void initialize() {
@@ -925,44 +938,75 @@ ${registrations || '        // (无事件处理器)'}
    * - ServerLevel（而非 Yarn 的 ServerWorld）
    *
    * P1 dogfood 修复：ServerPlayerEvents.JOIN/LEAVE 回调签名含 ServerPlayer + MinecraftServer。
+   * P2.1 事件参数绑定：回调多参数绑定为 EventContext 字段，不再只传 player。
    */
   private fabricEventRegistration(eventType: string, handlerMethod: string): string {
     switch (eventType) {
       case 'tick':
         return `        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> {
-            ${handlerMethod}(server);
+            EventContext ctx = new EventContext();
+            ctx.level = server.overworld();
+            ${handlerMethod}(ctx);
         });`;
       case 'player_join':
         return `        net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents.JOIN.register((player, server) -> {
-            ${handlerMethod}(player);
+            EventContext ctx = new EventContext();
+            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
+            ctx.level = server.overworld();
+            ${handlerMethod}(ctx);
         });`;
       case 'player_quit':
         return `        net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents.LEAVE.register((player, server) -> {
-            ${handlerMethod}(player);
+            EventContext ctx = new EventContext();
+            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
+            ctx.level = server.overworld();
+            ${handlerMethod}(ctx);
         });`;
       case 'block_break':
         return `        net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
-            ${handlerMethod}(player);
+            EventContext ctx = new EventContext();
+            ctx.level = (net.minecraft.server.level.ServerLevel) world;
+            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
+            ctx.pos = pos;
+            ctx.state = state;
+            ${handlerMethod}(ctx);
         });`;
       case 'player_right_click_block':
         return `        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            ${handlerMethod}(player);
+            EventContext ctx = new EventContext();
+            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
+            ctx.level = (net.minecraft.server.level.ServerLevel) world;
+            ctx.pos = hitResult.getBlockPos();
+            ${handlerMethod}(ctx);
             return net.minecraft.world.InteractionResult.PASS;
         });`;
       case 'player_right_click_item':
       case 'item_use':
         return `        net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register((player, world, hand) -> {
-            ${handlerMethod}(player);
+            EventContext ctx = new EventContext();
+            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
+            ctx.level = (net.minecraft.server.level.ServerLevel) world;
+            ctx.stack = player.getItemInHand(hand);
+            ${handlerMethod}(ctx);
             return net.minecraft.util.TypedActionResult.pass(player.getItemInHand(hand));
         });`;
       case 'player_left_click':
         return `        net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) -> {
-            ${handlerMethod}(player);
+            EventContext ctx = new EventContext();
+            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
+            ctx.level = (net.minecraft.server.level.ServerLevel) world;
+            ctx.pos = pos;
+            ${handlerMethod}(ctx);
             return net.minecraft.world.InteractionResult.PASS;
         });`;
       case 'item_pickup':
         return `        net.fabricmc.fabric.api.event.player.PlayerPickupItemCallback.EVENT.register((player, itemEntity) -> {
-            ${handlerMethod}(player);
+            EventContext ctx = new EventContext();
+            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
+            ctx.level = (net.minecraft.server.level.ServerLevel) player.level();
+            ctx.target = itemEntity;
+            ctx.stack = itemEntity.getItem();
+            ${handlerMethod}(ctx);
             return false;
         });`;
       case 'entity_death':
@@ -970,10 +1014,10 @@ ${registrations || '        // (无事件处理器)'}
       case 'block_place':
         // Fabric API 无现成的死亡/受伤/放置事件（需 Mixin 或数据驱动实现），保留 TODO 说明
         return `        // TODO: 注册 ${eventType} 事件（Fabric API 无现成事件，需 Mixin 实现）
-        // ${handlerMethod}(event);`;
+        // ${handlerMethod}(new EventContext());`;
       default:
         return `        // TODO: 注册 ${eventType} 事件（Fabric API 未映射）
-        // ${handlerMethod}(event);`;
+        // ${handlerMethod}(new EventContext());`;
     }
   }
 
