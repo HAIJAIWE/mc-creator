@@ -7,6 +7,7 @@ import type {
   NodePort,
   FileNode,
 } from '@mc-creator/shared';
+import { LATEST_FORMAT_VERSION } from '@mc-creator/shared';
 
 /**
  * L3 → L2 反向降级路径：从 PurecodeWorkspace 中的 Java/JSON 文件反向提取信息，
@@ -77,6 +78,8 @@ function createDefaultNodeData(kind: NodeKind, id: string): NodeData {
     disabled: false,
     collapsed: false,
     codeLocked: false,
+    // P1-1：新建节点使用最新 formatVersion
+    formatVersion: LATEST_FORMAT_VERSION,
   };
   switch (kind) {
     case 'item':
@@ -225,6 +228,14 @@ function createDefaultNodeData(kind: NodeKind, id: string): NodeData {
         update: 'i++',
         loopVarName: 'i',
         loopVarType: 'int',
+      } as NodeData;
+    case 'procedure':
+      // P1-3：过程节点默认数据
+      return {
+        ...base,
+        kind: 'procedure',
+        procedureName: 'myProcedure',
+        displayName: '新过程',
       } as NodeData;
     default: {
       // 类型安全：穷尽性检查
@@ -558,8 +569,6 @@ function mapEventType(apiPath: string): {
 } {
   // 标准化：去掉空格，按点分割
   const parts = apiPath.replace(/\s+/g, '').split('.');
-  // 取后两段作为关键判定（如 ServerTickEvents.END_SERVER_TICK）
-  const last2 = parts.slice(-2).join('.');
   const last1 = parts[parts.length - 1] ?? '';
 
   // ServerTickEvents.START_SERVER_TICK / END_SERVER_TICK → tick
@@ -584,7 +593,6 @@ function mapEventType(apiPath: string): {
     return { eventType: 'item_use', label: '物品使用' };
 
   // 兜底
-  void last2;
   return { eventType: 'custom', label: apiPath };
 }
 
