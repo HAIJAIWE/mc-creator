@@ -81,8 +81,8 @@ private static class EventContext {
 ## 后续方向(用户已确认,按序执行)
 
 1. **[已完成] 事件参数绑定(EventContext)** — 已提交
-2. **[本项] Mixin 事件补齐** — 实测 Fabric API 有 `ServerLivingEntityEvents.AFTER_DEATH/AFTER_DAMAGE`,entity_death/entity_hurt 无需 Mixin,直接注册并绑定 ctx.target/level;**仅 block_place 需 Mixin**(`@Inject BlockItem.place` RETURN 后调 `ModEvents.notifyBlockPlaced`,public 入口构造 ctx 分发);生成 ModBlockPlaceMixin.java + `<modId>.mixins.json` + fabric.mod.json mixins 字段。NeoForge 侧已由 EventContext getter 绑定覆盖。
-3. **P40 过程节点增强**:Procedure 封装 + PureCode 模式 + codeLock
-4. **P36/P37 脚本生成器**:KubeJS / CraftTweaker 生成器增强
-5. **P41 BuildCache**:构建缓存 + recipe-adapter 配方生成扩展
-6. **P30-P34 UI 面**:专业图标 / Toast / Splitter / Dashboard 统计
+2. **[已完成] Mixin 事件补齐** — entity_death/entity_hurt 用 `ServerLivingEntityEvents` 直接注册;block_place 生成 ModBlockPlaceMixin + `<modId>.mixins.json` + fabric.mod.json mixins 字段。已提交
+3. **[已完成] P40 过程节点增强** — Procedure inputs(类型化形参 + procedureCallArgs 传参 + in_<name> 数据端口)+ ListEditor UI。已提交
+4. **[已完成] P36/P37 脚本生成器** — KubeJS/CraftTweaker 增强:blasting/smoking 类型、KubeJS Nx 数量语法与 xp/cookingTime 链式、CraftTweaker xp/cookTime 四参。已提交
+5. **[已完成] P41 BuildCache** — ModRecipeSpec 扩展 campfire/smithing/brewing + recipe-adapter 转换 + RecipeNode UI。已提交
+6. **[已完成] P30-P34 UI 面** — Toast/Splitter/McIcon/Dashboard 组件测试覆盖。已提交
