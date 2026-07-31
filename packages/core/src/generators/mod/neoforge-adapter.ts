@@ -3,6 +3,7 @@ import { getLoaderVersions, type LoaderVersionConfig } from '@mc-creator/shared'
 import type { LoaderAdapter } from './adapter.js';
 import { mainClassName, packageName, packagePath, javaEscape } from './templates.js';
 import { BuildCache, hashCategory, type IncrementalResult } from '../../builder/BuildCache.js';
+import { conditionCheckBody, actionExecuteBody } from './event-logic.js';
 import type { CategoryDescriptor } from './fabric-adapter.js';
 
 /**
@@ -798,12 +799,16 @@ ${body}
     const conditionMethods = conditions
       .map((c) => {
         const methodName = `check_${this.sanitizeIdent(c.conditionId)}`;
+        // P1-7：常见条件类型生成真实检查逻辑（event-logic.ts），其余保留 TODO
+        const body =
+          conditionCheckBody(c) ??
+          `        // TODO: 实现 ${c.conditionType} 检查逻辑
+        return true;`;
         return `    // 条件: ${c.conditionId} (invert: ${c.invert})
     // conditionType: ${c.conditionType}
     // args: ${JSON.stringify(c.args)}
     private static boolean ${methodName}(Object event) {
-        // TODO: 实现 ${c.conditionType} 检查逻辑
-        return true;
+${body}
     }`;
       })
       .join('\n\n');
@@ -812,11 +817,13 @@ ${body}
     const actionMethods = actions
       .map((a) => {
         const methodName = `execute_${this.sanitizeIdent(a.actionId)}`;
+        // P1-7：常见动作类型生成真实执行逻辑（event-logic.ts），其余保留 TODO
+        const body = actionExecuteBody(a) ?? `        // TODO: 实现 ${a.actionType} 执行逻辑`;
         return `    // 动作: ${a.actionId}
     // actionType: ${a.actionType}
     // args: ${JSON.stringify(a.args)}
     private static void ${methodName}(Object event) {
-        // TODO: 实现 ${a.actionType} 执行逻辑
+${body}
     }`;
       })
       .join('\n\n');

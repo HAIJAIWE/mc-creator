@@ -3,6 +3,7 @@ import { getLoaderVersions, type LoaderVersionConfig } from '@mc-creator/shared'
 import type { LoaderAdapter } from './adapter.js';
 import { mainClassName, packageName, packagePath, javaEscape } from './templates.js';
 import { BuildCache, hashCategory, type IncrementalResult } from '../../builder/BuildCache.js';
+import { conditionCheckBody, actionExecuteBody } from './event-logic.js';
 
 /**
  * Fabric Loader Adapter（规格 §3.2）。
@@ -867,12 +868,16 @@ ${body}
     const conditionMethods = conditions
       .map((c) => {
         const methodName = `check_${this.sanitizeIdent(c.conditionId)}`;
+        // P1-7：常见条件类型生成真实检查逻辑（event-logic.ts），其余保留 TODO
+        const body =
+          conditionCheckBody(c) ??
+          `        // TODO: 实现 ${c.conditionType} 检查逻辑
+        return true;`;
         return `    // 条件: ${c.conditionId} (invert: ${c.invert})
     // conditionType: ${c.conditionType}
     // args: ${JSON.stringify(c.args)}
     private static boolean ${methodName}(Object event) {
-        // TODO: 实现 ${c.conditionType} 检查逻辑
-        return true;
+${body}
     }`;
       })
       .join('\n\n');
@@ -881,11 +886,13 @@ ${body}
     const actionMethods = actions
       .map((a) => {
         const methodName = `execute_${this.sanitizeIdent(a.actionId)}`;
+        // P1-7：常见动作类型生成真实执行逻辑（event-logic.ts），其余保留 TODO
+        const body = actionExecuteBody(a) ?? `        // TODO: 实现 ${a.actionType} 执行逻辑`;
         return `    // 动作: ${a.actionId}
     // actionType: ${a.actionType}
     // args: ${JSON.stringify(a.args)}
     private static void ${methodName}(Object event) {
-        // TODO: 实现 ${a.actionType} 执行逻辑
+${body}
     }`;
       })
       .join('\n\n');
@@ -937,6 +944,33 @@ ${registrations || '        // (无事件处理器)'}
         return `        net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
             ${handlerMethod}(player);
         });`;
+      case 'player_right_click_block':
+        return `        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+            ${handlerMethod}(player);
+            return net.minecraft.world.InteractionResult.PASS;
+        });`;
+      case 'player_right_click_item':
+      case 'item_use':
+        return `        net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register((player, world, hand) -> {
+            ${handlerMethod}(player);
+            return net.minecraft.util.TypedActionResult.pass(player.getItemInHand(hand));
+        });`;
+      case 'player_left_click':
+        return `        net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) -> {
+            ${handlerMethod}(player);
+            return net.minecraft.world.InteractionResult.PASS;
+        });`;
+      case 'item_pickup':
+        return `        net.fabricmc.fabric.api.event.player.PlayerPickupItemCallback.EVENT.register((player, itemEntity) -> {
+            ${handlerMethod}(player);
+            return false;
+        });`;
+      case 'entity_death':
+      case 'entity_hurt':
+      case 'block_place':
+        // Fabric API 无现成的死亡/受伤/放置事件（需 Mixin 或数据驱动实现），保留 TODO 说明
+        return `        // TODO: 注册 ${eventType} 事件（Fabric API 无现成事件，需 Mixin 实现）
+        // ${handlerMethod}(event);`;
       default:
         return `        // TODO: 注册 ${eventType} 事件（Fabric API 未映射）
         // ${handlerMethod}(event);`;

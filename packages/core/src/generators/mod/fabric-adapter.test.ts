@@ -289,10 +289,55 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
     // 真实 if/else 逻辑（非纯注释占位）
     expect(events!.content).toContain('if (check_cond_1(event))');
     expect(events!.content).toContain('execute_act_1(event);');
+    // P1-7：has_item 条件生成真实检查逻辑（countItem），give_item 动作生成真实执行逻辑（place）
+    expect(events!.content).toContain('countItem(');
+    expect(events!.content).toContain('getInventory().place(');
+    expect(events!.content).not.toContain('// TODO: 实现 has_item 检查逻辑');
+    expect(events!.content).not.toContain('// TODO: 实现 give_item 执行逻辑');
     // initialize 方法（含 Fabric API 注册调用）
     expect(events!.content).toContain('public static void initialize()');
-    // player_right_click_block 未映射到 Fabric API → 留 TODO 注释
-    expect(events!.content).toContain('TODO: 注册 player_right_click_block 事件');
+    // player_right_click_block 映射到 UseBlockCallback（Fabric API 1.21 真实事件）
+    expect(events!.content).toContain(
+      'net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register',
+    );
+    expect(events!.content).not.toContain('TODO: 注册 player_right_click_block 事件');
+  });
+
+  it('player_left_click / item_use / item_pickup 映射到真实 Fabric API', () => {
+    const SPEC_EVENTS: ModSpec = ModSpecSchema.parse({
+      modId: 'ruby_tools',
+      version: '1.0.0',
+      name: 'Ruby Tools',
+      description: 'Event mapping test',
+      items: [],
+      blocks: [],
+      license: 'MIT',
+      authors: [],
+      eventHandlers: [
+        { handlerId: 'evt_a', eventType: 'player_left_click', eventArgs: {} },
+        { handlerId: 'evt_b', eventType: 'item_use', eventArgs: {} },
+        { handlerId: 'evt_c', eventType: 'item_pickup', eventArgs: {} },
+      ],
+      conditions: [],
+      actions: [],
+    });
+    const files = adapter.translate({ ...CTX_P14, spec: SPEC_EVENTS });
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    expect(events!.content).toContain(
+      'net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register',
+    );
+    expect(events!.content).toContain(
+      'net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register',
+    );
+    expect(events!.content).toContain(
+      'net.fabricmc.fabric.api.event.player.PlayerPickupItemCallback.EVENT.register',
+    );
+    expect(events!.content).not.toContain('TODO: 注册 player_left_click 事件');
+    expect(events!.content).not.toContain('TODO: 注册 item_use 事件');
+    expect(events!.content).not.toContain('TODO: 注册 item_pickup 事件');
   });
 
   it('mainClass 的 onInitialize 调用新的 initialize 方法', () => {
