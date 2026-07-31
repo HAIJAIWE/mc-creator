@@ -80,8 +80,8 @@ private static class EventContext {
 
 ## 后续方向(用户已确认,按序执行)
 
-1. **[本项] 事件参数绑定(EventContext)**
-2. **Mixin 事件补齐**:entity_death / entity_hurt / block_place(Fabric 侧生成 Mixin 类 + mixins.json,Fabric adapter 注册引用);NeoForge 侧已可直接用 addListener 补齐(无 Mixin 需求)
+1. **[已完成] 事件参数绑定(EventContext)** — 已提交
+2. **[本项] Mixin 事件补齐** — 实测 Fabric API 有 `ServerLivingEntityEvents.AFTER_DEATH/AFTER_DAMAGE`,entity_death/entity_hurt 无需 Mixin,直接注册并绑定 ctx.target/level;**仅 block_place 需 Mixin**(`@Inject BlockItem.place` RETURN 后调 `ModEvents.notifyBlockPlaced`,public 入口构造 ctx 分发);生成 ModBlockPlaceMixin.java + `<modId>.mixins.json` + fabric.mod.json mixins 字段。NeoForge 侧已由 EventContext getter 绑定覆盖。
 3. **P40 过程节点增强**:Procedure 封装 + PureCode 模式 + codeLock
 4. **P36/P37 脚本生成器**:KubeJS / CraftTweaker 生成器增强
 5. **P41 BuildCache**:构建缓存 + recipe-adapter 配方生成扩展

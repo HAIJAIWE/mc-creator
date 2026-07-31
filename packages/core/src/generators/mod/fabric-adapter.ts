@@ -100,9 +100,24 @@ export class FabricAdapter implements LoaderAdapter {
       name: 'fabricModJson',
       // G-5 修复：用传入的 mcVersion（与 build.gradle/gradle.properties 一致），
       // 而非 spec.mcVersionHint（ModSpec 无此字段，恒为默认值且与 ctx.mcVersion 脱节）
-      hashInputs: (s, mcVersion) => [s.modId, s.name, s.description, s.version, mcVersion],
+      // P2.2：block_place handler 存在时 fabric.mod.json 需声明 mixins 字段
+      hashInputs: (s, mcVersion) => [
+        s.modId,
+        s.name,
+        s.description,
+        s.version,
+        mcVersion,
+        (s.eventHandlers ?? []).some((h) => h.eventType === 'block_place'),
+      ],
       generate: (s, pkg, mainCls, mcVersion, versions) => [
-        this.fabricModJson(s, pkg, mainCls, mcVersion, versions),
+        this.fabricModJson(
+          s,
+          pkg,
+          mainCls,
+          mcVersion,
+          versions,
+          (s.eventHandlers ?? []).some((h) => h.eventType === 'block_place'),
+        ),
       ],
     },
     {
@@ -193,6 +208,12 @@ export class FabricAdapter implements LoaderAdapter {
           : [],
     },
     {
+      // P2.2 block_place 需 Mixin（Fabric API 无放置事件）：生成 Mixin 类 + mixins.json
+      name: 'blockPlaceMixin',
+      hashInputs: (s) => (s.eventHandlers ?? []).filter((h) => h.eventType === 'block_place'),
+      generate: (s, pkg) => this.blockPlaceMixinFiles(s, pkg),
+    },
+    {
       name: 'lang',
       hashInputs: (s) => [
         s.modId,
@@ -279,8 +300,9 @@ export class FabricAdapter implements LoaderAdapter {
     mainCls: string,
     mcVersion: string,
     versions: LoaderVersionConfig,
+    hasMixins = false,
   ): FileNode {
-    const content = {
+    const content: Record<string, unknown> = {
       schemaVersion: 1,
       id: spec.modId,
       version: '${version}',
@@ -297,6 +319,9 @@ export class FabricAdapter implements LoaderAdapter {
         'fabric-api': '*',
       },
     };
+    if (hasMixins) {
+      content.mixins = [`${spec.modId}.mixins.json`];
+    }
     return {
       path: 'src/main/resources/fabric.mod.json',
       content: JSON.stringify(content, null, 2),
@@ -864,6 +889,21 @@ ${body}
       })
       .join('\n\n');
 
+    // P2.2 block_place：Fabric 无现成放置事件，由 Mixin @Inject 调用的公开通知入口。
+    // 构造 EventContext 并逐个调用 block_place 的 handle_ 方法（无 handler 时不生成）。
+    const blockPlaceHandlers = handlers.filter((h) => h.eventType === 'block_place');
+    const notifyBlockPlaced = blockPlaceHandlers.length
+      ? `    // block_place 事件通知入口（由 ModBlockPlaceMixin @Inject 调用，Fabric API 无放置事件）
+    public static void notifyBlockPlaced(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state, net.minecraft.server.level.ServerPlayer player) {
+        EventContext ctx = new EventContext();
+        ctx.level = level instanceof net.minecraft.server.level.ServerLevel sl ? sl : null;
+        ctx.pos = pos;
+        ctx.state = state;
+        ctx.player = player;
+${blockPlaceHandlers.map((h) => `        handle_${this.sanitizeIdent(h.handlerId)}(ctx);`).join('\n')}
+    }`
+      : '';
+
     // 条件检查方法（遍历 spec.conditions 全量生成，含未被 handler 引用的）
     const conditionMethods = conditions
       .map((c) => {
@@ -897,7 +937,13 @@ ${body}
       })
       .join('\n\n');
 
-    const allMethods = [handlerMethods, procedureMethods, conditionMethods, actionMethods]
+    const allMethods = [
+      handlerMethods,
+      notifyBlockPlaced,
+      procedureMethods,
+      conditionMethods,
+      actionMethods,
+    ]
       .filter(Boolean)
       .join('\n\n');
 
@@ -929,6 +975,69 @@ ${registrations || '        // (无事件处理器)'}
       path: `src/main/java/${packagePath(spec.modId)}/ModEvents.java`,
       content,
     };
+  }
+
+  /**
+   * P2.2 block_place 的 Mixin 支持（Fabric API 无放置事件）。
+   * 生成 ModBlockPlaceMixin.java（@Inject BlockItem.place 的 RETURN 后通知 ModEvents.notifyBlockPlaced）
+   * 与 <modId>.mixins.json（fabric.mod.json 通过 mixins 字段引用）。
+   * 无 block_place handler 时返回空数组（不生成任何文件）。
+   */
+  private blockPlaceMixinFiles(spec: ModSpecLike, pkg: string): FileNode[] {
+    const hasBlockPlace = (spec.eventHandlers ?? []).some((h) => h.eventType === 'block_place');
+    if (!hasBlockPlace) return [];
+
+    const mixinClass = `package ${pkg}.mixin;
+
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+@Mixin(BlockItem.class)
+public class ModBlockPlaceMixin {
+    // P2.2: 方块放置成功后通知 ModEvents（Fabric API 无现成放置事件）
+    @Inject(method = "place", at = @At("RETURN"))
+    private void onBlockPlaced(BlockPlaceContext context, CallbackInfoReturnable<InteractionResult> cir) {
+        if (cir.getReturnValue().consumesAction()) {
+            Level level = context.getLevel();
+            net.minecraft.core.BlockPos pos = context.getClickedPos();
+            BlockState state = level.getBlockState(pos);
+            net.minecraft.world.entity.player.Player player = context.getPlayer();
+            net.minecraft.server.level.ServerPlayer sp = player instanceof net.minecraft.server.level.ServerPlayer p ? p : null;
+            ${pkg}.ModEvents.notifyBlockPlaced(level, pos, state, sp);
+        }
+    }
+}
+`;
+
+    const mixinsJson = JSON.stringify(
+      {
+        required: true,
+        package: `${pkg}.mixin`,
+        compatibilityLevel: 'JAVA_21',
+        mixins: ['ModBlockPlaceMixin'],
+        injectors: { defaultRequire: 1 },
+      },
+      null,
+      2,
+    );
+
+    return [
+      {
+        path: `src/main/java/${packagePath(spec.modId)}/mixin/ModBlockPlaceMixin.java`,
+        content: mixinClass,
+      },
+      {
+        path: `src/main/resources/${spec.modId}.mixins.json`,
+        content: mixinsJson,
+      },
+    ];
   }
 
   /**
@@ -1010,11 +1119,25 @@ ${registrations || '        // (无事件处理器)'}
             return false;
         });`;
       case 'entity_death':
+        // Fabric API ServerLivingEntityEvents.AFTER_DEATH：实体死亡后触发（target 绑定死亡实体）
+        return `        net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
+            EventContext ctx = new EventContext();
+            ctx.target = entity;
+            ctx.level = (net.minecraft.server.level.ServerLevel) entity.level();
+            ${handlerMethod}(ctx);
+        });`;
       case 'entity_hurt':
+        // Fabric API ServerLivingEntityEvents.AFTER_DAMAGE：实体受伤后触发（target 绑定受伤实体）
+        return `        net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damageTaken, blocked) -> {
+            EventContext ctx = new EventContext();
+            ctx.target = entity;
+            ctx.level = (net.minecraft.server.level.ServerLevel) entity.level();
+            ${handlerMethod}(ctx);
+        });`;
       case 'block_place':
-        // Fabric API 无现成的死亡/受伤/放置事件（需 Mixin 或数据驱动实现），保留 TODO 说明
-        return `        // TODO: 注册 ${eventType} 事件（Fabric API 无现成事件，需 Mixin 实现）
-        // ${handlerMethod}(new EventContext());`;
+        // Fabric API 无现成放置事件：由 ModBlockPlaceMixin 在 BlockItem.place 后调用 notifyBlockPlaced
+        return `        // block_place: Fabric API 无放置事件，由 ModBlockPlaceMixin @Inject 触发
+        // ModEvents.notifyBlockPlaced(level, pos, state, player) 已在 Mixin 中调用`;
       default:
         return `        // TODO: 注册 ${eventType} 事件（Fabric API 未映射）
         // ${handlerMethod}(new EventContext());`;

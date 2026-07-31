@@ -381,6 +381,96 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
     expect(events!.content).toContain('ctx.level = server.overworld();');
   });
 
+  it('entity_death / entity_hurt 注册到 ServerLivingEntityEvents 并绑定 target', () => {
+    const SPEC_DEATH: ModSpec = ModSpecSchema.parse({
+      modId: 'ruby_tools',
+      version: '1.0.0',
+      name: 'Ruby Tools',
+      description: 'Living event test',
+      items: [],
+      blocks: [],
+      license: 'MIT',
+      authors: [],
+      eventHandlers: [
+        { handlerId: 'evt_death', eventType: 'entity_death', eventArgs: {} },
+        { handlerId: 'evt_hurt', eventType: 'entity_hurt', eventArgs: {} },
+      ],
+      conditions: [],
+      actions: [],
+    });
+    const files = adapter.translate({ ...CTX_P14, spec: SPEC_DEATH });
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    expect(events!.content).toContain(
+      'net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DEATH.register',
+    );
+    expect(events!.content).toContain(
+      'net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DAMAGE.register',
+    );
+    expect(events!.content).toContain('ctx.target = entity;');
+    expect(events!.content).toContain(
+      'ctx.level = (net.minecraft.server.level.ServerLevel) entity.level();',
+    );
+    expect(events!.content).not.toContain('TODO: 注册 entity_death 事件');
+    expect(events!.content).not.toContain('TODO: 注册 entity_hurt 事件');
+  });
+
+  it('block_place 生成 Mixin 类 + mixins.json + fabric.mod.json mixins 字段', () => {
+    const SPEC_PLACE: ModSpec = ModSpecSchema.parse({
+      modId: 'ruby_tools',
+      version: '1.0.0',
+      name: 'Ruby Tools',
+      description: 'Block place test',
+      items: [],
+      blocks: [],
+      license: 'MIT',
+      authors: [],
+      eventHandlers: [{ handlerId: 'evt_place', eventType: 'block_place', eventArgs: {} }],
+      conditions: [],
+      actions: [],
+    });
+    const files = adapter.translate({ ...CTX_P14, spec: SPEC_PLACE });
+    // Mixin 类
+    const mixin = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/mixin/ModBlockPlaceMixin.java',
+    );
+    expect(mixin).toBeDefined();
+    expect(mixin!.content).toContain('@Mixin(BlockItem.class)');
+    expect(mixin!.content).toContain('@Inject(method = "place", at = @At("RETURN"))');
+    expect(mixin!.content).toContain('ModEvents.notifyBlockPlaced(level, pos, state, sp)');
+    // mixins.json
+    const mixinsJson = files.find((f) => f.path === 'src/main/resources/ruby_tools.mixins.json');
+    expect(mixinsJson).toBeDefined();
+    const parsed = JSON.parse(mixinsJson!.content);
+    expect(parsed.package).toBe('com.example.ruby_tools.mixin');
+    expect(parsed.mixins).toEqual(['ModBlockPlaceMixin']);
+    // fabric.mod.json 声明 mixins 字段
+    const modJson = files.find((f) => f.path === 'src/main/resources/fabric.mod.json');
+    expect(modJson).toBeDefined();
+    expect(JSON.parse(modJson!.content).mixins).toEqual(['ruby_tools.mixins.json']);
+    // ModEvents 含通知入口（public，供 Mixin 调用）
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    expect(events!.content).toContain('public static void notifyBlockPlaced(');
+    expect(events!.content).toContain('handle_evt_place(ctx);');
+  });
+
+  it('无 block_place handler 时不生成 Mixin 文件与 mixins 字段', () => {
+    const files = adapter.translate(CTX_P14);
+    const paths = files.map((f) => f.path);
+    expect(paths).not.toContain(
+      'src/main/java/com/example/ruby_tools/mixin/ModBlockPlaceMixin.java',
+    );
+    expect(paths).not.toContain('src/main/resources/ruby_tools.mixins.json');
+    const modJson = files.find((f) => f.path === 'src/main/resources/fabric.mod.json');
+    expect(modJson).toBeDefined();
+    expect(JSON.parse(modJson!.content).mixins).toBeUndefined();
+  });
+
   it('mainClass 的 onInitialize 调用新的 initialize 方法', () => {
     const main = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
