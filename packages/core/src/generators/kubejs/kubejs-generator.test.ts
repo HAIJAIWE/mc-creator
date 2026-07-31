@@ -102,7 +102,7 @@ describe('KubejsGenerator', () => {
     const recipes = result.files.find((f) => f.path === 'kubejs/server_scripts/recipes.js');
     expect(recipes).toBeDefined();
     expect(recipes!.content).toContain(
-      "event.shapeless('minecraft:stick', ['minecraft:oak_planks']);",
+      "event.shapeless('4x minecraft:stick', ['minecraft:oak_planks']);",
     );
   });
 
@@ -156,6 +156,79 @@ describe('KubejsGenerator', () => {
     const recipes = result.files.find((f) => f.path === 'kubejs/server_scripts/recipes.js');
     expect(recipes).toBeDefined();
     expect(recipes!.content).toContain("  event.custom('foo');");
+  });
+
+  it('P36: count > 1 时产物用 KubeJS 数量语法 (Nx item)', async () => {
+    const spec = {
+      ...validSpec,
+      recipes: [
+        {
+          id: 'count_test',
+          type: 'shapeless',
+          result: 'minecraft:stick',
+          count: 4,
+          ingredients: ['minecraft:oak_planks'],
+        },
+      ],
+    };
+    const ctx = { spec } as any;
+    const result = await gen.generate(ctx);
+    const recipes = result.files.find((f) => f.path === 'kubejs/server_scripts/recipes.js');
+    expect(recipes!.content).toContain(
+      "event.shapeless('4x minecraft:stick', ['minecraft:oak_planks']);",
+    );
+  });
+
+  it('P36: smelting 支持 xp/cookingTime 链式调用', async () => {
+    const spec = {
+      ...validSpec,
+      recipes: [
+        {
+          id: 'smelt_xp',
+          type: 'smelting',
+          result: 'minecraft:iron_ingot',
+          count: 1,
+          ingredients: ['minecraft:iron_ore'],
+          experience: 0.7,
+          cookingTime: 300,
+        },
+      ],
+    };
+    const ctx = { spec } as any;
+    const result = await gen.generate(ctx);
+    const recipes = result.files.find((f) => f.path === 'kubejs/server_scripts/recipes.js');
+    expect(recipes!.content).toContain(
+      "event.smelting('minecraft:iron_ingot', 'minecraft:iron_ore').xp(0.7).cookingTime(300);",
+    );
+  });
+
+  it('P36: blasting/smoking 生成 event.blasting/event.smoking', async () => {
+    const spec = {
+      ...validSpec,
+      recipes: [
+        {
+          id: 'blast_test',
+          type: 'blasting',
+          result: 'minecraft:iron_ingot',
+          count: 1,
+          ingredients: ['minecraft:iron_ore'],
+        },
+        {
+          id: 'smoke_test',
+          type: 'smoking',
+          result: 'minecraft:cooked_beef',
+          count: 1,
+          ingredients: ['minecraft:beef'],
+        },
+      ],
+    };
+    const ctx = { spec } as any;
+    const result = await gen.generate(ctx);
+    const recipes = result.files.find((f) => f.path === 'kubejs/server_scripts/recipes.js');
+    expect(recipes!.content).toContain(
+      "event.blasting('minecraft:iron_ingot', 'minecraft:iron_ore');",
+    );
+    expect(recipes!.content).toContain("event.smoking('minecraft:cooked_beef', 'minecraft:beef');");
   });
 
   it('含 tags 时生成 tags.js 且支持 replace + values', async () => {

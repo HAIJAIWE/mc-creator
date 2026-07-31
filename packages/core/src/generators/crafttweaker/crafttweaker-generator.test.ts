@@ -175,6 +175,62 @@ describe('CraftTweakerGenerator', () => {
     expect(recipes!.content).toContain('// custom ZenScript code');
   });
 
+  it('P37: smelting 支持 xp/cookTime 四参形式', async () => {
+    const spec = {
+      ...validSpec,
+      recipes: [
+        {
+          id: 'smelt_xp',
+          type: 'smelting',
+          result: 'minecraft:iron_ingot',
+          count: 1,
+          ingredients: ['minecraft:iron_ore'],
+          experience: 0.7,
+          cookingTime: 300,
+        },
+      ],
+    };
+    const ctx = { spec } as any;
+    const result = await gen.generate(ctx);
+    const recipes = result.files.find((f) => f.path === 'scripts/recipes.zs');
+    expect(recipes).toBeDefined();
+    expect(recipes!.content).toContain(
+      'furnace.addRecipe(<minecraft:iron_ingot>, <minecraft:iron_ore>, 0.7, 300);',
+    );
+  });
+
+  it('P37: blasting/smoking 分别用 blastFurnace/smoker API', async () => {
+    const spec = {
+      ...validSpec,
+      recipes: [
+        {
+          id: 'blast_test',
+          type: 'blasting',
+          result: 'minecraft:iron_ingot',
+          count: 1,
+          ingredients: ['minecraft:iron_ore'],
+        },
+        {
+          id: 'smoke_test',
+          type: 'smoking',
+          result: 'minecraft:cooked_beef',
+          count: 1,
+          ingredients: ['minecraft:beef'],
+        },
+      ],
+    };
+    const ctx = { spec } as any;
+    const result = await gen.generate(ctx);
+    const recipes = result.files.find((f) => f.path === 'scripts/recipes.zs');
+    expect(recipes).toBeDefined();
+    expect(recipes!.content).toContain(
+      'blastFurnace.addRecipe(<minecraft:iron_ingot>, <minecraft:iron_ore>);',
+    );
+    expect(recipes!.content).toContain(
+      'smoker.addRecipe(<minecraft:cooked_beef>, <minecraft:beef>);',
+    );
+  });
+
   it('含 tags 时生成 tags.zs 使用 <tag:items:...> 语法', async () => {
     const spec = {
       ...validSpec,

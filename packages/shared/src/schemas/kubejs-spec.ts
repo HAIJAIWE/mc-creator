@@ -1,11 +1,17 @@
 import { z } from 'zod';
 
-/** KubeJS 配方类型（更灵活，允许 shaped/shapeless/smelting/stonecutting/custom） */
+/** KubeJS 配方类型（P36 增强：blasting/smoking 高炉/烟熏炉） */
 export const KubejsRecipeSpec = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
-  type: z.enum(['shaped', 'shapeless', 'smelting', 'stonecutting', 'custom']).default('shaped'),
+  type: z
+    .enum(['shaped', 'shapeless', 'smelting', 'blasting', 'smoking', 'stonecutting', 'custom'])
+    .default('shaped'),
   result: z.string(), // 产物物品 ID，如 minecraft:diamond
   count: z.number().int().min(1).default(1),
+  // P36：烧炼类配方经验值（smelting/blasting/smoking 用）
+  experience: z.number().min(0).optional(),
+  // P36：烧炼类配方时长 tick（smelting/blasting/smoking 用）
+  cookingTime: z.number().int().min(1).optional(),
   // shaped 配方用：pattern（如 ['III','III','III']）
   pattern: z.array(z.string()).optional(),
   // shaped 配方用：键映射（如 { I: ['minecraft:iron_ingot'] }）

@@ -148,10 +148,19 @@ export class CraftTweakerGenerator implements Generator {
         const resultExpr = r.count > 1 ? `${resultItem}:${r.count}` : resultItem;
         return `recipes.addShapeless(${resultExpr}, [${ingredients}]);`;
       }
-      case 'smelting': {
+      case 'smelting':
+      case 'blasting':
+      case 'smoking': {
         const ingredient = r.ingredients?.[0] ?? '';
         const inputItem = this.itemBracket(ingredient);
-        return `furnace.addRecipe(${resultItem}, ${inputItem});`;
+        // P37：xp/cookTime 有值时输出四参形式（furnace/blastFurnace/smoker）
+        const extra =
+          r.experience !== undefined || r.cookingTime !== undefined
+            ? `, ${r.experience ?? 0}, ${r.cookingTime ?? 200}`
+            : '';
+        const api =
+          r.type === 'blasting' ? 'blastFurnace' : r.type === 'smoking' ? 'smoker' : 'furnace';
+        return `${api}.addRecipe(${resultItem}, ${inputItem}${extra});`;
       }
       case 'stonecutting': {
         const ingredient = r.ingredients?.[0] ?? '';

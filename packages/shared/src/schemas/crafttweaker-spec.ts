@@ -1,11 +1,17 @@
 import { z } from 'zod';
 
-/** CraftTweaker 配方类型（与 KubeJS 对齐：shaped/shapeless/smelting/stonecutting/custom） */
+/** CraftTweaker 配方类型（P37 增强：blasting/smoking 高炉/烟熏炉） */
 export const CraftTweakerRecipeSpec = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
-  type: z.enum(['shaped', 'shapeless', 'smelting', 'stonecutting', 'custom']).default('shaped'),
+  type: z
+    .enum(['shaped', 'shapeless', 'smelting', 'blasting', 'smoking', 'stonecutting', 'custom'])
+    .default('shaped'),
   result: z.string(), // 产物物品 ID，如 minecraft:diamond
   count: z.number().int().min(1).default(1),
+  // P37：烧炼类配方经验值（smelting/blasting/smoking 用）
+  experience: z.number().min(0).optional(),
+  // P37：烧炼类配方时长 tick（smelting/blasting/smoking 用）
+  cookingTime: z.number().int().min(1).optional(),
   // shaped 配方用：pattern（如 ['III','III','III']）
   pattern: z.array(z.string()).optional(),
   // shaped 配方用：键映射（如 { I: ['minecraft:iron_ingot'] }）

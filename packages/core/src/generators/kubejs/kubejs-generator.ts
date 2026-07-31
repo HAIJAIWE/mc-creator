@@ -122,6 +122,10 @@ export class KubejsGenerator implements Generator {
 
   /** 单个 recipe → KubeJS event.recipes() 调用代码（已缩进 2 空格） */
   private generateRecipe(r: KubejsRecipeSpec): string {
+    // P36：count > 1 时产物用 KubeJS 数量语法 '4x minecraft:stick'
+    const resultExpr = r.count > 1 ? `${r.count}x ${r.result}` : r.result;
+    // P36：烧炼类配方 xp/cookingTime 链式调用（有值才链）
+    const cookingChain = this.cookingChain(r);
     switch (r.type) {
       case 'shaped': {
         const pattern = r.pattern ?? [];
@@ -129,17 +133,19 @@ export class KubejsGenerator implements Generator {
         for (const [k, v] of Object.entries(r.key ?? {})) {
           keyObj[k] = v[0] ?? '';
         }
-        return `  event.shaped('${r.result}', ${JSON.stringify(pattern)}, ${JSON.stringify(keyObj)
+        return `  event.shaped('${resultExpr}', ${JSON.stringify(pattern)}, ${JSON.stringify(keyObj)
           .replace(/"([^"]+)":/g, '$1:')
-          .replace(/"/g, "'")});`;
+          .replace(/"/g, "'")})${cookingChain};`;
       }
       case 'shapeless': {
         const ingredients = (r.ingredients ?? []).map((i) => `'${i}'`).join(', ');
-        return `  event.shapeless('${r.result}', [${ingredients}]);`;
+        return `  event.shapeless('${resultExpr}', [${ingredients}])${cookingChain};`;
       }
-      case 'smelting': {
+      case 'smelting':
+      case 'blasting':
+      case 'smoking': {
         const ingredient = r.ingredients?.[0] ?? '';
-        return `  event.smelting('${r.result}', '${ingredient}');`;
+        return `  event.${r.type}('${resultExpr}', '${ingredient}')${cookingChain};`;
       }
       case 'stonecutting': {
         const ingredient = r.ingredients?.[0] ?? '';
@@ -156,6 +162,18 @@ export class KubejsGenerator implements Generator {
       default:
         return '  // unknown recipe type';
     }
+  }
+
+  /** P36：烧炼类配方（smelting/blasting/smoking）的 xp/cookingTime 链式后缀 */
+  private cookingChain(r: KubejsRecipeSpec): string {
+    let chain = '';
+    if (r.experience !== undefined) {
+      chain += `.xp(${r.experience})`;
+    }
+    if (r.cookingTime !== undefined) {
+      chain += `.cookingTime(${r.cookingTime})`;
+    }
+    return chain;
   }
 
   /** 生成 tags.js（汇总所有 tags，使用 ServerEvents.tags） */
