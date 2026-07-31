@@ -319,6 +319,38 @@ const PROCEDURE_FIELDS: FieldSchema[] = [
     patternMessage: '须为合法 Java 标识符：字母/下划线开头，仅含字母/数字/下划线',
   },
   { key: 'displayName', label: '显示名', type: 'text' },
+  // P40：输入参数列表（name + type，编译为方法形参；每参数自动生成 in_<name> 数据端口）
+  {
+    key: 'inputs',
+    label: '输入参数',
+    type: 'list',
+    listItemSchema: [
+      {
+        key: 'name',
+        label: '参数名',
+        type: 'text',
+        pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$',
+        patternMessage: '须为合法 Java 标识符',
+      },
+      {
+        key: 'type',
+        label: '类型',
+        type: 'dropdown',
+        options: [
+          'int',
+          'float',
+          'double',
+          'long',
+          'boolean',
+          'string',
+          'item',
+          'block',
+          'entity',
+          'player',
+        ],
+      },
+    ],
+  },
 ];
 
 /** loop 节点字段（阶段 C） */

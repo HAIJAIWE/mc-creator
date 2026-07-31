@@ -39,7 +39,12 @@ function ProcedureNodeComponent({ id, data, selected }: NodeProps<ProcedureNodeD
       {data.displayName && data.displayName !== data.procedureName && (
         <div className="text-mc-dim">{data.displayName}</div>
       )}
-      <div className="text-mc-dim">procedure_{data.procedureName}(event)</div>
+      <div className="text-mc-dim">
+        procedure_{data.procedureName}
+        {(data.inputs ?? []).length > 0
+          ? `(ctx, ${data.inputs.map((i) => `${i.type} ${i.name}`).join(', ')})`
+          : '(ctx)'}
+      </div>
       {data.note && <div className="text-mc-mute">{data.note}</div>}
     </McNodeShell>
   );

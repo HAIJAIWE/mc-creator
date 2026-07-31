@@ -1,6 +1,6 @@
 import type { NodeGraph, NodeKind, PortType } from '@mc-creator/shared';
 
-/** 字段类型（对应 7 类编辑器 + text + code） */
+/** 字段类型（对应编辑器 + text + code） */
 export type FieldType =
   | 'text'
   | 'number'
@@ -10,7 +10,20 @@ export type FieldType =
   | 'color'
   | 'nbt'
   | 'segmented'
-  | 'code';
+  | 'code'
+  | 'list';
+
+/** list 编辑器用：每行的子字段定义 */
+export interface ListItemSchema {
+  /** 子字段键（如 name / type） */
+  key: string;
+  label: string;
+  type: 'text' | 'dropdown';
+  options?: string[];
+  /** Java 标识符正则（name 字段用） */
+  pattern?: string;
+  patternMessage?: string;
+}
 
 /** 字段 schema（驱动 NodeDetailForm 渲染） */
 export interface FieldSchema {
@@ -36,6 +49,8 @@ export interface FieldSchema {
   pattern?: string;
   /** pattern 不匹配时的错误提示 */
   patternMessage?: string;
+  /** list 编辑器用：每行子字段定义 */
+  listItemSchema?: ListItemSchema[];
 }
 
 /** 编辑器统一 props */

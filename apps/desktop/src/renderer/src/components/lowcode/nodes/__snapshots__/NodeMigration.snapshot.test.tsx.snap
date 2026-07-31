@@ -3150,7 +3150,7 @@ exports[`节点迁移快照测试 > procedure 节点展开状态快照 1`] = `
     >
       procedure_
       myProcedure
-      (event)
+      (ctx)
     </div>
   </div>
   <div
@@ -3362,7 +3362,7 @@ exports[`节点迁移快照测试 > procedure 节点选中状态快照 1`] = `
     >
       procedure_
       myProcedure
-      (event)
+      (ctx)
     </div>
   </div>
   <div

@@ -12,6 +12,7 @@ import { ResourceIdEditor } from './editors/ResourceIdEditor.js';
 import { NbtEditor } from './editors/NbtEditor.js';
 import { NodeRefEditor } from './editors/NodeRefEditor.js';
 import { CodeEditor } from './editors/CodeEditor.js';
+import { ListEditor } from './editors/ListEditor.js';
 import { FieldLabel } from './FieldLabel.js';
 import { getTooltip } from './fieldTooltips.js';
 import { ErrorRecovery, getErrorSuggestion, getFixLabel } from './ErrorRecovery.js';
@@ -118,6 +119,8 @@ function renderEditor(
       return (
         <CodeEditor value={String(value ?? '')} onChange={onChange} schema={field} graph={graph} />
       );
+    case 'list':
+      return <ListEditor value={value} onChange={onChange} schema={field} graph={graph} />;
     case 'text':
     default:
       return (
