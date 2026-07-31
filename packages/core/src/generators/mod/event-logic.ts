@@ -11,6 +11,21 @@
 
 import type { ConditionSpec, ActionSpec } from '@mc-creator/shared';
 
+/** 宽松条件结构：adapter 中的条件元素 conditionType 为 string（兼容增量 spec） */
+export interface ConditionLike {
+  conditionId?: string;
+  conditionType: string;
+  args?: Record<string, unknown>;
+  invert?: boolean;
+}
+
+/** 宽松动作结构：adapter 中的动作元素 actionType 为 string */
+export interface ActionLike {
+  actionId?: string;
+  actionType: string;
+  args?: Record<string, unknown>;
+}
+
 /** 从 args 读取数值参数（兼容 number 与字符串），缺省返回默认值 */
 function numArg(args: Record<string, unknown>, key: string, fallback: number): number {
   const v = args[key];
@@ -35,7 +50,7 @@ const SERVER_PLAYER = 'net.minecraft.server.level.ServerPlayer';
 const SERVER_LEVEL = 'net.minecraft.server.level.ServerLevel';
 
 /** 条件类型 → Java 布尔表达式（含 instanceof 转型检查），不匹配时返回 false */
-function conditionExpr(cond: ConditionSpec): string | null {
+function conditionExpr(cond: ConditionLike): string | null {
   const args = cond.args ?? {};
   switch (cond.conditionType) {
     case 'is_day':
@@ -66,7 +81,7 @@ function conditionExpr(cond: ConditionSpec): string | null {
 }
 
 /** 动作类型 → Java 语句（含 instanceof 转型检查），不匹配时静默跳过 */
-function actionStatements(action: ActionSpec): string | null {
+function actionStatements(action: ActionLike): string | null {
   const args = action.args ?? {};
   switch (action.actionType) {
     case 'send_message': {
@@ -123,7 +138,7 @@ function actionStatements(action: ActionSpec): string | null {
  * 生成 check_<id> 方法体。
  * 返回 null 表示该类型未实现（调用方回退到占位 TODO 注释）。
  */
-export function conditionCheckBody(cond: ConditionSpec): string | null {
+export function conditionCheckBody(cond: ConditionLike): string | null {
   return conditionExpr(cond);
 }
 
@@ -131,6 +146,6 @@ export function conditionCheckBody(cond: ConditionSpec): string | null {
  * 生成 execute_<id> 方法体。
  * 返回 null 表示该类型未实现（调用方回退到占位 TODO 注释）。
  */
-export function actionExecuteBody(action: ActionSpec): string | null {
+export function actionExecuteBody(action: ActionLike): string | null {
   return actionStatements(action);
 }
