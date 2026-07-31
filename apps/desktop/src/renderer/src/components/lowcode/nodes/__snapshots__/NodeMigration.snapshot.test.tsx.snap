@@ -2,7 +2,9 @@
 
 exports[`节点迁移快照测试 > action 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="生成实体 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -40,7 +42,9 @@ exports[`节点迁移快照测试 > action 节点展开状态快照 1`] = `
     </button>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -88,7 +92,9 @@ exports[`节点迁移快照测试 > action 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > action 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="生成实体 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -118,7 +124,7 @@ exports[`节点迁移快照测试 > action 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -126,8 +132,30 @@ exports[`节点迁移快照测试 > action 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="in"
+          data-handlepos="left"
+          data-id="null-in-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          执行
+        </span>
+      </div>
+    </div>
     <div
       class="flex flex-col gap-1"
     >
@@ -154,7 +182,9 @@ exports[`节点迁移快照测试 > action 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > action 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="生成实体 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -192,7 +222,9 @@ exports[`节点迁移快照测试 > action 节点选中状态快照 1`] = `
     </button>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -240,7 +272,9 @@ exports[`节点迁移快照测试 > action 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > block 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新方块 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -295,7 +329,9 @@ exports[`节点迁移快照测试 > block 节点展开状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -323,7 +359,9 @@ exports[`节点迁移快照测试 > block 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > block 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新方块 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -348,7 +386,7 @@ exports[`节点迁移快照测试 > block 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -356,7 +394,9 @@ exports[`节点迁移快照测试 > block 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -384,7 +424,9 @@ exports[`节点迁移快照测试 > block 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > block 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="新方块 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -439,7 +481,9 @@ exports[`节点迁移快照测试 > block 节点选中状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -467,7 +511,9 @@ exports[`节点迁移快照测试 > block 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > code 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="process() 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -520,7 +566,9 @@ exports[`节点迁移快照测试 > code 节点展开状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -568,7 +616,9 @@ exports[`节点迁移快照测试 > code 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > code 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="process() 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -598,7 +648,7 @@ exports[`节点迁移快照测试 > code 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -606,8 +656,30 @@ exports[`节点迁移快照测试 > code 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="in"
+          data-handlepos="left"
+          data-id="null-in-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 154, 154); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          输入
+        </span>
+      </div>
+    </div>
     <div
       class="flex flex-col gap-1"
     >
@@ -634,7 +706,9 @@ exports[`节点迁移快照测试 > code 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > code 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="process() 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -687,7 +761,9 @@ exports[`节点迁移快照测试 > code 节点选中状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -735,7 +811,9 @@ exports[`节点迁移快照测试 > code 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > comment 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="备注 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -781,7 +859,9 @@ exports[`节点迁移快照测试 > comment 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > comment 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="备注 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -806,7 +886,7 @@ exports[`节点迁移快照测试 > comment 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -818,7 +898,9 @@ exports[`节点迁移快照测试 > comment 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > comment 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="备注 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -864,7 +946,9 @@ exports[`节点迁移快照测试 > comment 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > condition 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="拥有物品 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -897,7 +981,9 @@ exports[`节点迁移快照测试 > condition 节点展开状态快照 1`] = `
     </button>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -961,7 +1047,9 @@ exports[`节点迁移快照测试 > condition 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > condition 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="拥有物品 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -986,7 +1074,7 @@ exports[`节点迁移快照测试 > condition 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -994,8 +1082,30 @@ exports[`节点迁移快照测试 > condition 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="in"
+          data-handlepos="left"
+          data-id="null-in-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          输入
+        </span>
+      </div>
+    </div>
     <div
       class="flex flex-col gap-1"
     >
@@ -1038,7 +1148,9 @@ exports[`节点迁移快照测试 > condition 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > condition 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="拥有物品 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1071,7 +1183,9 @@ exports[`节点迁移快照测试 > condition 节点选中状态快照 1`] = `
     </button>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1135,7 +1249,9 @@ exports[`节点迁移快照测试 > condition 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > entity 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新生物 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1199,7 +1315,9 @@ exports[`节点迁移快照测试 > entity 节点展开状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1227,7 +1345,9 @@ exports[`节点迁移快照测试 > entity 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > entity 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新生物 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1257,7 +1377,7 @@ exports[`节点迁移快照测试 > entity 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -1265,7 +1385,9 @@ exports[`节点迁移快照测试 > entity 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1293,7 +1415,9 @@ exports[`节点迁移快照测试 > entity 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > entity 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="新生物 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1357,7 +1481,9 @@ exports[`节点迁移快照测试 > entity 节点选中状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1385,7 +1511,9 @@ exports[`节点迁移快照测试 > entity 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > event 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="右键方块 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1423,7 +1551,9 @@ exports[`节点迁移快照测试 > event 节点展开状态快照 1`] = `
     </button>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1451,7 +1581,9 @@ exports[`节点迁移快照测试 > event 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > event 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="右键方块 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1481,7 +1613,7 @@ exports[`节点迁移快照测试 > event 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -1489,7 +1621,9 @@ exports[`节点迁移快照测试 > event 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1517,7 +1651,9 @@ exports[`节点迁移快照测试 > event 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > event 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="右键方块 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1555,7 +1691,9 @@ exports[`节点迁移快照测试 > event 节点选中状态快照 1`] = `
     </button>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1583,7 +1721,9 @@ exports[`节点迁移快照测试 > event 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > item 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新物品 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1642,7 +1782,9 @@ exports[`节点迁移快照测试 > item 节点展开状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1670,7 +1812,9 @@ exports[`节点迁移快照测试 > item 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > item 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新物品 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1700,7 +1844,7 @@ exports[`节点迁移快照测试 > item 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -1708,7 +1852,9 @@ exports[`节点迁移快照测试 > item 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1736,7 +1882,9 @@ exports[`节点迁移快照测试 > item 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > item 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="新物品 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1795,7 +1943,9 @@ exports[`节点迁移快照测试 > item 节点选中状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1823,7 +1973,9 @@ exports[`节点迁移快照测试 > item 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > loop 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="循环 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1880,7 +2032,9 @@ exports[`节点迁移快照测试 > loop 节点展开状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -1960,7 +2114,9 @@ exports[`节点迁移快照测试 > loop 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > loop 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="循环 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -1990,7 +2146,7 @@ exports[`节点迁移快照测试 > loop 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -1998,8 +2154,30 @@ exports[`节点迁移快照测试 > loop 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="input"
+          data-handlepos="left"
+          data-id="null-input-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          输入
+        </span>
+      </div>
+    </div>
     <div
       class="flex flex-col gap-1"
     >
@@ -2058,7 +2236,9 @@ exports[`节点迁移快照测试 > loop 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > loop 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="循环 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -2115,7 +2295,9 @@ exports[`节点迁移快照测试 > loop 节点选中状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -2195,7 +2377,9 @@ exports[`节点迁移快照测试 > loop 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > machine 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新机器 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -2268,7 +2452,9 @@ exports[`节点迁移快照测试 > machine 节点展开状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -2332,7 +2518,9 @@ exports[`节点迁移快照测试 > machine 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > machine 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新机器 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -2362,7 +2550,7 @@ exports[`节点迁移快照测试 > machine 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -2370,8 +2558,46 @@ exports[`节点迁移快照测试 > machine 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="in_item"
+          data-handlepos="left"
+          data-id="null-in_item-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(216, 138, 138); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          输入物品
+        </span>
+      </div>
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="in_energy"
+          data-handlepos="left"
+          data-id="null-in_energy-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(216, 200, 122); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          能源输入
+        </span>
+      </div>
+    </div>
     <div
       class="flex flex-col gap-1"
     >
@@ -2398,7 +2624,9 @@ exports[`节点迁移快照测试 > machine 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > machine 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="新机器 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -2471,7 +2699,9 @@ exports[`节点迁移快照测试 > machine 节点选中状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -2535,7 +2765,9 @@ exports[`节点迁移快照测试 > machine 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > multiblock 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新多方块结构 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -2593,7 +2825,9 @@ exports[`节点迁移快照测试 > multiblock 节点展开状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -2646,7 +2880,9 @@ exports[`节点迁移快照测试 > multiblock 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > multiblock 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="新多方块结构 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -2676,7 +2912,7 @@ exports[`节点迁移快照测试 > multiblock 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -2684,8 +2920,35 @@ exports[`节点迁移快照测试 > multiblock 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="controller"
+          data-handlepos="left"
+          data-id="null-controller-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(216, 168, 122); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          <span
+            class="text-red-400"
+          >
+            *
+          </span>
+          控制器
+        </span>
+      </div>
+    </div>
     <div
       class="flex flex-col gap-1"
     >
@@ -2712,7 +2975,9 @@ exports[`节点迁移快照测试 > multiblock 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > multiblock 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="新多方块结构 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -2770,7 +3035,9 @@ exports[`节点迁移快照测试 > multiblock 节点选中状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -2821,9 +3088,337 @@ exports[`节点迁移快照测试 > multiblock 节点选中状态快照 1`] = `
 </div>
 `;
 
+exports[`节点迁移快照测试 > procedure 节点展开状态快照 1`] = `
+<div
+  aria-label="myProcedure 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(106, 154, 182);"
+    />
+    <img
+      alt="link"
+      class="shrink-0"
+      height="14"
+      src="/src/renderer/src/assets/mc-ui/pixel/link.svg"
+      style="image-rendering: pixelated; display: inline-block;"
+      width="14"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(106, 154, 182);"
+    >
+      myProcedure
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      过程
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-dim"
+    >
+      新过程
+    </div>
+    <div
+      class="text-mc-dim"
+    >
+      procedure_
+      myProcedure
+      (event)
+    </div>
+  </div>
+  <div
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
+  >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="in"
+          data-handlepos="left"
+          data-id="null-in-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          调用
+        </span>
+      </div>
+    </div>
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          过程体
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="trigger"
+          data-handlepos="right"
+          data-id="null-trigger-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > procedure 节点折叠状态快照 1`] = `
+<div
+  aria-label="myProcedure 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(106, 154, 182);"
+    />
+    <img
+      alt="link"
+      class="shrink-0"
+      height="14"
+      src="/src/renderer/src/assets/mc-ui/pixel/link.svg"
+      style="image-rendering: pixelated; display: inline-block;"
+      width="14"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(106, 154, 182);"
+    >
+      myProcedure
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      过程
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="展开"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▸
+    </button>
+  </div>
+  <div
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
+  >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="in"
+          data-handlepos="left"
+          data-id="null-in-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          调用
+        </span>
+      </div>
+    </div>
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          过程体
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="trigger"
+          data-handlepos="right"
+          data-id="null-trigger-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > procedure 节点选中状态快照 1`] = `
+<div
+  aria-label="myProcedure 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(106, 154, 182);"
+    />
+    <img
+      alt="link"
+      class="shrink-0"
+      height="14"
+      src="/src/renderer/src/assets/mc-ui/pixel/link.svg"
+      style="image-rendering: pixelated; display: inline-block;"
+      width="14"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(106, 154, 182);"
+    >
+      myProcedure
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      过程
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-dim"
+    >
+      新过程
+    </div>
+    <div
+      class="text-mc-dim"
+    >
+      procedure_
+      myProcedure
+      (event)
+    </div>
+  </div>
+  <div
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
+  >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="in"
+          data-handlepos="left"
+          data-id="null-in-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          调用
+        </span>
+      </div>
+    </div>
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <span
+          class="select-none"
+        >
+          过程体
+        </span>
+        <div
+          class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
+          data-handleid="trigger"
+          data-handlepos="right"
+          data-id="null-trigger-source"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
 exports[`节点迁移快照测试 > recipe 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="new_recipe 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -2879,7 +3474,9 @@ exports[`节点迁移快照测试 > recipe 节点展开状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -2932,7 +3529,9 @@ exports[`节点迁移快照测试 > recipe 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > recipe 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="new_recipe 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -2962,7 +3561,7 @@ exports[`节点迁移快照测试 > recipe 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -2970,8 +3569,35 @@ exports[`节点迁移快照测试 > recipe 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
+    <div
+      class="flex flex-col gap-1"
+    >
+      <div
+        class="flex items-center gap-1 text-[10px] text-mc-text"
+      >
+        <div
+          class="react-flow__handle react-flow__handle-left nodrag nopan target connectable connectablestart connectableend connectionindicator"
+          data-handleid="in"
+          data-handlepos="left"
+          data-id="null-in-target"
+          style="width: 8px; height: 8px; border-radius: 0; background: rgb(216, 138, 138); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
+        />
+        <span
+          class="select-none"
+        >
+          <span
+            class="text-red-400"
+          >
+            *
+          </span>
+          材料
+        </span>
+      </div>
+    </div>
     <div
       class="flex flex-col gap-1"
     >
@@ -2998,7 +3624,9 @@ exports[`节点迁移快照测试 > recipe 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > recipe 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="new_recipe 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -3054,7 +3682,9 @@ exports[`节点迁移快照测试 > recipe 节点选中状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -3107,7 +3737,9 @@ exports[`节点迁移快照测试 > recipe 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > subgraph 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="子图 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -3161,7 +3793,9 @@ exports[`节点迁移快照测试 > subgraph 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > subgraph 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="子图 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -3186,7 +3820,7 @@ exports[`节点迁移快照测试 > subgraph 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -3198,7 +3832,9 @@ exports[`节点迁移快照测试 > subgraph 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > subgraph 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="子图 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -3252,7 +3888,9 @@ exports[`节点迁移快照测试 > subgraph 节点选中状态快照 1`] = `
 
 exports[`节点迁移快照测试 > variable 节点展开状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="var1 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -3310,7 +3948,9 @@ exports[`节点迁移快照测试 > variable 节点展开状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -3338,7 +3978,9 @@ exports[`节点迁移快照测试 > variable 节点展开状态快照 1`] = `
 
 exports[`节点迁移快照测试 > variable 节点折叠状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] "
+  aria-label="var1 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -3363,7 +4005,7 @@ exports[`节点迁移快照测试 > variable 节点折叠状态快照 1`] = `
       ⚙
     </button>
     <button
-      aria-label="折叠"
+      aria-label="展开"
       class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       type="button"
     >
@@ -3371,7 +4013,9 @@ exports[`节点迁移快照测试 > variable 节点折叠状态快照 1`] = `
     </button>
   </div>
   <div
-    class="flex justify-end gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    aria-label="端口"
+    class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"
@@ -3399,7 +4043,9 @@ exports[`节点迁移快照测试 > variable 节点折叠状态快照 1`] = `
 
 exports[`节点迁移快照测试 > variable 节点选中状态快照 1`] = `
 <div
-  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent"
+  aria-label="var1 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
   style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
 >
   <div
@@ -3457,7 +4103,9 @@ exports[`节点迁移快照测试 > variable 节点选中状态快照 1`] = `
     </div>
   </div>
   <div
+    aria-label="端口"
     class="flex justify-between gap-2 border-t-2 border-t-black border-b-white border-l-white border-r-white px-2 py-1"
+    role="list"
   >
     <div
       class="flex flex-col gap-1"

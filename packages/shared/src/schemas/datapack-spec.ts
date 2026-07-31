@@ -64,6 +64,10 @@ export const AdvancementSpec = z.object({
   icon: z.string(), // 物品 ID
   trigger: z.string(), // 触发器，如 minecraft:inventory_changed
   conditions: z.string().optional(), // 条件 JSON 字符串
+  /** P1 dogfood：父进度路径（如 "minecraft:story/root"），用于进度树 */
+  parent: z.string().optional(),
+  /** P1 dogfood：进度框架类型（task/challenge/goal） */
+  frame: z.enum(['task', 'challenge', 'goal']).default('task').optional(),
 });
 
 /** 战利品表条目 */

@@ -62,7 +62,16 @@ export const useSpecHistoryStore = create<SpecHistoryState>((set, get) => ({
 
   removeVersion: (id) =>
     set((state) => {
+      const idx = state.versions.findIndex((v) => v.id === id);
+      if (idx === -1) return state;
       const versions = state.versions.filter((v) => v.id !== id);
-      return { versions, currentIndex: Math.min(state.currentIndex, versions.length - 1) };
+      let currentIndex = state.currentIndex;
+      // L-7 修复：被删版本在当前激活版本之前时索引左移；删除的正是当前版本时回退到前一个版本
+      if (idx < currentIndex) {
+        currentIndex -= 1;
+      } else if (idx === currentIndex) {
+        currentIndex = idx > 0 ? idx - 1 : -1;
+      }
+      return { versions, currentIndex };
     }),
 }));

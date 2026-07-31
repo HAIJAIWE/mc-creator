@@ -1,9 +1,8 @@
 import { memo } from 'react';
 import { type NodeProps } from 'reactflow';
 import type { RecipeNodeData } from '@mc-creator/shared';
-import { useNodeGraphStore } from '../../../store/node-graph-store.js';
-import { useDrawerStore } from '../../../store/drawer-store.js';
 import { McNodeShell } from './base/McNodeShell.js';
+import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
 
 const RECIPE_TYPE_LABELS: Record<RecipeNodeData['recipeType'], string> = {
@@ -19,11 +18,12 @@ const RECIPE_TYPE_LABELS: Record<RecipeNodeData['recipeType'], string> = {
  * 配方节点：表达一个合成/烧炼配方。
  * 端口：in (item_stack, multiple) ← 材料 / out (item_stack) ← 产物
  * 颜色：mc-recipe（黄色）
+ *
+ * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
+ * 避免每次任何节点变化都因 find 选择器触发重新渲染。
  */
 function RecipeNodeComponent({ id, data, selected }: NodeProps<RecipeNodeData>) {
-  const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
-  const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n) => n.id === id)?.ports ?? []);
+  const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
   return (
@@ -32,12 +32,13 @@ function RecipeNodeComponent({ id, data, selected }: NodeProps<RecipeNodeData>) 
       title={data.label || data.recipeId || '配方'}
       colorClass="mc-recipe"
       badge={RECIPE_TYPE_LABELS[data.recipeType]}
-      ports={ports}
+      ports={node?.ports ?? []}
       collapsed={data.collapsed}
       selected={selected}
       debugState={debugState}
-      onToggleCollapse={() => toggleCollapse(id)}
-      onOpenDrawer={() => openDrawer(id)}
+      codeLocked={data.codeLocked}
+      onToggleCollapse={toggleCollapse}
+      onOpenDrawer={openDrawer}
     >
       <div className="text-mc-mute">ID: {data.recipeId}</div>
       <div className="flex gap-2 text-mc-dim">

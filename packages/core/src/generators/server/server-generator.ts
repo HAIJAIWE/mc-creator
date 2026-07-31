@@ -14,6 +14,15 @@ import type { ServerSpec as ServerSpecType, OpEntry, WhitelistEntry } from '@mc-
  * 生成 server.properties、eula.txt、启动脚本、ops.json、whitelist.json、
  * mods/modlist.txt、README.txt 等服务器运行所需文件。
  */
+
+/**
+ * P2 dogfood：Shell 参数安全转义，防止命令注入。
+ * 移除危险的 shell 元字符（; | & $ ` " < > \n \r），保留基本路径字符。
+ * 注意：括号在引号包裹的参数中无特殊含义，须保留（如 "C:\Program Files (x86)\..."）。
+ */
+function shellEscape(s: string): string {
+  return s.replace(/[;&|`$"<>!\n\r]/g, '');
+}
 export class ServerGenerator implements Generator {
   readonly type = 'server';
   readonly loaders: Loader[] = ['fabric', 'neoforge'];
@@ -102,7 +111,7 @@ export class ServerGenerator implements Generator {
   private generateStartBat(spec: ServerSpecType): FileNode {
     return {
       path: 'start.bat',
-      content: `@echo off\njava -Xmx${spec.maxMemory} -Xms${spec.startMemory} -jar server.jar nogui\npause\n`,
+      content: `@echo off\n"${shellEscape(spec.javaPath || 'java')}" -Xmx${shellEscape(spec.maxMemory)} -Xms${shellEscape(spec.startMemory)} -jar "${shellEscape(spec.jarName)}" nogui\npause\n`,
     };
   }
 
@@ -110,7 +119,7 @@ export class ServerGenerator implements Generator {
   private generateStartSh(spec: ServerSpecType): FileNode {
     return {
       path: 'start.sh',
-      content: `#!/bin/sh\njava -Xmx${spec.maxMemory} -Xms${spec.startMemory} -jar server.jar nogui\n`,
+      content: `#!/bin/sh\n"${shellEscape(spec.javaPath || 'java')}" -Xmx${shellEscape(spec.maxMemory)} -Xms${shellEscape(spec.startMemory)} -jar "${shellEscape(spec.jarName)}" nogui\n`,
     };
   }
 
@@ -186,14 +195,14 @@ export class ServerGenerator implements Generator {
   private generateSystemdService(spec: ServerSpecType): FileNode {
     const restart = spec.restartOnCrash ? 'on-failure' : 'no';
     const content = `[Unit]
-Description=Minecraft Server (${spec.serverName})
+Description=Minecraft Server (${shellEscape(spec.serverName)})
 After=network.target
 
 [Service]
 Type=simple
-User=${spec.serviceUser}
-WorkingDirectory=${spec.serviceDir}
-ExecStart=${spec.javaPath} -Xmx${spec.maxMemory} -Xms${spec.startMemory} -jar ${spec.jarName} nogui
+User=${shellEscape(spec.serviceUser)}
+WorkingDirectory=${shellEscape(spec.serviceDir)}
+ExecStart="${shellEscape(spec.javaPath || 'java')}" -Xmx${shellEscape(spec.maxMemory)} -Xms${shellEscape(spec.startMemory)} -jar "${shellEscape(spec.jarName)}" nogui
 Restart=${restart}
 RestartSec=10
 
@@ -205,16 +214,18 @@ WantedBy=multi-user.target
 
   /** deploy/install-systemd.sh — systemd 安装脚本 */
   private generateInstallSystemdSh(spec: ServerSpecType): FileNode {
+    const user = shellEscape(spec.serviceUser);
+    const dir = shellEscape(spec.serviceDir);
     const content = `#!/bin/bash
 set -e
 # 创建用户
-useradd -r -m -d ${spec.serviceDir} ${spec.serviceUser} || true
+useradd -r -m -d "${dir}" "${user}" || true
 # 创建目录
-mkdir -p ${spec.serviceDir}
+mkdir -p "${dir}"
 # 复制文件
-cp -r ./* ${spec.serviceDir}/
+cp -r ./* "${dir}/"
 # 设置权限
-chown -R ${spec.serviceUser}:${spec.serviceUser} ${spec.serviceDir}
+chown -R "${user}:${user}" "${dir}"
 # 安装 service
 cp deploy/minecraft.service /etc/systemd/system/
 systemctl daemon-reload
@@ -230,8 +241,8 @@ echo "安装完成。运行: systemctl start minecraft"
 WORKDIR /server
 COPY . .
 EXPOSE ${spec.port}
-ENV JAVA_OPTS="-Xmx${spec.maxMemory} -Xms${spec.startMemory}"
-CMD ["sh", "-c", "java $JAVA_OPTS -jar ${spec.jarName} nogui"]
+ENV JAVA_OPTS="-Xmx${shellEscape(spec.maxMemory)} -Xms${shellEscape(spec.startMemory)}"
+CMD ["sh", "-c", "java $JAVA_OPTS -jar ${shellEscape(spec.jarName)} nogui"]
 `;
     return { path: 'deploy/Dockerfile', content };
   }
@@ -243,7 +254,7 @@ CMD ["sh", "-c", "java $JAVA_OPTS -jar ${spec.jarName} nogui"]
 services:
   minecraft:
     build: ..
-    container_name: ${spec.serverName}
+    container_name: ${shellEscape(spec.serverName)}
     ports:
       - "${spec.port}:${spec.port}"
     volumes:
@@ -260,7 +271,7 @@ services:
   private generateBuildDockerSh(spec: ServerSpecType): FileNode {
     const content = `#!/bin/bash
 set -e
-docker build -t minecraft-${spec.serverName} -f deploy/Dockerfile .
+docker build -t minecraft-${shellEscape(spec.serverName)} -f deploy/Dockerfile .
 docker compose -f deploy/docker-compose.yml up -d
 echo "Docker 部署完成。查看日志: docker compose -f deploy/docker-compose.yml logs -f"
 `;
@@ -269,11 +280,11 @@ echo "Docker 部署完成。查看日志: docker compose -f deploy/docker-compos
 
   /** deploy/backup.sh — 备份脚本 */
   private generateBackupSh(spec: ServerSpecType): FileNode {
-    const src = spec.serviceDir || '.';
+    const src = shellEscape(spec.serviceDir || '.');
     const content = `#!/bin/bash
 BACKUP_DIR="/backups/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"
-cp -r ${src}/* "$BACKUP_DIR/"
+cp -r "${src}"/* "$BACKUP_DIR/"
 # 保留最近 7 个备份
 ls -dt /backups/* | tail -n +8 | xargs rm -rf
 echo "备份完成: $BACKUP_DIR"
@@ -283,7 +294,7 @@ echo "备份完成: $BACKUP_DIR"
 
   /** deploy/backup-cron — cron 定时任务 */
   private generateBackupCron(spec: ServerSpecType): FileNode {
-    const content = `0 */${spec.backupInterval} * * * ${spec.serviceUser} /path/to/deploy/backup.sh >> /var/log/minecraft-backup.log 2>&1
+    const content = `0 */${spec.backupInterval} * * * ${shellEscape(spec.serviceUser)} /path/to/deploy/backup.sh >> /var/log/minecraft-backup.log 2>&1
 `;
     return { path: 'deploy/backup-cron', content };
   }

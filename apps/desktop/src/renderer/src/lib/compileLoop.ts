@@ -33,7 +33,8 @@ export function compileLoop(
 function buildLoopHeader(data: LoopNodeData): string {
   switch (data.loopType) {
     case 'for':
-      return `for (${data.init ?? 'int i = 0'}; ${data.condition}; ${data.update ?? 'i++'})`;
+      // L-4 修复：condition 空时兜底 'true'，避免生成无限循环 `for (;;)` 或语法错误 `for (int i = 0; ; i++)`
+      return `for (${data.init ?? 'int i = 0'}; ${data.condition || 'true'}; ${data.update ?? 'i++'})`;
     case 'forEach': {
       const javaType = loopVarTypeToJava(data.loopVarType);
       // 空名回退到默认 'item'；非空时校验为合法 Java 标识符，防止注入破坏声明
@@ -42,7 +43,8 @@ function buildLoopHeader(data: LoopNodeData): string {
       return `for (${javaType} ${varName} : ${iterable})`;
     }
     case 'while':
-      return `while (${data.condition})`;
+      // L-4 修复：condition 空时兜底 'true'，避免生成语法错误的 `while ()`
+      return `while (${data.condition || 'true'})`;
   }
 }
 

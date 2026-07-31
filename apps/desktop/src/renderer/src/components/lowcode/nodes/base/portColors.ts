@@ -32,4 +32,6 @@ export const NODE_COLORS: Record<string, string> = {
   'mc-action': '#c67a7a',
   'mc-code': '#9a9a9a',
   'mc-comment': '#d8c87a',
+  // P1-3：过程节点（靛青色，区别于 event 紫与 condition 蓝）
+  'mc-procedure': '#6a9ab6',
 };

@@ -211,8 +211,17 @@ function renderTokens(
             result += renderTokens(elseTokens, fields, currentThis);
           }
         } else {
-          // each
-          const arr = tok.key in fields ? fields[tok.key] : undefined;
+          // each：取值与 if 一致走作用域链（嵌套 each 内优先当前项，外层 fields 兜底）
+          const thisObj =
+            currentThis !== null && typeof currentThis === 'object'
+              ? (currentThis as Record<string, unknown>)
+              : null;
+          const arr =
+            thisObj && tok.key in thisObj
+              ? thisObj[tok.key]
+              : tok.key in fields
+                ? fields[tok.key]
+                : undefined;
           let items: unknown[] = [];
           if (Array.isArray(arr)) {
             items = arr;

@@ -31,6 +31,7 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
     disabled: false,
     collapsed: false,
     codeLocked: false,
+    formatVersion: 1,
   };
   switch (kind) {
     case 'item':
@@ -178,6 +179,14 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         update: 'i++',
         loopVarName: 'i',
         loopVarType: 'int',
+      } as NodeData;
+    case 'procedure':
+      // P1-3：过程节点默认数据（测试辅助）
+      return {
+        ...base,
+        kind: 'procedure',
+        procedureName: 'myProcedure',
+        displayName: '新过程',
       } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);
@@ -426,7 +435,6 @@ describe('compileNodeGraph', () => {
     expect(result.spec.actions).toEqual([]);
     expect(result.warnings).toEqual([]);
     expect(result.errors).toEqual([]);
-    expect(result.unsupported).toEqual([]);
   });
 
   it('编译单个 item 节点', () => {
@@ -498,10 +506,6 @@ describe('compileNodeGraph', () => {
     // 不再产生 recipe 相关 warning
     const recipeWarnings = result.warnings.filter((w) => w.includes('bronze_recipe'));
     expect(recipeWarnings).toEqual([]);
-
-    // 不再记录到 unsupported
-    const recipeUnsupported = result.unsupported?.filter((u) => u.kind === 'recipe');
-    expect(recipeUnsupported).toEqual([]);
   });
 
   it('recipe 节点无输出连线时产生 error', () => {
@@ -547,10 +551,6 @@ describe('compileNodeGraph', () => {
     // 不再产生 entity 相关 warning
     const entityWarnings = result.warnings.filter((w) => w.includes('fire_elemental'));
     expect(entityWarnings).toEqual([]);
-
-    // 不再记录到 unsupported
-    const entityUnsupported = result.unsupported?.filter((u) => u.kind === 'entity');
-    expect(entityUnsupported).toEqual([]);
   });
 
   it('machine 节点编译到 spec.machines（含能源/GUI 配置）', () => {
@@ -626,9 +626,8 @@ describe('compileNodeGraph', () => {
     expect(snippet.inputSignature).toEqual({ in: 'integer' });
     expect(snippet.outputSignature).toEqual({ out: 'integer' });
 
-    // code 节点不应产生 warning 或 unsupported
+    // code 节点不应产生 warning
     expect(result.warnings.filter((w) => w.includes('n1'))).toEqual([]);
-    expect(result.unsupported?.filter((u) => u.kind === 'code')).toEqual([]);
   });
 
   it('code 节点的非法 JSON 签名被安全回退为空对象', () => {
@@ -668,8 +667,7 @@ describe('compileNodeGraph', () => {
     expect(mb.hollow).toBe(true);
     expect(mb.controllerOffset).toEqual({ x: 1, y: 0, z: 1 });
 
-    // multiblock 不应再被记入 unsupported 或 warning
-    expect(result.unsupported?.filter((u) => u.kind === 'multiblock')).toEqual([]);
+    // multiblock 不应再产生 warning
     expect(result.warnings.filter((w) => w.includes('smeltery'))).toEqual([]);
   });
 
@@ -689,8 +687,7 @@ describe('compileNodeGraph', () => {
     expect(handler.conditionIds).toEqual([]);
     expect(handler.actionIds).toEqual([]);
 
-    // event 不应再被记入 unsupported 或 warning
-    expect(result.unsupported?.filter((u) => u.kind === 'event')).toEqual([]);
+    // event 不应再产生 warning
     expect(result.warnings.filter((w) => w.includes('n1'))).toEqual([]);
   });
 
@@ -859,7 +856,6 @@ describe('compileNodeGraph', () => {
     expect(cond.args).toEqual({ threshold: 10 });
     expect(cond.invert).toBe(true);
 
-    expect(result.unsupported?.filter((u) => u.kind === 'condition')).toEqual([]);
     expect(result.warnings.filter((w) => w.includes('n1'))).toEqual([]);
   });
 
@@ -876,7 +872,6 @@ describe('compileNodeGraph', () => {
     expect(act.actionType).toBe('spawn_entity');
     expect(act.args).toEqual({ entity: 'minecraft:zombie', count: 3 });
 
-    expect(result.unsupported?.filter((u) => u.kind === 'action')).toEqual([]);
     expect(result.warnings.filter((w) => w.includes('n1'))).toEqual([]);
   });
 
@@ -898,6 +893,147 @@ describe('compileNodeGraph', () => {
     expect(result.errors).toEqual([]);
   });
 
+  // === P1-3：过程系统（对标 MCreator procedure） ===
+
+  it('procedure 节点编译到 spec.procedures（含过程名）', () => {
+    const nodes = [
+      makeNode('p1', 'procedure', { procedureName: 'grantReward', displayName: '发放奖励' }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes));
+
+    expect(result.spec.procedures).toHaveLength(1);
+    const proc = result.spec.procedures[0];
+    expect(proc.procedureId).toBe('p1');
+    expect(proc.procedureName).toBe('grantReward');
+    expect(proc.displayName).toBe('发放奖励');
+    // 无 control 边时各 id 列表为空
+    expect(proc.conditionIds).toEqual([]);
+    expect(proc.actionIds).toEqual([]);
+    expect(proc.procedureCallIds).toEqual([]);
+  });
+
+  it('procedure → condition → action 过程体编译（BFS 收集 conditionIds/actionIds）', () => {
+    const nodes = [
+      makeNode('p1', 'procedure', { procedureName: 'onTick' }),
+      makeNode('c1', 'condition', { conditionType: 'is_day' }),
+      makeNode('a1', 'action', { actionType: 'give_item' }),
+    ];
+    const edges = [
+      makeEdge('pc1', 'p1', 'c1', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+      makeEdge('ca1', 'c1', 'a1', { kind: 'control', sourceHandle: 'true', targetHandle: 'in' }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes, edges));
+
+    expect(result.spec.procedures).toHaveLength(1);
+    const proc = result.spec.procedures[0];
+    expect(proc.conditionIds).toEqual(['c1']);
+    expect(proc.actionIds).toEqual(['a1']);
+    expect(proc.procedureCallIds).toEqual([]);
+  });
+
+  it('event → procedure 调用编译（procedureCallIds 引用，不内联过程体）', () => {
+    // event 调用 procedure；procedure 自身含 condition/action 过程体
+    // event 不应收集 procedure 的 condition/action（那些归属 procedure）
+    const nodes = [
+      makeNode('e1', 'event', { eventType: 'player_join' }),
+      makeNode('p1', 'procedure', { procedureName: 'greet' }),
+      makeNode('c1', 'condition', { conditionType: 'is_day' }),
+      makeNode('a1', 'action', { actionType: 'send_message' }),
+    ];
+    const edges = [
+      // event → procedure（调用）
+      makeEdge('ep1', 'e1', 'p1', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+      // procedure → condition → action（过程体）
+      makeEdge('pc1', 'p1', 'c1', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+      makeEdge('ca1', 'c1', 'a1', { kind: 'control', sourceHandle: 'true', targetHandle: 'in' }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes, edges));
+
+    // event handler 记录 procedureCallIds，但不收集 procedure 的 condition/action
+    expect(result.spec.eventHandlers).toHaveLength(1);
+    const handler = result.spec.eventHandlers[0];
+    expect(handler.procedureCallIds).toEqual(['p1']);
+    expect(handler.conditionIds).toEqual([]);
+    expect(handler.actionIds).toEqual([]);
+
+    // procedure 自身记录过程体
+    expect(result.spec.procedures).toHaveLength(1);
+    const proc = result.spec.procedures[0];
+    expect(proc.procedureId).toBe('p1');
+    expect(proc.conditionIds).toEqual(['c1']);
+    expect(proc.actionIds).toEqual(['a1']);
+  });
+
+  it('多个 event 复用同一 procedure（命名可复用：单一 ProcedureSpec + 多处调用）', () => {
+    // 两个 event 都调用同一个 procedure → procedure 只出现一次，两个 handler 都引用它
+    const nodes = [
+      makeNode('e1', 'event', { eventType: 'player_join' }),
+      makeNode('e2', 'event', { eventType: 'player_quit' }),
+      makeNode('p1', 'procedure', { procedureName: 'logEvent' }),
+      makeNode('a1', 'action', { actionType: 'send_message' }),
+    ];
+    const edges = [
+      makeEdge('ep1', 'e1', 'p1', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+      makeEdge('ep2', 'e2', 'p1', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+      makeEdge('pa1', 'p1', 'a1', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes, edges));
+
+    // procedure 只出现一次（按节点 id 唯一）
+    expect(result.spec.procedures).toHaveLength(1);
+    expect(result.spec.procedures[0].procedureId).toBe('p1');
+    expect(result.spec.procedures[0].actionIds).toEqual(['a1']);
+
+    // 两个 event handler 都引用该 procedure
+    expect(result.spec.eventHandlers).toHaveLength(2);
+    expect(result.spec.eventHandlers[0].procedureCallIds).toEqual(['p1']);
+    expect(result.spec.eventHandlers[1].procedureCallIds).toEqual(['p1']);
+  });
+
+  it('procedure 嵌套调用（procedure → procedure，不内联被调用过程的体）', () => {
+    // p1 调用 p2；p2 有自己的 action 体
+    // p1 的 procedureCallIds 含 p2，但 actionIds 不含 p2 的 action
+    const nodes = [
+      makeNode('p1', 'procedure', { procedureName: 'outer' }),
+      makeNode('p2', 'procedure', { procedureName: 'inner' }),
+      makeNode('a1', 'action', { actionType: 'play_sound' }),
+    ];
+    const edges = [
+      makeEdge('pp1', 'p1', 'p2', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+      makeEdge('pa1', 'p2', 'a1', { kind: 'control', sourceHandle: 'trigger', targetHandle: 'in' }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes, edges));
+
+    expect(result.spec.procedures).toHaveLength(2);
+    const outer = result.spec.procedures.find((p) => p.procedureId === 'p1')!;
+    const inner = result.spec.procedures.find((p) => p.procedureId === 'p2')!;
+
+    // outer 调用 inner，但不收集 inner 的 action
+    expect(outer.procedureCallIds).toEqual(['p2']);
+    expect(outer.actionIds).toEqual([]);
+    expect(outer.conditionIds).toEqual([]);
+
+    // inner 自身含 action
+    expect(inner.procedureCallIds).toEqual([]);
+    expect(inner.actionIds).toEqual(['a1']);
+  });
+
+  it('procedure 节点无 control 边时各 id 列表为空数组', () => {
+    const nodes = [makeNode('p1', 'procedure', { procedureName: 'empty' })];
+    // 只连 craft 边（非 control），验证不会误收集
+    const edges = [
+      makeEdge('pitem', 'p1', 'i1', { kind: 'craft', sourceHandle: 'trigger', targetHandle: 'in' }),
+    ];
+    const nodes2 = [...nodes, makeNode('i1', 'item')];
+    const result = compileNodeGraph(makeGraph(nodes2, edges));
+
+    expect(result.spec.procedures).toHaveLength(1);
+    const proc = result.spec.procedures[0];
+    expect(proc.conditionIds).toEqual([]);
+    expect(proc.actionIds).toEqual([]);
+    expect(proc.procedureCallIds).toEqual([]);
+  });
+
   it('comment 节点被跳过（不产生 spec/warning/unsupported）', () => {
     const commentNode = makeNode('n1', 'comment', { text: '这是个备注', color: 'blue' });
     const result = compileNodeGraph(makeGraph([commentNode]));
@@ -909,7 +1045,6 @@ describe('compileNodeGraph', () => {
     // 不产生 warning 或 error
     expect(result.warnings).toEqual([]);
     expect(result.errors).toEqual([]);
-    expect(result.unsupported).toEqual([]);
   });
 
   it('所有节点类型混合编译（item/block/recipe/entity/machine/code/multiblock/event/condition/action）', () => {
@@ -945,8 +1080,6 @@ describe('compileNodeGraph', () => {
     // comment 不计入任何字段
     // 所有节点应正常编译，无 error
     expect(result.errors).toEqual([]);
-    // 不应有任何 unsupported（所有类型均已编译）
-    expect(result.unsupported).toEqual([]);
   });
 
   it('孤立 item 节点（无连线）仍能编译到 items 数组', () => {
@@ -978,6 +1111,7 @@ describe('compileNodeGraph', () => {
         nodeId: 'n2',
         itemId: 'locked_item',
         codeLocked: true,
+        formatVersion: 1,
         lockedCode: userCode,
       }),
     ];
@@ -998,6 +1132,7 @@ describe('compileNodeGraph', () => {
         nodeId: 'n1',
         itemId: 'empty_locked_item',
         codeLocked: true,
+        formatVersion: 1,
         // lockedCode 缺省
       }),
     ];
@@ -1019,6 +1154,7 @@ describe('compileNodeGraph', () => {
         nodeId: 'n1',
         code: originalCode,
         codeLocked: true,
+        formatVersion: 1,
         lockedCode: userModifiedCode,
       }),
     ];
@@ -1169,6 +1305,7 @@ function makeVariable(id: string, varName: string): ModNode {
       isConstant: true,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     },
     ports: [],
     selected: false,
@@ -1194,6 +1331,7 @@ function makeLoop(id: string): ModNode {
       loopVarType: 'int',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     },
     ports: [],
     selected: false,
@@ -1217,6 +1355,7 @@ function makeCustom(id: string, typeId: string, fields: Record<string, unknown> 
       customFields: fields,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     },
     ports: [],
     selected: false,
@@ -1265,6 +1404,7 @@ describe('compileNodeGraph 阶段 C 集成', () => {
         glow: false,
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       },
       ports: [],
       selected: false,
@@ -1293,6 +1433,7 @@ describe('compileNodeGraph 阶段 C 集成', () => {
         customFields: {},
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       },
       ports: [],
       selected: false,
@@ -1386,6 +1527,7 @@ describe('compileNodeGraph 阶段 C 集成', () => {
         glow: false,
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       },
       ports: [],
       selected: false,
@@ -1445,6 +1587,7 @@ describe('compileNodeGraph 阶段 C 集成', () => {
         glow: false,
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       },
       ports: [],
       selected: false,
@@ -1459,7 +1602,11 @@ describe('compileNodeGraph 阶段 C 集成', () => {
     };
     const result = compileNodeGraph(graph);
     // my_mod:item 与净化后的 modId(my_mod) 一致，不应产生外部依赖 warning
-    expect(result.warnings.some((w) => w.includes('my_mod'))).toBe(false);
+    // 注意：modId 净化警告也包含 my_mod 字符串，需排除净化警告精确检查
+    const externalWarnings = result.warnings.filter(
+      (w) => w.includes('外部 mod') || w.includes('未安装'),
+    );
+    expect(externalWarnings.some((w) => w.includes('my_mod'))).toBe(false);
     // 清理缓存
     preloadExternalMods([]);
   });

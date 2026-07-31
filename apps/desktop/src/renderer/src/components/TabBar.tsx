@@ -65,6 +65,8 @@ export function TabBar() {
   return (
     <div
       ref={tabBarRef}
+      role="tablist"
+      aria-label="打开的文件"
       className="flex items-center gap-0.5 overflow-x-auto border-b border-mc-border bg-mc-surface px-1 py-1"
     >
       {openTabs.length === 0 && (
@@ -76,30 +78,45 @@ export function TabBar() {
         const isDirty = dirtyFiles.has(path);
 
         return (
-          <button
+          <div
             key={path}
+            role="tab"
+            tabIndex={0}
+            aria-selected={isSelected}
             onClick={() => selectFile(path)}
             onAuxClick={(e) => handleAuxClick(e, path)}
             onContextMenu={(e) => handleContextMenu(e, path)}
-            className={`group flex items-center gap-1.5 rounded-mc border-b-2 px-2 py-1 text-xs transition-colors ${
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectFile(path);
+              }
+            }}
+            className={`group flex cursor-pointer items-center gap-1.5 rounded-mc border-b-2 px-2 py-1 text-xs transition-colors ${
               isSelected
                 ? 'border-mc-accent bg-mc-surface-2 text-mc-text'
                 : 'border-transparent text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
             }`}
           >
-            {getFileIcon(path)}
+            <span aria-hidden="true">{getFileIcon(path)}</span>
             <span className="max-w-32 truncate">{fileName}</span>
-            {isDirty && <span className="text-mc-gold">●</span>}
+            {isDirty && (
+              <span className="text-mc-gold" aria-label="未保存的更改">
+                ●
+              </span>
+            )}
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 closeTab(path);
               }}
+              aria-label={`关闭 ${fileName}`}
               className="rounded-mc p-0.5 text-mc-mute transition-colors hover:bg-mc-surface-3 hover:text-mc-text"
             >
-              <X className="h-3 w-3" />
+              <X className="h-3 w-3" aria-hidden="true" />
             </button>
-          </button>
+          </div>
         );
       })}
 

@@ -13,6 +13,7 @@ import { CommentNode } from './CommentNode.js';
 import { VariableNode } from './VariableNode.js';
 import { SubgraphNode } from './SubgraphNode.js';
 import { LoopNode } from './LoopNode.js';
+import { ProcedureNode } from './ProcedureNode.js';
 
 /**
  * 节点类型注册表
@@ -36,6 +37,8 @@ export const nodeTypes = {
   variable: VariableNode,
   subgraph: SubgraphNode,
   loop: LoopNode,
+  // P1-3 新增
+  procedure: ProcedureNode,
 } as const;
 
 export type NodeTypeRegistry = typeof nodeTypes;
@@ -169,6 +172,15 @@ export const NODE_METADATA: NodeMeta[] = [
     icon: 'loop',
     category: 'advanced',
     color: 'emerald',
+  },
+  // P1-3 新增
+  {
+    kind: 'procedure',
+    label: '过程',
+    description: '命名可复用逻辑（对标 MCreator procedure），编译为 Java 方法',
+    icon: 'link',
+    category: 'logic',
+    color: 'indigo',
   },
 ];
 

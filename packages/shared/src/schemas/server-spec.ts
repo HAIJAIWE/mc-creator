@@ -25,7 +25,8 @@ export const ServerProperty = z.record(z.string(), z.union([z.string(), z.number
 /** ServerSpec：服务器配置规格 */
 export const ServerSpec = z.object({
   serverName: z.string(),
-  mcVersion: z.string().default('1.21.1'),
+  // S-9 修复：默认 MC 版本与 types/loader.ts 的 DEFAULT_MC_VERSION ('1.21.11') 对齐
+  mcVersion: z.string().default('1.21.11'),
   motd: z.string().default('A Minecraft Server'),
   maxPlayers: z.number().int().min(1).max(999).default(20),
   port: z.number().int().min(1).max(65535).default(25565),
@@ -36,7 +37,9 @@ export const ServerSpec = z.object({
   pvp: z.boolean().default(true),
   onlineMode: z.boolean().default(true),
   whitelist: z.boolean().default(false),
-  enforceWhitelist: z.boolean().default(true),
+  // S-7 修复：enforceWhitelist 默认值与 whitelist 对齐（vanilla 中 enforce-whitelist
+  // 仅在 white-list 开启时生效，此前 false/true 组合产出无效配置）
+  enforceWhitelist: z.boolean().default(false),
   viewDistance: z.number().int().min(3).max(32).default(10),
   simulationDistance: z.number().int().min(3).max(32).default(10),
   allowFlight: z.boolean().default(false),

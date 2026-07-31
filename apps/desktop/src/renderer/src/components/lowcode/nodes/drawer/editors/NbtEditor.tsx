@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState, useEffect, useRef } from 'react';
 import type { EditorProps } from './types.js';
 
 type NbtValue = string | number | boolean | null | NbtValue[] | { [key: string]: NbtValue };
@@ -23,6 +23,10 @@ function isNbtRecord(v: unknown): v is Record<string, NbtValue> {
  * - 解析为键值对列表显示
  * - 添加键（默认 string 类型）
  * - 修改值触发 onChange（重新序列化为 JSON）
+ *
+ * P2 dogfood 修复：每个键的输入框用本地 state 管理显示值，
+ * 避免受控 value + onChange 导致光标在每次输入后跳到末尾。
+ * 仅在初始挂载或外部 value 变化时从 renderValue 初始化本地显示值。
  */
 function NbtEditorComponent({ value, onChange, error }: EditorProps<string>) {
   // 同步派生 parseError，避免渲染期间 setState
@@ -38,7 +42,27 @@ function NbtEditorComponent({ value, onChange, error }: EditorProps<string>) {
     }
   }, [value]);
 
+  // P2 修复：本地编辑状态，key → 显示文本的映射。
+  // 用户输入时只更新本地显示文本 + 触发 onChange，不重新格式化显示值。
+  const [localValues, setLocalValues] = useState<Record<string, string>>({});
+  // 追踪上次 parsed 的 key 集合，当 key 变化时重置对应的本地值
+  const prevKeysRef = useRef<Set<string>>(new Set());
+
   const entries = Object.entries(parsed);
+
+  // 当 parsed 的 key 集合变化时（新增/删除键），同步本地显示值
+  useEffect(() => {
+    const currentKeys = new Set(entries.map(([k]) => k));
+    const newLocalValues: Record<string, string> = {};
+    for (const [k, v] of entries) {
+      // 保留已有本地值（用户正在编辑），新键用格式化值初始化
+      newLocalValues[k] = localValues[k] ?? renderValue(v);
+    }
+    prevKeysRef.current = currentKeys;
+    setLocalValues(newLocalValues);
+    // 仅在 entries key 集合变化时执行，不依赖 localValues 避免循环
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsed]);
 
   const handleAddKey = () => {
     const newKey = `key_${entries.length + 1}`;
@@ -46,14 +70,29 @@ function NbtEditorComponent({ value, onChange, error }: EditorProps<string>) {
     onChange(JSON.stringify(next, null, 2));
   };
 
-  const handleValueChange = (key: string, newValue: NbtValue) => {
-    const next = { ...parsed, [key]: newValue };
-    onChange(JSON.stringify(next, null, 2));
+  const handleValueChange = (key: string, displayText: string) => {
+    // 更新本地显示文本（不格式化，保留用户原始输入）
+    setLocalValues((prev) => ({ ...prev, [key]: displayText }));
+    // 解析用户输入为 NBT 值
+    let next: NbtValue = displayText;
+    if (displayText === 'true') next = true;
+    else if (displayText === 'false') next = false;
+    else if (displayText === 'null') next = null;
+    else if (/^-?\d+(\.\d+)?$/.test(displayText)) next = Number(displayText);
+    else if (displayText.startsWith('"') && displayText.endsWith('"'))
+      next = displayText.slice(1, -1);
+    const updated = { ...parsed, [key]: next };
+    onChange(JSON.stringify(updated, null, 2));
   };
 
   const handleDeleteKey = (key: string) => {
     const next = { ...parsed };
     delete next[key];
+    setLocalValues((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
     onChange(JSON.stringify(next, null, 2));
   };
 
@@ -77,18 +116,8 @@ function NbtEditorComponent({ value, onChange, error }: EditorProps<string>) {
           <span className="text-mc-dim">:</span>
           <input
             type="text"
-            defaultValue={renderValue(v)}
-            onChange={(e) => {
-              const raw = e.target.value;
-              let next: NbtValue = raw;
-              // 尝试解析为数字/布尔/null
-              if (raw === 'true') next = true;
-              else if (raw === 'false') next = false;
-              else if (raw === 'null') next = null;
-              else if (/^-?\d+(\.\d+)?$/.test(raw)) next = Number(raw);
-              else if (raw.startsWith('"') && raw.endsWith('"')) next = raw.slice(1, -1);
-              handleValueChange(k, next);
-            }}
+            value={localValues[k] ?? renderValue(v)}
+            onChange={(e) => handleValueChange(k, e.target.value)}
             className="flex-1 border border-t-black border-l-black border-b-white border-r-white bg-mc-bg px-1 py-0.5 text-[11px] text-mc-text outline-none focus:border-mc-accent"
           />
           <button

@@ -107,7 +107,7 @@ describe('LauncherGenerator', () => {
     const result = await gen.generate(ctx);
     const bat = result.files.find((f) => f.path === 'start.bat');
     expect(bat).toBeDefined();
-    expect(bat!.content).toContain('java -Xmx2048M');
+    expect(bat!.content).toContain('"java" -Xmx2048M');
     expect(bat!.content).not.toContain('/usr/bin/java');
   });
 
@@ -117,7 +117,7 @@ describe('LauncherGenerator', () => {
     const sh = result.files.find((f) => f.path === 'start.sh');
     expect(sh).toBeDefined();
     expect(sh!.content).toContain('#!/bin/sh');
-    expect(sh!.content).toContain('java -Xmx2048M');
+    expect(sh!.content).toContain('"java" -Xmx2048M');
   });
 
   it('launch.ps1 内容正确', async () => {

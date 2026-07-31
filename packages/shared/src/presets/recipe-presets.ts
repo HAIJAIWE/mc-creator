@@ -76,7 +76,8 @@ export const ARMOR_RECIPE_PRESETS: RecipePreset[] = [
     description: '5 材料排列',
     template: {
       pattern: ['MMM', 'M M'],
-      key: { M: '{material}' },
+      // 注：key 值为数组（与 RecipeSpec.key 的 z.record(z.string(), z.array(z.string())) 对齐）
+      key: { M: ['{material}'] },
       result: '{modId}:{material_name}_helmet',
     },
   },
@@ -86,7 +87,8 @@ export const ARMOR_RECIPE_PRESETS: RecipePreset[] = [
     description: '8 材料排列',
     template: {
       pattern: ['M M', 'MMM', 'MMM'],
-      key: { M: '{material}' },
+      // 注：key 值为数组（与 RecipeSpec.key 的 z.record(z.string(), z.array(z.string())) 对齐）
+      key: { M: ['{material}'] },
       result: '{modId}:{material_name}_chestplate',
     },
   },
@@ -96,7 +98,8 @@ export const ARMOR_RECIPE_PRESETS: RecipePreset[] = [
     description: '7 材料排列',
     template: {
       pattern: ['MMM', 'M M', 'M M'],
-      key: { M: '{material}' },
+      // 注：key 值为数组（与 RecipeSpec.key 的 z.record(z.string(), z.array(z.string())) 对齐）
+      key: { M: ['{material}'] },
       result: '{modId}:{material_name}_leggings',
     },
   },
@@ -106,7 +109,8 @@ export const ARMOR_RECIPE_PRESETS: RecipePreset[] = [
     description: '4 材料排列',
     template: {
       pattern: ['M M', 'M M'],
-      key: { M: '{material}' },
+      // 注：key 值为数组（与 RecipeSpec.key 的 z.record(z.string(), z.array(z.string())) 对齐）
+      key: { M: ['{material}'] },
       result: '{modId}:{material_name}_boots',
     },
   },
@@ -164,7 +168,8 @@ export const STORAGE_RECIPE_PRESETS: RecipePreset[] = [
     description: '9 个锭压缩为存储方块',
     template: {
       pattern: ['MMM', 'MMM', 'MMM'],
-      key: { M: '{ingot}' },
+      // 注：key 值为数组（与 RecipeSpec.key 的 z.record(z.string(), z.array(z.string())) 对齐）
+      key: { M: ['{ingot}'] },
       result: '{storage_block}',
     },
   },

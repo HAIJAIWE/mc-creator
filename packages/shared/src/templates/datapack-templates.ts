@@ -24,7 +24,8 @@ export const DATAPACK_TEMPLATES: SpecTemplate[] = [
     description:
       '做一个数据包，自定义以下战利品表：1）僵尸掉落：50% 概率掉落铁锭 1 个，' +
       '30% 概率掉落胡萝卜 2 个，20% 概率掉落马铃薯 1 个；2）末影龙击杀掉落：' +
-      '必掉 1 个龙蛋 + 500 经验球 + 1 个鞘翅（耐久度 50%）；3）村庄箱子战利品：' +
+      // S-13 修复：LootEntrySpec 无经验球/耐久度字段，删除不可表达需求
+      '必掉 1 个龙蛋 + 1 个鞘翅；3）村庄箱子战利品：' +
       '2 次抽取，每次 1-3 个绿宝石、10% 概率附魔书。packId 用 better_loot，' +
       '路径分别为 entity/zombie、entity/ender_dragon、chest/village/village_weaponsmith。',
   },

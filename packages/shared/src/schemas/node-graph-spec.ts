@@ -32,6 +32,8 @@ export const NodeKind = z.enum([
   'variable',
   'subgraph',
   'loop',
+  // P1-3 新增：过程节点（对标 MCreator procedure）
+  'procedure',
 ]);
 export type NodeKind = z.infer<typeof NodeKind>;
 
@@ -108,6 +110,15 @@ export const BaseNodeData = z.object({
    * 为空时（即使 codeLocked=true）回退到常规编译并产生 warning。
    */
   lockedCode: z.string().optional(),
+  /**
+   * 节点数据格式版本（对标 MCreator GeneratableElement.formatVersion）。
+   *
+   * - 新建节点 data.formatVersion = LATEST_FORMAT_VERSION（见 nodeDataMigrator.ts）
+   * - 反序列化旧 JSON 时，缺少此字段视为 v1
+   * - migrateGraph 顺序应用 v1→v2→v3... 迁移器，把旧数据升级到当前版本
+   * - 这保证了 schema 演进（字段改名/类型变更/结构重组）时旧项目文件不丢失语义
+   */
+  formatVersion: z.number().int().default(1),
 });
 export type BaseNodeData = z.infer<typeof BaseNodeData>;
 
@@ -438,6 +449,30 @@ export const LoopNodeData = BaseNodeData.extend({
 });
 export type LoopNodeData = z.infer<typeof LoopNodeData>;
 
+// === P1-3：过程节点（对标 MCreator procedure） ===
+
+/**
+ * 过程节点：命名的可复用逻辑单元。
+ *
+ * 设计对标 MCreator 的 procedure：
+ * - procedureName 为 Java 方法名（编译为 `procedure_<name>(Object event)`）
+ * - 通过 control 边连接 condition/action 节点构成过程体（编译时 BFS 收集）
+ * - event 节点通过 control 边连接 procedure 节点（事件调用过程）
+ * - procedure 节点可连接其他 procedure 节点（过程嵌套调用）
+ * - 同一 procedure 可被多个 event/procedure 引用 → 复用（单一 Java 方法，多处调用）
+ */
+export const ProcedureNodeData = BaseNodeData.extend({
+  kind: z.literal('procedure'),
+  /** 过程名（Java 标识符，编译为方法名 procedure_<procedureName>） */
+  procedureName: z
+    .string()
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
+    .default('myProcedure'),
+  /** 显示名（UI 展示用，默认同 procedureName） */
+  displayName: z.string().default('新过程'),
+});
+export type ProcedureNodeData = z.infer<typeof ProcedureNodeData>;
+
 // === 节点数据联合类型 ===
 
 export const NodeData = z.discriminatedUnion('kind', [
@@ -456,6 +491,8 @@ export const NodeData = z.discriminatedUnion('kind', [
   VariableNodeData,
   SubgraphNodeData,
   LoopNodeData,
+  // P1-3 新增
+  ProcedureNodeData,
 ]);
 export type NodeData = z.infer<typeof NodeData>;
 
@@ -508,8 +545,13 @@ export type SubgraphDefinition = z.infer<typeof SubgraphDefinition>;
 // === 完整节点图 ===
 
 export const NodeGraph = z.object({
-  /** 节点图版本（用于迁移） */
-  version: z.literal(1).default(1),
+  /**
+   * 节点图版本（用于迁移）。
+   * S-11 修复：原为 z.literal(1)，旧 JSON 缺字段或未来 bump 版本时 parse 失败；
+   * 改为数字并默认 1。注意：图级版本当前不参与节点数据迁移（nodeDataMigrator 按
+   * 节点 formatVersion 迁移），仅作存档元信息保留。
+   */
+  version: z.number().int().default(1),
   /** 项目 ID（关联 ModSpec.modId） */
   modId: z.string(),
   /** 画布元信息 */

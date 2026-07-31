@@ -15,6 +15,24 @@ import type { LauncherSpec as LauncherSpecType } from '@mc-creator/shared';
  * README.txt、config/theme.json 等启动器运行所需文件。
  * 启动器不限定 mod loader，故支持全部 5 种 loader。
  */
+
+/**
+ * P2 dogfood：Shell 参数安全转义，防止命令注入。
+ * 移除危险的 shell 元字符（; | & $ ` " < > \n \r），保留基本路径字符。
+ * 注意：括号在引号包裹的参数中无特殊含义，须保留（如 "C:\Program Files (x86)\..."）。
+ */
+function shellEscape(s: string): string {
+  return s.replace(/[;&|`$"<>!\n\r]/g, '');
+}
+
+/**
+ * P2 dogfood：PowerShell 参数安全转义，防止命令注入。
+ * 移除危险的 PS 元字符（; | & $ ` " { } < > \n \r），保留基本路径字符。
+ * 注意：括号在引号包裹的字符串字面量中无特殊含义，须保留。
+ */
+function psEscape(s: string): string {
+  return s.replace(/[;&|`$"{}<>!\n\r]/g, '');
+}
 export class LauncherGenerator implements Generator {
   readonly type = 'launcher';
   // 启动器不限定 mod loader，故支持全部 5 种 loader（含 vanilla）。
@@ -91,28 +109,31 @@ export class LauncherGenerator implements Generator {
 
   /** start.bat：Windows 启动脚本 */
   private generateStartBat(spec: LauncherSpecType): FileNode {
-    const java = spec.javaPath || 'java';
+    const java = shellEscape(spec.javaPath || 'java');
+    const jvmArgs = shellEscape(spec.jvmArgs);
     return {
       path: 'start.bat',
-      content: `@echo off\n${java} -Xmx${spec.memoryMax}M -Xms${spec.memoryMin}M ${spec.jvmArgs} -jar minecraft-${spec.mcVersion}-${spec.loader}.jar\npause\n`,
+      content: `@echo off\n"${java}" -Xmx${spec.memoryMax}M -Xms${spec.memoryMin}M ${jvmArgs} -jar "minecraft-${shellEscape(spec.mcVersion)}-${shellEscape(spec.loader)}.jar"\npause\n`,
     };
   }
 
   /** start.sh：Unix 启动脚本 */
   private generateStartSh(spec: LauncherSpecType): FileNode {
-    const java = spec.javaPath || 'java';
+    const java = shellEscape(spec.javaPath || 'java');
+    const jvmArgs = shellEscape(spec.jvmArgs);
     return {
       path: 'start.sh',
-      content: `#!/bin/sh\n${java} -Xmx${spec.memoryMax}M -Xms${spec.memoryMin}M ${spec.jvmArgs} -jar minecraft-${spec.mcVersion}-${spec.loader}.jar\n`,
+      content: `#!/bin/sh\n"${java}" -Xmx${spec.memoryMax}M -Xms${spec.memoryMin}M ${jvmArgs} -jar "minecraft-${shellEscape(spec.mcVersion)}-${shellEscape(spec.loader)}.jar"\n`,
     };
   }
 
   /** launch.ps1：PowerShell 启动脚本 */
   private generateLaunchPs1(spec: LauncherSpecType): FileNode {
-    const java = spec.javaPath || 'java';
+    const java = psEscape(spec.javaPath || 'java');
+    const jvmArgs = psEscape(spec.jvmArgs);
     return {
       path: 'launch.ps1',
-      content: `# ${spec.launcherName} 启动脚本\n& "${java}" -Xmx${spec.memoryMax}M -Xms${spec.memoryMin}M ${spec.jvmArgs} -jar "minecraft-${spec.mcVersion}-${spec.loader}.jar"\n`,
+      content: `# ${shellEscape(spec.launcherName)} 启动脚本\n& "${java}" -Xmx${spec.memoryMax}M -Xms${spec.memoryMin}M ${jvmArgs} -jar "minecraft-${psEscape(spec.mcVersion)}-${psEscape(spec.loader)}.jar"\n`,
     };
   }
 

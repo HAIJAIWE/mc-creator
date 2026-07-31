@@ -24,7 +24,8 @@ export const BEHAVIOR_PACK_TEMPLATES: SpecTemplate[] = [
     description:
       '做一个基岩版行为包，添加以下配方：1）九宫格合成：用 9 个铁锭合成 1 个钻石块' +
       '（shaped_crafting，3x3 铁锭排列）；2）无序合成：4 个红石粉 + 1 个金锭 = 1 个时钟' +
-      '（shapeless_crafting）；3）熔炉烧炼：铁矿石烧炼成铁锭（furnace，经验 0.7）。' +
+      // S-14 修复：BpRecipeSpec 无 experience 字段，删除不可表达需求
+      '（shapeless_crafting）；3）熔炉烧炼：铁矿石烧炼成铁锭（furnace）。' +
       'packId 用 custom_recipes，identifier 格式为 custom_recipes:iron_to_diamond_block 等。',
   },
   {

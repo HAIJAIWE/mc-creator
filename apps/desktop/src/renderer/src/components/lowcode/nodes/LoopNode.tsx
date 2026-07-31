@@ -23,6 +23,7 @@ function LoopNodeComponent({ data, selected }: NodeProps<LoopNodeData>) {
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
       selected={selected}
+      codeLocked={data.codeLocked}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

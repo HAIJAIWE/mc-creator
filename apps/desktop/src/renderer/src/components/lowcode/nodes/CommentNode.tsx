@@ -1,17 +1,18 @@
 import { memo } from 'react';
 import { type NodeProps } from 'reactflow';
 import type { CommentNodeData } from '@mc-creator/shared';
-import { useNodeGraphStore } from '../../../store/node-graph-store.js';
-import { useDrawerStore } from '../../../store/drawer-store.js';
 import { McNodeShell } from './base/McNodeShell.js';
+import { useNodeActions } from './hooks/useNodeActions.js';
 
 /**
  * 注释节点：仅文档用途，不参与编译。无端口。
  * 颜色：mc-comment（黄色）
+ *
+ * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer，
+ * 避免内联回调创建不稳定引用。
  */
-function CommentNodeComponent({ id, data, selected }: NodeProps<CommentNodeData>) {
-  const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
-  const openDrawer = useDrawerStore((s) => s.openDrawer);
+function CommentNodeComponent({ id: _id, data, selected }: NodeProps<CommentNodeData>) {
+  const { toggleCollapse, openDrawer } = useNodeActions(data.nodeId);
   const debugState = null; // comment 节点不支持调试
 
   return (
@@ -24,8 +25,8 @@ function CommentNodeComponent({ id, data, selected }: NodeProps<CommentNodeData>
       collapsed={data.collapsed}
       selected={selected}
       debugState={debugState}
-      onToggleCollapse={() => toggleCollapse(id)}
-      onOpenDrawer={() => openDrawer(id)}
+      onToggleCollapse={toggleCollapse}
+      onOpenDrawer={openDrawer}
     >
       <div className="whitespace-pre-wrap break-words text-mc-text">
         {data.text || '（空备注）'}

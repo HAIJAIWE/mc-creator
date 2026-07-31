@@ -30,7 +30,8 @@ export const DIMENSION_TYPE_PRESETS: WorldgenPreset[] = [
       height: 384,
       logicalHeight: 384,
       infiniburn: '#minecraft:infiniburn_overworld',
-      effects: 'minecraft:overworld',
+      // S-2 修复：effects 对应 datapack-spec.ts 的 enum（overworld/the_nether/the_end/none），不带命名空间前缀
+      effects: 'overworld',
       ambientLight: 0,
       piglinSafe: false,
     },
@@ -51,7 +52,8 @@ export const DIMENSION_TYPE_PRESETS: WorldgenPreset[] = [
       height: 256,
       logicalHeight: 128,
       infiniburn: '#minecraft:infiniburn_nether',
-      effects: 'minecraft:the_nether',
+      // S-2 修复：enum 值不带前缀
+      effects: 'the_nether',
       ambientLight: 0.1,
       piglinSafe: true,
     },
@@ -72,7 +74,8 @@ export const DIMENSION_TYPE_PRESETS: WorldgenPreset[] = [
       height: 256,
       logicalHeight: 256,
       infiniburn: '#minecraft:infiniburn_end',
-      effects: 'minecraft:the_end',
+      // S-2 修复：enum 值不带前缀
+      effects: 'the_end',
       ambientLight: 0,
       piglinSafe: false,
     },
@@ -93,7 +96,8 @@ export const DIMENSION_TYPE_PRESETS: WorldgenPreset[] = [
       height: 384,
       logicalHeight: 384,
       infiniburn: '#minecraft:infiniburn_overworld',
-      effects: 'minecraft:overworld',
+      // S-2 修复：enum 值不带前缀
+      effects: 'overworld',
       ambientLight: 0,
       piglinSafe: false,
     },
@@ -114,7 +118,8 @@ export const DIMENSION_TYPE_PRESETS: WorldgenPreset[] = [
       height: 384,
       logicalHeight: 384,
       infiniburn: '#minecraft:infiniburn_overworld',
-      effects: 'minecraft:overworld',
+      // S-2 修复：enum 值不带前缀
+      effects: 'overworld',
       ambientLight: 0,
       piglinSafe: false,
     },

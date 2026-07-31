@@ -4,6 +4,7 @@ import { McIcon } from '../../assets/mc-ui/McIcon';
 import { TabBar } from '../TabBar.js';
 import { CodePreview } from '../CodePreview.js';
 import { SplitCodeEditor } from '../SplitCodeEditor.js';
+import { ShortcutHelpDialog } from '../ShortcutHelpDialog.js';
 import { ServerPreviewPanel } from './ServerPreviewPanel.js';
 import { ModPreviewPanel } from './ModPreviewPanel.js';
 import { DatapackPreviewPanel } from './DatapackPreviewPanel.js';
@@ -17,16 +18,19 @@ import { BehaviorPackPreviewPanel } from './BehaviorPackPreviewPanel.js';
 import { ResourcePackPreview } from '../ResourcePackPreview.js';
 import { NbtEditor } from '../NbtEditor.js';
 import { CommandPalette, type Command } from '../CommandPalette.js';
+import { LowcodeWorkspace } from '../lowcode/LowcodeWorkspace.js';
+import { PurecodeWorkspace } from '../purecode/PurecodeWorkspace.js';
 import { useModStore } from '../../store/mod-store.js';
+import { useEditorModeStore } from '../../store/editor-mode-store.js';
 import { ipcClient } from '../../lib/ipc-client.js';
 import type { GeneratorType } from '@mc-creator/shared';
 
-type MiddleTab = 'preview' | 'resources' | 'nbt' | 'code';
+type MiddleTab = 'preview' | 'lowcode' | 'resources' | 'nbt' | 'code';
 
 /**
  * 中间面板调度器：顶部 tab 切换（预览/资源/NBT/代码），预览 tab 按 generatorType 分发到对应面板。
  * 阶段 4 已实现全部 7 种类型（server/mod/datapack/modpack/resource_pack/skin/launcher）+ KubeJS。
- * 命令面板（F1）暴露保存/导出/新建/清空等操作，避免用户在多处工具栏间切换。
+ * 命令面板（F1/Ctrl+P/Ctrl+Shift+P）暴露保存/导出/新建/清空等操作，避免用户在多处工具栏间切换。
  */
 export function MiddlePanel() {
   const [activeTab, setActiveTab] = useState<MiddleTab>('preview');
@@ -34,14 +38,41 @@ export function MiddlePanel() {
     (s) => ({ generatorType: s.generatorType, splitFile: s.splitFile }),
     shallow,
   );
+  // L3 纯代码模式分支：purecode 渲染 PurecodeWorkspace，其余仍用 LowcodeWorkspace
+  const editorMode = useEditorModeStore((s) => s.mode);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
 
-  // F1 打开命令面板（阻止浏览器默认帮助菜单）
+  // 全局快捷键：F1 / Ctrl+P / Ctrl+Shift+P 打开命令面板，Ctrl+S 保存当前文件
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // F1：打开命令面板（阻止浏览器默认帮助菜单）
       if (e.key === 'F1') {
         e.preventDefault();
         setPaletteOpen(true);
+        return;
+      }
+      // Ctrl+P / Ctrl+Shift+P：Quick Open / 命令面板（与 VS Code 一致）
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
+      // Ctrl+S：保存当前文件
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        const s = useModStore.getState();
+        const f = s.files.find((x) => x.path === s.selectedFile);
+        if (!f) return;
+        void ipcClient
+          .saveFile({
+            path: f.path,
+            content: f.content,
+            defaultName: f.path.split('/').pop() || 'file.txt',
+          })
+          .then((res) => {
+            if (res.ok) s.markFileClean(f.path);
+          });
       }
     };
     window.addEventListener('keydown', onKey);
@@ -147,6 +178,14 @@ export function MiddlePanel() {
         run: () => setActiveTab('preview'),
       });
 
+      // 切换到低代码 Tab
+      cmds.push({
+        id: 'tab-lowcode',
+        label: '切换到低代码视图',
+        description: '打开节点图编辑器（L1 低代码 / L2 混合 / L3 纯代码）',
+        run: () => setActiveTab('lowcode'),
+      });
+
       // 切换到代码 Tab
       cmds.push({
         id: 'tab-code',
@@ -199,10 +238,18 @@ export function MiddlePanel() {
         },
       });
 
+      // 快捷键帮助
+      cmds.push({
+        id: 'shortcut-help',
+        label: '快捷键帮助',
+        description: '查看全项目所有快捷键列表',
+        run: () => setShortcutHelpOpen(true),
+      });
+
       return cmds;
     },
     // setActiveTab 引用稳定（来自 useState），加入 deps 保证闭包正确
-    [setActiveTab],
+    [setActiveTab, setShortcutHelpOpen],
   );
 
   // 在 tab 栏点击 F1 提示徽标也能打开命令面板
@@ -218,16 +265,21 @@ export function MiddlePanel() {
         onKeyDown={(e) => {
           if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
             e.preventDefault();
-            const tabs: MiddleTab[] = ['preview', 'resources', 'nbt', 'code'];
+            const tabs: MiddleTab[] = ['preview', 'lowcode', 'resources', 'nbt', 'code'];
             const idx = tabs.indexOf(activeTab);
-            const next = e.key === 'ArrowRight' ? tabs[(idx + 1) % 4] : tabs[(idx - 1 + 4) % 4];
+            const next = e.key === 'ArrowRight' ? tabs[(idx + 1) % 5] : tabs[(idx - 1 + 5) % 5];
             setActiveTab(next);
+            // 焦点跟随选中项移动（WAI-ARIA Tabs 模式：箭头键切换 + 自动聚焦新 tab）
+            const nextBtn = document.getElementById(`middle-tab-${next}`);
+            nextBtn?.focus();
           }
         }}
       >
         <button
+          id="middle-tab-preview"
           role="tab"
           aria-selected={activeTab === 'preview'}
+          aria-controls="middle-tabpanel-preview"
           tabIndex={activeTab === 'preview' ? 0 : -1}
           onClick={() => setActiveTab('preview')}
           className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
@@ -240,8 +292,26 @@ export function MiddlePanel() {
           预览
         </button>
         <button
+          id="middle-tab-lowcode"
+          role="tab"
+          aria-selected={activeTab === 'lowcode'}
+          aria-controls="middle-tabpanel-lowcode"
+          tabIndex={activeTab === 'lowcode' ? 0 : -1}
+          onClick={() => setActiveTab('lowcode')}
+          className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
+            activeTab === 'lowcode'
+              ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
+              : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
+          }`}
+        >
+          <McIcon scope="pixel" name="grid" size={12} />
+          低代码
+        </button>
+        <button
+          id="middle-tab-resources"
           role="tab"
           aria-selected={activeTab === 'resources'}
+          aria-controls="middle-tabpanel-resources"
           tabIndex={activeTab === 'resources' ? 0 : -1}
           onClick={() => setActiveTab('resources')}
           className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
@@ -254,8 +324,10 @@ export function MiddlePanel() {
           资源
         </button>
         <button
+          id="middle-tab-nbt"
           role="tab"
           aria-selected={activeTab === 'nbt'}
+          aria-controls="middle-tabpanel-nbt"
           tabIndex={activeTab === 'nbt' ? 0 : -1}
           onClick={() => setActiveTab('nbt')}
           className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
@@ -268,8 +340,10 @@ export function MiddlePanel() {
           NBT
         </button>
         <button
+          id="middle-tab-code"
           role="tab"
           aria-selected={activeTab === 'code'}
+          aria-controls="middle-tabpanel-code"
           tabIndex={activeTab === 'code' ? 0 : -1}
           onClick={() => setActiveTab('code')}
           className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
@@ -286,19 +360,35 @@ export function MiddlePanel() {
         <button
           onClick={handleOpenPalette}
           title="打开命令面板（F1）"
+          aria-label="打开命令面板（F1）"
           className="ml-auto flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-2 py-0.5 text-xs text-mc-dim transition-colors hover:bg-mc-surface-3 hover:text-mc-text"
         >
           <span>命令面板</span>
-          <span className="rounded-mc bg-mc-surface-3 px-1 py-0.5 text-[10px] text-mc-mute">
+          <span
+            className="rounded-mc bg-mc-surface-3 px-1 py-0.5 text-[10px] text-mc-mute"
+            aria-hidden="true"
+          >
             F1
           </span>
         </button>
       </div>
 
-      {/* Tab 内容 */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Tab 内容（WAI-ARIA Tabpanel：role="tabpanel" + aria-labelledby 关联 tab） */}
+      <div
+        className="flex flex-1 flex-col overflow-hidden"
+        role="tabpanel"
+        id={`middle-tabpanel-${activeTab}`}
+        aria-labelledby={`middle-tab-${activeTab}`}
+        tabIndex={0}
+      >
         {activeTab === 'preview' ? (
           renderPreviewPanel()
+        ) : activeTab === 'lowcode' ? (
+          editorMode === 'purecode' ? (
+            <PurecodeWorkspace />
+          ) : (
+            <LowcodeWorkspace />
+          )
         ) : activeTab === 'resources' ? (
           <ResourcePackPreview />
         ) : activeTab === 'nbt' ? (
@@ -329,6 +419,9 @@ export function MiddlePanel() {
         onClose={() => setPaletteOpen(false)}
         commands={commands}
       />
+
+      {/* 快捷键帮助对话框 */}
+      <ShortcutHelpDialog open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
     </div>
   );
 }

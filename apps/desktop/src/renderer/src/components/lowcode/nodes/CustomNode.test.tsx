@@ -56,6 +56,7 @@ describe('CustomNodeContent', () => {
       customTypeId: 'mymod:crafter',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
       customFields: {},
     };
     render(<CustomNodeContent data={data} selected={false} ports={[]} />);
@@ -75,6 +76,7 @@ describe('CustomNodeContent', () => {
       customTypeId: 'unregistered:type',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
       customFields: {},
     };
     render(<CustomNodeContent data={data} selected={false} ports={[]} />);

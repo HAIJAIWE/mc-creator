@@ -138,3 +138,600 @@ describe('FabricAdapter 资源文件', () => {
     expect(json.parent).toBe('minecraft:item/generated');
   });
 });
+
+// === P1.4 新增字段消费测试 ===
+
+const SPEC_P14: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Adds ruby tools',
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  customCode: [
+    {
+      snippetId: 'code_1',
+      language: 'java',
+      code: 'return 42;',
+      inputSignature: { in_0: 'integer' },
+      outputSignature: { out_0: 'integer' },
+      methodName: 'calculateAnswer',
+    },
+  ],
+  multiblocks: [
+    {
+      structureId: 'altar_1',
+      displayName: 'Altar',
+      width: 3,
+      height: 3,
+      depth: 3,
+      hollow: true,
+      controllerOffset: { x: 1, y: 1, z: 1 },
+    },
+  ],
+  eventHandlers: [
+    {
+      handlerId: 'evt_1',
+      eventType: 'player_right_click_block',
+      eventArgs: { hand: 'main_hand' },
+      // P1.5：通过 conditionIds/actionIds 引用顶层 conditions/actions
+      conditionIds: ['cond_1'],
+      actionIds: ['act_1'],
+    },
+  ],
+  conditions: [
+    {
+      conditionId: 'cond_1',
+      conditionType: 'has_item',
+      args: { item: 'minecraft:stick' },
+      invert: false,
+    },
+  ],
+  actions: [
+    {
+      actionId: 'act_1',
+      actionType: 'give_item',
+      args: { item: 'minecraft:diamond', count: 1 },
+    },
+  ],
+});
+
+const CTX_P14: GeneratorContext = {
+  loader: 'fabric',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P14,
+  projectPath: '/proj',
+};
+
+describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate(CTX_P14);
+  const paths = files.map((f) => f.path);
+
+  it('生成 ModCustomCode.java（customCode 非空时）', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModCustomCode.java');
+    const code = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModCustomCode.java',
+    );
+    expect(code).toBeDefined();
+    expect(code!.content).toContain('public class ModCustomCode');
+    expect(code!.content).toContain('snippetId: code_1');
+    // PortType integer → int，方法签名应包含 int 返回类型与 int 参数
+    expect(code!.content).toContain('public static int calculateAnswer(int in_0)');
+    // 原样嵌入用户代码
+    expect(code!.content).toContain('return 42;');
+    // 包含 initialize 占位方法
+    expect(code!.content).toContain('public static void initialize()');
+  });
+
+  it('生成 ModMultiblocks.java（multiblocks 非空时）', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModMultiblocks.java');
+    const mb = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModMultiblocks.java',
+    );
+    expect(mb).toBeDefined();
+    expect(mb!.content).toContain('public class ModMultiblocks');
+    expect(mb!.content).toContain('结构: altar_1 (Altar)');
+    expect(mb!.content).toContain('尺寸: 3x3x3, 空心: true');
+    expect(mb!.content).toContain('控制器偏移: (1, 1, 1)');
+    expect(mb!.content).toContain('public static final String ALTAR_1_ID = "altar_1";');
+    expect(mb!.content).toContain('public static void initialize()');
+  });
+
+  it('生成 ModEvents.java（eventHandlers 非空时）', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModEvents.java');
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    expect(events!.content).toContain('public class ModEvents');
+    // 事件处理器方法（handle_<handlerId>）
+    expect(events!.content).toContain('事件处理器: evt_1');
+    expect(events!.content).toContain('eventType: player_right_click_block');
+    expect(events!.content).toContain('private static void handle_evt_1(Object event)');
+    // 条件检查方法（check_<conditionId>）
+    expect(events!.content).toContain('条件: cond_1');
+    expect(events!.content).toContain('has_item');
+    expect(events!.content).toContain('private static boolean check_cond_1(Object event)');
+    // 动作执行方法（execute_<actionId>）
+    expect(events!.content).toContain('动作: act_1');
+    expect(events!.content).toContain('give_item');
+    expect(events!.content).toContain('private static void execute_act_1(Object event)');
+    // 真实 if/else 逻辑（非纯注释占位）
+    expect(events!.content).toContain('if (check_cond_1(event))');
+    expect(events!.content).toContain('execute_act_1(event);');
+    // initialize 方法（含 Fabric API 注册调用）
+    expect(events!.content).toContain('public static void initialize()');
+    // player_right_click_block 未映射到 Fabric API → 留 TODO 注释
+    expect(events!.content).toContain('TODO: 注册 player_right_click_block 事件');
+  });
+
+  it('mainClass 的 onInitialize 调用新的 initialize 方法', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main).toBeDefined();
+    expect(main!.content).toContain('ModCustomCode.initialize()');
+    expect(main!.content).toContain('ModMultiblocks.initialize()');
+    expect(main!.content).toContain('ModEvents.initialize()');
+  });
+});
+
+// === P1-3 过程系统测试（对标 MCreator procedure） ===
+
+const SPEC_P13_PROC: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Procedure test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  eventHandlers: [
+    {
+      handlerId: 'evt_1',
+      eventType: 'player_join',
+      eventArgs: {},
+      conditionIds: [],
+      actionIds: [],
+      // event 调用 grantReward 过程
+      procedureCallIds: ['proc_1'],
+    },
+  ],
+  conditions: [
+    {
+      conditionId: 'cond_1',
+      conditionType: 'is_day',
+      args: {},
+      invert: false,
+    },
+  ],
+  actions: [
+    {
+      actionId: 'act_1',
+      actionType: 'give_item',
+      args: { item: 'minecraft:diamond' },
+    },
+  ],
+  procedures: [
+    {
+      procedureId: 'proc_1',
+      procedureName: 'grantReward',
+      displayName: '发放奖励',
+      conditionIds: ['cond_1'],
+      actionIds: ['act_1'],
+      procedureCallIds: [],
+    },
+    {
+      procedureId: 'proc_2',
+      procedureName: 'logEvent',
+      displayName: '记录事件',
+      conditionIds: [],
+      actionIds: [],
+      // proc_2 嵌套调用 proc_1
+      procedureCallIds: ['proc_1'],
+    },
+  ],
+});
+
+const CTX_P13_PROC: GeneratorContext = {
+  loader: 'fabric',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P13_PROC,
+  projectPath: '/proj',
+};
+
+describe('FabricAdapter P1-3 过程系统（procedure 编译为 Java 方法）', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate(CTX_P13_PROC);
+  const events = files.find(
+    (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+  );
+
+  it('生成 ModEvents.java（procedures 非空时）', () => {
+    expect(events).toBeDefined();
+    expect(events!.content).toContain('public class ModEvents');
+  });
+
+  it('过程编译为独立 Java 方法 procedure_<name>', () => {
+    // grantReward 过程 → procedure_grantReward 方法
+    expect(events!.content).toContain('private static void procedure_grantReward(Object event)');
+    // logEvent 过程 → procedure_logEvent 方法
+    expect(events!.content).toContain('private static void procedure_logEvent(Object event)');
+  });
+
+  it('过程方法体含条件检查与动作执行调用', () => {
+    // grantReward 过程体：check_cond_1 → execute_act_1
+    expect(events!.content).toContain('if (check_cond_1(event))');
+    expect(events!.content).toContain('execute_act_1(event);');
+  });
+
+  it('事件处理器调用过程方法（procedureCallIds 解析为方法调用）', () => {
+    // handle_evt_1 内调用 procedure_grantReward(event)
+    expect(events!.content).toContain('procedure_grantReward(event);');
+  });
+
+  it('过程嵌套调用（procedure 调用 procedure）', () => {
+    // logEvent 过程内调用 grantReward
+    // 验证 procedure_logEvent 方法体内含 procedure_grantReward(event);
+    const content = events!.content;
+    const logMethodIdx = content.indexOf('private static void procedure_logEvent(Object event)');
+    const grantMethodIdx = content.indexOf(
+      'private static void procedure_grantReward(Object event)',
+    );
+    expect(logMethodIdx).toBeGreaterThan(-1);
+    expect(grantMethodIdx).toBeGreaterThan(-1);
+    // logEvent 方法体应在 grantReward 方法定义之前（procedureMethods 按数组顺序）
+    // 且 logEvent 方法体内应包含对 grantReward 的调用
+    const logMethodBody = content.slice(
+      logMethodIdx,
+      logMethodIdx < grantMethodIdx ? grantMethodIdx : content.length,
+    );
+    expect(logMethodBody).toContain('procedure_grantReward(event);');
+  });
+
+  it('过程方法有复用注释（可被 event/procedure 调用）', () => {
+    expect(events!.content).toContain('可被 event/procedure 调用，复用此方法');
+  });
+});
+
+describe('FabricAdapter P1.4 字段为空时不生成新文件', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate(CTX);
+  const paths = files.map((f) => f.path);
+
+  it('不生成 ModCustomCode.java / ModMultiblocks.java / ModEvents.java', () => {
+    expect(paths).not.toContain('src/main/java/com/example/ruby_tools/ModCustomCode.java');
+    expect(paths).not.toContain('src/main/java/com/example/ruby_tools/ModMultiblocks.java');
+    expect(paths).not.toContain('src/main/java/com/example/ruby_tools/ModEvents.java');
+  });
+
+  it('mainClass 不调用新的 initialize 方法', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main).toBeDefined();
+    expect(main!.content).not.toContain('ModCustomCode.initialize()');
+    expect(main!.content).not.toContain('ModMultiblocks.initialize()');
+    expect(main!.content).not.toContain('ModEvents.initialize()');
+  });
+});
+
+// === P1.3 新增字段消费测试（recipes/entities/machines） ===
+
+const SPEC_P13: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Adds ruby tools',
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  recipes: [
+    {
+      recipeId: 'ruby_sword_recipe',
+      recipeType: 'crafting_shaped',
+      inputs: [
+        { item: 'minecraft:iron_ingot', count: 1, slot: 'A' },
+        { item: 'minecraft:stick', count: 1, slot: 'B' },
+      ],
+      output: 'minecraft:ruby_sword',
+      outputCount: 1,
+      cookTime: 200,
+      experience: 0,
+      pattern: ['AB', 'BA'],
+    },
+    {
+      recipeId: 'ruby_smelt',
+      recipeType: 'smelting',
+      inputs: [{ item: 'minecraft:iron_ore', count: 1, slot: '' }],
+      output: 'minecraft:ruby',
+      outputCount: 1,
+      cookTime: 400,
+      experience: 0.5,
+      pattern: [],
+    },
+  ],
+  entities: [
+    {
+      entityId: 'ruby_golem',
+      displayName: 'Ruby Golem',
+      maxHealth: 100,
+      attackDamage: 15,
+      movementSpeed: 0.25,
+      classification: 'animal',
+      modelType: 'pig',
+      spawnWeight: 10,
+      spawnBiomes: ['plains', 'forest'],
+    },
+  ],
+  machines: [
+    {
+      machineId: 'ruby_furnace',
+      displayName: 'Ruby Furnace',
+      energyCapacity: 20000,
+      maxEnergyTransfer: 200,
+      inputSlots: 1,
+      outputSlots: 1,
+      defaultProcessTime: 100,
+      defaultEnergyPerTick: 20,
+      guiWidth: 176,
+      guiHeight: 166,
+    },
+  ],
+});
+
+const CTX_P13: GeneratorContext = {
+  loader: 'fabric',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P13,
+  projectPath: '/proj',
+};
+
+describe('FabricAdapter P1.3 字段消费（recipes/entities/machines 非空时生成新文件）', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate(CTX_P13);
+  const paths = files.map((f) => f.path);
+
+  it('生成 ModRecipes.java / ModEntities.java / ModMachines.java', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModRecipes.java');
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModEntities.java');
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModMachines.java');
+  });
+
+  it('ModRecipes.java 含 recipeId（配方通过 datapack JSON 加载）', () => {
+    const recipes = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModRecipes.java',
+    );
+    expect(recipes).toBeDefined();
+    expect(recipes!.content).toContain('RUBY_SWORD_RECIPE_ID');
+    expect(recipes!.content).toContain('ruby_sword_recipe');
+    expect(recipes!.content).toContain('ruby_smelt');
+  });
+
+  it('ModEntities.java 含 Registry.register 与 entityId', () => {
+    const entities = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEntities.java',
+    );
+    expect(entities).toBeDefined();
+    expect(entities!.content).toContain('Registry.register');
+    expect(entities!.content).toContain('ruby_golem');
+    expect(entities!.content).toContain('Ruby Golem');
+  });
+
+  it('ModMachines.java 含 Registry.register 与 machineId', () => {
+    const machines = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModMachines.java',
+    );
+    expect(machines).toBeDefined();
+    expect(machines!.content).toContain('Registry.register');
+    expect(machines!.content).toContain('ruby_furnace');
+    expect(machines!.content).toContain('Ruby Furnace');
+  });
+
+  it('mainClass 的 onInitialize 调用 P1.3 模块的 initialize', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main).toBeDefined();
+    expect(main!.content).toContain('ModRecipes.initialize()');
+    expect(main!.content).toContain('ModEntities.initialize()');
+    expect(main!.content).toContain('ModMachines.initialize()');
+  });
+});
+
+// === P1.5 真实事件处理逻辑测试（conditionIds/actionIds/invert/事件注册） ===
+
+const SPEC_P15_INVERT: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Adds ruby tools',
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  eventHandlers: [
+    {
+      handlerId: 'evt_inv',
+      eventType: 'tick',
+      eventArgs: {},
+      // P1.5：引用 invert=true 的 condition
+      conditionIds: ['cond_inv'],
+      actionIds: ['act_inv'],
+    },
+  ],
+  conditions: [
+    {
+      conditionId: 'cond_inv',
+      conditionType: 'is_night',
+      args: {},
+      invert: true,
+    },
+  ],
+  actions: [
+    {
+      actionId: 'act_inv',
+      actionType: 'summon_lightning',
+      args: { count: 1 },
+    },
+  ],
+});
+
+const CTX_P15_INVERT: GeneratorContext = {
+  loader: 'fabric',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P15_INVERT,
+  projectPath: '/proj',
+};
+
+describe('FabricAdapter P1.5 真实事件处理逻辑生成', () => {
+  it('invert=true 的 condition 生成 if (!check_<id>) 语句', () => {
+    const adapter = new FabricAdapter();
+    const files = adapter.translate(CTX_P15_INVERT);
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    // invert: true → if (!check_cond_inv(event))
+    expect(events!.content).toContain('if (!check_cond_inv(event))');
+    expect(events!.content).toContain('execute_act_inv(event);');
+    // 同时验证正向 if 不存在（避免误判）
+    expect(events!.content).not.toContain('if (check_cond_inv(event))');
+  });
+
+  it('eventType=tick 注册到 ServerTickEvents.END_SERVER_TICK 并调用 handle_<handlerId>', () => {
+    const adapter = new FabricAdapter();
+    const files = adapter.translate(CTX_P15_INVERT);
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    expect(events!.content).toContain(
+      'net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register',
+    );
+    expect(events!.content).toContain('handle_evt_inv(server)');
+  });
+
+  it('eventHandlers/conditions/actions 全为空时不生成 ModEvents.java', () => {
+    // CTX 是基础 spec，无 P1.4 字段（eventHandlers/conditions/actions 均默认 []）
+    const adapter = new FabricAdapter();
+    const files = adapter.translate(CTX);
+    const paths = files.map((f) => f.path);
+    expect(paths).not.toContain('src/main/java/com/example/ruby_tools/ModEvents.java');
+  });
+
+  it('仅 conditions 非空（无 eventHandlers）时仍生成 ModEvents.java', () => {
+    // 边界：conditions 非空但 eventHandlers 为空 → 仍生成（按现有 translate 逻辑）
+    const specOnlyConditions = ModSpecSchema.parse({
+      ...SPEC,
+      conditions: [
+        {
+          conditionId: 'solo_cond',
+          conditionType: 'is_day',
+          args: {},
+          invert: false,
+        },
+      ],
+    });
+    const adapter = new FabricAdapter();
+    const files = adapter.translate({ ...CTX, spec: specOnlyConditions });
+    const paths = files.map((f) => f.path);
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModEvents.java');
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    // 即使无 handler，check_<conditionId> 方法仍生成
+    expect(events!.content).toContain('private static boolean check_solo_cond(Object event)');
+  });
+});

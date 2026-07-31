@@ -5,6 +5,7 @@ import type {
   VariableNodeData,
   SubgraphNodeData,
   LoopNodeData,
+  ProcedureNodeData,
 } from '@mc-creator/shared';
 
 /**
@@ -251,6 +252,30 @@ export function getPorts(data: NodeData, graph?: NodeGraph): NodePort[] {
         {
           id: 'done',
           label: '完成',
+          type: 'void',
+          direction: 'out',
+          required: false,
+          multiple: true,
+        },
+      ];
+    }
+    case 'procedure': {
+      // P1-3：过程节点端口
+      // - in：调用入口（event/procedure → procedure 的 control 边）
+      // - trigger：过程体出口（procedure → condition/action 的 control 边）
+      const _p = data as ProcedureNodeData;
+      return [
+        {
+          id: 'in',
+          label: '调用',
+          type: 'void',
+          direction: 'in',
+          required: false,
+          multiple: true,
+        },
+        {
+          id: 'trigger',
+          label: '过程体',
           type: 'void',
           direction: 'out',
           required: false,

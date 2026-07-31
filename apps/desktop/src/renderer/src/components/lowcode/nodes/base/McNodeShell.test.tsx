@@ -55,13 +55,15 @@ describe('McNodeShell', () => {
     expect(screen.getByText('产物')).toBeTruthy();
   });
 
-  it('折叠时隐藏输入端口，保留输出端口', () => {
+  it('折叠时主体隐藏，端口区仍渲染（输入+输出端口均保留）', () => {
     renderWithProvider(
       <McNodeShell {...defaultProps} collapsed={true}>
         <div>摘要</div>
       </McNodeShell>,
     );
-    expect(screen.queryByText('材料')).toBeNull();
+    expect(screen.queryByText('摘要内容')).toBeNull();
+    // P2 修正：折叠时端口区完整保留（输入+输出），便于连线和视觉一致性
+    expect(screen.getByText('材料')).toBeTruthy();
     expect(screen.getByText('产物')).toBeTruthy();
   });
 
@@ -100,5 +102,58 @@ describe('McNodeShell', () => {
   it('无 children 时不渲染主体区', () => {
     renderWithProvider(<McNodeShell {...defaultProps} />);
     expect(screen.queryByText('摘要内容')).toBeNull();
+  });
+
+  // ============================================================
+  // P0-1 codeLock UI：McNodeShell 显示锁定状态
+  // ============================================================
+  describe('codeLocked 状态', () => {
+    it('codeLocked=true 时渲染锁定标记', () => {
+      renderWithProvider(
+        <McNodeShell {...defaultProps} codeLocked={true}>
+          <div>摘要</div>
+        </McNodeShell>,
+      );
+      // 锁定标记应有 aria-label 或 title 标识
+      expect(screen.getByLabelText('代码已锁定')).toBeTruthy();
+    });
+
+    it('codeLocked=false 时不渲染锁定标记', () => {
+      renderWithProvider(
+        <McNodeShell {...defaultProps} codeLocked={false}>
+          <div>摘要</div>
+        </McNodeShell>,
+      );
+      expect(screen.queryByLabelText('代码已锁定')).toBeNull();
+    });
+
+    it('不传 codeLocked 时不渲染锁定标记（默认未锁定）', () => {
+      renderWithProvider(
+        <McNodeShell {...defaultProps}>
+          <div>摘要</div>
+        </McNodeShell>,
+      );
+      expect(screen.queryByLabelText('代码已锁定')).toBeNull();
+    });
+
+    it('codeLocked=true 时节点外壳加锁定边框样式', () => {
+      const { container } = renderWithProvider(
+        <McNodeShell {...defaultProps} codeLocked={true}>
+          <div>摘要</div>
+        </McNodeShell>,
+      );
+      const wrapper = container.firstChild as HTMLElement;
+      expect(wrapper.className).toContain('border-yellow');
+    });
+
+    it('codeLocked=true 时仍显示原 badge', () => {
+      renderWithProvider(
+        <McNodeShell {...defaultProps} badge="罕见" codeLocked={true}>
+          <div>摘要</div>
+        </McNodeShell>,
+      );
+      expect(screen.getByText('罕见')).toBeTruthy();
+      expect(screen.getByLabelText('代码已锁定')).toBeTruthy();
+    });
   });
 });

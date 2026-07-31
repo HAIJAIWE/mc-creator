@@ -51,6 +51,21 @@ export function arePortTypesCompatible(sourceType: PortType, targetType: PortTyp
 }
 
 /**
+ * 构建 nodeMap 索引（按 id 查找节点，O(1)）。
+ * P2 dogfood 优化：缓存 nodeMap，避免每次 isValidConnection/validateConnection
+ * 调用都重建 Map。当 graph 引用变化时才重新构建。
+ */
+let cachedGraphRef: NodeGraph | null = null;
+let cachedNodeMap: Map<string, ModNode> | null = null;
+
+function getNodeMap(graph: NodeGraph): Map<string, ModNode> {
+  if (cachedGraphRef === graph && cachedNodeMap) return cachedNodeMap;
+  cachedGraphRef = graph;
+  cachedNodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
+  return cachedNodeMap;
+}
+
+/**
  * 校验一条连线是否合法。
  *
  * @param graph 当前节点图
@@ -67,9 +82,10 @@ export function isValidConnection(graph: NodeGraph, connection: Connection | Edg
   // 2. 自连校验
   if (sourceId === targetId) return false;
 
-  // 3. 节点存在校验
-  const sourceNode = graph.nodes.find((n) => n.id === sourceId);
-  const targetNode = graph.nodes.find((n) => n.id === targetId);
+  // 3. 节点存在校验（P1 优化：用 Map 替代 Array.find，P2 缓存优化）
+  const nodeMap = getNodeMap(graph);
+  const sourceNode = nodeMap.get(sourceId);
+  const targetNode = nodeMap.get(targetId);
   if (!sourceNode || !targetNode) return false;
 
   // 4. 节点禁用校验
@@ -108,8 +124,9 @@ export function validateConnection(
   if (!sourceId || !targetId) return { ok: false, reason: '缺少源或目标节点' };
   if (sourceId === targetId) return { ok: false, reason: '不能自连' };
 
-  const sourceNode = graph.nodes.find((n) => n.id === sourceId);
-  const targetNode = graph.nodes.find((n) => n.id === targetId);
+  const nodeMap = getNodeMap(graph);
+  const sourceNode = nodeMap.get(sourceId);
+  const targetNode = nodeMap.get(targetId);
   if (!sourceNode || !targetNode) return { ok: false, reason: '节点不存在' };
 
   if (sourceNode.data.disabled) return { ok: false, reason: '源节点已禁用' };

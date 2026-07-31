@@ -27,6 +27,7 @@ function BlockNodeComponent({ id, data, selected }: NodeProps<BlockNodeData>) {
       collapsed={data.collapsed}
       selected={selected}
       debugState={debugState}
+      codeLocked={data.codeLocked}
       onToggleCollapse={() => toggleCollapse(id)}
       onOpenDrawer={() => openDrawer(id)}
     >

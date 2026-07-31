@@ -18,6 +18,7 @@ describe('compileLoop', () => {
       loopVarType: 'int',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileLoop(data, '// body');
     expect(snippet.snippetId).toBe('l1');
@@ -39,6 +40,7 @@ describe('compileLoop', () => {
       iterable: 'itemList',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileLoop(data, '// do something');
     expect(snippet.code).toContain('for (ItemStack item : itemList)');
@@ -58,6 +60,7 @@ describe('compileLoop', () => {
       loopVarType: 'int',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileLoop(data, '// body');
     expect(snippet.code).toContain('while (running)');
@@ -79,6 +82,7 @@ describe('compileLoop', () => {
       loopVarType: 'int',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const result = compileLoop(data, '');
     const _: CustomCodeSnippetSpec = result.snippet;
@@ -99,6 +103,7 @@ describe('compileLoop', () => {
       iterable: 'items',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     expect(() => compileLoop(data, '// body')).toThrow(/Java 标识符/);
   });
@@ -117,6 +122,7 @@ describe('compileLoop', () => {
       iterable: 'items',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileLoop(data, '// body');
     expect(snippet.code).toContain('for (ItemStack item : items)');
@@ -136,6 +142,7 @@ describe('compileLoop', () => {
       iterable: 'items',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileLoop(data, '// body');
     expect(snippet.code).toContain('for (ItemStack $each_item : items)');

@@ -70,6 +70,7 @@ describe('subgraphManager（单例）', () => {
             customFields: {},
             collapsed: false,
             codeLocked: false,
+            formatVersion: 1,
           },
           ports: [],
           selected: false,

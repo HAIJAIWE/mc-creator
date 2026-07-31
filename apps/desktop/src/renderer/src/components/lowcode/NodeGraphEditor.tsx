@@ -90,31 +90,6 @@ function toFlowEdge(e: ModEdge): Edge {
   };
 }
 
-function fromFlowNode(n: Node): ModNode {
-  return {
-    id: n.id,
-    type: n.type as NodeKind,
-    position: n.position,
-    data: n.data as ModNode['data'],
-    ports: [], // ports 由 store 管理，不从 Flow 同步回来
-    selected: n.selected ?? false,
-  };
-}
-
-function fromFlowEdge(e: Edge): ModEdge {
-  const data = (e.data ?? {}) as { kind?: EdgeKind; disabled?: boolean };
-  return {
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    sourceHandle: e.sourceHandle ?? undefined,
-    targetHandle: e.targetHandle ?? undefined,
-    kind: data.kind ?? 'data',
-    label: typeof e.label === 'string' ? e.label : undefined,
-    disabled: data.disabled ?? false,
-  };
-}
-
 // === 推断连线类型 ===
 
 function inferEdgeKind(sourceType: NodeKind, targetType: NodeKind): EdgeKind {
@@ -177,6 +152,7 @@ export function NodeGraphEditor({
 
   const graph = useNodeGraphStore((s) => s.graph);
   const addNode = useNodeGraphStore((s) => s.addNode);
+  const addCustomNode = useNodeGraphStore((s) => s.addCustomNode);
   const moveNode = useNodeGraphStore((s) => s.moveNode);
   const removeNode = useNodeGraphStore((s) => s.removeNode);
   const selectNode = useNodeGraphStore((s) => s.selectNode);
@@ -279,17 +255,23 @@ export function NodeGraphEditor({
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const kind = e.dataTransfer.getData('application/reactflow-node-kind') as NodeKind;
-      if (!kind || !rfInstanceRef.current) return;
+      if (!rfInstanceRef.current) return;
 
+      const customTypeId = e.dataTransfer.getData('application/custom-node-typeid');
       const position = rfInstanceRef.current.screenToFlowPosition({
         x: e.clientX,
         y: e.clientY,
       });
       commit();
+      if (customTypeId) {
+        addCustomNode(customTypeId, position);
+        return;
+      }
+      const kind = e.dataTransfer.getData('application/reactflow-node-kind') as NodeKind;
+      if (!kind) return;
       addNode(kind, position);
     },
-    [addNode, commit],
+    [addNode, addCustomNode, commit],
   );
 
   // === 节点变化处理 ===
@@ -312,11 +294,15 @@ export function NodeGraphEditor({
         } else if (change.type === 'remove') {
           removeNode(change.id);
         } else if (change.type === 'select') {
-          if (change.selected) selectNode(change.id);
+          if (change.selected) {
+            selectNode(change.id);
+          } else if (selectedNodeId === change.id) {
+            selectNode(null);
+          }
         }
       }
     },
-    [readOnly, commit, moveNode, removeNode, selectNode],
+    [readOnly, commit, moveNode, removeNode, selectNode, selectedNodeId],
   );
 
   // === 连线变化处理 ===
@@ -427,6 +413,8 @@ export function NodeGraphEditor({
         onPaneClick={() => {
           selectNode(null);
           selectEdge(null);
+          // P0 dogfood 修复：点击画布空白时关闭右键菜单
+          setContextMenu(null);
         }}
         fitView
         nodesConnectable={!readOnly}

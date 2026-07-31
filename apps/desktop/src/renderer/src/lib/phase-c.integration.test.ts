@@ -3,7 +3,7 @@ import { compileNodeGraph, preloadExternalMods } from './compileNodeGraph.js';
 import { useNodeGraphStore } from '../store/node-graph-store.js';
 import { subgraphManager } from '../components/lowcode/subgraph/subgraphManager.js';
 import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
-import type { NodeGraph, ModNode } from '@mc-creator/shared';
+import type { ModNode } from '@mc-creator/shared';
 
 /**
  * 阶段 C 端到端集成测试
@@ -221,6 +221,7 @@ describe('阶段 C 端到端集成', () => {
         customFields: {},
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       },
       ports: [],
       selected: false,
@@ -241,6 +242,7 @@ describe('阶段 C 端到端集成', () => {
         customFields: {},
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       },
       ports: [],
       selected: false,

@@ -32,12 +32,14 @@ describe('useDrawerStore 草稿模式', () => {
   it('saveDraft 写回 store 并关闭抽屉', () => {
     const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
     useDrawerStore.getState().openDrawer(id);
-    useDrawerStore.getState().updateField('itemId', 'saved_id');
+    // P2 修复：使用合法的 resourceId 格式（modid:path）通过校验
+    useDrawerStore.getState().updateField('itemId', 'mc:saved_id');
+    useDrawerStore.getState().updateField('label', '测试');
 
     useDrawerStore.getState().saveDraft();
 
     const node = useNodeGraphStore.getState().graph.nodes[0];
-    expect((node.data as { itemId: string }).itemId).toBe('saved_id');
+    expect((node.data as { itemId: string }).itemId).toBe('mc:saved_id');
     expect(useDrawerStore.getState().open).toBe(false);
   });
 

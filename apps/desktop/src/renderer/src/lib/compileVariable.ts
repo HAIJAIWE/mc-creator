@@ -78,15 +78,18 @@ function formatValue(value: unknown, varType: VariableNodeData['varType']): stri
     case 'string':
       return `"${escapeJavaStringLiteral(String(value))}"`;
     case 'boolean':
-      return value ? 'true' : 'false';
+      // L-5 修复：显式比较，避免数字/字符串等 truthy 值被误生成 `= true;`
+      return value === true ? 'true' : 'false';
     case 'item':
-      // 用 ResourceLocation 解析物品 id（值做 Java 字符串字面量转义，防止注入关闭字符串）
-      return `new ItemStack(ForgeRegistries.ITEMS.getValue(new ResourceLocation("${escapeJavaStringLiteral(
+      // Critical 修复：BuiltInRegistries.ITEM.getValue() 返回 Optional<Item>（非 ItemStack），
+      // Item 没有 copy() 方法，orElse(ItemStack.EMPTY) 类型不匹配。
+      // 正确写法：用 new ItemStack(Item) 包裹，与 block 分支同构。
+      return `new ItemStack(BuiltInRegistries.ITEM.getValue(new ResourceLocation("${escapeJavaStringLiteral(
         String(value),
-      )}")))`;
+      )}")).orElse(Items.AIR))`;
     case 'block':
-      return `ForgeRegistries.BLOCKS.getValue(new ResourceLocation("${escapeJavaStringLiteral(
+      return `BuiltInRegistries.BLOCK.getValue(new ResourceLocation("${escapeJavaStringLiteral(
         String(value),
-      )}")).defaultBlockState()`;
+      )}")).orElse(Blocks.AIR).defaultBlockState()`;
   }
 }

@@ -232,27 +232,38 @@ export function TerminalPanel() {
       {/* 标题栏 */}
       <div className="flex items-center border-b border-mc-border bg-mc-surface px-1 py-1">
         {terminals.map((t, i) => (
-          <button
+          <div
             key={t.pid}
+            role="tab"
+            tabIndex={0}
+            aria-selected={i === activeIdx}
             onClick={() => setActiveIdx(i)}
-            className={`flex items-center gap-1 rounded-mc px-2 py-0.5 text-xs transition-colors ${
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setActiveIdx(i);
+              }
+            }}
+            className={`flex cursor-pointer items-center gap-1 rounded-mc px-2 py-0.5 text-xs transition-colors ${
               i === activeIdx
                 ? 'bg-mc-surface-2 text-mc-text'
                 : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
             }`}
           >
-            <TerminalIcon className="h-3 w-3" />
+            <TerminalIcon className="h-3 w-3" aria-hidden="true" />
             <span className="max-w-24 truncate">{t.title}</span>
             <button
+              type="button"
+              aria-label={`关闭 ${t.title}`}
               onClick={(e) => {
                 e.stopPropagation();
                 killTerminal(i);
               }}
               className="rounded-mc p-0.5 text-mc-mute hover:text-mc-text"
             >
-              <X className="h-2.5 w-2.5" />
+              <X className="h-2.5 w-2.5" aria-hidden="true" />
             </button>
-          </button>
+          </div>
         ))}
         <button
           onClick={spawnTerminal}

@@ -30,6 +30,8 @@ export interface IconTabBarProps<K extends string> {
  * Modpack 的子视图切换样式略不同（无图标、按钮更紧凑），可通过 className 覆盖。
  *
  * 调用方需把 `setActiveTab + setQuery('') + setXxxFilter('all')` 包装到 onSelect handler。
+ *
+ * a11y：实现 WAI-ARIA Tab 模式（role="tablist" + role="tab" + aria-selected + Roving Tabindex）。
  */
 export function IconTabBar<K extends string>({
   tabs,
@@ -38,16 +40,21 @@ export function IconTabBar<K extends string>({
   className = 'flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1',
 }: IconTabBarProps<K>) {
   return (
-    <div className={className}>
+    <div role="tablist" aria-label="预览面板视图切换" className={className}>
       {tabs.map((t) => {
         const Icon = t.icon;
         const showCount = !t.hideCount && t.count !== undefined;
+        const selected = activeTab === t.key;
         return (
           <button
             key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            tabIndex={selected ? 0 : -1}
             onClick={() => onSelect(t.key)}
             className={`flex items-center gap-1 rounded-mc px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              activeTab === t.key
+              selected
                 ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
                 : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
             }`}

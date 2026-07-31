@@ -114,6 +114,11 @@ export const FIELD_TOOLTIPS: Record<string, string> = {
   // === comment ===
   'comment.text': '备注文本（仅文档用途，不参与编译）',
   'comment.color': '备注背景色：yellow/green/blue/pink/gray',
+
+  // === procedure ===
+  'procedure.procedureName':
+    '过程名（Java 标识符），编译为方法名 procedure_<name>(Object event)。字母/下划线开头，仅含字母/数字/下划线',
+  'procedure.displayName': 'UI 显示名（可选，默认同过程名），仅用于画布展示，不影响编译产物',
 };
 
 /** 获取字段 tooltip，先查 `${kind}.${fieldKey}`，未命中 fallback 到 `common.${fieldKey}`，仍无则返回 undefined */

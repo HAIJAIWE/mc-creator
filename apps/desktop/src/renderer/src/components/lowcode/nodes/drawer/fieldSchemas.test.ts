@@ -108,3 +108,61 @@ describe('getFieldSchemas（阶段 C 新节点）', () => {
     expect(iterableField?.condition).toBeDefined();
   });
 });
+
+describe('getFieldSchemas（P0-1 codeLock 公共字段）', () => {
+  it('非 comment 节点包含 codeLocked segmented 字段', () => {
+    const kinds = [
+      'item',
+      'block',
+      'entity',
+      'recipe',
+      'machine',
+      'multiblock',
+      'event',
+      'condition',
+      'action',
+      'code',
+      'variable',
+      'subgraph',
+      'loop',
+    ] as const;
+    for (const kind of kinds) {
+      const fields = getFieldSchemas(kind);
+      const codeLocked = fields.find((f) => f.key === 'codeLocked');
+      expect(codeLocked, `${kind} 应包含 codeLocked`).toBeDefined();
+      expect(codeLocked?.type).toBe('segmented');
+      expect(codeLocked?.options).toEqual(['false', 'true']);
+    }
+  });
+
+  it('comment 节点不包含 codeLocked（excludeKinds 过滤）', () => {
+    const fields = getFieldSchemas('comment');
+    const keys = fields.map((f) => f.key);
+    expect(keys).not.toContain('codeLocked');
+    expect(keys).not.toContain('lockedCode');
+  });
+
+  it('非 comment 节点包含 lockedCode code 字段', () => {
+    const fields = getFieldSchemas('item');
+    const lockedCode = fields.find((f) => f.key === 'lockedCode');
+    expect(lockedCode).toBeDefined();
+    expect(lockedCode?.type).toBe('code');
+    expect(lockedCode?.language).toBe('java');
+  });
+
+  it('lockedCode 字段有条件显示：codeLocked=true 时才显示', () => {
+    const fields = getFieldSchemas('item');
+    const lockedCode = fields.find((f) => f.key === 'lockedCode');
+    expect(lockedCode?.condition).toBeDefined();
+    expect(lockedCode?.condition?.field).toBe('codeLocked');
+    expect(lockedCode?.condition?.equals).toBe('true');
+  });
+
+  it('codeLocked 与 lockedCode 都标记 excludeKinds: ["comment"]', () => {
+    const fields = getFieldSchemas('item');
+    const codeLocked = fields.find((f) => f.key === 'codeLocked');
+    const lockedCode = fields.find((f) => f.key === 'lockedCode');
+    expect(codeLocked?.excludeKinds).toEqual(['comment']);
+    expect(lockedCode?.excludeKinds).toEqual(['comment']);
+  });
+});

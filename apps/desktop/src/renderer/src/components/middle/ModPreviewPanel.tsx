@@ -430,13 +430,11 @@ export function ModPreviewPanel() {
         } else if (scope === 'items') {
           lines.push(`# ${mod.name || mod.modId} - 物品列表`, '');
           lines.push(`共 ${mod.items.length} 个物品`, '');
+          lines.push('| ID | 名称 | 稀有度 | 堆叠 |', '|---|---|---|---|');
           for (const i of mod.items) {
             lines.push(
               `| \`${i.id}\` | ${i.name} | ${RARITY_LABEL[i.rarity]} | ${i.maxStackSize} |`,
             );
-            if (lines.length === 2) {
-              lines.splice(2, 0, '| ID | 名称 | 稀有度 | 堆叠 |', '|---|---|---|---|');
-            }
           }
         } else if (scope === 'blocks') {
           lines.push(`# ${mod.name || mod.modId} - 方块列表`, '');
@@ -468,6 +466,10 @@ export function ModPreviewPanel() {
         icon="box"
         title="尚未生成 Mod Spec"
         hint="在右侧 AgentPanel 描述你想要的 mod，生成 Spec 后即可预览"
+        action={{
+          label: '打开命令面板',
+          onClick: () => window.dispatchEvent(new Event('mc:open-command-palette')),
+        }}
       />
     );
   }

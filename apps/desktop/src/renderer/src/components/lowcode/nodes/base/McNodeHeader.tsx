@@ -14,6 +14,8 @@ interface McNodeHeaderProps {
   collapsed: boolean;
   debugState?: NodeDebugState;
   errorState?: NodeErrorState;
+  /** P0-1: 代码锁定状态（对标 MCreator codeLock），锁定时头部显示 🔒 标记 */
+  codeLocked?: boolean;
   onToggleCollapse: () => void;
   onOpenDrawer: () => void;
 }
@@ -22,7 +24,7 @@ interface McNodeHeaderProps {
  * MC 风格 3D 凸起灰色头部条。
  * - 背景 #c6c6c6（mc-btn），3D 凸起边框（上/左白、下/右黑）
  * - 左侧 4px 类别色条 + 像素图标 + 像素字体标题
- * - 右侧徽章 + 调试/错误标记 + 设置按钮 + 折叠按钮
+ * - 右侧徽章 + 锁定标记 + 调试/错误标记 + 设置按钮 + 折叠按钮
  */
 function McNodeHeaderComponent({
   icon,
@@ -32,6 +34,7 @@ function McNodeHeaderComponent({
   collapsed,
   debugState,
   errorState,
+  codeLocked,
   onToggleCollapse,
   onOpenDrawer,
 }: McNodeHeaderProps) {
@@ -55,6 +58,13 @@ function McNodeHeaderComponent({
 
       {/* 徽章 */}
       {badge && <span className="text-[10px] text-mc-text">{badge}</span>}
+
+      {/* P0-1: 代码锁定标记（对标 MCreator codeLock） */}
+      {codeLocked && (
+        <span aria-label="代码已锁定" className="text-[10px]" style={{ color: '#fbbf24' }}>
+          🔒
+        </span>
+      )}
 
       {/* 调试标记 */}
       {debugState === 'debugging' && (
@@ -93,7 +103,7 @@ function McNodeHeaderComponent({
       {/* 折叠按钮 */}
       <button
         type="button"
-        aria-label="折叠"
+        aria-label={collapsed ? '展开' : '折叠'}
         onClick={onToggleCollapse}
         className="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
       >

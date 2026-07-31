@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback, type ChangeEvent } from 'react';
+import { memo, useState, useEffect, useCallback, useRef, type ChangeEvent } from 'react';
 import type { EditorProps } from './types.js';
 import { listExternalMods, type ExternalMod } from '../../../custom/externalModList.js';
 
@@ -17,6 +17,10 @@ function parseResourceId(value: string): { modid: string; path: string } {
  *
  * 阶段 C：命名空间下拉加载外部 mod 列表（listExternalMods），
  * 支持 minecraft / forge / create 等命名空间切换。
+ *
+ * P1 dogfood 修复：使用 ref 跟踪本地编辑状态，避免外部 value prop
+ * 在用户输入时立即回写导致竞态闪烁。只有当 value 真正来自外部（非本组件
+ * 刚触发的 onChange）时才同步本地 state。
  */
 function ResourceIdEditorComponent({ value, onChange, error }: EditorProps<string>) {
   const [mods, setMods] = useState<ExternalMod[]>([
@@ -25,6 +29,10 @@ function ResourceIdEditorComponent({ value, onChange, error }: EditorProps<strin
   const { modid, path } = parseResourceId(value);
   const [modidValue, setModidValue] = useState(modid);
   const [pathValue, setPathValue] = useState(path);
+
+  // P1 修复：ref 记录本组件最后一次 onChange 发出的完整值，
+  // 仅当外部 value 与上次发出的不同时才同步本地 state
+  const lastEmittedRef = useRef<string>(value);
 
   // 加载外部 mod 列表
   useEffect(() => {
@@ -38,16 +46,22 @@ function ResourceIdEditorComponent({ value, onChange, error }: EditorProps<strin
   }, []);
 
   useEffect(() => {
-    const parsed = parseResourceId(value);
-    setModidValue(parsed.modid);
-    setPathValue(parsed.path);
+    // 仅当外部 value 非本组件刚发出时才同步本地 state
+    if (value !== lastEmittedRef.current) {
+      const parsed = parseResourceId(value);
+      setModidValue(parsed.modid);
+      setPathValue(parsed.path);
+    }
+    lastEmittedRef.current = value;
   }, [value]);
 
   const handleModidChange = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
       const newModid = e.target.value;
       setModidValue(newModid);
-      onChange(`${newModid}:${pathValue}`);
+      const emitted = `${newModid}:${pathValue}`;
+      lastEmittedRef.current = emitted;
+      onChange(emitted);
     },
     [pathValue, onChange],
   );
@@ -56,7 +70,9 @@ function ResourceIdEditorComponent({ value, onChange, error }: EditorProps<strin
     (e: ChangeEvent<HTMLInputElement>) => {
       const newPath = e.target.value;
       setPathValue(newPath);
-      onChange(`${modidValue}:${newPath}`);
+      const emitted = `${modidValue}:${newPath}`;
+      lastEmittedRef.current = emitted;
+      onChange(emitted);
     },
     [modidValue, onChange],
   );

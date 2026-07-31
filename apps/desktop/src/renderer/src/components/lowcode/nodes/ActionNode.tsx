@@ -43,6 +43,7 @@ function ActionNodeComponent({ id, data, selected }: NodeProps<ActionNodeData>) 
       collapsed={data.collapsed}
       selected={selected}
       debugState={debugState}
+      codeLocked={data.codeLocked}
       onToggleCollapse={() => toggleCollapse(id)}
       onOpenDrawer={() => openDrawer(id)}
     >

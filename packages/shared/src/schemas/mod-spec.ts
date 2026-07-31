@@ -263,6 +263,251 @@ export const ModAdvancementSpec = z
   })
   .default({ id: '', criteria: [] });
 
+// === 配方/实体/机器（P1.3 新增，从节点图编译） ===
+// 注意：datapack-spec.ts 已有名为 RecipeSpec 的 schema（vanilla 数据包 JSON 格式），
+// 这里采用 ModRecipeSpec / ModRecipeInputSpec 前缀以避免命名冲突。
+// 二者用途不同：ModRecipeSpec 是 loader 无关的抽象表示（由节点图编译而来），
+// datapack 的 RecipeSpec 是 vanilla 数据包 JSON 输出格式（由 datapack-generator 输出）。
+
+/** 配方输入物品条目（loader 无关） */
+export const ModRecipeInputSpec = z.object({
+  /** 物品 id（如 'minecraft:iron_ingot'） */
+  item: z.string(),
+  /** 数量 */
+  count: z.number().int().min(1).default(1),
+  /** 在 shaped 配方中的格子位置标记（如 'A'、'B'），shapeless 时留空 */
+  slot: z.string().default(''),
+});
+
+/** 配方条目（loader 无关，由节点图编译而来） */
+export const ModRecipeSpec = z.object({
+  /** 配方 id（小写下划线） */
+  recipeId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 配方类型 */
+  recipeType: z
+    .enum([
+      'crafting_shaped',
+      'crafting_shapeless',
+      'smelting',
+      'blasting',
+      'smoking',
+      'stonecutting',
+    ])
+    .default('crafting_shaped'),
+  /** 输入物品列表 */
+  inputs: z.array(ModRecipeInputSpec).default([]),
+  /** 输出物品 id */
+  output: z.string(),
+  /** 输出数量 */
+  outputCount: z.number().int().min(1).default(1),
+  /** 烧炼时间（tick，仅 smelting/blasting/smoking） */
+  cookTime: z.number().int().min(1).default(200),
+  /** 经验值（仅烧炼类） */
+  experience: z.number().min(0).default(0),
+  /** shaped 配方的形状（如 ['AB', 'BA']，最多 3 行） */
+  pattern: z.array(z.string()).max(3).default([]),
+});
+
+/** 实体/生物条目（loader 无关） */
+export const EntitySpec = z.object({
+  /** 实体 id（小写下划线） */
+  entityId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 显示名 */
+  displayName: z.string(),
+  /** 最大生命值 */
+  maxHealth: z.number().min(1).default(20),
+  /** 攻击伤害 */
+  attackDamage: z.number().min(0).default(0),
+  /** 移动速度 */
+  movementSpeed: z.number().min(0).default(0.3),
+  /** 阵营分类 */
+  classification: z
+    .enum(['animal', 'monster', 'water_creature', 'ambient', 'misc'])
+    .default('misc'),
+  /** 模型类型（vanilla 骨架或自定义） */
+  modelType: z.enum(['pig', 'zombie', 'skeleton', 'creeper', 'cow', 'custom']).default('pig'),
+  /** 生成权重（0 = 不自然生成） */
+  spawnWeight: z.number().min(0).default(0),
+  /** 生成群系（空数组 = 不限制） */
+  spawnBiomes: z.array(z.string()).default([]),
+  /** 贴图路径（相对 resources/） */
+  texturePath: z.string().optional(),
+});
+
+/** 机器条目（loader 无关，方块实体 + GUI + 能源） */
+export const MachineSpec = z.object({
+  /** 机器 id（小写下划线） */
+  machineId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 显示名 */
+  displayName: z.string(),
+  /** 能源容量（FE） */
+  energyCapacity: z.number().int().min(0).default(10000),
+  /** 最大能源传输速率 */
+  maxEnergyTransfer: z.number().int().min(0).default(100),
+  /** 输入槽数量 */
+  inputSlots: z.number().int().min(0).max(9).default(1),
+  /** 输出槽数量 */
+  outputSlots: z.number().int().min(0).max(9).default(1),
+  /** 默认加工时间（tick） */
+  defaultProcessTime: z.number().int().min(1).default(200),
+  /** 默认能源消耗/tick */
+  defaultEnergyPerTick: z.number().int().min(0).default(10),
+  /** GUI 宽度 */
+  guiWidth: z.number().int().min(176).max(256).default(176),
+  /** GUI 高度 */
+  guiHeight: z.number().int().min(166).max(256).default(166),
+});
+
+// === 自定义代码/多方块/事件链（P1.4 新增，从节点图编译） ===
+// 设计说明：
+// - code 节点编译为 CustomCodeSnippetSpec（保留用户原始代码 + 端口签名，由 mod-generator 决定嵌入位置）
+// - multiblock 节点编译为 MultiBlockSpec（结构尺寸 + 控制器偏移）
+// - event/condition/action 节点采用扁平结构编译到独立数组（顶层 conditions/actions），
+//   P1.5 通过 control 边在 EventHandlerSpec.conditionIds/actionIds 中建立引用关系：
+//   顶层 conditions/actions = 所有节点的扁平列表；
+//   eventHandlers[].conditionIds/actionIds = 该事件处理器关联的节点 id 引用。
+
+/** 自定义代码片段（由 CodeNode 编译而来） */
+export const CustomCodeSnippetSpec = z.object({
+  /** 代码片段 id（使用节点 nodeId，便于调试与回溯） */
+  snippetId: z.string(),
+  /** 代码语言 */
+  language: z.enum(['java', 'javascript', 'kotlin']).default('java'),
+  /** 代码内容（原样保留，由 generator 决定如何嵌入） */
+  code: z.string().default(''),
+  /** 输入端口类型签名（解析自 CodeNodeData.inputSignature JSON：{ portId: PortType }） */
+  inputSignature: z.record(z.string()).default({}),
+  /** 输出端口类型签名 */
+  outputSignature: z.record(z.string()).default({}),
+  /** 函数名（生成的 Java 方法名） */
+  methodName: z.string().default('process'),
+});
+
+/** 多方块结构（由 MultiBlockNode 编译而来） */
+export const MultiBlockSpec = z.object({
+  /** 结构 id（小写下划线） */
+  structureId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 显示名 */
+  displayName: z.string(),
+  /** 结构尺寸（1-16） */
+  width: z.number().int().min(1).max(16),
+  height: z.number().int().min(1).max(16),
+  depth: z.number().int().min(1).max(16),
+  /** 是否为空心结构 */
+  hollow: z.boolean().default(true),
+  /** 主控制器位置（相对坐标） */
+  controllerOffset: z.object({
+    x: z.number().int(),
+    y: z.number().int(),
+    z: z.number().int(),
+  }),
+});
+
+/** 事件处理器（由 EventNode 编译而来，扁平结构 + P1.5 控制流链引用） */
+export const EventHandlerSpec = z.object({
+  /** 处理器 id（使用节点 nodeId） */
+  handlerId: z.string(),
+  /** 事件类型 */
+  eventType: z.enum([
+    'player_right_click_block',
+    'player_right_click_item',
+    'player_left_click',
+    'block_break',
+    'block_place',
+    'entity_death',
+    'entity_hurt',
+    'item_use',
+    'item_pickup',
+    'player_join',
+    'player_quit',
+    'tick',
+    'custom',
+  ]),
+  /** 事件参数（解析自 EventNodeData.eventArgs JSON） */
+  eventArgs: z.record(z.unknown()).default({}),
+  /** 关联的条件节点 id 列表（通过 control 边从 event 可达的 condition 节点） */
+  conditionIds: z.array(z.string()).default([]),
+  /** 关联的动作节点 id 列表（通过 control 边从 event/condition 可达的 action 节点） */
+  actionIds: z.array(z.string()).default([]),
+  /**
+   * P1-3：关联的过程节点 id 列表（通过 control 边从 event 可达的 procedure 节点）。
+   * 事件触发时调用对应的过程方法（procedure_<name>），过程体（condition/action）
+   * 归属过程本身（在 ProcedureSpec 中维护），不在此 handler 内联。
+   */
+  procedureCallIds: z.array(z.string()).default([]),
+});
+
+/** 条件（由 ConditionNode 编译而来，扁平结构） */
+export const ConditionSpec = z.object({
+  /** 条件 id（使用节点 nodeId） */
+  conditionId: z.string(),
+  /** 条件类型 */
+  conditionType: z.enum([
+    'has_item',
+    'health_below',
+    'health_above',
+    'distance_less',
+    'distance_greater',
+    'is_day',
+    'is_night',
+    'is_raining',
+    'biome_is',
+    'block_is',
+    'custom',
+  ]),
+  /** 条件参数（解析自 ConditionNodeData.conditionArgs JSON） */
+  args: z.record(z.unknown()).default({}),
+  /** 是否取反 */
+  invert: z.boolean().default(false),
+});
+
+/** 动作（由 ActionNode 编译而来，扁平结构） */
+export const ActionSpec = z.object({
+  /** 动作 id（使用节点 nodeId） */
+  actionId: z.string(),
+  /** 动作类型 */
+  actionType: z.enum([
+    'spawn_entity',
+    'give_item',
+    'take_item',
+    'teleport',
+    'damage',
+    'heal',
+    'set_block',
+    'remove_block',
+    'play_sound',
+    'send_message',
+    'summon_lightning',
+    'give_effect',
+    'custom',
+  ]),
+  /** 动作参数（解析自 ActionNodeData.actionArgs JSON） */
+  args: z.record(z.unknown()).default({}),
+});
+
+/**
+ * 过程（P1-3 由 ProcedureNode 编译而来，对标 MCreator procedure）。
+ *
+ * 命名的可复用逻辑单元，编译为独立的 Java 方法 `procedure_<procedureName>(Object event)`。
+ * - conditionIds/actionIds：过程体（通过 control 边从 procedure 节点 BFS 收集）
+ * - procedureCallIds：嵌套调用的其他过程节点 id（过程调用过程）
+ * - 同一 procedure 可被多个 event/procedure 引用 → 单一方法定义 + 多处调用
+ */
+export const ProcedureSpec = z.object({
+  /** 过程 id（使用节点 nodeId） */
+  procedureId: z.string(),
+  /** 过程名（Java 标识符，生成方法名 procedure_<procedureName>） */
+  procedureName: z.string(),
+  /** 显示名 */
+  displayName: z.string().default(''),
+  /** 过程体内的条件节点 id 列表（通过 control 边从 procedure 节点可达） */
+  conditionIds: z.array(z.string()).default([]),
+  /** 过程体内的动作节点 id 列表（通过 control 边从 procedure 节点可达） */
+  actionIds: z.array(z.string()).default([]),
+  /** 嵌套调用的过程节点 id 列表（过程→过程的 control 边） */
+  procedureCallIds: z.array(z.string()).default([]),
+});
+
 /** ModSpec：loader 无关的结构化规格 */
 export const ModSpec = z.object({
   modId: z.string().regex(/^[a-z0-9_]+$/),
@@ -300,6 +545,24 @@ export const ModSpec = z.object({
       }),
     )
     .default([]),
+  // 新增：配方（P1.3 从节点图编译，loader 无关抽象表示）
+  recipes: z.array(ModRecipeSpec).default([]),
+  // 新增：实体/生物（P1.3 从节点图编译）
+  entities: z.array(EntitySpec).default([]),
+  // 新增：机器（P1.3 从节点图编译）
+  machines: z.array(MachineSpec).default([]),
+  // 新增：自定义代码片段（P1.4 从 CodeNode 编译）
+  customCode: z.array(CustomCodeSnippetSpec).default([]),
+  // 新增：多方块结构（P1.4 从 MultiBlockNode 编译）
+  multiblocks: z.array(MultiBlockSpec).default([]),
+  // 新增：事件处理器（P1.4 从 EventNode 编译，扁平结构；P1.5 通过 conditionIds/actionIds 建立控制流链引用）
+  eventHandlers: z.array(EventHandlerSpec).default([]),
+  // 新增：条件（P1.4 从 ConditionNode 编译，扁平列表，被 eventHandlers[].conditionIds 引用）
+  conditions: z.array(ConditionSpec).default([]),
+  // 新增：动作（P1.4 从 ActionNode 编译，扁平列表，被 eventHandlers[].actionIds 引用）
+  actions: z.array(ActionSpec).default([]),
+  // 新增：过程（P1-3 从 ProcedureNode 编译，命名可复用逻辑单元，编译为独立 Java 方法）
+  procedures: z.array(ProcedureSpec).default([]),
 });
 
 export type ModSpec = z.infer<typeof ModSpec>;
@@ -313,3 +576,13 @@ export type BlockStatePropertySpec = z.infer<typeof BlockStatePropertySpec>;
 export type AABBShapeSpec = z.infer<typeof AABBShapeSpec>;
 export type ModLootTableSpec = z.infer<typeof ModLootTableSpec>;
 export type ModAdvancementSpec = z.infer<typeof ModAdvancementSpec>;
+export type ModRecipeSpec = z.infer<typeof ModRecipeSpec>;
+export type ModRecipeInputSpec = z.infer<typeof ModRecipeInputSpec>;
+export type EntitySpec = z.infer<typeof EntitySpec>;
+export type MachineSpec = z.infer<typeof MachineSpec>;
+export type CustomCodeSnippetSpec = z.infer<typeof CustomCodeSnippetSpec>;
+export type MultiBlockSpec = z.infer<typeof MultiBlockSpec>;
+export type EventHandlerSpec = z.infer<typeof EventHandlerSpec>;
+export type ConditionSpec = z.infer<typeof ConditionSpec>;
+export type ActionSpec = z.infer<typeof ActionSpec>;
+export type ProcedureSpec = z.infer<typeof ProcedureSpec>;

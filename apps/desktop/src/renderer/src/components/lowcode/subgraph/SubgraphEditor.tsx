@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -35,6 +35,8 @@ const subgraphNodeTypes = { boundary: SubgraphBoundaryNode };
  * 使内部节点可拖拽、可连线。边界节点位置由 portMappings 索引推导（不可拖拽）。
  */
 export function SubgraphEditor({ subgraph, onChange }: SubgraphEditorProps) {
+  // Minor 修复：用 useRef 替代 document.getElementById，避免全局 DOM 查询（组件实例隔离 + 类型安全）
+  const boundaryTypeRef = useRef<HTMLSelectElement>(null);
   const flowNodes: Node[] = useMemo(() => {
     const inner: Node[] = subgraph.nodes.map((n: ModNode) => ({
       id: n.id,
@@ -101,10 +103,18 @@ export function SubgraphEditor({ subgraph, onChange }: SubgraphEditorProps) {
           });
         }
       }
-      // 若内部节点数量没变，说明没有节点被删除（边界节点不允许删除）
-      if (updatedInnerNodes.length === subgraph.nodes.length) {
-        onChange({ ...subgraph, nodes: updatedInnerNodes });
-      }
+      // P1 dogfood 修复：允许删除内部节点（之前节点数变化时静默丢弃变更）
+      // 同时删除与被删节点关联的边，避免 dangling 边
+      const removedNodeIds = new Set(
+        subgraph.nodes.map((n) => n.id).filter((id) => !updatedInnerNodes.some((n) => n.id === id)),
+      );
+      const updatedEdges =
+        removedNodeIds.size > 0
+          ? subgraph.edges.filter(
+              (e) => !removedNodeIds.has(e.source) && !removedNodeIds.has(e.target),
+            )
+          : subgraph.edges;
+      onChange({ ...subgraph, nodes: updatedInnerNodes, edges: updatedEdges });
     },
     [flowNodes, subgraph, onChange],
   );
@@ -167,15 +177,21 @@ export function SubgraphEditor({ subgraph, onChange }: SubgraphEditorProps) {
   }, []);
 
   const addBoundary = useCallback(
-    (direction: 'in' | 'out') => {
-      const idx = subgraph.portMappings.length;
+    (
+      direction: 'in' | 'out',
+      type: 'void' | 'item_stack' | 'integer' | 'string' | 'boolean' | 'number' = 'void',
+    ) => {
+      // U-9 修复：基于 length 的序号在删除端口后会复用已删除 id，改为取最小空闲序号
+      const used = new Set(subgraph.portMappings.map((m) => m.externalPortId));
+      let idx = 0;
+      while (used.has(`${direction}_${idx}`)) idx++;
       const externalPortId = `${direction}_${idx}`;
       const newMapping = {
         internalPortId: externalPortId,
         externalPortId,
         label: direction === 'in' ? `输入${idx + 1}` : `输出${idx + 1}`,
         direction,
-        type: 'item_stack' as const,
+        type,
       };
       onChange({
         ...subgraph,
@@ -208,16 +224,37 @@ export function SubgraphEditor({ subgraph, onChange }: SubgraphEditorProps) {
         </ReactFlow>
       </div>
       <div className="flex gap-2 border-t border-mc-border p-2">
+        <select
+          ref={boundaryTypeRef}
+          defaultValue="void"
+          className="border border-t-black border-l-black border-b-white border-r-white bg-mc-bg px-1 py-0.5 text-[11px] text-mc-text"
+          aria-label="边界端口类型"
+        >
+          <option value="void">void</option>
+          <option value="item_stack">item_stack</option>
+          <option value="integer">integer</option>
+          <option value="number">number</option>
+          <option value="string">string</option>
+          <option value="boolean">boolean</option>
+        </select>
         <button
           type="button"
-          onClick={() => addBoundary('in')}
+          onClick={() => {
+            const type = (boundaryTypeRef.current?.value ?? 'void') as
+              'void' | 'item_stack' | 'integer' | 'string' | 'boolean' | 'number';
+            addBoundary('in', type);
+          }}
           className="rounded-mc bg-mc-surface-2 px-2 py-1 text-[11px] text-mc-text hover:bg-mc-surface-3"
         >
           添加输入边界
         </button>
         <button
           type="button"
-          onClick={() => addBoundary('out')}
+          onClick={() => {
+            const type = (boundaryTypeRef.current?.value ?? 'void') as
+              'void' | 'item_stack' | 'integer' | 'string' | 'boolean' | 'number';
+            addBoundary('out', type);
+          }}
           className="rounded-mc bg-mc-surface-2 px-2 py-1 text-[11px] text-mc-text hover:bg-mc-surface-3"
         >
           添加输出边界

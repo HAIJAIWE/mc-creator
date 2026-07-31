@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import {
   ChevronRight,
@@ -217,9 +217,17 @@ export function NbtEditor({ initialValue = '{}', onChange, readOnly = false }: N
   const [editValue, setEditValue] = useState('');
   const [snbtInput, setSnbtInput] = useState('');
   const [showSnbtImport, setShowSnbtImport] = useState(false);
-  const [showTypeSelect, setShowTypeSelect] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // U-7 修复：切换文件时 initialValue 变化，重新解析 root（避免只首次挂载初始化）
+  const lastInitialRef = useRef(initialValue);
+  useEffect(() => {
+    if (initialValue === lastInitialRef.current) return;
+    lastInitialRef.current = initialValue;
+    setRoot(parseSnbt(initialValue) ?? { entries: [] });
+    setExpandedPaths(new Set(['']));
+    setEditingPath(null);
+  }, [initialValue]);
 
   const toggleExpand = useCallback((path: string) => {
     setExpandedPaths((prev) => {
@@ -451,6 +459,8 @@ export function NbtEditor({ initialValue = '{}', onChange, readOnly = false }: N
               depth={0}
               expanded={expandedPaths.has(String(i))}
               onToggle={() => toggleExpand(String(i))}
+              expandedPaths={expandedPaths}
+              onTogglePath={toggleExpand}
               editingPath={editingPath}
               editValue={editValue}
               onStartEdit={startEdit}
@@ -479,6 +489,9 @@ interface RowProps {
   depth: number;
   expanded: boolean;
   onToggle: () => void;
+  /** U-6：子行展开状态与切换（统一走 expandedPaths，避免硬编码 + 空 onToggle） */
+  expandedPaths: Set<string>;
+  onTogglePath: (path: string) => void;
   editingPath: string | null;
   editValue: string;
   onStartEdit: (path: string, currentValue: string) => void;
@@ -499,6 +512,8 @@ function NbtEntryRow({
   depth,
   expanded,
   onToggle,
+  expandedPaths,
+  onTogglePath,
   editingPath,
   editValue,
   onStartEdit,
@@ -535,11 +550,17 @@ function NbtEntryRow({
       >
         {/* 展开箭头 */}
         {isContainer ? (
-          <button onClick={onToggle} className="flex-shrink-0">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={expanded ? '折叠' : '展开'}
+            aria-expanded={expanded}
+            className="flex-shrink-0"
+          >
             {expanded ? (
-              <ChevronDown className="h-3 w-3 text-mc-mute" />
+              <ChevronDown className="h-3 w-3 text-mc-mute" aria-hidden="true" />
             ) : (
-              <ChevronRight className="h-3 w-3 text-mc-mute" />
+              <ChevronRight className="h-3 w-3 text-mc-mute" aria-hidden="true" />
             )}
           </button>
         ) : (
@@ -589,13 +610,20 @@ function NbtEntryRow({
         {isEditing && (
           <>
             <button
+              type="button"
               onClick={() => onSaveEdit(pathStr, path, tag)}
+              aria-label="保存编辑"
               className="text-green-400 hover:text-green-300"
             >
-              <Save className="h-3 w-3" />
+              <Save className="h-3 w-3" aria-hidden="true" />
             </button>
-            <button onClick={onCancelEdit} className="text-red-400 hover:text-red-300">
-              <X className="h-3 w-3" />
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              aria-label="取消编辑"
+              className="text-red-400 hover:text-red-300"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
             </button>
           </>
         )}
@@ -605,24 +633,28 @@ function NbtEntryRow({
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             {!isContainer && (
               <button
+                type="button"
                 onClick={() => onStartEdit(pathStr, String(tag.value))}
+                aria-label="编辑值"
                 className="text-mc-mute hover:text-mc-text"
                 title="编辑"
               >
-                <Edit3 className="h-2.5 w-2.5" />
+                <Edit3 className="h-2.5 w-2.5" aria-hidden="true" />
               </button>
             )}
             <button
+              type="button"
               onClick={() => {
                 // 从父级删除：path 末尾是索引，前面的 path 是父级路径
                 const parentPath = path.slice(0, -1);
                 const index = parseInt(path[path.length - 1], 10);
                 onDelete(parentPath.length === 0 ? [] : parentPath, index);
               }}
+              aria-label="删除条目"
               className="text-mc-mute hover:text-red-400"
               title="删除"
             >
-              <Trash2 className="h-2.5 w-2.5" />
+              <Trash2 className="h-2.5 w-2.5" aria-hidden="true" />
             </button>
           </div>
         )}
@@ -632,53 +664,61 @@ function NbtEntryRow({
       {isContainer && expanded && (
         <div>
           {tag.type === 'compound' &&
-            (tag.value as NbtEntry[]).map((child, i) => (
-              <NbtEntryRow
-                key={`${child.key}-${i}`}
-                entry={child}
-                path={[...path, String(i)]}
-                pathStr={`${pathStr}/${i}`}
-                depth={depth + 1}
-                expanded={editingPath?.startsWith(`${pathStr}/${i}`) ?? false}
-                onToggle={() => {
-                  /* 复合展开/折叠由内部管理 */
-                }}
-                editingPath={editingPath}
-                editValue={editValue}
-                onStartEdit={onStartEdit}
-                onSaveEdit={onSaveEdit}
-                onCancelEdit={onCancelEdit}
-                onEditValueChange={onEditValueChange}
-                onDelete={onDelete}
-                onAddEntry={onAddEntry}
-                onAddListItem={onAddListItem}
-                onUpdateTag={onUpdateTag}
-                readOnly={readOnly}
-              />
-            ))}
+            (tag.value as NbtEntry[]).map((child, i) => {
+              const childPath = `${pathStr}/${i}`;
+              return (
+                <NbtEntryRow
+                  key={`${child.key}-${i}`}
+                  entry={child}
+                  path={[...path, String(i)]}
+                  pathStr={childPath}
+                  depth={depth + 1}
+                  expanded={expandedPaths.has(childPath)}
+                  onToggle={() => onTogglePath(childPath)}
+                  expandedPaths={expandedPaths}
+                  onTogglePath={onTogglePath}
+                  editingPath={editingPath}
+                  editValue={editValue}
+                  onStartEdit={onStartEdit}
+                  onSaveEdit={onSaveEdit}
+                  onCancelEdit={onCancelEdit}
+                  onEditValueChange={onEditValueChange}
+                  onDelete={onDelete}
+                  onAddEntry={onAddEntry}
+                  onAddListItem={onAddListItem}
+                  onUpdateTag={onUpdateTag}
+                  readOnly={readOnly}
+                />
+              );
+            })}
           {tag.type === 'list' &&
-            (tag.value as NbtTag[]).map((childTag, i) => (
-              <NbtEntryRow
-                key={`list-${i}`}
-                entry={{ key: `[${i}]`, tag: childTag }}
-                path={[...path, String(i)]}
-                pathStr={`${pathStr}/${i}`}
-                depth={depth + 1}
-                expanded={editingPath?.startsWith(`${pathStr}/${i}`) ?? false}
-                onToggle={() => {}}
-                editingPath={editingPath}
-                editValue={editValue}
-                onStartEdit={onStartEdit}
-                onSaveEdit={onSaveEdit}
-                onCancelEdit={onCancelEdit}
-                onEditValueChange={onEditValueChange}
-                onDelete={onDelete}
-                onAddEntry={onAddEntry}
-                onAddListItem={onAddListItem}
-                onUpdateTag={onUpdateTag}
-                readOnly={readOnly}
-              />
-            ))}
+            (tag.value as NbtTag[]).map((childTag, i) => {
+              const childPath = `${pathStr}/${i}`;
+              return (
+                <NbtEntryRow
+                  key={`list-${i}`}
+                  entry={{ key: `[${i}]`, tag: childTag }}
+                  path={[...path, String(i)]}
+                  pathStr={childPath}
+                  depth={depth + 1}
+                  expanded={expandedPaths.has(childPath)}
+                  onToggle={() => onTogglePath(childPath)}
+                  expandedPaths={expandedPaths}
+                  onTogglePath={onTogglePath}
+                  editingPath={editingPath}
+                  editValue={editValue}
+                  onStartEdit={onStartEdit}
+                  onSaveEdit={onSaveEdit}
+                  onCancelEdit={onCancelEdit}
+                  onEditValueChange={onEditValueChange}
+                  onDelete={onDelete}
+                  onAddEntry={onAddEntry}
+                  onAddListItem={onAddListItem}
+                  onUpdateTag={onUpdateTag}
+                  readOnly={readOnly}
+                />
+              );
+            })}
           {/* 添加按钮 */}
           {!readOnly && (
             <div className="flex items-center gap-1 py-0.5" style={{ paddingLeft: indent + 20 }}>

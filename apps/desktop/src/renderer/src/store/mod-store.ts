@@ -211,7 +211,9 @@ export const useModStore = create<ModState>((set, get) => ({
       }
       const openTabs = state.openTabs.map((t) => (t === oldPath ? newPath : t));
       const selectedFile = state.selectedFile === oldPath ? newPath : state.selectedFile;
-      return { files, dirtyFiles, openTabs, selectedFile };
+      // L-8 修复：同步更新分栏路径，避免右侧分栏编辑器指向已失效的旧路径
+      const splitFile = state.splitFile === oldPath ? newPath : state.splitFile;
+      return { files, dirtyFiles, openTabs, selectedFile, splitFile };
     }),
   markFileClean: (path) =>
     set((state) => {

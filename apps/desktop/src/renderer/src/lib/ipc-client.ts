@@ -48,8 +48,16 @@ export const ipcClient = {
   saveModelConfig: (config: { name: string; modelId: string; baseURL: string; apiKey: string }) =>
     window.mcApi.saveModelConfig(config),
   chat: (message: string) => window.mcApi.chat(message),
-  chatStream: (message: string, onChunk: (delta: string, done: boolean) => void) =>
-    window.mcApi.chatStream(message, onChunk),
+  /**
+   * P12 chat 模式工具调用增强：chatStream 添加可选 context 参数。
+   * context 由调用方（如 ChatPanel）从项目 store 提取并传入，
+   * main 进程会据此构建增强 system message。
+   */
+  chatStream: (
+    message: string,
+    onChunk: (delta: string, done: boolean) => void,
+    context?: { generatorType?: string; description?: string; specSummary?: string },
+  ) => window.mcApi.chatStream(message, onChunk, context),
   explainCode: (
     fileName: string,
     code: string,

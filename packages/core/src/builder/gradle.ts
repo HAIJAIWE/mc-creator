@@ -22,11 +22,16 @@ export async function runGradleBuild(
   projectPath: string,
   run: (cmd: string, args: string[], opts: RunOptions) => Promise<RunResult> = defaultRun,
 ): Promise<BuildResult> {
-  const r = await run('./gradlew', ['build', '--quiet'], { cwd: projectPath });
+  // C-2 修复：Windows 下只有 gradlew.bat（./gradlew 会 ENOENT）
+  const gradlew = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+  const r = await run(gradlew, ['build', '--quiet'], { cwd: projectPath });
   const log = `${r.stdout}\n${r.stderr}`;
   if (r.exitCode !== 0) return { success: false, jarPath: null, log };
-  // 产物在 build/libs/*.jar（排除 sources/javadoc）
-  const jar = log.match(/build\/libs\/([^\s]+\.jar)/)?.[0] ?? null;
+  // C-2 修复：产物在 build/libs/*.jar，排除 -sources / -javadoc 附属 jar
+  const jar =
+    [...log.matchAll(/build\/libs\/([^\s]+\.jar)/g)]
+      .map((m) => m[0])
+      .find((j) => !/-(?:sources|javadoc)\.jar$/.test(j)) ?? null;
   return { success: true, jarPath: jar, log };
 }
 

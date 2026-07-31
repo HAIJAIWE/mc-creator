@@ -24,8 +24,9 @@ export const ModpackSpec = z.object({
   author: z.string().default(''),
   description: z.string().default(''),
   format: z.enum(['modrinth', 'curseforge']).default('modrinth'),
-  mcVersion: z.string(),
-  loader: z.enum(['fabric', 'neoforge', 'quilt', 'legacy_fabric']),
+  // S-10 修复：补默认值（此前缺失，AI 输出省略这两字段时 orchestrator parse 失败）
+  mcVersion: z.string().default('1.21.11'),
+  loader: z.enum(['fabric', 'neoforge', 'quilt', 'legacy_fabric']).default('fabric'),
   loaderVersion: z.string().default(''),
   mods: z.array(ModEntry).default([]),
   // P10 新增字段（向后兼容：均带 default）

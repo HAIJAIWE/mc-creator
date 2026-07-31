@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { NodeDetailDrawer } from './NodeDetailDrawer.js';
 import { useNodeGraphStore } from '../../../../store/node-graph-store.js';
@@ -32,6 +32,10 @@ describe('NodeDetailDrawer', () => {
   it('点击保存触发 saveDraft', () => {
     const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
     useDrawerStore.getState().openDrawer(id);
+    // P2 修复：设置合法的 itemId（modid:path 格式），通过 resourceId 校验
+    useDrawerStore.getState().updateField('itemId', 'mc:new_item');
+    // 设置 label 通过 required 校验
+    useDrawerStore.getState().updateField('label', '测试物品');
 
     render(<NodeDetailDrawer compileMessages={[]} />);
     fireEvent.click(screen.getByText('保存'));
@@ -39,10 +43,12 @@ describe('NodeDetailDrawer', () => {
     expect(useDrawerStore.getState().open).toBe(false);
   });
 
-  it('点击取消触发 cancelDraft（不保存修改）', () => {
+  it('点击取消触发 cancelDraft（dirty 时确认后丢弃修改）', () => {
     const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
     useDrawerStore.getState().openDrawer(id);
     useDrawerStore.getState().updateField('displayName', '临时修改');
+    // #18 修复：取消按钮统一走 handleClose，dirty 时先弹确认，确认后丢弃草稿
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(<NodeDetailDrawer compileMessages={[]} />);
     fireEvent.click(screen.getByText('取消'));

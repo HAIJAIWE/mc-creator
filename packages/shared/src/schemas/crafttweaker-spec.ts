@@ -60,7 +60,8 @@ export const CraftTweakerSpec = z.object({
   packName: z.string(),
   description: z.string().default(''),
   packFormat: z.number().int().default(48), // 1.21.x
-  mcVersion: z.string().default('1.21.1'),
+  // S-9 修复：默认 MC 版本与 DEFAULT_MC_VERSION ('1.21.11') 对齐
+  mcVersion: z.string().default('1.21.11'),
   recipes: z.array(CraftTweakerRecipeSpec).default([]),
   tags: z.array(CraftTweakerTagSpec).default([]),
   events: z.array(CraftTweakerEventSpec).default([]),

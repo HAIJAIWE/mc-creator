@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { type ReactElement } from 'react';
 import { ReactFlowProvider, type NodeProps } from 'reactflow';
-import type { ItemNodeData, RecipeNodeData, ConditionNodeData, NodeData } from '@mc-creator/shared';
+import type { ItemNodeData, RecipeNodeData, ConditionNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
 import { ItemNode } from './ItemNode.js';
@@ -54,7 +54,7 @@ describe('节点迁移集成测试', () => {
     expect(screen.getByText('假')).toBeTruthy();
   });
 
-  it('折叠后输入端口隐藏，输出端口保留', () => {
+  it('折叠后端口区完整保留（输入+输出端口均可见）', () => {
     const id = useNodeGraphStore.getState().addNode('recipe', { x: 0, y: 0 });
     useNodeGraphStore.getState().toggleCollapse(id);
     const data = useNodeGraphStore.getState().graph.nodes[0].data as RecipeNodeData;
@@ -62,7 +62,8 @@ describe('节点迁移集成测试', () => {
 
     renderWithProvider(<RecipeNode {...props} />);
 
-    expect(screen.queryByText('材料')).toBeNull();
+    // P2 修正：折叠时端口区完整保留（输入+输出），便于连线和视觉一致性
+    expect(screen.getByText('材料')).toBeTruthy();
     expect(screen.getByText('产物')).toBeTruthy();
   });
 });

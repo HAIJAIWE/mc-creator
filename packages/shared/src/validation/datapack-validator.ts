@@ -173,6 +173,28 @@ function validateRecipe(r: RecipeSpec, issues: ValidationIssue[]): void {
         }
       }
     }
+    // S-15 修复：校验 pattern 各行字符数一致，且不超过 3 行 3 列（原版合成限制）
+    if (r.pattern && r.pattern.length > 0) {
+      const firstWidth = r.pattern[0].length;
+      if (r.pattern.some((row) => row.length !== firstWidth)) {
+        issues.push({
+          level: 'error',
+          type: 'recipe',
+          id: r.id,
+          field: 'pattern',
+          message: 'pattern 各行的字符数必须一致',
+        });
+      }
+      if (r.pattern.length > 3 || firstWidth > 3) {
+        issues.push({
+          level: 'error',
+          type: 'recipe',
+          id: r.id,
+          field: 'pattern',
+          message: '有形合成 pattern 最多 3 行、每行最多 3 个字符',
+        });
+      }
+    }
   }
 
   // 无形合成必须提供 ingredients
@@ -219,6 +241,15 @@ function validateRecipe(r: RecipeSpec, issues: ValidationIssue[]): void {
 
   // 锻造台必须提供 template/base/addition
   if (r.type === 'smithing_transform') {
+    // S-6 修复：补检 template（此前漏检，缺 template 时生成无效配方）
+    if (!r.template)
+      issues.push({
+        level: 'error',
+        type: 'recipe',
+        id: r.id,
+        field: 'template',
+        message: 'smithing_transform 必须提供 template',
+      });
     if (!r.base)
       issues.push({
         level: 'error',

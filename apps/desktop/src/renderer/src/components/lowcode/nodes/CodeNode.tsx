@@ -32,13 +32,14 @@ function CodeNodeComponent({ id, data, selected }: NodeProps<CodeNodeData>) {
   return (
     <McNodeShell
       icon="scroll-quill"
-      title={data.methodName + '()' || data.label || '代码'}
+      title={(data.methodName ? `${data.methodName}()` : '') || data.label || '代码'}
       colorClass="mc-code"
       badge={languageLabel}
       ports={ports}
       collapsed={data.collapsed}
       selected={selected}
       debugState={debugState}
+      codeLocked={data.codeLocked}
       onToggleCollapse={() => toggleCollapse(id)}
       onOpenDrawer={() => openDrawer(id)}
     >

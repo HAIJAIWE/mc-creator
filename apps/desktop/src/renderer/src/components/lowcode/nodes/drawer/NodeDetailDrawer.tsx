@@ -1,4 +1,4 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useCallback } from 'react';
 import { useDrawerStore } from '../../../../store/drawer-store.js';
 import { NodeDetailForm } from './NodeDetailForm.js';
 
@@ -30,16 +30,28 @@ function NodeDetailDrawerComponent({ compileMessages }: NodeDetailDrawerProps) {
   const saveDraft = useDrawerStore((s) => s.saveDraft);
   const cancelDraft = useDrawerStore((s) => s.cancelDraft);
 
-  // Esc 键关闭
+  // P0 dogfood 修复：遮罩点击 / Esc / 关闭按钮时若有未保存修改，弹确认而非直接丢弃
+  // Minor 修复：统一三处关闭入口（遮罩、Esc、× 按钮）都走 dirty 确认逻辑
+  const handleClose = useCallback(() => {
+    if (dirty) {
+      const ok = window.confirm('有未保存的修改，确定要关闭吗？');
+      if (!ok) return;
+    }
+    cancelDraft();
+  }, [dirty, cancelDraft]);
+
+  // Esc 键关闭（走 handleClose 含 dirty 确认）
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') cancelDraft();
+      if (e.key === 'Escape') handleClose();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, cancelDraft]);
+  }, [open, handleClose]);
 
+  // P2 修复：所有 hooks 必须在条件返回之前调用（Rules of Hooks），
+  // 否则关闭抽屉时 useCallback 被跳过，导致 "Rendered fewer hooks than expected"。
   if (!open || !nodeId) return null;
 
   const nodeMessages = compileMessages.filter((m) => m.nodeId === nodeId);
@@ -47,7 +59,7 @@ function NodeDetailDrawerComponent({ compileMessages }: NodeDetailDrawerProps) {
   return (
     <>
       {/* 遮罩 */}
-      <div className="fixed inset-0 z-40 bg-black/50" onClick={cancelDraft} aria-hidden="true" />
+      <div className="fixed inset-0 z-40 bg-black/50" onClick={handleClose} aria-hidden="true" />
       {/* 抽屉 */}
       <aside
         role="dialog"
@@ -62,7 +74,7 @@ function NodeDetailDrawerComponent({ compileMessages }: NodeDetailDrawerProps) {
             <button
               type="button"
               aria-label="关闭"
-              onClick={cancelDraft}
+              onClick={handleClose}
               className="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2 text-[11px] hover:bg-mc-btn-hover"
             >
               ×
@@ -75,7 +87,7 @@ function NodeDetailDrawerComponent({ compileMessages }: NodeDetailDrawerProps) {
           <div className="space-y-1 border-b-2 border-b-black border-t-white border-l-white border-r-white bg-mc-bg px-3 py-2">
             {nodeMessages.map((msg, i) => (
               <div
-                key={i}
+                key={`${msg.type}-${msg.message}-${i}`}
                 role={msg.type === 'error' ? 'alert' : 'status'}
                 className={`text-[10px] ${
                   msg.type === 'error'
@@ -105,7 +117,7 @@ function NodeDetailDrawerComponent({ compileMessages }: NodeDetailDrawerProps) {
           </button>
           <button
             type="button"
-            onClick={cancelDraft}
+            onClick={handleClose}
             className="flex-1 border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2 py-1 text-[11px] text-mc-text hover:bg-mc-btn-hover"
           >
             取消

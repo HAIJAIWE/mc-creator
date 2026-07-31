@@ -139,7 +139,7 @@ describe('createDefaultRegistry 端到端', () => {
     expect(result.files).toHaveLength(8);
     // javaPath 为空时 start.bat 应回退到 'java'
     const startBat = result.files.find((f) => f.path === 'start.bat');
-    expect(startBat?.content).toContain('java -Xmx1024M -Xms512M');
+    expect(startBat?.content).toContain('"java" -Xmx1024M -Xms512M');
     // buildCmd 应反映 vanilla loader
     expect(result.buildCmd).toBe('java -jar minecraft-1.21.1-vanilla.jar');
   });

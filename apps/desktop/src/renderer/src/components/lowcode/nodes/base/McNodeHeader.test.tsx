@@ -36,7 +36,7 @@ describe('McNodeHeader', () => {
 
   it('折叠状态显示 ▸ 标记', () => {
     render(<McNodeHeader {...defaultProps} collapsed={true} />);
-    const btn = screen.getByLabelText('折叠');
+    const btn = screen.getByLabelText('展开');
     expect(btn.textContent).toContain('▸');
   });
 

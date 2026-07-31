@@ -1,6 +1,7 @@
 import type { FileNode, GeneratorContext, Loader, ModSpec } from '@mc-creator/shared';
 import { mainClassName, packageName } from './templates.js';
 import { FabricAdapter } from './fabric-adapter.js';
+import { BuildCache, type IncrementalResult } from '../../builder/BuildCache.js';
 
 /**
  * Quilt Loader Adapter（规格 §3.2 衍生）。
@@ -11,17 +12,33 @@ import { FabricAdapter } from './fabric-adapter.js';
  *   - fabric.mod.json  → quilt.mod.json（路径不同，内容用 quilt_loader schema）
  *   - build.gradle     → 用 org.quiltmc.loom + quilt-loader / quilted-fabric-api 依赖
  *   - gradle.properties → 用 quilt_loader_version / quilt_version
+ *
+ * P1-1 dogfood 修复：覆写 translateWithCache，在 Fabric 增量结果上替换 Quilt 特异文件，
+ * 确保增量构建正确缓存 Quilt 版本而非 Fabric 版本的文件。
  */
 export class QuiltAdapter extends FabricAdapter {
   readonly loader: Loader = 'quilt';
 
   translate(ctx: GeneratorContext): FileNode[] {
+    return this.translateWithCache(ctx, new BuildCache()).files;
+  }
+
+  /**
+   * P1-1 dogfood 修复：覆写 translateWithCache，复用 Fabric 增量逻辑后替换 Quilt 特异文件。
+   *
+   * 关键：Fabric 增量结果中的 fabricModJson/buildGradle/gradleProperties 用 Fabric 版本，
+   * 这里替换为 Quilt 版本，确保缓存键（modId::quilt::category）和文件内容正确。
+   */
+  translateWithCache(ctx: GeneratorContext, cache: BuildCache): IncrementalResult {
     const { spec, mcVersion } = ctx;
     const pkg = packageName(spec.modId);
     const mainCls = mainClassName(spec.modId);
 
-    // 复用 Fabric 的全部产物，再按路径替换 3 个 loader 特异文件
-    return super.translate(ctx).map((f) => {
+    // 复用 Fabric 的增量构建逻辑，得到基础文件列表和缓存统计
+    const fabricResult = super.translateWithCache(ctx, cache);
+
+    // 替换 3 个 Quilt 特异文件（缓存键不变，但文件内容已替换为 Quilt 版本）
+    const quiltFiles = fabricResult.files.map((f) => {
       if (f.path === 'src/main/resources/fabric.mod.json') {
         return this.quiltModJson(spec, mcVersion, pkg, mainCls);
       }
@@ -33,6 +50,12 @@ export class QuiltAdapter extends FabricAdapter {
       }
       return f;
     });
+
+    return {
+      files: quiltFiles,
+      stats: fabricResult.stats,
+      cacheSnapshot: fabricResult.cacheSnapshot,
+    };
   }
 
   /** 生成 src/main/resources/quilt.mod.json（Quilt 的 mod 元数据，schema_version=1） */

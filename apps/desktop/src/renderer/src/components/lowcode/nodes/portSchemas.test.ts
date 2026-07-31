@@ -16,6 +16,7 @@ function makeData(kind: NodeData['kind']): NodeData {
     disabled: false,
     collapsed: false,
     codeLocked: false,
+    formatVersion: 1,
   };
   switch (kind) {
     case 'item':
@@ -125,6 +126,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       isConstant: true,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const ports = getPorts(data);
     expect(ports).toHaveLength(1);
@@ -146,6 +148,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const ports = getPorts(data);
     expect(ports[0]!.type).toBe('string');
@@ -164,6 +167,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       customFields: {},
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     // getPorts 第二参数可选传 graph（含 subgraphs）
     const graph = {
@@ -216,6 +220,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       customFields: {},
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     expect(getPorts(data)).toEqual([]);
   });
@@ -234,6 +239,7 @@ describe('getPorts（阶段 C 新节点）', () => {
       iterable: 'items',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const ports = getPorts(data);
     expect(ports.find((p) => p.id === 'loop_var')?.label).toBe('item');

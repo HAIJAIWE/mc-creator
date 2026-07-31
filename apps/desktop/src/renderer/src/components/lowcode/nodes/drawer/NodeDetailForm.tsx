@@ -11,6 +11,7 @@ import { ColorEditor } from './editors/ColorEditor.js';
 import { ResourceIdEditor } from './editors/ResourceIdEditor.js';
 import { NbtEditor } from './editors/NbtEditor.js';
 import { NodeRefEditor } from './editors/NodeRefEditor.js';
+import { CodeEditor } from './editors/CodeEditor.js';
 import { FieldLabel } from './FieldLabel.js';
 import { getTooltip } from './fieldTooltips.js';
 import { ErrorRecovery, getErrorSuggestion, getFixLabel } from './ErrorRecovery.js';
@@ -36,6 +37,12 @@ function validateField(field: FieldSchema, value: unknown): string | undefined {
   if (field.type === 'resourceId' && typeof value === 'string' && value.length > 0) {
     if (!/^[a-z0-9_]+:[a-z0-9_/]+$/.test(value)) {
       return `格式错误，应为 modid:path（全小写+下划线）`;
+    }
+  }
+  // P1-4 dogfood：pattern 正则校验（如 Java 标识符合法性）
+  if (field.pattern && typeof value === 'string' && value.length > 0) {
+    if (!new RegExp(field.pattern).test(value)) {
+      return field.patternMessage ?? `格式不匹配：${field.pattern}`;
     }
   }
   return undefined;
@@ -107,6 +114,10 @@ function renderEditor(
           graph={graph}
         />
       );
+    case 'code':
+      return (
+        <CodeEditor value={String(value ?? '')} onChange={onChange} schema={field} graph={graph} />
+      );
     case 'text':
     default:
       return (
@@ -120,13 +131,38 @@ function renderEditor(
   }
 }
 
-/** 检查字段是否应该显示（基于 condition） */
+/** 检查字段是否应该显示（基于 condition + excludeKinds） */
 function shouldShow(field: FieldSchema, draft: NodeData): boolean {
+  // excludeKinds：字段不在指定 kind 的抽屉里显示
+  if (field.excludeKinds?.includes(draft.kind)) return false;
   if (!field.condition) return true;
   const fieldValue = (draft as Record<string, unknown>)[field.condition.field];
-  if (field.condition.equals !== undefined) return fieldValue === field.condition.equals;
-  if (field.condition.in !== undefined) return field.condition.in.includes(String(fieldValue));
+  // 兼容 boolean 字段：true/false 转 'true'/'false' 字符串再与 condition 字符串比较
+  // （codeLocked=true 时 condition.equals:'true' 应匹配）
+  const comparableValue = typeof fieldValue === 'boolean' ? String(fieldValue) : fieldValue;
+  if (field.condition.equals !== undefined) return comparableValue === field.condition.equals;
+  if (field.condition.in !== undefined) return field.condition.in.includes(String(comparableValue));
   return true;
+}
+
+/**
+ * 检测 segmented 字段是否为布尔切换（options 恰为 ['false','true'] 或 ['true','false']）。
+ *
+ * SegmentedEditor 内部以字符串 'true'/'false' 表示选项，但 schema 字段是 `z.boolean()`。
+ * 不做转换会让 `glow: 'false'`（字符串）在 Mustache `{{#if glow}}` 中被当作 truthy（非空字符串），
+ * 导致条件代码块误渲染。此处统一在 FieldRow 边界做 string→boolean 转换。
+ */
+function isBooleanSegmented(field: FieldSchema): boolean {
+  if (field.type !== 'segmented') return false;
+  const opts = field.options ?? [];
+  if (opts.length !== 2) return false;
+  return (opts[0] === 'false' && opts[1] === 'true') || (opts[0] === 'true' && opts[1] === 'false');
+}
+
+/** 布尔 segmented 字段：把字符串值转回布尔（'true'→true，其他→false） */
+function coerceBooleanValue(field: FieldSchema, raw: unknown): unknown {
+  if (!isBooleanSegmented(field)) return raw;
+  return raw === 'true' || raw === true;
 }
 
 interface FieldRowProps {
@@ -138,8 +174,13 @@ interface FieldRowProps {
 }
 
 function FieldRow({ field, draft, updateField, graph, errors }: FieldRowProps) {
-  const value = (draft as Record<string, unknown>)[field.key];
-  const onChange = (v: unknown) => updateField(field.key, v);
+  // 布尔 segmented 字段：读取时把 boolean 转 string 给编辑器显示
+  const rawValue = (draft as Record<string, unknown>)[field.key];
+  const value = isBooleanSegmented(field) ? String(rawValue === true ? 'true' : 'false') : rawValue;
+  // 布尔 segmented 字段：写入时把 string 转回 boolean
+  const onChange = (v: unknown) => {
+    updateField(field.key, coerceBooleanValue(field, v));
+  };
   const tooltip = getTooltip(draft.kind, field.key);
   const error = errors[field.key];
   const suggestion = getErrorSuggestion(field, error, value);

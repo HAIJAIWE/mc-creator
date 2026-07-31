@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { DatapackGenerator } from './datapack-generator.js';
 import type { GeneratorContext, DatapackSpec } from '@mc-creator/shared';
-import { RecipeSpec } from '@mc-creator/shared';
+import { RecipeSpec, ModRecipeSpec } from '@mc-creator/shared';
 
-function makeCtx(spec: Partial<DatapackSpec>): GeneratorContext {
+// recipes 字段允许同时传入 datapack RecipeSpec 和 ModRecipeSpec（运行时由 isModRecipe 区分），
+// 因此用 Omit 移除原 recipes 类型约束后放宽为 any[]，其余字段仍保留 DatapackSpec 的类型约束。
+function makeCtx(
+  spec: Omit<Partial<DatapackSpec>, 'recipes'> & { recipes?: any[] },
+): GeneratorContext {
   return {
     loader: 'fabric',
     mcVersion: '1.21.11',
@@ -105,7 +109,7 @@ describe('DatapackGenerator', () => {
     expect(result.buildCmd).toBe('');
   });
 
-  it('P10：生成战利品表 loot_tables（带子路径）', async () => {
+  it('P10：生成战利品表 loot_table（带子路径）', async () => {
     const result = await gen.generate(
       makeCtx({
         packId: 'my_pack',
@@ -128,7 +132,7 @@ describe('DatapackGenerator', () => {
       }),
     );
     const loot = result.files.find(
-      (f) => f.path === 'data/my_pack/loot_tables/block/blocks/custom_block.json',
+      (f) => f.path === 'data/my_pack/loot_table/block/blocks/custom_block.json',
     );
     expect(loot).toBeDefined();
     const parsed = JSON.parse(loot!.content);
@@ -157,7 +161,7 @@ describe('DatapackGenerator', () => {
       }),
     );
     const loot = result.files.find(
-      (f) => f.path === 'data/my_pack/loot_tables/block/custom_block.json',
+      (f) => f.path === 'data/my_pack/loot_table/block/custom_block.json',
     );
     expect(loot).toBeDefined();
     const parsed = JSON.parse(loot!.content);
@@ -183,10 +187,11 @@ describe('DatapackGenerator', () => {
         ],
       }),
     );
-    const pred = result.files.find((f) => f.path === 'data/my_pack/predicates/has_diamond.json');
+    const pred = result.files.find((f) => f.path === 'data/my_pack/predicate/has_diamond.json');
     expect(pred).toBeDefined();
     const parsed = JSON.parse(pred!.content);
-    expect(parsed.condition.condition).toBe('minecraft:inventory_changed');
+    // 谓词文件顶层就是条件对象本身（MC 1.21 格式），不再包一层 condition
+    expect(parsed.condition).toBe('minecraft:inventory_changed');
   });
 
   it('P10：生成 itemTags', async () => {
@@ -434,8 +439,8 @@ describe('DatapackGenerator', () => {
     const dt = result.files.find((f) => f.path === 'data/my_pack/damage_type/soul_burn.json');
     expect(dt).toBeDefined();
     const parsed = JSON.parse(dt!.content);
-    expect(parsed.message_type).toBe('minecraft:default');
-    expect(parsed.scaling).toBe('minecraft:always');
+    expect(parsed.message_id).toBe('default');
+    expect(parsed.scaling).toBe('always');
   });
 
   it('生成自定义结构', async () => {
@@ -464,7 +469,8 @@ describe('DatapackGenerator', () => {
     expect(st).toBeDefined();
     const parsed = JSON.parse(st!.content);
     expect(parsed.type).toBe('minecraft:jigsaw');
-    expect(parsed.template_pools).toContain('my_pack:crystal_tower/start_pool');
+    expect(parsed.start_pool).toBe('my_pack:crystal_tower/start_pool');
+    expect(parsed.max_distance_from_center).toBe(7);
   });
 
   it('生成粒子', async () => {
@@ -616,5 +622,176 @@ describe('DatapackGenerator', () => {
     expect(parsed.generator.biome_source.biomes[0].temperature).toBe(0.5);
     expect(parsed.generator.biome_source.biomes[1].temperature).toBe(2.0);
     expect(parsed.generator.biome_source.biomes[1].humidity).toBe(-0.5);
+  });
+
+  // ===== ModSpec.recipes 消费测试（通过 modRecipeToDatapackRecipe 转换）=====
+
+  it('消费 ModSpec.recipes：crafting_shapeless 转换并生成 JSON', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        recipes: [
+          ModRecipeSpec.parse({
+            recipeId: 'mod_shapeless_recipe',
+            recipeType: 'crafting_shapeless',
+            inputs: [
+              { item: 'minecraft:iron_ingot', count: 1, slot: '' },
+              { item: 'minecraft:stick', count: 1, slot: '' },
+            ],
+            output: 'minecraft:iron_pickaxe',
+            outputCount: 1,
+            cookTime: 200,
+            experience: 0,
+            pattern: [],
+          }),
+        ],
+      }) as any,
+    );
+    const recipe = result.files.find(
+      (f) => f.path === 'data/my_pack/recipe/mod_shapeless_recipe.json',
+    );
+    expect(recipe).toBeDefined();
+    const parsed = JSON.parse(recipe!.content);
+    expect(parsed.type).toBe('minecraft:crafting_shapeless');
+    // datapack-generator 把 ingredients 数组包装成 [{item|tag: ...}] 形式（1.20.5+ 格式）
+    expect(parsed.ingredients).toEqual([
+      { item: 'minecraft:iron_ingot' },
+      { item: 'minecraft:stick' },
+    ]);
+    expect(parsed.result.id).toBe('minecraft:iron_pickaxe');
+    expect(parsed.result.count).toBe(1);
+  });
+
+  it('消费 ModSpec.recipes：crafting_shaped 转换并生成 pattern + key', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        recipes: [
+          ModRecipeSpec.parse({
+            recipeId: 'mod_shaped_recipe',
+            recipeType: 'crafting_shaped',
+            inputs: [
+              { item: 'minecraft:diamond', count: 3, slot: 'D' },
+              { item: 'minecraft:stick', count: 2, slot: 'S' },
+            ],
+            output: 'minecraft:diamond_pickaxe',
+            outputCount: 1,
+            cookTime: 200,
+            experience: 0,
+            pattern: ['DDD', ' S ', ' S '],
+          }),
+        ],
+      }) as any,
+    );
+    const recipe = result.files.find(
+      (f) => f.path === 'data/my_pack/recipe/mod_shaped_recipe.json',
+    );
+    expect(recipe).toBeDefined();
+    const parsed = JSON.parse(recipe!.content);
+    expect(parsed.type).toBe('minecraft:crafting_shaped');
+    expect(parsed.pattern).toEqual(['DDD', ' S ', ' S ']);
+    expect(parsed.key).toEqual({
+      D: { item: 'minecraft:diamond' },
+      S: { item: 'minecraft:stick' },
+    });
+    expect(parsed.result.id).toBe('minecraft:diamond_pickaxe');
+  });
+
+  it('消费 ModSpec.recipes：smelting 转换并生成 ingredient + cookingtime', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        recipes: [
+          ModRecipeSpec.parse({
+            recipeId: 'mod_smelting_recipe',
+            recipeType: 'smelting',
+            inputs: [{ item: 'minecraft:raw_iron', count: 1, slot: '' }],
+            output: 'minecraft:iron_ingot',
+            outputCount: 1,
+            cookTime: 150,
+            experience: 0.7,
+            pattern: [],
+          }),
+        ],
+      }) as any,
+    );
+    const recipe = result.files.find(
+      (f) => f.path === 'data/my_pack/recipe/mod_smelting_recipe.json',
+    );
+    expect(recipe).toBeDefined();
+    const parsed = JSON.parse(recipe!.content);
+    expect(parsed.type).toBe('minecraft:smelting');
+    expect(parsed.ingredient.item).toBe('minecraft:raw_iron');
+    expect(parsed.cookingtime).toBe(150);
+    expect(parsed.experience).toBe(0.7);
+  });
+
+  it('消费 ModSpec.recipes：stonecutting 转换并生成 source → ingredient', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        recipes: [
+          ModRecipeSpec.parse({
+            recipeId: 'mod_stonecutting_recipe',
+            recipeType: 'stonecutting',
+            inputs: [{ item: 'minecraft:stone', count: 1, slot: '' }],
+            output: 'minecraft:stone_brick_stairs',
+            outputCount: 1,
+            cookTime: 200,
+            experience: 0,
+            pattern: [],
+          }),
+        ],
+      }) as any,
+    );
+    const recipe = result.files.find(
+      (f) => f.path === 'data/my_pack/recipe/mod_stonecutting_recipe.json',
+    );
+    expect(recipe).toBeDefined();
+    const parsed = JSON.parse(recipe!.content);
+    expect(parsed.type).toBe('minecraft:stonecutting');
+    // datapack-generator 用 r.source ?? r.ingredients?.[0] 作为 ingredient.item（1.20.5+ 格式）
+    expect(parsed.ingredient.item).toBe('minecraft:stone');
+    expect(parsed.result).toBe('minecraft:stone_brick_stairs');
+    expect(parsed.count).toBe(1);
+  });
+
+  it('混合 spec.recipes：同时包含 datapack RecipeSpec 与 ModRecipeSpec 都能生成 JSON', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        recipes: [
+          // datapack 格式（原有行为）
+          RecipeSpec.parse({
+            id: 'datapack_style_recipe',
+            type: 'crafting_shapeless',
+            result: 'minecraft:emerald',
+            count: 1,
+            ingredients: ['minecraft:diamond'],
+          }),
+          // ModSpec 格式（新增行为，经转换）
+          ModRecipeSpec.parse({
+            recipeId: 'mod_style_recipe',
+            recipeType: 'crafting_shapeless',
+            inputs: [{ item: 'minecraft:iron_ingot', count: 1, slot: '' }],
+            output: 'minecraft:iron_block',
+            outputCount: 1,
+            cookTime: 200,
+            experience: 0,
+            pattern: [],
+          }),
+        ],
+      }) as any,
+    );
+    const datapackStyle = result.files.find(
+      (f) => f.path === 'data/my_pack/recipe/datapack_style_recipe.json',
+    );
+    const modStyle = result.files.find(
+      (f) => f.path === 'data/my_pack/recipe/mod_style_recipe.json',
+    );
+    expect(datapackStyle).toBeDefined();
+    expect(modStyle).toBeDefined();
+    expect(JSON.parse(datapackStyle!.content).result.id).toBe('minecraft:emerald');
+    expect(JSON.parse(modStyle!.content).result.id).toBe('minecraft:iron_block');
   });
 });

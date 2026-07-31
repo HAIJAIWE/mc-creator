@@ -123,3 +123,392 @@ describe('NeoForgeAdapter 资源文件', () => {
     expect(json['block.ruby_tools.ruby_block']).toBe('Ruby Block');
   });
 });
+
+// === P1.4 新增字段消费测试 ===
+
+const SPEC_P14: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Adds ruby tools',
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  customCode: [
+    {
+      snippetId: 'code_1',
+      language: 'java',
+      code: 'return 42;',
+      inputSignature: { in_0: 'integer' },
+      outputSignature: { out_0: 'integer' },
+      methodName: 'calculateAnswer',
+    },
+  ],
+  multiblocks: [
+    {
+      structureId: 'altar_1',
+      displayName: 'Altar',
+      width: 3,
+      height: 3,
+      depth: 3,
+      hollow: true,
+      controllerOffset: { x: 1, y: 1, z: 1 },
+    },
+  ],
+  eventHandlers: [
+    {
+      handlerId: 'evt_1',
+      eventType: 'player_right_click_block',
+      eventArgs: { hand: 'main_hand' },
+      // P1.5：通过 conditionIds/actionIds 引用顶层 conditions/actions
+      conditionIds: ['cond_1'],
+      actionIds: ['act_1'],
+    },
+  ],
+  conditions: [
+    {
+      conditionId: 'cond_1',
+      conditionType: 'has_item',
+      args: { item: 'minecraft:stick' },
+      invert: false,
+    },
+  ],
+  actions: [
+    {
+      actionId: 'act_1',
+      actionType: 'give_item',
+      args: { item: 'minecraft:diamond', count: 1 },
+    },
+  ],
+});
+
+const CTX_P14: GeneratorContext = {
+  loader: 'neoforge',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P14,
+  projectPath: '/proj',
+};
+
+describe('NeoForgeAdapter P1.4 字段消费（spec 非空时生成新文件）', () => {
+  const adapter = new NeoForgeAdapter();
+  const files = adapter.translate(CTX_P14);
+  const paths = files.map((f) => f.path);
+
+  it('生成 ModCustomCode.java（customCode 非空时）', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModCustomCode.java');
+    const code = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModCustomCode.java',
+    );
+    expect(code).toBeDefined();
+    expect(code!.content).toContain('public class ModCustomCode');
+    expect(code!.content).toContain('snippetId: code_1');
+    expect(code!.content).toContain('public static int calculateAnswer(int in_0)');
+    expect(code!.content).toContain('return 42;');
+  });
+
+  it('生成 ModMultiblocks.java（multiblocks 非空时）', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModMultiblocks.java');
+    const mb = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModMultiblocks.java',
+    );
+    expect(mb).toBeDefined();
+    expect(mb!.content).toContain('ALTAR_1_ID = "altar_1"');
+    expect(mb!.content).toContain('尺寸: 3x3x3, 空心: true');
+  });
+
+  it('生成 ModEvents.java（eventHandlers 非空时，含真实 if/else 逻辑）', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModEvents.java');
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    // 事件处理器方法（handle_<handlerId>）
+    expect(events!.content).toContain('事件处理器: evt_1');
+    expect(events!.content).toContain('private static void handle_evt_1(Object event)');
+    // 条件检查方法（check_<conditionId>）+ 动作执行方法（execute_<actionId>）
+    expect(events!.content).toContain('条件: cond_1');
+    expect(events!.content).toContain('private static boolean check_cond_1(Object event)');
+    expect(events!.content).toContain('动作: act_1');
+    expect(events!.content).toContain('private static void execute_act_1(Object event)');
+    // 真实 if 语句（非纯注释占位）
+    expect(events!.content).toContain('if (check_cond_1(event))');
+    expect(events!.content).toContain('execute_act_1(event);');
+    // NeoForge 事件注册：真实 IEventBus.addListener 调用（非占位注释）
+    expect(events!.content).toContain('modEventBus.addListener');
+    expect(events!.content).toContain('PlayerInteractEvent.RightClickBlock');
+  });
+
+  it('mainClass 构造函数调用新的 initialize 方法', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main).toBeDefined();
+    expect(main!.content).toContain('ModCustomCode.initialize()');
+    expect(main!.content).toContain('ModMultiblocks.initialize()');
+    expect(main!.content).toContain('ModEvents.initialize(modEventBus)');
+  });
+});
+
+// === P1.3 新增字段消费测试（recipes/entities/machines） ===
+
+const SPEC_P13: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Adds ruby tools',
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  recipes: [
+    {
+      recipeId: 'ruby_sword_recipe',
+      recipeType: 'crafting_shaped',
+      inputs: [
+        { item: 'minecraft:iron_ingot', count: 1, slot: 'A' },
+        { item: 'minecraft:stick', count: 1, slot: 'B' },
+      ],
+      output: 'minecraft:ruby_sword',
+      outputCount: 1,
+      cookTime: 200,
+      experience: 0,
+      pattern: ['AB', 'BA'],
+    },
+  ],
+  entities: [
+    {
+      entityId: 'ruby_golem',
+      displayName: 'Ruby Golem',
+      maxHealth: 100,
+      attackDamage: 15,
+      movementSpeed: 0.25,
+      classification: 'animal',
+      modelType: 'pig',
+      spawnWeight: 10,
+      spawnBiomes: ['plains'],
+    },
+  ],
+  machines: [
+    {
+      machineId: 'ruby_furnace',
+      displayName: 'Ruby Furnace',
+      energyCapacity: 20000,
+      maxEnergyTransfer: 200,
+      inputSlots: 1,
+      outputSlots: 1,
+      defaultProcessTime: 100,
+      defaultEnergyPerTick: 20,
+      guiWidth: 176,
+      guiHeight: 166,
+    },
+  ],
+});
+
+const CTX_P13: GeneratorContext = {
+  loader: 'neoforge',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P13,
+  projectPath: '/proj',
+};
+
+describe('NeoForgeAdapter P1.3 字段消费（recipes/entities/machines 非空时生成新文件）', () => {
+  const adapter = new NeoForgeAdapter();
+  const files = adapter.translate(CTX_P13);
+  const paths = files.map((f) => f.path);
+
+  it('生成 ModRecipes.java / ModEntities.java / ModMachines.java', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModRecipes.java');
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModEntities.java');
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModMachines.java');
+  });
+
+  it('ModRecipes.java 含 register 与 recipeId', () => {
+    const recipes = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModRecipes.java',
+    );
+    expect(recipes).toBeDefined();
+    expect(recipes!.content).toContain('RUBY_SWORD_RECIPE_ID');
+    expect(recipes!.content).toContain('ruby_sword_recipe');
+  });
+
+  it('ModEntities.java 含 DeferredRegister 与 entityId', () => {
+    const entities = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEntities.java',
+    );
+    expect(entities).toBeDefined();
+    expect(entities!.content).toContain('DeferredRegister');
+    expect(entities!.content).toContain('ruby_golem');
+    expect(entities!.content).toContain('Ruby Golem');
+  });
+
+  it('ModMachines.java 含 DeferredRegister 与 machineId', () => {
+    const machines = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModMachines.java',
+    );
+    expect(machines).toBeDefined();
+    expect(machines!.content).toContain('DeferredRegister');
+    expect(machines!.content).toContain('ruby_furnace');
+    expect(machines!.content).toContain('Ruby Furnace');
+  });
+
+  it('mainClass 构造函数调用 P1.3 模块的 register/initialize', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main).toBeDefined();
+    expect(main!.content).toContain('ModRecipes.initialize()');
+    expect(main!.content).toContain('ModEntities.register(modEventBus)');
+    expect(main!.content).toContain('ModMachines.register(modEventBus)');
+  });
+});
+
+// === P1.5 真实事件处理逻辑测试（conditionIds/actionIds/invert） ===
+
+const SPEC_P15_INVERT: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Adds ruby tools',
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  eventHandlers: [
+    {
+      handlerId: 'evt_inv',
+      eventType: 'tick',
+      eventArgs: {},
+      conditionIds: ['cond_inv'],
+      actionIds: ['act_inv'],
+    },
+  ],
+  conditions: [
+    {
+      conditionId: 'cond_inv',
+      conditionType: 'is_night',
+      args: {},
+      invert: true,
+    },
+  ],
+  actions: [
+    {
+      actionId: 'act_inv',
+      actionType: 'summon_lightning',
+      args: { count: 1 },
+    },
+  ],
+});
+
+const CTX_P15_INVERT: GeneratorContext = {
+  loader: 'neoforge',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P15_INVERT,
+  projectPath: '/proj',
+};
+
+describe('NeoForgeAdapter P1.5 真实事件处理逻辑生成', () => {
+  it('invert=true 的 condition 生成 if (!check_<id>) 语句', () => {
+    const adapter = new NeoForgeAdapter();
+    const files = adapter.translate(CTX_P15_INVERT);
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    // invert: true → if (!check_cond_inv(event))
+    expect(events!.content).toContain('if (!check_cond_inv(event))');
+    expect(events!.content).toContain('execute_act_inv(event);');
+    // 同时验证正向 if 不存在（避免误判）
+    expect(events!.content).not.toContain('if (check_cond_inv(event))');
+    // NeoForge tick 事件类名占位
+    expect(events!.content).toContain('ServerTickEvent');
+  });
+
+  it('eventHandlers/conditions/actions 全为空时不生成 ModEvents.java', () => {
+    const adapter = new NeoForgeAdapter();
+    const files = adapter.translate(CTX);
+    const paths = files.map((f) => f.path);
+    expect(paths).not.toContain('src/main/java/com/example/ruby_tools/ModEvents.java');
+  });
+});

@@ -87,13 +87,13 @@ const SYSTEM_PROMPT = `你是 MC Creator 的 AI 编程助手，运行在一个 M
 - brewing: 酿造台（inputPotion + ingredientItem + outputPotion）
 
 ### 自定义附魔（enchantments）— data/<namespace>/enchantment/<id>.json（1.21+）
-字段: description, supported_items(标签如 #minecraft:enchantable/sword), weight, anvil_cost, max_cost, min_level, max_level, slots(any/mainhand/offhand/hand/feet/legs/chest/head/armor/body), is_curse, is_treasure
+字段: description, supported_items(标签如 #minecraft:enchantable/sword), weight, anvil_cost, min_cost({base, per_level_above_first}), max_cost({base, per_level_above_first}), max_level, slots(any/mainhand/offhand/hand/feet/legs/chest/head/armor/body), is_curse, is_treasure
 
 ### 自定义状态效果（effects）— data/<namespace>/effect/<id>.json（1.21+）
 字段: description, color(0xRRGGBB), instant, beneficial
 
 ### 自定义损伤类型（damageTypes）— data/<namespace>/damage_type/<id>.json（1.19.4+）
-字段: message_type(default/player/player_attack/fall/intentional_game_design), scaling(never/when_caused_by_living_non_player/always), exhaustion
+字段: message_id(default/player/player_attack/fall/intentional_game_design), scaling(never/when_caused_by_living_non_player/always), exhaustion
 
 ### 世界生成
 - dimension_types: 固定时间/天空光/天花板/超薄/坐标缩放/床工作/重生锚/minY/height/logicalHeight/infiniburn/effects/ambientLight/piglinSafe

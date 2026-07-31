@@ -195,17 +195,18 @@ export function newOreTemplate(params: TemplateParams): Partial<DatapackSpec> {
   }
 
   // === 标签 ===
+  // S-3 修复：tag 为短名（不带命名空间），命名空间由 SimpleTagSpec.namespace 承载
   // 物品标签
   itemTags.push(
-    { namespace: ns, tag: `${ns}:${mn}_ingots`, values: [`${ns}:${mn}_ingot`], replace: false },
-    { namespace: ns, tag: `${ns}:${mn}_nuggets`, values: [`${ns}:${mn}_nugget`], replace: false },
-    { namespace: ns, tag: `${ns}:${mn}_ores`, values: [`${ns}:${mn}_ore`], replace: false },
-    { namespace: ns, tag: `${ns}:raw_${mn}_ores`, values: [`${ns}:raw_${mn}`], replace: false },
+    { namespace: ns, tag: `${mn}_ingots`, values: [`${ns}:${mn}_ingot`], replace: false },
+    { namespace: ns, tag: `${mn}_nuggets`, values: [`${ns}:${mn}_nugget`], replace: false },
+    { namespace: ns, tag: `${mn}_ores`, values: [`${ns}:${mn}_ore`], replace: false },
+    { namespace: ns, tag: `raw_${mn}_ores`, values: [`${ns}:raw_${mn}`], replace: false },
   );
   // 方块标签
   blockTags.push({
     namespace: ns,
-    tag: `${ns}:${mn}_storage_blocks`,
+    tag: `${mn}_storage_blocks`,
     values: [`${ns}:${mn}_block`],
     replace: false,
   });
@@ -315,13 +316,14 @@ export function newFoodLangKeys(params: TemplateParams): {
   const mn = materialName;
 
   return {
+    // S-4 修复：语言 key 用点号分隔（item.<namespace>.<path>），原冒号格式无效
     en: {
-      [`item.${ns}:raw_${mn}`]: `Raw ${materialNameZh}`,
-      [`item.${ns}:cooked_${mn}`]: `Cooked ${materialNameZh}`,
+      [`item.${ns}.raw_${mn}`]: `Raw ${materialNameZh}`,
+      [`item.${ns}.cooked_${mn}`]: `Cooked ${materialNameZh}`,
     },
     zh: {
-      [`item.${ns}:raw_${mn}`]: `生${materialNameZh}`,
-      [`item.${ns}:cooked_${mn}`]: `熟${materialNameZh}`,
+      [`item.${ns}.raw_${mn}`]: `生${materialNameZh}`,
+      [`item.${ns}.cooked_${mn}`]: `熟${materialNameZh}`,
     },
   };
 }
@@ -408,13 +410,14 @@ export function newDimensionLangKeys(params: TemplateParams): {
   const mn = materialName;
 
   return {
+    // S-4 修复：语言 key 用点号分隔（dimension.<namespace>.<path> / biome.<namespace>.<path>）
     en: {
-      [`dimension.${ns}:${mn}_dimension`]: `${materialNameZh} Dimension`,
-      [`biome.${ns}:${mn}_plains`]: `${materialNameZh} Plains`,
+      [`dimension.${ns}.${mn}_dimension`]: `${materialNameZh} Dimension`,
+      [`biome.${ns}.${mn}_plains`]: `${materialNameZh} Plains`,
     },
     zh: {
-      [`dimension.${ns}:${mn}_dimension`]: `${materialNameZh}维度`,
-      [`biome.${ns}:${mn}_plains`]: `${materialNameZh}平原`,
+      [`dimension.${ns}.${mn}_dimension`]: `${materialNameZh}维度`,
+      [`biome.${ns}.${mn}_plains`]: `${materialNameZh}平原`,
     },
   };
 }

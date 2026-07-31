@@ -35,3 +35,23 @@ export function itemFieldName(itemId: string): string {
 export function blockFieldName(blockId: string): string {
   return blockId.toUpperCase();
 }
+
+/**
+ * Java 字符串字面量转义：防止用户输入（name/description 等）中的
+ * 反斜杠、双引号、换行等破坏生成的 .java 字符串（G-7 修复）。
+ * 覆盖 \ " \n \r \t NUL \b \f（与 Java 转义规则一致）。
+ */
+export function javaEscape(s: string): string {
+  return (
+    s
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t')
+      .replace(new RegExp(String.fromCharCode(0), 'g'), '\\0')
+      // 注意：正则字面量 /[\b]/ 才表示退格符（/\b/ 是单词边界）
+      .replace(new RegExp(String.fromCharCode(8), 'g'), '\\b')
+      .replace(/\f/g, '\\f')
+  );
+}

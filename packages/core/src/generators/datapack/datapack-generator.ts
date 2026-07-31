@@ -28,13 +28,58 @@ import type {
   TrimMaterialSpec,
   InstrumentSpec,
   StructureSetSpec,
+  ModRecipeSpec,
 } from '@mc-creator/shared';
+import { isModRecipe, modRecipeToDatapackRecipe } from './recipe-adapter.js';
 
 /**
  * 数据包生成器（路线图第 3 阶段）。
  * 生成 pack.mcmeta + data/<namespace>/ 下的 JSON/mcfunction 文件。
  * 数据包是原版功能，不需 loader adapter。
  */
+
+/** 安全解析 JSON 字符串，解析失败时返回 fallback（不抛异常） */
+function safeJsonParse(json: string, fallback: unknown): unknown {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * MC 1.20.5+ 配方成分（Ingredient）格式：`{ item: "minecraft:x" }` 或 `{ tag: "minecraft:x" }`。
+ * 输入字符串以 `#` 开头表示标签引用，否则为物品 ID（G-3 修复：旧格式 `{ id: ... }` 无法加载）。
+ */
+function toIngredient(ref: string): Record<string, string> {
+  const trimmed = (ref ?? '').trim();
+  return trimmed.startsWith('#') ? { tag: trimmed.slice(1) } : { item: trimmed };
+}
+
+/**
+ * P2 dogfood：路径段消毒，防止路径穿越（如 ../）和特殊字符注入。
+ *
+ * Minecraft datapack 路径段仅允许小写字母、数字、下划线、点、斜杠、连字符。
+ * - 替换非法字符为下划线
+ * - 移除路径穿越（.. 和以 / 开头的段）
+ * - 空字符串回退为 'unknown'
+ *
+ * @param segment 原始路径段（如 namespace、recipe id、advancement id）
+ * @returns 消毒后的安全路径段
+ */
+function sanitizePathSegment(segment: string): string {
+  if (!segment) return 'unknown';
+  // 移除路径穿越：先按 / 拆分，过滤掉 .. 和空段
+  const parts = segment.split('/').filter((p) => p && p !== '..' && p !== '.');
+  if (parts.length === 0) return 'unknown';
+  // 每个段仅保留合法字符（小写字母、数字、下划线、点、连字符）
+  const sanitized = parts
+    .map((p) => p.toLowerCase().replace(/[^a-z0-9_.-]/g, '_'))
+    .filter(Boolean)
+    .join('/');
+  return sanitized || 'unknown';
+}
+
 export class DatapackGenerator implements Generator {
   readonly type = 'datapack';
   readonly loaders: Loader[] = ['fabric', 'neoforge'];
@@ -43,6 +88,10 @@ export class DatapackGenerator implements Generator {
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     const spec = ctx.spec as unknown as DatapackSpec;
     const files: FileNode[] = [];
+    const warnings: string[] = [];
+
+    // P2 dogfood：必填字段校验（生成 warning 而非崩溃，保持向后兼容）
+    validateDatapackSpec(spec, warnings);
 
     // pack.mcmeta
     files.push({
@@ -51,7 +100,7 @@ export class DatapackGenerator implements Generator {
         {
           pack: {
             pack_format: spec.packFormat,
-            description: spec.description || spec.packName,
+            description: spec.description ?? spec.packName,
           },
         },
         null,
@@ -60,23 +109,33 @@ export class DatapackGenerator implements Generator {
     });
 
     // 配方
-    for (const recipe of spec.recipes ?? []) {
-      files.push(this.generateRecipe(spec.packId, recipe));
+    // spec.recipes 可能包含两种格式（同名不同元素类型）：
+    //   1. datapack RecipeSpec（vanilla 数据包格式，字段 id/type/result）
+    //   2. ModRecipeSpec（loader 无关抽象格式，由节点图编译而来，字段 recipeId/recipeType/output）
+    // 通过 isModRecipe 检测后分别处理：ModRecipeSpec 经 modRecipeToDatapackRecipe 转换后生成 JSON。
+    // spec.recipes 为空时无任何输出（保持原有行为）。
+    const ns = sanitizePathSegment(spec.packId);
+    const recipes = (spec.recipes ?? []) as unknown[];
+    for (const recipe of recipes) {
+      const datapackRecipe: RecipeSpec = isModRecipe(recipe)
+        ? modRecipeToDatapackRecipe(recipe as ModRecipeSpec)
+        : (recipe as RecipeSpec);
+      files.push(this.generateRecipe(ns, datapackRecipe));
     }
 
     // 标签
     for (const tag of spec.tags ?? []) {
-      files.push(this.generateTag(spec.packId, tag));
+      files.push(this.generateTag(ns, tag));
     }
 
     // 函数
     for (const func of spec.functions ?? []) {
-      files.push(this.generateFunction(spec.packId, func));
+      files.push(this.generateFunction(ns, func));
     }
 
     // 进度
     for (const adv of spec.advancements ?? []) {
-      files.push(this.generateAdvancement(spec.packId, adv));
+      files.push(this.generateAdvancement(ns, adv));
     }
 
     // P10 新增：战利品表
@@ -101,63 +160,63 @@ export class DatapackGenerator implements Generator {
 
     // 世界生成：维度类型
     for (const dt of spec.dimensionTypes ?? []) {
-      files.push(this.generateDimensionType(spec.packId, dt));
+      files.push(this.generateDimensionType(ns, dt));
     }
 
     // 世界生成：噪声设置
-    for (const ns of spec.noiseSettings ?? []) {
-      files.push(this.generateNoiseSettings(spec.packId, ns));
+    for (const ns2 of spec.noiseSettings ?? []) {
+      files.push(this.generateNoiseSettings(ns, ns2));
     }
 
     // 世界生成：生物群系
     for (const biome of spec.biomes ?? []) {
-      files.push(this.generateBiome(spec.packId, biome));
+      files.push(this.generateBiome(ns, biome));
     }
 
     // 世界生成：维度
     for (const dim of spec.dimensions ?? []) {
-      files.push(this.generateDimension(spec.packId, dim));
+      files.push(this.generateDimension(ns, dim));
     }
 
     // 自定义附魔
     for (const ench of spec.enchantments ?? []) {
-      files.push(this.generateEnchantment(spec.packId, ench));
+      files.push(this.generateEnchantment(ns, ench));
     }
     // 自定义状态效果
     for (const eff of spec.effects ?? []) {
-      files.push(this.generateStatusEffect(spec.packId, eff));
+      files.push(this.generateStatusEffect(ns, eff));
     }
     // 自定义损伤类型
     for (const dt of spec.damageTypes ?? []) {
-      files.push(this.generateDamageType(spec.packId, dt));
+      files.push(this.generateDamageType(ns, dt));
     }
     // 自定义结构
     for (const st of spec.structures ?? []) {
-      files.push(this.generateStructure(spec.packId, st));
+      files.push(this.generateStructure(ns, st));
     }
     // 自定义粒子
     for (const p of spec.particles ?? []) {
-      files.push(this.generateParticle(spec.packId, p));
+      files.push(this.generateParticle(ns, p));
     }
     // 盔甲纹饰
     for (const tp of spec.trimPatterns ?? []) {
-      files.push(this.generateTrimPattern(spec.packId, tp));
+      files.push(this.generateTrimPattern(ns, tp));
     }
     for (const tm of spec.trimMaterials ?? []) {
-      files.push(this.generateTrimMaterial(spec.packId, tm));
+      files.push(this.generateTrimMaterial(ns, tm));
     }
     // 乐器
     for (const inst of spec.instruments ?? []) {
-      files.push(this.generateInstrument(spec.packId, inst));
+      files.push(this.generateInstrument(ns, inst));
     }
     // 结构集
     for (const ss of spec.structureSets ?? []) {
-      files.push(this.generateStructureSet(spec.packId, ss));
+      files.push(this.generateStructureSet(ns, ss));
     }
 
     return {
       files,
-      warnings: [],
+      warnings,
       buildCmd: '', // 数据包不需要编译
     };
   }
@@ -170,57 +229,63 @@ export class DatapackGenerator implements Generator {
         recipeObj = {
           type: 'minecraft:crafting_shaped',
           pattern: r.pattern ?? [],
-          key: r.key ?? {},
+          // G-3：key 值（string[]）转换为 {item|tag} 成分对象
+          key: Object.fromEntries(
+            Object.entries(r.key ?? {}).map(([k, vals]) => [
+              k,
+              toIngredient((Array.isArray(vals) ? vals[0] : (vals as unknown as string)) ?? ''),
+            ]),
+          ),
           result: { id: r.result, count: r.count },
         };
         break;
       case 'crafting_shapeless':
         recipeObj = {
           type: 'minecraft:crafting_shapeless',
-          ingredients: (r.ingredients ?? []).map((i) => ({ id: i })),
+          ingredients: (r.ingredients ?? []).map((i) => toIngredient(i)),
           result: { id: r.result, count: r.count },
         };
         break;
       case 'smelting':
         recipeObj = {
           type: 'minecraft:smelting',
-          ingredient: { id: r.ingredient ?? r.ingredients?.[0] ?? '' },
+          ingredient: toIngredient(r.ingredient ?? r.ingredients?.[0] ?? ''),
           result: r.result,
-          experience: r.experience || 0.1,
+          experience: r.experience ?? 0.1,
           cookingtime: r.cookingTime,
         };
         break;
       case 'blasting':
         recipeObj = {
           type: 'minecraft:blasting',
-          ingredient: { id: r.ingredient ?? r.ingredients?.[0] ?? '' },
+          ingredient: toIngredient(r.ingredient ?? r.ingredients?.[0] ?? ''),
           result: r.result,
-          experience: r.experience || 0.1,
-          cookingtime: r.cookingTime || 100,
+          experience: r.experience ?? 0.1,
+          cookingtime: r.cookingTime ?? 100,
         };
         break;
       case 'smoking':
         recipeObj = {
           type: 'minecraft:smoking',
-          ingredient: { id: r.ingredient ?? r.ingredients?.[0] ?? '' },
+          ingredient: toIngredient(r.ingredient ?? r.ingredients?.[0] ?? ''),
           result: r.result,
-          experience: r.experience || 0.1,
-          cookingtime: r.cookingTime || 100,
+          experience: r.experience ?? 0.1,
+          cookingtime: r.cookingTime ?? 100,
         };
         break;
       case 'campfire_cooking':
         recipeObj = {
           type: 'minecraft:campfire_cooking',
-          ingredient: { id: r.ingredient ?? r.ingredients?.[0] ?? '' },
+          ingredient: toIngredient(r.ingredient ?? r.ingredients?.[0] ?? ''),
           result: r.result,
-          experience: r.experience || 0.1,
-          cookingtime: r.cookingTime || 600,
+          experience: r.experience ?? 0.1,
+          cookingtime: r.cookingTime ?? 600,
         };
         break;
       case 'stonecutting':
         recipeObj = {
           type: 'minecraft:stonecutting',
-          ingredient: { id: r.source ?? r.ingredients?.[0] ?? '' },
+          ingredient: toIngredient(r.source ?? r.ingredients?.[0] ?? ''),
           result: r.result,
           count: r.count,
         };
@@ -228,18 +293,18 @@ export class DatapackGenerator implements Generator {
       case 'smithing_transform':
         recipeObj = {
           type: 'minecraft:smithing_transform',
-          template: { id: r.template ?? 'minecraft:netherite_upgrade_smithing_template' },
-          base: { id: r.base ?? '' },
-          addition: { id: r.addition ?? '' },
+          template: toIngredient(r.template ?? 'minecraft:netherite_upgrade_smithing_template'),
+          base: toIngredient(r.base ?? ''),
+          addition: toIngredient(r.addition ?? ''),
           result: { id: r.result },
         };
         break;
       case 'smithing_trim':
         recipeObj = {
           type: 'minecraft:smithing_trim',
-          template: { id: r.template ?? '' },
-          base: { id: r.base ?? '' },
-          addition: { id: r.addition ?? '' },
+          template: toIngredient(r.template ?? ''),
+          base: toIngredient(r.base ?? ''),
+          addition: toIngredient(r.addition ?? ''),
         };
         break;
       case 'brewing':
@@ -279,46 +344,53 @@ export class DatapackGenerator implements Generator {
     }
 
     return {
-      path: `data/${namespace}/recipe/${r.id}.json`,
+      path: `data/${namespace}/recipe/${sanitizePathSegment(r.id)}.json`,
       content: JSON.stringify(recipeObj, null, 2),
     };
   }
 
   private generateTag(namespace: string, t: TagSpec): FileNode {
     return {
-      path: `data/${namespace}/tags/${t.type}/${t.id}.json`,
+      path: `data/${namespace}/tags/${sanitizePathSegment(t.type)}/${sanitizePathSegment(t.id)}.json`,
       content: JSON.stringify({ replace: t.replace, values: t.values }, null, 2),
     };
   }
 
   private generateFunction(namespace: string, f: FunctionSpec): FileNode {
     return {
-      path: `data/${namespace}/function/${f.id}.mcfunction`,
+      path: `data/${namespace}/function/${sanitizePathSegment(f.id)}.mcfunction`,
       content: f.commands.join('\n') + '\n',
     };
   }
 
   private generateAdvancement(namespace: string, a: AdvancementSpec): FileNode {
-    const advObj = {
-      display: {
-        icon: { id: a.icon },
-        title: a.title,
-        description: a.description,
-      },
+    // P0 dogfood 修复：JSON.parse 无 try/catch 会导致整个 generate 崩溃
+    const parsedConditions = a.conditions ? safeJsonParse(a.conditions, {}) : {};
+    // P1 dogfood 修复：criteria 结构应为 { [条件名]: { trigger, conditions } }
+    // 而非 { trigger: { trigger, conditions } }，否则 Minecraft 无法加载
+    const displayObj: Record<string, unknown> = {
+      icon: { id: a.icon },
+      title: a.title,
+      description: a.description,
+    };
+    if (a.frame && a.frame !== 'task') displayObj.frame = a.frame;
+    const advObj: Record<string, unknown> = {
+      display: displayObj,
       criteria: {
-        trigger: {
+        [a.id]: {
           trigger: a.trigger,
-          conditions: a.conditions ? JSON.parse(a.conditions) : {},
+          conditions: parsedConditions,
         },
       },
     };
+    if (a.parent) advObj.parent = a.parent;
     return {
-      path: `data/${namespace}/advancement/${a.id}.json`,
+      path: `data/${namespace}/advancement/${sanitizePathSegment(a.id)}.json`,
       content: JSON.stringify(advObj, null, 2),
     };
   }
 
-  /** P10：生成战利品表 → data/<namespace>/loot_tables/<type>/<path>.json */
+  /** P10：生成战利品表 → data/<namespace>/loot_table/<type>/<path>.json（目录为单数，G-11 修复） */
   private generateLootTable(l: LootTableSpec): FileNode {
     const lootObj = {
       type: `minecraft:${l.type}`,
@@ -333,18 +405,19 @@ export class DatapackGenerator implements Generator {
       })),
     };
     return {
-      path: `data/${l.namespace}/loot_tables/${l.type}/${l.path}.json`,
+      path: `data/${sanitizePathSegment(l.namespace)}/loot_table/${sanitizePathSegment(l.type)}/${sanitizePathSegment(l.path)}.json`,
       content: JSON.stringify(lootObj, null, 2),
     };
   }
 
-  /** P10：生成谓词 → data/<namespace>/predicates/<path>.json */
+  /** P10：生成谓词 → data/<namespace>/predicate/<path>.json（目录为单数，G-11 修复） */
   private generatePredicate(p: PredicateSpec): FileNode {
-    const predObj = {
-      condition: JSON.parse(p.condition) as unknown,
-    };
+    // P0 dogfood 修复：JSON.parse 无 try/catch 会导致整个 generate 崩溃
+    // Major 修复：谓词文件顶层就是条件对象本身，不应再包一层 condition 字段
+    // 解析失败时 fallback 为固定无效谓词（minecraft:impossible），避免把原始文本包进 condition
+    const predObj = safeJsonParse(p.condition, { condition: 'minecraft:impossible' });
     return {
-      path: `data/${p.namespace}/predicates/${p.path}.json`,
+      path: `data/${sanitizePathSegment(p.namespace)}/predicate/${sanitizePathSegment(p.path)}.json`,
       content: JSON.stringify(predObj, null, 2),
     };
   }
@@ -356,7 +429,7 @@ export class DatapackGenerator implements Generator {
       values: t.values,
     };
     return {
-      path: `data/${t.namespace}/tags/${kind}/${t.tag}.json`,
+      path: `data/${sanitizePathSegment(t.namespace)}/tags/${kind}/${sanitizePathSegment(t.tag)}.json`,
       content: JSON.stringify(tagObj, null, 2),
     };
   }
@@ -364,7 +437,6 @@ export class DatapackGenerator implements Generator {
   /** 世界生成：维度类型 → data/<namespace>/dimension_type/<id>.json */
   private generateDimensionType(namespace: string, dt: DimensionTypeSpec): FileNode {
     const obj: Record<string, unknown> = {
-      fixed_time: dt.fixedTime,
       has_skylight: dt.hasSkyLight,
       has_ceiling: dt.hasCeiling,
       ultrawarm: dt.ultraWarm,
@@ -387,8 +459,12 @@ export class DatapackGenerator implements Generator {
       ambient_light: dt.ambientLight,
       piglin_safe: dt.piglinSafe,
     };
+    // P2 dogfood 修复：fixedTime 为 null 时省略字段（Minecraft 规范要求省略而非设为 null）
+    if (dt.fixedTime !== null && dt.fixedTime !== undefined) {
+      obj.fixed_time = dt.fixedTime;
+    }
     return {
-      path: `data/${namespace}/dimension_type/${dt.id}.json`,
+      path: `data/${namespace}/dimension_type/${sanitizePathSegment(dt.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
@@ -402,13 +478,18 @@ export class DatapackGenerator implements Generator {
         size_horizontal: ns.noiseSizeHorizontal,
         size_vertical: ns.noiseSizeVertical,
       },
-      density_function: ns.densityFunction,
+      // P2 dogfood：densityFunction 应为对象（密度函数 JSON），不是字符串 ID
+      // 若为 JSON 字符串则解析，否则原样保留（向后兼容）
+      density_function:
+        typeof ns.densityFunction === 'string'
+          ? safeJsonParse(ns.densityFunction, ns.densityFunction)
+          : ns.densityFunction,
     };
     if (ns.noiseRouter) {
       obj.noise_router = ns.noiseRouter;
     }
     return {
-      path: `data/${namespace}/worldgen/noise_settings/${ns.id}.json`,
+      path: `data/${namespace}/worldgen/noise_settings/${sanitizePathSegment(ns.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
@@ -424,16 +505,23 @@ export class DatapackGenerator implements Generator {
     if (b.grassColor !== undefined) effectsObj.grass_color = b.grassColor;
     if (b.foliageColor !== undefined) effectsObj.foliage_color = b.foliageColor;
 
-    const obj = {
+    const obj: Record<string, unknown> = {
       precipitation: b.precipitation,
       temperature: b.temperature,
       temperature_modifier: b.temperatureModifier === 'frozen' ? 'frozen' : 'none',
       downfall: b.downfall,
       effects: effectsObj,
-      surface_builder: { type: b.surfaceBuilder },
     };
+    // P2 dogfood：1.18+ 废弃 surface_builder，改用 surface_rule
+    // 旧格式 { type: b.surfaceBuilder } 不正确且 Minecraft 1.21+ 忽略此字段
+    // TODO: 添加 surface_rule 支持（需要 DensityFunction schema）
+    // 仅在解析成功时写入字段；无效 JSON 时不设置（避免生成已知无效的旧格式）
+    if (b.surfaceBuilder) {
+      const parsed = safeJsonParse(b.surfaceBuilder, null);
+      if (parsed) obj.surface_builder = parsed;
+    }
     return {
-      path: `data/${namespace}/worldgen/biome/${b.id}.json`,
+      path: `data/${namespace}/worldgen/biome/${sanitizePathSegment(b.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
@@ -508,27 +596,31 @@ export class DatapackGenerator implements Generator {
       generator,
     };
     return {
-      path: `data/${namespace}/dimension/${d.id}.json`,
+      path: `data/${namespace}/dimension/${sanitizePathSegment(d.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
 
   /** 自定义附魔 → data/<namespace>/enchantment/<id>.json（1.21+） */
   private generateEnchantment(namespace: string, e: DatapackEnchantmentSpec): FileNode {
+    // G-4 修复：1.21+ enchantment JSON 的 min_cost/max_cost 必须是 { base, per_level_above_first } 对象
+    //（旧实现直接输出数字，codec 解码失败导致附魔无法加载）；min_level 不是合法字段（移除）。
+    // min_cost.base 采用 minLevel，per_level_above_first 由 maxCost/maxLevel 推导。
+    const perLevel = Math.max(1, Math.round(e.maxCost / e.maxLevel));
     const obj = {
       description: { translate: e.description },
       supported_items: e.supportedItems,
       weight: e.weight,
       anvil_cost: e.anvilCost,
-      max_cost: e.maxCost,
-      min_level: e.minLevel,
+      min_cost: { base: e.minLevel, per_level_above_first: perLevel },
+      max_cost: { base: e.maxCost, per_level_above_first: perLevel },
       max_level: e.maxLevel,
       slots: e.slots,
       ...(e.isCurse ? { is_curse: true } : {}),
       ...(e.isTreasure ? { is_treasure: true } : {}),
     };
     return {
-      path: `data/${namespace}/enchantment/${e.id}.json`,
+      path: `data/${namespace}/enchantment/${sanitizePathSegment(e.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
@@ -542,40 +634,47 @@ export class DatapackGenerator implements Generator {
       ...(e.beneficial ? {} : { beneficial: false }),
     };
     return {
-      path: `data/${namespace}/effect/${e.id}.json`,
+      path: `data/${namespace}/effect/${sanitizePathSegment(e.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
 
   /** 自定义损伤类型 → data/<namespace>/damage_type/<id>.json（1.19.4+） */
   private generateDamageType(namespace: string, d: DamageTypeSpec): FileNode {
+    // G-4 修复：1.20.5+ damage_type 字段名为 message_id（非 message_type），
+    // scaling 取值无命名空间前缀（never/when_caused_by_living_non_player/always）。
     const obj = {
-      message_type: `minecraft:${d.messageType}`,
-      scaling: `minecraft:${d.scaling}`,
+      message_id: d.messageType,
+      scaling: d.scaling,
       exhaustion: d.exhaustion,
     };
     return {
-      path: `data/${namespace}/damage_type/${d.id}.json`,
+      path: `data/${namespace}/damage_type/${sanitizePathSegment(d.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
 
   /** 自定义结构 → data/<namespace>/worldgen/structure/<id>.json */
   private generateStructure(namespace: string, s: StructureSpec): FileNode {
+    // G-12 修复：structure JSON 的 type 是结构实现类型（jigsaw），
+    // 不是 placementType（random_spread/concentric_rings 属于 structure_set 的 placement 字段）。
+    // jigsaw 结构用 start_pool 指定起始模板池（原 template_pools 字段不存在，无法加载）。
     const obj: Record<string, unknown> = {
-      type: `minecraft:${s.placementType}`,
+      type: 'minecraft:jigsaw',
       biomes: s.biomes,
       size: s.size,
-      start_height: JSON.parse(s.startHeight),
+      start_height: safeJsonParse(s.startHeight, {
+        type: 'minecraft:uniform',
+        min: { absolute: 0 },
+        max: { absolute: 63 },
+      }),
       step: s.step,
       use_expansion_hack: s.useExpansionHack,
+      start_pool: s.templatePool,
+      max_distance_from_center: s.maxDistance,
     };
-    if (s.placementType === 'jigsaw') {
-      obj.template_pools = [s.templatePool];
-      obj.max_distance_from_center = s.maxDistance;
-    }
     return {
-      path: `data/${namespace}/worldgen/structure/${s.id}.json`,
+      path: `data/${namespace}/worldgen/structure/${sanitizePathSegment(s.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
@@ -587,7 +686,7 @@ export class DatapackGenerator implements Generator {
       ...(p.override ? { override: true } : {}),
     };
     return {
-      path: `data/${namespace}/particle/${p.id}.json`,
+      path: `data/${namespace}/particle/${sanitizePathSegment(p.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
@@ -600,7 +699,7 @@ export class DatapackGenerator implements Generator {
       decal: t.decal,
     };
     return {
-      path: `data/${namespace}/trim_pattern/${t.id}.json`,
+      path: `data/${namespace}/trim_pattern/${sanitizePathSegment(t.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
@@ -613,7 +712,7 @@ export class DatapackGenerator implements Generator {
       description: { translate: t.description },
     };
     return {
-      path: `data/${namespace}/trim_material/${t.id}.json`,
+      path: `data/${namespace}/trim_material/${sanitizePathSegment(t.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
@@ -627,7 +726,7 @@ export class DatapackGenerator implements Generator {
     };
     if (i.description) obj.description = { translate: i.description };
     return {
-      path: `data/${namespace}/instrument/${i.id}.json`,
+      path: `data/${namespace}/instrument/${sanitizePathSegment(i.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
@@ -655,8 +754,77 @@ export class DatapackGenerator implements Generator {
       placement: placementObj,
     };
     return {
-      path: `data/${namespace}/worldgen/structure_set/${ss.id}.json`,
+      path: `data/${namespace}/worldgen/structure_set/${sanitizePathSegment(ss.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
+  }
+}
+
+/**
+ * P2 dogfood：校验 DatapackSpec 必填字段，缺失时收集 warning。
+ *
+ * 校验项：
+ * - packId：非空（用于路径构造）
+ * - packFormat：正整数（用于 pack.mcmeta）
+ * - recipes[].result：非空（Minecraft 配方必须有输出）
+ * - advancements[].trigger：非空（Minecraft 进度必须有触发器）
+ * - functions[].id：非空（函数路径必需）
+ * - tags[].id：非空（标签路径必需）
+ * - lootTables[].namespace/path：非空（战利品表路径必需）
+ *
+ * 不阻断生成（warning 模式），仅提醒用户补全。
+ */
+function validateDatapackSpec(spec: DatapackSpec, warnings: string[]): void {
+  if (!spec.packId) {
+    warnings.push('DatapackSpec.packId 为空，路径将回退为 "unknown"');
+  }
+  if (!spec.packFormat || !Number.isFinite(spec.packFormat) || spec.packFormat < 1) {
+    warnings.push(
+      `DatapackSpec.packFormat 无效 (${String(spec.packFormat)})，pack.mcmeta 可能不被 Minecraft 加载`,
+    );
+  }
+
+  const recipes = (spec.recipes ?? []) as unknown[];
+  for (let i = 0; i < recipes.length; i++) {
+    const r = recipes[i];
+    // recipes 支持两种格式：datapack RecipeSpec（用 result）与 ModRecipeSpec（用 output，由 isModRecipe 区分）
+    if (isModRecipe(r)) {
+      if (!r.output) {
+        warnings.push(`recipes[${i}].output 为空，Minecraft 可能无法加载此配方`);
+      }
+    } else if (!(r as RecipeSpec).result) {
+      warnings.push(`recipes[${i}].result 为空，Minecraft 可能无法加载此配方`);
+    }
+  }
+
+  for (let i = 0; i < (spec.advancements ?? []).length; i++) {
+    const a = spec.advancements![i] as unknown as Record<string, unknown>;
+    if (!a.trigger) {
+      warnings.push(`advancements[${i}].trigger 为空，Minecraft 可能无法加载此进度`);
+    }
+  }
+
+  for (let i = 0; i < (spec.functions ?? []).length; i++) {
+    const f = spec.functions![i] as unknown as Record<string, unknown>;
+    if (!f.id) {
+      warnings.push(`functions[${i}].id 为空，函数路径将回退为 "unknown"`);
+    }
+  }
+
+  for (let i = 0; i < (spec.tags ?? []).length; i++) {
+    const t = spec.tags![i] as unknown as Record<string, unknown>;
+    if (!t.id) {
+      warnings.push(`tags[${i}].id 为空，标签路径将回退为 "unknown"`);
+    }
+  }
+
+  for (let i = 0; i < (spec.lootTables ?? []).length; i++) {
+    const l = spec.lootTables![i] as unknown as Record<string, unknown>;
+    if (!l.namespace) {
+      warnings.push(`lootTables[${i}].namespace 为空，战利品表路径将回退为 "unknown"`);
+    }
+    if (!l.path) {
+      warnings.push(`lootTables[${i}].path 为空，战利品表路径将回退为 "unknown"`);
+    }
   }
 }

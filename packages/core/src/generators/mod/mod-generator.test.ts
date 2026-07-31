@@ -220,6 +220,7 @@ describe('ModGenerator 黄金样本快照（防 Adapter 回归）', () => {
         "src/main/java/com/example/golden/ModItems.java",
         "src/main/resources/META-INF/mods.toml",
         "src/main/resources/assets/golden/lang/en_us.json",
+        "src/main/resources/assets/golden/models/item/gold_dust.json",
         "src/main/resources/golden_meta.json",
       ]
     `);

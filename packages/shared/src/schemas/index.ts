@@ -10,4 +10,5 @@ export * from './resource-pack-spec.js';
 export * from './launcher-spec.js';
 export * from './behavior-pack-spec.js';
 export * from './node-graph-spec.js';
+export * from './nodeDataMigrator.js';
 export * from './custom-node-schema.js';

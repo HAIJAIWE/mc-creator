@@ -149,10 +149,10 @@ describe('ServerGenerator', () => {
     expect(bat).toBeDefined();
     expect(sh).toBeDefined();
     expect(bat!.content).toContain('@echo off');
-    expect(bat!.content).toContain('java -Xmx4G -Xms2G -jar server.jar nogui');
+    expect(bat!.content).toContain('"java" -Xmx4G -Xms2G -jar "server.jar" nogui');
     expect(bat!.content).toContain('pause');
     expect(sh!.content).toContain('#!/bin/sh');
-    expect(sh!.content).toContain('java -Xmx4G -Xms2G -jar server.jar nogui');
+    expect(sh!.content).toContain('"java" -Xmx4G -Xms2G -jar "server.jar" nogui');
   });
 
   it('空配置（最小 Spec）不崩溃且生成 8 个文件', async () => {
@@ -306,7 +306,7 @@ describe('ServerGenerator', () => {
     expect(content).toContain('Description=Minecraft Server (MyServer)');
     expect(content).toContain('User=mcadmin');
     expect(content).toContain('WorkingDirectory=/srv/mc');
-    expect(content).toContain('ExecStart=/usr/bin/java -Xmx6G -Xms2G -jar paper.jar nogui');
+    expect(content).toContain('ExecStart="/usr/bin/java" -Xmx6G -Xms2G -jar "paper.jar" nogui');
     expect(content).toContain('Restart=no');
   });
 
@@ -387,10 +387,10 @@ describe('ServerGenerator', () => {
     expect(sh).toBeDefined();
     const content = sh!.content;
     expect(content).toContain('#!/bin/bash');
-    expect(content).toContain('useradd -r -m -d /opt/mc mcuser || true');
-    expect(content).toContain('mkdir -p /opt/mc');
-    expect(content).toContain('cp -r ./* /opt/mc/');
-    expect(content).toContain('chown -R mcuser:mcuser /opt/mc');
+    expect(content).toContain('useradd -r -m -d "/opt/mc" "mcuser" || true');
+    expect(content).toContain('mkdir -p "/opt/mc"');
+    expect(content).toContain('cp -r ./* "/opt/mc/"');
+    expect(content).toContain('chown -R "mcuser:mcuser" "/opt/mc"');
     expect(content).toContain('cp deploy/minecraft.service /etc/systemd/system/');
     expect(content).toContain('systemctl daemon-reload');
     expect(content).toContain('systemctl enable minecraft');
@@ -424,7 +424,7 @@ describe('ServerGenerator', () => {
     const content = sh!.content;
     expect(content).toContain('#!/bin/bash');
     expect(content).toContain('BACKUP_DIR="/backups/$(date +%Y%m%d_%H%M%S)"');
-    expect(content).toContain('cp -r /opt/mc/* "$BACKUP_DIR/"');
+    expect(content).toContain('cp -r "/opt/mc"/* "$BACKUP_DIR/"');
     expect(content).toContain('ls -dt /backups/* | tail -n +8 | xargs rm -rf');
   });
 

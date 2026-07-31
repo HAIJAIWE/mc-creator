@@ -59,6 +59,7 @@ describe('SubgraphNode', () => {
       customTypeId: null,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
       customFields: {},
     };
     render(
@@ -93,6 +94,7 @@ describe('SubgraphNode', () => {
       customTypeId: 'mymod:crafter',
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
       customFields: {},
     };
     render(
@@ -116,6 +118,7 @@ describe('SubgraphNode', () => {
       customTypeId: null,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
       customFields: {},
     };
     render(

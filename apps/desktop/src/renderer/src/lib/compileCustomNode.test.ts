@@ -31,6 +31,7 @@ describe('compileCustomNode', () => {
       customFields: { speed: 42 },
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const result = compileCustomNode(data, data.customFields);
     expect(result.error).toBeUndefined();
@@ -56,6 +57,7 @@ describe('compileCustomNode', () => {
       customFields: {},
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const result = compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeUndefined();
@@ -75,6 +77,7 @@ describe('compileCustomNode', () => {
       customFields: {},
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const result = compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeUndefined();
@@ -104,6 +107,7 @@ describe('compileCustomNode', () => {
       customFields: {},
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const result = compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeUndefined();
@@ -133,6 +137,7 @@ describe('compileCustomNode', () => {
       customFields: { name: 'a"; evil(); "' },
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const result = compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeDefined();
@@ -170,6 +175,7 @@ describe('compileCustomNode', () => {
       customFields: { speed: 42, extra: 'LEAKED' },
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const result = compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeDefined();
@@ -203,6 +209,7 @@ describe('compileCustomNode', () => {
       customFields: { speed: 'not-a-number' },
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const result = compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeDefined();
@@ -235,6 +242,7 @@ describe('compileCustomNode', () => {
       customFields: { count: '42' },
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const result = compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeDefined();
@@ -269,6 +277,7 @@ describe('compileCustomNode', () => {
         customFields: { speed: 5 },
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       const result = compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
@@ -299,6 +308,7 @@ describe('compileCustomNode', () => {
         customFields: { speed: 9 },
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       const result = compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
@@ -333,6 +343,7 @@ describe('compileCustomNode', () => {
         customFields: { name: 'X' },
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       const result = compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
@@ -381,6 +392,7 @@ describe('compileCustomNode', () => {
         customFields: { mode: 'advanced' },
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       const result = compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
@@ -425,6 +437,7 @@ describe('compileCustomNode', () => {
         customFields: { mode: 'simple' },
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       const result = compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
@@ -468,6 +481,7 @@ describe('compileCustomNode', () => {
         customFields: { tier: 'diamond' },
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       expect(compileCustomNode(data1, data1.customFields).snippet!.code).toBe('ENCHANT_GLOW;');
 
@@ -518,6 +532,7 @@ describe('compileCustomNode', () => {
         customFields: {},
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       const result = compileCustomNode(data, data.customFields);
       expect(result.snippet!.code).toBe('DEFAULT;');
@@ -552,6 +567,7 @@ describe('compileCustomNode', () => {
         customFields: { unknownField: 'x' }, // 用户传入了未定义字段
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       const result = compileCustomNode(data, data.customFields);
       // 未定义字段的 condition 不应触发，避免用户通过额外字段绕过 schema 控制
@@ -596,6 +612,7 @@ describe('compileCustomNode', () => {
           customFields: { v },
           collapsed: false,
           codeLocked: false,
+          formatVersion: 1,
         }) as SubgraphNodeData;
       // equals 匹配
       expect(compileCustomNode(mk('u1', 'a'), { v: 'a' }).snippet!.code).toBe('MATCH;');
@@ -638,6 +655,7 @@ describe('compileCustomNode', () => {
         customFields: { glow: true, name: 'MyBlock', items: ['a', 'b'] },
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       const result = compileCustomNode(data, data.customFields);
       expect(result.snippet!.code).toContain('boolean glow=true;');
@@ -674,6 +692,7 @@ describe('compileCustomNode', () => {
         customFields: { tier: 3 },
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
       };
       const result = compileCustomNode(data, data.customFields);
       // number 3 经 String() 后与 '3' 相等

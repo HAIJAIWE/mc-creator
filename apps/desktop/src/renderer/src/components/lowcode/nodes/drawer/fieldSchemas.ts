@@ -1,10 +1,34 @@
 import type { NodeData, NodeKind } from '@mc-creator/shared';
 import type { FieldSchema } from './editors/types.js';
 
-/** 公共字段：所有节点都有 label/note */
+/**
+ * 公共字段：所有节点都有 label/note。
+ *
+ * codeLocked / lockedCode 对标 MCreator 的 codeLock 机制：
+ * - codeLocked=true 时编译器跳过常规代码生成，直接使用 lockedCode
+ * - lockedCode 仅在 codeLocked=true 时显示（condition）
+ * - 排除 comment 节点（不参与编译，codeLock 无意义）
+ */
 const COMMON_FIELDS: FieldSchema[] = [
   { key: 'label', label: '标签', type: 'text', required: true },
   { key: 'note', label: '备注', type: 'text' },
+  {
+    key: 'codeLocked',
+    label: '锁定代码',
+    type: 'segmented',
+    options: ['false', 'true'],
+    excludeKinds: ['comment'],
+  },
+  {
+    key: 'lockedCode',
+    label: '锁定代码内容',
+    type: 'code',
+    language: 'java',
+    placeholder:
+      '// 锁定后编译器直接使用此代码，跳过常规代码生成\n// 留空时回退到常规编译并产生 warning',
+    condition: { field: 'codeLocked', equals: 'true' },
+    excludeKinds: ['comment'],
+  },
 ];
 
 /** item 节点字段 */
@@ -220,7 +244,7 @@ const COMMENT_FIELDS: FieldSchema[] = [
   },
 ];
 
-/** variable 节点字段（阶段 C） */
+/** variable 节点字段（阶段 C，P2 dogfood 修复：value 字段根据 varType 动态切换编辑器类型） */
 const VARIABLE_FIELDS: FieldSchema[] = [
   { key: 'varName', label: '变量名', type: 'text', required: true },
   {
@@ -230,7 +254,50 @@ const VARIABLE_FIELDS: FieldSchema[] = [
     required: true,
     options: ['int', 'double', 'string', 'boolean', 'item', 'block'],
   },
-  { key: 'value', label: '初始值', type: 'text' },
+  // P2：根据 varType 动态切换 value 编辑器（int/double → number, boolean → segmented, item/block → resourceId, string → text）
+  {
+    key: 'value',
+    label: '初始值',
+    type: 'number',
+    min: -999999,
+    max: 999999,
+    step: 1,
+    condition: { field: 'varType', in: ['int'] },
+  },
+  {
+    key: 'value',
+    label: '初始值',
+    type: 'number',
+    min: -999999,
+    max: 999999,
+    step: 0.01,
+    condition: { field: 'varType', in: ['double'] },
+  },
+  {
+    key: 'value',
+    label: '初始值',
+    type: 'text',
+    condition: { field: 'varType', in: ['string'] },
+  },
+  {
+    key: 'value',
+    label: '初始值',
+    type: 'segmented',
+    options: ['false', 'true'],
+    condition: { field: 'varType', in: ['boolean'] },
+  },
+  {
+    key: 'value',
+    label: '初始值',
+    type: 'resourceId',
+    condition: { field: 'varType', in: ['item'] },
+  },
+  {
+    key: 'value',
+    label: '初始值',
+    type: 'resourceId',
+    condition: { field: 'varType', in: ['block'] },
+  },
   { key: 'isConstant', label: '常量', type: 'segmented', options: ['false', 'true'] },
 ];
 
@@ -239,6 +306,19 @@ const SUBGRAPH_FIELDS: FieldSchema[] = [
   { key: 'label', label: '显示名', type: 'text', required: true },
   { key: 'subgraphName', label: '子图名', type: 'text' },
   { key: 'subgraphId', label: '子图 ID', type: 'text' },
+];
+
+/** P1-3：procedure 节点字段（对标 MCreator procedure） */
+const PROCEDURE_FIELDS: FieldSchema[] = [
+  {
+    key: 'procedureName',
+    label: '过程名',
+    type: 'text',
+    required: true,
+    pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$',
+    patternMessage: '须为合法 Java 标识符：字母/下划线开头，仅含字母/数字/下划线',
+  },
+  { key: 'displayName', label: '显示名', type: 'text' },
 ];
 
 /** loop 节点字段（阶段 C） */
@@ -279,7 +359,7 @@ const LOOP_FIELDS: FieldSchema[] = [
   { key: 'bodySubgraphId', label: '循环体子图', type: 'noderef' },
 ];
 
-/** 按 kind 获取字段 schema 列表 */
+/** 按 kind 获取字段 schema 列表（已按 excludeKinds 过滤） */
 export function getFieldSchemas(kind: NodeKind): FieldSchema[] {
   const specific: Record<NodeData['kind'], FieldSchema[]> = {
     item: ITEM_FIELDS,
@@ -296,6 +376,9 @@ export function getFieldSchemas(kind: NodeKind): FieldSchema[] {
     variable: VARIABLE_FIELDS,
     subgraph: SUBGRAPH_FIELDS,
     loop: LOOP_FIELDS,
+    procedure: PROCEDURE_FIELDS,
   };
-  return [...COMMON_FIELDS, ...(specific[kind] ?? [])];
+  return [...COMMON_FIELDS, ...(specific[kind] ?? [])].filter(
+    (f) => !f.excludeKinds?.includes(kind),
+  );
 }

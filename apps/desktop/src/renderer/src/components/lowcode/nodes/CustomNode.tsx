@@ -33,6 +33,7 @@ function CustomNodeContentComponent({ data, selected, ports }: CustomNodeContent
         ports={ports}
         collapsed={data.collapsed}
         selected={selected}
+        codeLocked={data.codeLocked}
         errorState="warning"
         onToggleCollapse={toggleCollapse}
         onOpenDrawer={openDrawer}
@@ -51,6 +52,7 @@ function CustomNodeContentComponent({ data, selected, ports }: CustomNodeContent
       ports={ports.length > 0 ? ports : schema.ports}
       collapsed={data.collapsed}
       selected={selected}
+      codeLocked={data.codeLocked}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

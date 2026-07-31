@@ -46,8 +46,9 @@ export const KUBEJS_TEMPLATES: SpecTemplate[] = [
     icon: '📦',
     description:
       '用 KubeJS 在启动脚本中注册以下自定义内容：1）注册自定义物品：ruby（红宝石）、ruby_dust（红宝石粉）、ruby_nugget（红宝石粒），' +
-      '每个物品有独立的 ID 和显示名；2）注册自定义方块：ruby_ore（红宝石矿石）、ruby_block（红宝石块），' +
-      '设置材质和挖掘等级；3）注册自定义流体：molten_ruby（熔融红宝石）；' +
+      '每个物品有独立的 ID 和显示名；2）注册自定义方块：ruby_ore（红宝石矿石）、ruby_block（红宝石块）' +
+      // S-16 修复：KubejsRegistrySpec 无 material/miningLevel 字段，删除不可表达需求
+      '（用 customCode 补充材质与挖掘等级）；3）注册自定义流体：molten_ruby（熔融红宝石）；' +
       '4）语言文件：en_us 和 zh_cn 都需要包含以上所有物品/方块/流体的显示名翻译。' +
       'packId 用 custom_registry，packName 显示「自定义注册表脚本」。',
   },

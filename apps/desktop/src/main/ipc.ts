@@ -18,6 +18,8 @@ import {
   ModrinthApiClient,
   CurseForgeApiClient,
   createDefaultRegistry,
+  ModGenerator,
+  type BuildCacheSnapshot,
   type SpecType,
 } from '@mc-creator/core';
 import * as nodeFs from 'fs';
@@ -26,6 +28,7 @@ import { assertWithin, parseGitStatus } from './ipc-utils.js';
 import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
 import { loadCurseForgeConfig, saveCurseForgeConfig } from './curseforge-config.js';
 import { loadProjects, saveProject, deleteProject, getProject } from './project-store.js';
+import { buildChatSystemMessage } from './chat-system-message.js';
 import {
   IPC,
   EXPORT_ZIP,
@@ -136,6 +139,13 @@ import {
   IMPORT_RESOURCE_FILES,
   ImportResourceFilesRequest,
   type ImportResourceFilesRes,
+  NODE_GRAPH_SAVE,
+  NODE_GRAPH_LOAD,
+  NODE_GRAPH_SHOW_SAVE_DIALOG,
+  NODE_GRAPH_SHOW_OPEN_DIALOG,
+  NodeGraphSaveRequest,
+  NodeGraphLoadRequest,
+  NodeGraphShowSaveDialogRequest,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -145,6 +155,10 @@ import {
 export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
   // 生成器注册表（P1：替代 switch/case，新增生成器只需在 createDefaultRegistry 注册）
   const generatorRegistry = createDefaultRegistry();
+
+  // P1-4：增量构建缓存快照（跨请求保持，按 modId::loader::category 隔离）。
+  // 首次构建为 undefined → 全量生成；后续构建传入上次快照 → 类别级增量。
+  let modBuildCacheSnapshot: BuildCacheSnapshot | undefined;
 
   ipcMain.handle(IPC.GENERATE_SPEC, async (_e, raw: unknown): Promise<GenerateSpecRes> => {
     const req = GenerateSpecRequest.parse(raw);
@@ -162,13 +176,27 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     }
     // modId 可能从 spec 顶层或单独字段取
     const modId = req.modId || (req.spec as { modId?: string }).modId || 'mc_creator';
-    const result = await gen.generate({
+    const genCtx = {
       loader: req.loader,
       mcVersion: req.mcVersion,
       modId,
       spec: req.spec as unknown as ModSpec,
       projectPath: '',
-    });
+    };
+
+    // P1-4：ModGenerator 走增量构建（类别级缓存），其他生成器走全量 generate
+    if (gen instanceof ModGenerator) {
+      const incResult = await gen.generateWithCache(genCtx, modBuildCacheSnapshot);
+      // 更新缓存快照，供下次构建复用
+      modBuildCacheSnapshot = incResult.cacheSnapshot;
+      return {
+        files: incResult.files,
+        warnings: incResult.warnings,
+        buildStats: incResult.stats,
+      };
+    }
+
+    const result = await gen.generate(genCtx);
     return { files: result.files, warnings: result.warnings };
   });
 
@@ -221,10 +249,13 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       return;
     }
 
+    // P12 chat 模式工具调用增强：根据 context 构建增强 system message
+    const systemMessage = buildChatSystemMessage(req.context);
+
     const provider = new VercelAiProvider(config);
     try {
       for await (const chunk of provider.stream(req.message, {
-        system: '你是 Minecraft mod 专家助手，帮助用户设计 mod。简洁回答。',
+        system: systemMessage,
       })) {
         e.sender.send(CHAT_STREAM_CHUNK, { delta: chunk.delta, done: chunk.done });
       }
@@ -1023,6 +1054,89 @@ ${req.buildLog}
     spawn(launcherExe, [], { detached: true, stdio: 'ignore' }).unref();
     return { ok: true, method: 'launcher', launcher, error: null };
   });
+
+  // === 节点图持久化（保存/加载到磁盘 + 文件对话框）===
+  // 渲染层通过 window.api.nodeGraph.* 调用，主进程只做 fs 读写与 dialog 弹框。
+  // 最近列表由渲染层用 localStorage 维护，主进程不参与（便于无 Electron 环境测试）。
+
+  /**
+   * 将已序列化的节点图 JSON 字符串写入指定路径。
+   * 不弹对话框（调用方需先调 showSaveDialog 取得路径）。
+   * 写入失败时返回 { ok: false, error }，不抛错。
+   */
+  ipcMain.handle(
+    NODE_GRAPH_SAVE,
+    async (_e, raw: unknown): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const req = NodeGraphSaveRequest.parse(raw);
+      try {
+        // 确保父目录存在（用户可能选了不存在的新路径）
+        await mkdir(dirname(req.filePath), { recursive: true });
+        await writeFile(req.filePath, req.json, 'utf-8');
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: `写入文件失败：${(err as Error).message}` };
+      }
+    },
+  );
+
+  /**
+   * 读取指定路径的节点图 JSON 字符串。
+   * 不弹对话框（调用方需先调 showOpenDialog 取得路径）。
+   * 读取失败时返回 { ok: false, error }，不抛错。
+   */
+  ipcMain.handle(
+    NODE_GRAPH_LOAD,
+    async (
+      _e,
+      raw: unknown,
+    ): Promise<{ ok: true; json: string } | { ok: false; error: string }> => {
+      const req = NodeGraphLoadRequest.parse(raw);
+      try {
+        const json = await readFile(req.filePath, 'utf-8');
+        return { ok: true, json };
+      } catch (err) {
+        return { ok: false, error: `读取文件失败：${(err as Error).message}` };
+      }
+    },
+  );
+
+  /**
+   * 弹出保存对话框，让用户选择 .json 路径。
+   * 默认文件名由调用方传入（一般是 `${modId}-node-graph.json`）。
+   * 用户取消时返回 { ok: false }，不抛错。
+   */
+  ipcMain.handle(
+    NODE_GRAPH_SHOW_SAVE_DIALOG,
+    async (_e, raw: unknown): Promise<{ ok: true; filePath: string } | { ok: false }> => {
+      const req = NodeGraphShowSaveDialogRequest.parse(raw);
+      const result = await dialog.showSaveDialog({
+        defaultPath: req.defaultName,
+        filters: [{ name: 'Node Graph JSON', extensions: ['json'] }],
+      });
+      if (result.canceled || !result.filePath) {
+        return { ok: false };
+      }
+      return { ok: true, filePath: result.filePath };
+    },
+  );
+
+  /**
+   * 弹出打开对话框，让用户选择 .json 文件。
+   * 用户取消时返回 { ok: false }，不抛错。
+   */
+  ipcMain.handle(
+    NODE_GRAPH_SHOW_OPEN_DIALOG,
+    async (): Promise<{ ok: true; filePath: string } | { ok: false }> => {
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [{ name: 'Node Graph JSON', extensions: ['json'] }],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { ok: false };
+      }
+      return { ok: true, filePath: result.filePaths[0] };
+    },
+  );
 }
 
 /** 默认编排器工厂（优先用配置的真实模型，否则 fallback Mock） */

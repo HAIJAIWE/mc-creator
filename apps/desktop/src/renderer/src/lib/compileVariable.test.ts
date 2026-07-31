@@ -16,6 +16,7 @@ describe('compileVariable', () => {
       isConstant: true,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet, varName } = compileVariable(data);
     expect(varName).toBe('MAX_DAMAGE');
@@ -38,6 +39,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toContain('public String playerName = "Steve";');
@@ -57,6 +59,7 @@ describe('compileVariable', () => {
       isConstant: true,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toContain('public static final boolean enabled = true;');
@@ -75,6 +78,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toContain('ItemStack');
@@ -94,6 +98,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     const _: CustomCodeSnippetSpec = snippet;
@@ -116,6 +121,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     // 期望 Java 源码: public String path = "a\\\"";
@@ -136,6 +142,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     // 整个字段值作为字符串内容，evil() 是数据而非代码
@@ -156,6 +163,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     // ResourceLocation 字符串字面量内的引号需被转义为 \"
@@ -180,6 +188,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toContain('\\"');
@@ -200,6 +209,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     expect(() => compileVariable(data)).toThrow(/Java 标识符/);
   });
@@ -217,6 +227,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toContain('$my_var1');
@@ -235,6 +246,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toContain('= 0;');
@@ -253,6 +265,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toContain('= 0;');
@@ -271,6 +284,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toContain('= 3;');
@@ -290,6 +304,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toMatch(/= 0(\.0)?;/);
@@ -308,6 +323,7 @@ describe('compileVariable', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
     expect(snippet.code).toMatch(/= 0(\.0)?;/);

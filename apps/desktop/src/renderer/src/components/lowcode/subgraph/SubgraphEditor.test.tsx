@@ -42,6 +42,7 @@ function makeInnerItem(id: string): ModNode {
       glow: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     },
     ports: [],
     selected: false,

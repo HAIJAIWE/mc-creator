@@ -24,6 +24,21 @@ import {
 } from '../../utils/png-encoder.js';
 
 /**
+ * P2 dogfood：路径段消毒，防止路径穿越和特殊字符注入。
+ * 复用 datapack-generator 的同一策略。
+ */
+function sanitizePathSegment(segment: string): string {
+  if (!segment) return 'unknown';
+  const parts = segment.split('/').filter((p) => p && p !== '..' && p !== '.');
+  if (parts.length === 0) return 'unknown';
+  const sanitized = parts
+    .map((p) => p.toLowerCase().replace(/[^a-z0-9_.-]/g, '_'))
+    .filter(Boolean)
+    .join('/');
+  return sanitized || 'unknown';
+}
+
+/**
  * 资源包生成器（P14）。
  * 生成 pack.mcmeta + 贴图覆盖 + 模型覆盖 + 语言文件 + 字体定义 + 音效占位。
  * PNG/OGG 二进制以 base64 编码存入 FileNode.content。
@@ -44,6 +59,7 @@ export class ResourcePackGenerator implements Generator {
     files.push(this.generatePackMcmeta(spec));
 
     // 2. 贴图覆盖（写入 assets/minecraft/textures/<path>.png）
+    const ns = sanitizePathSegment(spec.namespace);
     for (const entry of spec.textureOverrides ?? []) {
       files.push(this.generateTextureOverridePng(entry));
     }
@@ -59,22 +75,22 @@ export class ResourcePackGenerator implements Generator {
 
     // 6. 字体贴图 PNG（assets/<namespace>/textures/font/<id>.png）
     for (const entry of spec.fonts ?? []) {
-      files.push(this.generateFontTexturePng(spec.namespace, entry));
+      files.push(this.generateFontTexturePng(ns, entry));
     }
 
     // 7. 字体定义 JSON（assets/<namespace>/font/<namespace>.json）
     if ((spec.fonts ?? []).length > 0) {
-      files.push(this.generateFontJson(spec.namespace, spec.fonts ?? []));
+      files.push(this.generateFontJson(ns, spec.fonts ?? []));
     }
 
     // 8. 音效 ogg 文件（assets/<namespace>/sounds/<id>.ogg）
     for (const entry of spec.sounds ?? []) {
-      files.push(this.generateSoundOgg(spec.namespace, entry));
+      files.push(this.generateSoundOgg(ns, entry));
     }
 
     // 9. sounds.json（assets/<namespace>/sounds.json）
     if ((spec.sounds ?? []).length > 0) {
-      files.push(this.generateSoundsJson(spec.namespace, spec.sounds ?? []));
+      files.push(this.generateSoundsJson(ns, spec.sounds ?? []));
     }
 
     return {
@@ -121,7 +137,7 @@ export class ResourcePackGenerator implements Generator {
 
     const png = encodePng(buf);
     return {
-      path: `assets/minecraft/textures/${entry.path}.png`,
+      path: `assets/minecraft/textures/${sanitizePathSegment(entry.path)}.png`,
       content: png.toString('base64'),
     };
   }
@@ -157,7 +173,7 @@ export class ResourcePackGenerator implements Generator {
     }
 
     return {
-      path: `assets/minecraft/models/${entry.path}.json`,
+      path: `assets/minecraft/models/${sanitizePathSegment(entry.path)}.json`,
       content,
     };
   }
@@ -177,7 +193,7 @@ export class ResourcePackGenerator implements Generator {
     fillSolid(buf, r, g, b);
     const png = encodePng(buf);
     return {
-      path: `assets/${namespace}/textures/font/${entry.id}.png`,
+      path: `assets/${namespace}/textures/font/${sanitizePathSegment(entry.id)}.png`,
       content: png.toString('base64'),
     };
   }
@@ -201,7 +217,7 @@ export class ResourcePackGenerator implements Generator {
   private generateSoundOgg(namespace: string, entry: SoundEntry): FileNode {
     // 如果 data 为空，生成空字符串占位文件；否则 data 已是 base64 编码，直接存入
     return {
-      path: `assets/${namespace}/sounds/${entry.id}.ogg`,
+      path: `assets/${namespace}/sounds/${sanitizePathSegment(entry.id)}.ogg`,
       content: entry.data || '',
     };
   }

@@ -4,6 +4,10 @@ import type { EditorProps } from './types.js';
 /**
  * 数字步进编辑器：凹陷输入框 + 左右 [-][+] MC 按钮。
  * 支持 min/max/step 校验。
+ *
+ * P1 dogfood 修复：输入过程中不立即 clamp，允许用户输入中间值（如先输 1 再输 2 → 12）。
+ * 仅在失焦（onBlur）时 clamp 到 [min, max] 范围。
+ * 空输入或非数字输入保持原值不变。
  */
 function NumberStepperEditorComponent({ value, onChange, schema }: EditorProps<number>) {
   const min = schema.min ?? -Infinity;
@@ -20,11 +24,27 @@ function NumberStepperEditorComponent({ value, onChange, schema }: EditorProps<n
     onChange(next);
   };
 
+  /** 输入中：直接传递原始数值，不 clamp（允许输入中间值） */
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
+    // 空字符串或纯负号不触发 onChange（用户还在输入）
+    if (raw === '' || raw === '-') return;
     const num = Number(raw);
     if (Number.isNaN(num)) return;
-    onChange(Math.max(min, Math.min(max, num)));
+    onChange(num);
+  };
+
+  /** 失焦时：clamp 到合法范围 */
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    // 空字符串或纯负号不触发 onChange（与 handleInput 一致，避免 Number('')===0 把空输入回退为 0）
+    if (raw === '' || raw === '-') return;
+    const num = Number(raw);
+    if (!Number.isNaN(num)) {
+      const clamped = Math.max(min, Math.min(max, num));
+      // 仅当值变化时才触发 onChange，避免不必要的重渲染
+      if (clamped !== num) onChange(clamped);
+    }
   };
 
   return (
@@ -41,6 +61,7 @@ function NumberStepperEditorComponent({ value, onChange, schema }: EditorProps<n
         type="number"
         value={value}
         onChange={handleInput}
+        onBlur={handleBlur}
         min={schema.min}
         max={schema.max}
         step={step}

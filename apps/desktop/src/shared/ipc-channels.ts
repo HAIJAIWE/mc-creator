@@ -47,6 +47,20 @@ export const GenerateFilesRequest = z.object({
 export const GenerateFilesResponse = z.object({
   files: z.array(z.object({ path: z.string(), content: z.string() })),
   warnings: z.array(z.string()),
+  /**
+   * P1-4：增量构建统计（可选）。
+   * 仅当生成器支持增量构建（如 ModGenerator）时返回，否则不存在。
+   * 用于 UI 展示"本次构建命中缓存 X 个类别，重新生成 Y 个"。
+   */
+  buildStats: z
+    .object({
+      total: z.number(),
+      cached: z.number(),
+      regenerated: z.number(),
+      filesTotal: z.number(),
+      filesUnchanged: z.number(),
+    })
+    .optional(),
 });
 
 export const BuildRequest = z.object({ projectPath: z.string().min(1) });
@@ -109,7 +123,22 @@ export type ChatRes = z.infer<typeof ChatResponse>;
 export const CHAT_STREAM = 'ai:chatStream';
 export const CHAT_STREAM_CHUNK = 'ai:chatStream:chunk'; // 主进程→渲染进程的事件
 
-export const ChatStreamRequest = z.object({ message: z.string().min(1) });
+/**
+ * P12 chat 模式工具调用增强：ChatStreamRequest 添加可选 context 字段，
+ * 让 chat 模式能感知项目上下文（生成器类型 + 用户描述 + 当前 spec 摘要）。
+ * 上下文由 main 进程拼接到 system message，不暴露原始 spec 给模型以外的用途。
+ */
+export const ChatStreamRequest = z.object({
+  message: z.string().min(1),
+  context: z
+    .object({
+      generatorType: z.string().optional(),
+      description: z.string().optional(),
+      /** spec 的简短摘要（避免传完整 JSON 消耗 token） */
+      specSummary: z.string().optional(),
+    })
+    .optional(),
+});
 export type ChatStreamReq = z.infer<typeof ChatStreamRequest>;
 
 // === AI 解释代码（流式） ===
@@ -635,3 +664,53 @@ export const TerminalResizeRequest = z.object({
 export const TerminalKillRequest = z.object({
   pid: z.number(),
 });
+
+// === 节点图持久化（保存/加载到磁盘 + 文件对话框）===
+// 渲染层通过 window.api.nodeGraph 调用，主进程用 fs.promises 读写文件、dialog 弹出选择框。
+export const NODE_GRAPH_SAVE = 'nodeGraph:save';
+export const NODE_GRAPH_LOAD = 'nodeGraph:load';
+export const NODE_GRAPH_SHOW_SAVE_DIALOG = 'nodeGraph:showSaveDialog';
+export const NODE_GRAPH_SHOW_OPEN_DIALOG = 'nodeGraph:showOpenDialog';
+
+/** nodeGraph:save 请求：把 JSON 字符串写入指定路径 */
+export const NodeGraphSaveRequest = z.object({
+  filePath: z.string().min(1),
+  json: z.string(),
+});
+export const NodeGraphSaveResponse = z.object({
+  ok: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+
+/** nodeGraph:load 请求：读取指定路径的 JSON 字符串 */
+export const NodeGraphLoadRequest = z.object({
+  filePath: z.string().min(1),
+});
+export const NodeGraphLoadResponse = z.object({
+  ok: z.boolean(),
+  json: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+});
+
+/** nodeGraph:showSaveDialog 请求：默认文件名（一般传 modId-node-graph.json） */
+export const NodeGraphShowSaveDialogRequest = z.object({
+  defaultName: z.string().default('node-graph.json'),
+});
+export const NodeGraphShowSaveDialogResponse = z.object({
+  ok: z.boolean(),
+  filePath: z.string().nullable().optional(),
+});
+
+/** nodeGraph:showOpenDialog 响应：用户选择文件后返回路径 */
+export const NodeGraphShowOpenDialogResponse = z.object({
+  ok: z.boolean(),
+  filePath: z.string().nullable().optional(),
+});
+
+export type NodeGraphSaveReq = z.infer<typeof NodeGraphSaveRequest>;
+export type NodeGraphSaveRes = z.infer<typeof NodeGraphSaveResponse>;
+export type NodeGraphLoadReq = z.infer<typeof NodeGraphLoadRequest>;
+export type NodeGraphLoadRes = z.infer<typeof NodeGraphLoadResponse>;
+export type NodeGraphShowSaveDialogReq = z.infer<typeof NodeGraphShowSaveDialogRequest>;
+export type NodeGraphShowSaveDialogRes = z.infer<typeof NodeGraphShowSaveDialogResponse>;
+export type NodeGraphShowOpenDialogRes = z.infer<typeof NodeGraphShowOpenDialogResponse>;

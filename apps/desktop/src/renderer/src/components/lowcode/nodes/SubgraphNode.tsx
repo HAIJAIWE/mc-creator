@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import type { NodeProps } from 'reactflow';
 import type { SubgraphNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
@@ -13,6 +13,9 @@ import { useNodeGraphStore } from '../../../store/node-graph-store.js';
  * 否则渲染普通子图摘要（含双击进入子图编辑提示）。
  *
  * 数据上 kind 始终是 'subgraph'，不新增 'custom' NodeKind。
+ *
+ * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
+ * 使用 useCallback 稳定化 enterSubgraph 回调。
  */
 function SubgraphNodeComponent({ data, selected }: NodeProps<SubgraphNodeData>) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
@@ -21,6 +24,10 @@ function SubgraphNodeComponent({ data, selected }: NodeProps<SubgraphNodeData>) 
   const sg = useNodeGraphStore((s) =>
     data.subgraphId ? s.graph.subgraphs[data.subgraphId] : undefined,
   );
+
+  const enterSubgraph = useCallback(() => {
+    if (data.subgraphId) setEditingSubgraphId(data.subgraphId);
+  }, [setEditingSubgraphId, data.subgraphId]);
 
   // 自定义节点：委托 CustomNodeContent
   if (data.customTypeId) {
@@ -37,6 +44,7 @@ function SubgraphNodeComponent({ data, selected }: NodeProps<SubgraphNodeData>) 
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
       selected={selected}
+      codeLocked={data.codeLocked}
       errorState={!subgraphFound && data.subgraphId ? 'warning' : undefined}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
@@ -56,7 +64,7 @@ function SubgraphNodeComponent({ data, selected }: NodeProps<SubgraphNodeData>) 
         data-testid="subgraph-enter-hint"
         aria-label="双击进入子图"
         className="sr-only"
-        onClick={() => setEditingSubgraphId(data.subgraphId)}
+        onClick={enterSubgraph}
       >
         双击进入子图
       </span>

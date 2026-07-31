@@ -52,6 +52,7 @@ describe('VariableNode', () => {
       isConstant: true,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     render(
       <VariableNode
@@ -78,6 +79,7 @@ describe('VariableNode', () => {
       isConstant: false,
       collapsed: false,
       codeLocked: false,
+      formatVersion: 1,
     };
     render(
       <VariableNode

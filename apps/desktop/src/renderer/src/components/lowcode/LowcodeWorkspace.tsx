@@ -19,8 +19,29 @@ import { DebuggerPanel } from './DebuggerPanel.js';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { OnboardingTour } from './onboarding/OnboardingTour.js';
 
-/** 编译消息占位（Plan C 接入编译器输出后替换为真实消息） */
-const EMPTY_COMPILE_MESSAGES: { type: 'error' | 'warning'; nodeId: string; message: string }[] = [];
+/**
+ * P1 dogfood 修复：从 compileResult 中提取编译消息（替代硬编码空数组）。
+ * 编译错误/警告消息现在会传递给 NodeDetailDrawer，在抽屉中显示与当前节点相关的消息。
+ */
+function extractCompileMessages(
+  compileResult: { errors: string[]; warnings: string[] } | null,
+  nodeIds: string[],
+): { type: 'error' | 'warning'; nodeId: string; message: string }[] {
+  if (!compileResult) return [];
+  const messages: { type: 'error' | 'warning'; nodeId: string; message: string }[] = [];
+  // 从错误/警告文本中提取涉及的节点 ID（与 NodeGraphEditor.extractNodeIds 逻辑一致）
+  for (const id of nodeIds) {
+    const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?:^|[^a-z0-9_])${escaped}(?:$|[^a-z0-9_])`, 'i');
+    for (const msg of compileResult.errors) {
+      if (regex.test(msg)) messages.push({ type: 'error', nodeId: id, message: msg });
+    }
+    for (const msg of compileResult.warnings) {
+      if (regex.test(msg)) messages.push({ type: 'warning', nodeId: id, message: msg });
+    }
+  }
+  return messages;
+}
 
 /** localStorage key：完成引导标记 */
 const ONBOARDING_KEY = 'mc-creator:onboarding-completed';
@@ -127,6 +148,8 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   const redoStackLength = useNodeGraphStore((s) => s.redoStack.length);
   const setCompileResult = useNodeGraphStore((s) => s.setCompileResult);
   const compileResult = useNodeGraphStore((s) => s.compileResult);
+  // P2 dogfood 修复：订阅节点 ID 列表用于编译消息提取（替代 JSX 中 getState()）
+  const nodeIds = useNodeGraphStore((s) => s.graph.nodes.map((n) => n.id));
   const exportGraph = useNodeGraphStore((s) => s.exportGraph);
   const importGraph = useNodeGraphStore((s) => s.importGraph);
   // 阶段 C：当前正在编辑的子图 id（非 null 时用 SubgraphWorkspace 替代主画布）
@@ -595,7 +618,9 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
       {!readOnly && <CodeNodeEditor nodeId={codeNodeId} onClose={() => setCodeNodeId(null)} />}
 
       {/* 节点详情抽屉（覆盖层，由 drawer-store 控制显隐） */}
-      {!readOnly && <NodeDetailDrawer compileMessages={EMPTY_COMPILE_MESSAGES} />}
+      {!readOnly && (
+        <NodeDetailDrawer compileMessages={extractCompileMessages(compileResult, nodeIds)} />
+      )}
 
       {/* 新手引导浮层（首次打开或点 ? 按钮触发） */}
       {onboardingStep !== null && (

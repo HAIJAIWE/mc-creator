@@ -128,3 +128,242 @@ describe('QuiltAdapter 复用 Fabric 逻辑', () => {
     expect(paths).toContain('src/main/resources/ruby_tools_meta.json');
   });
 });
+
+// === P1.4 新增字段消费测试（验证 QuiltAdapter 继承 FabricAdapter 的新字段处理） ===
+
+const SPEC_P14: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Adds ruby tools',
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  customCode: [
+    {
+      snippetId: 'code_1',
+      language: 'java',
+      code: 'return 42;',
+      inputSignature: { in_0: 'integer' },
+      outputSignature: { out_0: 'integer' },
+      methodName: 'calculateAnswer',
+    },
+  ],
+  multiblocks: [
+    {
+      structureId: 'altar_1',
+      displayName: 'Altar',
+      width: 3,
+      height: 3,
+      depth: 3,
+      hollow: true,
+      controllerOffset: { x: 1, y: 1, z: 1 },
+    },
+  ],
+  eventHandlers: [
+    {
+      handlerId: 'evt_1',
+      eventType: 'player_right_click_block',
+      eventArgs: { hand: 'main_hand' },
+    },
+  ],
+});
+
+const CTX_P14: GeneratorContext = {
+  loader: 'quilt',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P14,
+  projectPath: '/proj',
+};
+
+describe('QuiltAdapter P1.4 字段消费（继承 FabricAdapter）', () => {
+  const adapter = new QuiltAdapter();
+  const files = adapter.translate(CTX_P14);
+  const paths = files.map((f) => f.path);
+
+  it('生成 ModCustomCode.java / ModMultiblocks.java / ModEvents.java', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModCustomCode.java');
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModMultiblocks.java');
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModEvents.java');
+  });
+
+  it('mainClass 的 onInitialize 调用新的 initialize 方法', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main).toBeDefined();
+    expect(main!.content).toContain('ModCustomCode.initialize()');
+    expect(main!.content).toContain('ModMultiblocks.initialize()');
+    expect(main!.content).toContain('ModEvents.initialize()');
+  });
+
+  it('spec 为空时不生成新文件（原始 CTX）', () => {
+    const emptyFiles = adapter.translate(CTX);
+    const emptyPaths = emptyFiles.map((f) => f.path);
+    expect(emptyPaths).not.toContain('src/main/java/com/example/ruby_tools/ModCustomCode.java');
+    expect(emptyPaths).not.toContain('src/main/java/com/example/ruby_tools/ModMultiblocks.java');
+    expect(emptyPaths).not.toContain('src/main/java/com/example/ruby_tools/ModEvents.java');
+  });
+});
+
+// === P1.3 新增字段消费测试（验证 QuiltAdapter 继承 FabricAdapter 的 recipes/entities/machines 处理） ===
+
+const SPEC_P13: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Adds ruby tools',
+  items: [
+    {
+      id: 'ruby',
+      name: 'Ruby',
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+    },
+  ],
+  blocks: [
+    {
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5.0,
+      miningLevel: 0,
+      lightLevel: 0,
+      resistance: 6.0,
+      soundType: 'stone',
+      dropSelf: true,
+      dropItem: '',
+    },
+  ],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  recipes: [
+    {
+      recipeId: 'ruby_sword_recipe',
+      recipeType: 'crafting_shaped',
+      inputs: [
+        { item: 'minecraft:iron_ingot', count: 1, slot: 'A' },
+        { item: 'minecraft:stick', count: 1, slot: 'B' },
+      ],
+      output: 'minecraft:ruby_sword',
+      outputCount: 1,
+      cookTime: 200,
+      experience: 0,
+      pattern: ['AB', 'BA'],
+    },
+  ],
+  entities: [
+    {
+      entityId: 'ruby_golem',
+      displayName: 'Ruby Golem',
+      maxHealth: 100,
+      attackDamage: 15,
+      movementSpeed: 0.25,
+      classification: 'animal',
+      modelType: 'pig',
+      spawnWeight: 10,
+      spawnBiomes: ['plains'],
+    },
+  ],
+  machines: [
+    {
+      machineId: 'ruby_furnace',
+      displayName: 'Ruby Furnace',
+      energyCapacity: 20000,
+      maxEnergyTransfer: 200,
+      inputSlots: 1,
+      outputSlots: 1,
+      defaultProcessTime: 100,
+      defaultEnergyPerTick: 20,
+      guiWidth: 176,
+      guiHeight: 166,
+    },
+  ],
+});
+
+const CTX_P13: GeneratorContext = {
+  loader: 'quilt',
+  mcVersion: '1.21.11',
+  modId: 'ruby_tools',
+  spec: SPEC_P13,
+  projectPath: '/proj',
+};
+
+describe('QuiltAdapter P1.3 字段消费（继承 FabricAdapter）', () => {
+  const adapter = new QuiltAdapter();
+  const files = adapter.translate(CTX_P13);
+  const paths = files.map((f) => f.path);
+
+  it('生成 ModRecipes.java / ModEntities.java / ModMachines.java', () => {
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModRecipes.java');
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModEntities.java');
+    expect(paths).toContain('src/main/java/com/example/ruby_tools/ModMachines.java');
+  });
+
+  it('ModRecipes/ModEntities/ModMachines 含 Registry.register 与对应 id', () => {
+    const recipes = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModRecipes.java',
+    );
+    expect(recipes).toBeDefined();
+    expect(recipes!.content).toContain('RUBY_SWORD_RECIPE_ID');
+    expect(recipes!.content).toContain('ruby_sword_recipe');
+
+    const entities = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEntities.java',
+    );
+    expect(entities).toBeDefined();
+    expect(entities!.content).toContain('Registry.register');
+    expect(entities!.content).toContain('ruby_golem');
+
+    const machines = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModMachines.java',
+    );
+    expect(machines).toBeDefined();
+    expect(machines!.content).toContain('Registry.register');
+    expect(machines!.content).toContain('ruby_furnace');
+  });
+
+  it('mainClass 的 onInitialize 调用 P1.3 模块的 initialize', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main).toBeDefined();
+    expect(main!.content).toContain('ModRecipes.initialize()');
+    expect(main!.content).toContain('ModEntities.initialize()');
+    expect(main!.content).toContain('ModMachines.initialize()');
+  });
+});

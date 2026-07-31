@@ -67,9 +67,12 @@ const listFilesTool: ToolDefinition = {
   category: 'read',
   requiresApproval: false,
   execute: async (args) => {
-    const dir = args.directory ? String(args.directory) : '';
+    const dir = args.directory ? String(args.directory).trim() : '';
     const files = useModStore.getState().files;
-    const filtered = dir ? files.filter((f) => f.path.startsWith(dir)) : files;
+    // L-11 修复：按目录前缀过滤需以 "/" 结尾匹配，避免 assets 误匹配 assets2 等
+    const filtered = dir
+      ? files.filter((f) => f.path === dir || f.path.startsWith(dir + '/'))
+      : files;
     if (filtered.length === 0) return `没有找到文件${dir ? `（目录前缀：${dir}）` : ''}`;
     return filtered.map((f) => `${f.path} (${f.content.length} 字符)`).join('\n');
   },
@@ -231,12 +234,34 @@ const runCommandTool: ToolDefinition = {
     try {
       // 通过已有终端 IPC spawn 一个临时 PTY 执行命令
       const { pid } = await ipcClient.terminalSpawn({ cols: 120, rows: 24, cwd });
-      // 写入命令
+      const mcApi = window.mcApi;
+      // L-3 修复：订阅 terminal:data / terminal:exit 收集命令输出，而不是固定等待 5s
+      // 预览环境（vite mock）下 onTerminalData 是 no-op，事件永不触发，走超时兜底
+      let output = '';
+      const unsubData = mcApi?.onTerminalData?.((_e, d) => {
+        if (d.pid === pid) output += d.data;
+      });
+      const exitPromise = new Promise<number>((resolve) => {
+        const unsubExit = mcApi?.onTerminalExit?.((_e, d) => {
+          if (d.pid !== pid) return;
+          unsubExit?.();
+          resolve(d.exitCode);
+        });
+      });
       await ipcClient.terminalWrite(pid, command + '\n');
-      // 等待一段时间收集输出（简化方案；生产级需监听 terminal:data 收集输出直到 prompt 出现）
-      await new Promise((r) => setTimeout(r, 5000));
-      await ipcClient.terminalKill(pid);
-      return `已在终端中执行命令: ${command}`;
+      const timeoutMs = 120_000;
+      const exitCode = await Promise.race([
+        exitPromise,
+        new Promise<number>((r) => setTimeout(() => r(-1), timeoutMs)),
+      ]);
+      if (exitCode === -1) await ipcClient.terminalKill(pid).catch(() => {});
+      unsubData?.();
+      const trimmed = output.trim();
+      const truncated =
+        trimmed.length > 4000 ? trimmed.slice(0, 4000) + '\n...(输出已截断)' : trimmed;
+      return `命令已执行，退出码 ${exitCode}${
+        truncated ? `：\n${truncated}` : '（无输出）'
+      }${exitCode === -1 ? '\n（提示：超时未获取退出码，可能仍在后台运行）' : ''}`;
     } catch {
       return `无法执行命令: ${command}（终端不可用）`;
     }

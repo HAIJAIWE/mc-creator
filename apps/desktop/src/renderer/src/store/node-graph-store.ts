@@ -5,13 +5,30 @@ import type {
   ModEdge,
   NodeKind,
   NodeData,
-  EditorMode,
   SubgraphDefinition,
 } from '@mc-creator/shared';
+import { LATEST_FORMAT_VERSION } from '@mc-creator/shared';
 import type { CompileResult } from '../lib/compileNodeGraph.js';
 import { serializeGraph, safeDeserializeGraph } from '../lib/nodeGraphSerializer.js';
 import { getPorts } from '../components/lowcode/nodes/portSchemas.js';
 import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
+
+/**
+ * 为 procedure 节点生成不冲突的 procedureName（Java 方法名需唯一）。
+ * 以 baseName 为基准：冲突则追加数字后缀，直到找到未使用的名称。
+ * addNode（新增）与 duplicateNode（复制）共用，避免复制后产生同名过程。
+ */
+function uniqueProcedureName(nodes: ModNode[], baseName: string): string {
+  const existing = new Set(
+    nodes
+      .filter((n) => n.data.kind === 'procedure')
+      .map((n) => (n.data as { procedureName: string }).procedureName),
+  );
+  if (!existing.has(baseName)) return baseName;
+  let suffix = 2;
+  while (existing.has(`${baseName}${suffix}`)) suffix++;
+  return `${baseName}${suffix}`;
+}
 
 /**
  * 节点图状态管理
@@ -101,13 +118,36 @@ interface NodeGraphState {
 // === 节点工厂 ===
 
 let nodeCounter = 0;
+
+/**
+ * P2 修复：根据图中已有节点/边 ID 更新 nodeCounter，
+ * 防止 loadGraph/importGraph 后新 ID 与已导入的 ID 碰撞。
+ * 从已有 ID 中提取最大 counter 值并加 1。
+ */
+function syncCounterFromGraph(graph: NodeGraph): void {
+  let maxCounter = 0;
+  const allIds = [...graph.nodes.map((n) => n.id), ...graph.edges.map((e) => e.id)];
+  for (const id of allIds) {
+    const parts = id.split('_');
+    const last = parts[parts.length - 1];
+    // genId 产生 base36 counter 作为最后一段
+    const parsed = parseInt(last, 36);
+    if (!Number.isNaN(parsed) && parsed > maxCounter) {
+      maxCounter = parsed;
+    }
+  }
+  if (maxCounter >= nodeCounter) {
+    nodeCounter = maxCounter + 1;
+  }
+}
+
 function genId(prefix: string): string {
   nodeCounter += 1;
   return `${prefix}_${Date.now().toString(36)}_${nodeCounter.toString(36)}`;
 }
 
 /** 根据节点类型创建默认 data */
-function createDefaultNodeData(kind: NodeKind, modId: string): NodeData {
+function createDefaultNodeData(kind: NodeKind, _modId: string): NodeData {
   const base = {
     nodeId: '',
     label: '',
@@ -115,6 +155,8 @@ function createDefaultNodeData(kind: NodeKind, modId: string): NodeData {
     disabled: false,
     collapsed: false,
     codeLocked: false,
+    // P1-1：新建节点使用最新 formatVersion，反序列化旧 JSON 时由 migrateGraph 升级
+    formatVersion: LATEST_FORMAT_VERSION,
   };
 
   switch (kind) {
@@ -264,6 +306,14 @@ function createDefaultNodeData(kind: NodeKind, modId: string): NodeData {
         loopVarName: 'i',
         loopVarType: 'int',
       } as NodeData;
+    case 'procedure':
+      // P1-3：过程节点（对标 MCreator procedure），命名可复用逻辑单元
+      return {
+        ...base,
+        kind: 'procedure',
+        procedureName: 'myProcedure',
+        displayName: '新过程',
+      } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);
   }
@@ -350,8 +400,17 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
 
   addNode: (kind, position, partial) => {
     const nodeId = genId(kind);
+    const defaultData = createDefaultNodeData(kind, get().graph.modId);
+    // P1-4 dogfood：procedure 节点 procedureName 自增后缀，避免多个过程同名导致编译冲突
+    // Minor 修复：收集已存在的 procedureName，找到第一个不冲突的名称，
+    // 防止删除后重新添加时产生重名（如 myProcedure2 碰撞）。
+    const procedureOverride =
+      kind === 'procedure'
+        ? { procedureName: uniqueProcedureName(get().graph.nodes, 'myProcedure') }
+        : {};
     const data = {
-      ...createDefaultNodeData(kind, get().graph.modId),
+      ...defaultData,
+      ...procedureOverride,
       ...partial,
       nodeId,
     } as NodeData;
@@ -374,9 +433,16 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
     set((state) => ({
       graph: {
         ...state.graph,
-        nodes: state.graph.nodes.map((n) =>
-          n.id === nodeId ? { ...n, data: { ...n.data, ...patch } as NodeData } : n,
-        ),
+        nodes: state.graph.nodes.map((n) => {
+          if (n.id !== nodeId) return n;
+          const newData = { ...n.data, ...patch } as NodeData;
+          // P0-2 dogfood 修复：data 变更后同步 ports（确保端口定义与 data 一致）
+          // Major 修复：subgraph/custom 节点的端口来自 portMappings/registry schema，
+          // 不依赖可编辑的 data 字段；且 getPorts 对 subgraph 需要 graph 参数，
+          // 缺失时返回 []，会导致端口清空、连线断裂。跳过端口重生成保留现有端口。
+          const newPorts = newData.kind === 'subgraph' ? n.ports : getPorts(newData, state.graph);
+          return { ...n, data: newData, ports: newPorts };
+        }),
       },
     }));
   },
@@ -402,6 +468,15 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
       nodeId: newId,
       label: `${original.data.label} 副本`,
     } as NodeData;
+    // Major 修复：复制 procedure 节点时重命名 procedureName，
+    // 避免与原件重名导致编译出同名 Java 方法（addNode 已去重，此处补上）。
+    // NodeData 是联合类型，仅 procedure 成员含 procedureName，需类型断言。
+    if (original.data.kind === 'procedure') {
+      (newData as { procedureName: string }).procedureName = uniqueProcedureName(
+        state.graph.nodes,
+        (original.data as { procedureName: string }).procedureName,
+      );
+    }
     const newNode: ModNode = {
       ...original,
       id: newId,
@@ -425,7 +500,18 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
     }));
   },
 
-  selectNode: (nodeId) => set({ selectedNodeId: nodeId, selectedEdgeId: null }),
+  selectNode: (nodeId) =>
+    set((state) => ({
+      selectedNodeId: nodeId,
+      selectedEdgeId: null,
+      graph: {
+        ...state.graph,
+        nodes: state.graph.nodes.map((n) => {
+          if (n.id === nodeId) return n.selected ? n : { ...n, selected: true };
+          return n.selected ? { ...n, selected: false } : n;
+        }),
+      },
+    })),
 
   toggleCollapse: (nodeId) => {
     set((state) => ({
@@ -519,6 +605,8 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
       redoStack: [...state.redoStack, state.graph],
       selectedNodeId: null,
       selectedEdgeId: null,
+      // P1-5 dogfood 修复：undo 后清除旧编译结果，避免错误高亮指向已不存在的节点
+      compileResult: null,
     });
   },
 
@@ -532,6 +620,8 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
       undoStack: [...state.undoStack, state.graph],
       selectedNodeId: null,
       selectedEdgeId: null,
+      // P1-5 dogfood 修复：redo 后清除旧编译结果
+      compileResult: null,
     });
   },
 
@@ -542,16 +632,24 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
       selectedEdgeId: null,
       undoStack: [],
       redoStack: [],
+      // L-2 修复：清空后同时清除旧编译结果与子图编辑态，避免高亮/子图面板指向旧图
+      compileResult: null,
+      editingSubgraphId: null,
     }));
   },
 
   loadGraph: (graph) => {
+    // P2 修复：导入后同步 counter，避免后续 genId 碰撞
+    syncCounterFromGraph(graph);
     set({
       graph,
       selectedNodeId: null,
       selectedEdgeId: null,
       undoStack: [],
       redoStack: [],
+      // L-2 修复：载入新图后清除旧编译结果与子图编辑态
+      compileResult: null,
+      editingSubgraphId: null,
     });
   },
 
@@ -565,6 +663,8 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
     if (!result.ok) {
       return { ok: false, error: result.error };
     }
+    // P2 修复：导入后同步 counter，避免后续 genId 碰撞
+    syncCounterFromGraph(result.graph);
     // 导入前保存撤销点，便于 Ctrl+Z 回滚到导入前的状态
     set((state) => ({
       undoStack: [...state.undoStack.slice(-49), state.graph],
@@ -575,6 +675,8 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
       selectedNodeId: null,
       selectedEdgeId: null,
       compileResult: null,
+      // L-2 修复：导入新图后重置子图编辑态
+      editingSubgraphId: null,
     });
     return { ok: true };
   },
@@ -593,29 +695,56 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
     const internalEdges = graph.edges.filter(
       (e) => selectedIdSet.has(e.source) && selectedIdSet.has(e.target),
     );
-    // 外部连线 → portMappings
+
+    // 外部连线 → portMappings + 重连边
+    // P0 dogfood 修复：外部边不再直接删除，而是重连到新建的子图节点的对应端口
     const portMappings: SubgraphDefinition['portMappings'] = [];
+    const reconnectedEdges: ModEdge[] = [];
     let inPortIdx = 0;
     let outPortIdx = 0;
     for (const edge of graph.edges) {
       if (selectedIdSet.has(edge.source) && !selectedIdSet.has(edge.target)) {
-        // 内 → 外：输出端口
+        // 内 → 外：创建输出端口映射 + 重连边（子图节点 out → 原外部 target）
+        const externalPortId = `out_${outPortIdx}`;
         portMappings.push({
           internalPortId: `${edge.source}:${edge.sourceHandle ?? 'out'}`,
-          externalPortId: `out_${outPortIdx++}`,
-          label: `输出${outPortIdx}`,
+          externalPortId,
+          label: `输出${outPortIdx + 1}`,
           direction: 'out' as const,
           type: 'any',
         });
+        reconnectedEdges.push({
+          id: genId('edge'),
+          source: '__SG_NODE_ID__', // 占位，后面替换为 sgNodeId
+          target: edge.target,
+          sourceHandle: externalPortId,
+          targetHandle: edge.targetHandle,
+          kind: edge.kind,
+          label: edge.label,
+          disabled: edge.disabled,
+        });
+        outPortIdx++;
       } else if (!selectedIdSet.has(edge.source) && selectedIdSet.has(edge.target)) {
-        // 外 → 内：输入端口
+        // 外 → 内：创建输入端口映射 + 重连边（原外部 source → 子图节点 in）
+        const externalPortId = `in_${inPortIdx}`;
         portMappings.push({
           internalPortId: `${edge.target}:${edge.targetHandle ?? 'in'}`,
-          externalPortId: `in_${inPortIdx++}`,
-          label: `输入${inPortIdx}`,
+          externalPortId,
+          label: `输入${inPortIdx + 1}`,
           direction: 'in' as const,
           type: 'any',
         });
+        reconnectedEdges.push({
+          id: genId('edge'),
+          source: edge.source,
+          target: '__SG_NODE_ID__', // 占位，后面替换为 sgNodeId
+          sourceHandle: edge.sourceHandle,
+          targetHandle: externalPortId,
+          kind: edge.kind,
+          label: edge.label,
+          disabled: edge.disabled,
+        });
+        inPortIdx++;
       }
     }
 
@@ -632,6 +761,13 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
     const cx = selectedNodes.reduce((s, n) => s + n.position.x, 0) / selectedNodes.length;
     const cy = selectedNodes.reduce((s, n) => s + n.position.y, 0) / selectedNodes.length;
     const sgNodeId = genId('subgraph');
+
+    // 替换重连边中的占位节点 id 为实际的 sgNodeId
+    for (const e of reconnectedEdges) {
+      if (e.source === '__SG_NODE_ID__') e.source = sgNodeId;
+      if (e.target === '__SG_NODE_ID__') e.target = sgNodeId;
+    }
+
     const sgNode: ModNode = {
       id: sgNodeId,
       type: 'subgraph',
@@ -643,6 +779,8 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
         disabled: false,
         collapsed: false,
         codeLocked: false,
+        // P1-1：新建子图节点使用最新 formatVersion
+        formatVersion: LATEST_FORMAT_VERSION,
         kind: 'subgraph',
         subgraphId: sgId,
         subgraphName: name,
@@ -660,14 +798,16 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
       selected: true,
     };
 
-    // 从主图移除选中节点 + 相关连线，添加 SubgraphNode，注册子图
+    // 从主图移除选中节点 + 相关连线，添加 SubgraphNode + 重连边，注册子图
+    // 纯外部边（source 和 target 都不在选中集合）保留
+    const pureExternalEdges = graph.edges.filter(
+      (e) => !selectedIdSet.has(e.source) && !selectedIdSet.has(e.target),
+    );
     set((s) => ({
       graph: {
         ...s.graph,
         nodes: [...s.graph.nodes.filter((n) => !selectedIdSet.has(n.id)), sgNode],
-        edges: s.graph.edges.filter(
-          (e) => !(selectedIdSet.has(e.source) || selectedIdSet.has(e.target)),
-        ),
+        edges: [...pureExternalEdges, ...reconnectedEdges],
         subgraphs: { ...s.graph.subgraphs, [sgId]: sgDef },
       },
       selectedNodeId: sgNodeId,
@@ -690,6 +830,8 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
       disabled: false,
       collapsed: false,
       codeLocked: false,
+      // P1-1：新建自定义节点使用最新 formatVersion
+      formatVersion: LATEST_FORMAT_VERSION,
       kind: 'subgraph' as const,
       subgraphId: '',
       subgraphName: schema.label,
@@ -714,7 +856,11 @@ export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
 
 // === 选择器便捷 hooks ===
 
-/** 获取当前选中节点 */
+/**
+ * 获取当前选中节点。
+ * P2 性能优化：使用 useShallow 减少因无关节点变化导致的重渲染，
+ * 仅当 selectedNodeId 或对应节点引用变化时才触发更新。
+ */
 export function useSelectedNode(): ModNode | null {
   return useNodeGraphStore((s) => {
     if (!s.selectedNodeId) return null;

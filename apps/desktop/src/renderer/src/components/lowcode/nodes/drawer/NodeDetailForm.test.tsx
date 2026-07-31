@@ -55,3 +55,91 @@ describe('NodeDetailForm', () => {
     expect(screen.getByText('烧制时间')).toBeTruthy();
   });
 });
+
+// ============================================================
+// P0-1 codeLock UI：抽屉集成测试
+// ============================================================
+describe('NodeDetailForm codeLock 集成', () => {
+  it('item 节点抽屉显示「锁定代码」字段', () => {
+    useNodeGraphStore.getState().clear();
+    const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
+    useDrawerStore.getState().openDrawer(id);
+
+    render(<NodeDetailForm />);
+
+    expect(screen.getByText('锁定代码')).toBeTruthy();
+  });
+
+  it('comment 节点抽屉不显示「锁定代码」字段（excludeKinds 过滤）', () => {
+    useNodeGraphStore.getState().clear();
+    const id = useNodeGraphStore.getState().addNode('comment', { x: 0, y: 0 });
+    useDrawerStore.getState().openDrawer(id);
+
+    render(<NodeDetailForm />);
+
+    expect(screen.queryByText('锁定代码')).toBeNull();
+    expect(screen.queryByText('锁定代码内容')).toBeNull();
+  });
+
+  it('codeLocked=false 时不显示 lockedCode 编辑器', () => {
+    useNodeGraphStore.getState().clear();
+    const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
+    useDrawerStore.getState().openDrawer(id);
+
+    render(<NodeDetailForm />);
+
+    // 默认 codeLocked=false，lockedCode 字段应不显示
+    expect(screen.queryByText('锁定代码内容')).toBeNull();
+    expect(screen.queryByLabelText('锁定代码内容')).toBeNull();
+  });
+
+  it('点击「锁定代码」切换到 true 后显示 lockedCode 编辑器', () => {
+    useNodeGraphStore.getState().clear();
+    const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
+    useDrawerStore.getState().openDrawer(id);
+
+    const { rerender } = render(<NodeDetailForm />);
+
+    // 切换 codeLocked 到 true（用 aria-label 精确定位，避免与 glow 的 'true' 冲突）
+    fireEvent.click(screen.getByLabelText('锁定代码: true'));
+
+    rerender(<NodeDetailForm />);
+
+    // lockedCode 字段应显示，textarea 应可访问
+    expect(screen.getByText('锁定代码内容')).toBeTruthy();
+    expect(screen.getByLabelText('锁定代码内容')).toBeTruthy();
+  });
+
+  it('切换 codeLocked 后 draft.codeLocked 为 boolean true（非字符串）', () => {
+    useNodeGraphStore.getState().clear();
+    const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
+    useDrawerStore.getState().openDrawer(id);
+
+    render(<NodeDetailForm />);
+
+    fireEvent.click(screen.getByLabelText('锁定代码: true'));
+
+    const draft = useDrawerStore.getState().draft as ItemNodeData;
+    expect(draft.codeLocked).toBe(true);
+    expect(typeof draft.codeLocked).toBe('boolean');
+  });
+
+  it('编辑 lockedCode 文本框更新 draft.lockedCode', () => {
+    useNodeGraphStore.getState().clear();
+    const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
+    useDrawerStore.getState().openDrawer(id);
+
+    const { rerender } = render(<NodeDetailForm />);
+
+    // 先切换 codeLocked 到 true
+    fireEvent.click(screen.getByLabelText('锁定代码: true'));
+    rerender(<NodeDetailForm />);
+
+    // 编辑 lockedCode textarea
+    const textarea = screen.getByLabelText('锁定代码内容') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'public static final int X = 1;' } });
+
+    const draft = useDrawerStore.getState().draft as ItemNodeData;
+    expect(draft.lockedCode).toBe('public static final int X = 1;');
+  });
+});
