@@ -68,6 +68,7 @@ const SYSTEM_PROMPT = `你是 MC Creator 的 AI 编程助手，运行在一个 M
   - new_structure: 新结构 → jigsaw/random_spread/concentric_rings + 模板池 + 生物群系 + 语言文件
   - new_biome: 新生物群系 → 降水/温度/颜色 + 语言文件
 - **generate_datapack**：传入 DatapackSpec JSON，一次性生成完整数据包
+- **generate_mod**：传入 ModSpec JSON，一次性生成完整 Mod（Fabric/NeoForge，Java 源码 + 注册 + 事件 + 配方 + 资源）
 - 读取、创建、编辑、删除项目文件
 - 搜索代码和文件，获取项目上下文
 - 执行构建命令，验证生成结果

@@ -574,6 +574,103 @@ const generateDatapackTool: ToolDefinition = {
 };
 
 /**
+ * 生成 Mod 内容：接收 ModSpec JSON，运行 ModGenerator（Fabric/NeoForge），产出所有 Mod 源文件到 store
+ */
+const generateModTool: ToolDefinition = {
+  name: 'generate_mod',
+  description:
+    '生成 Mod 内容：传入 ModSpec JSON，自动运行 ModGenerator 产出所有文件（Java 源码 + fabric.mod.json/mods.toml + 资源文件）到项目文件列表。支持 Fabric/NeoForge loader。这是生成 Mod 最高效的方式。',
+  parameters: [
+    {
+      name: 'spec_json',
+      type: 'string',
+      description:
+        'ModSpec JSON 字符串，包含 modId/version/name/description/items/blocks/recipes/entities/machines/multiblocks/eventHandlers/conditions/actions/procedures/customCode 等字段',
+      required: true,
+    },
+    {
+      name: 'loader',
+      type: 'string',
+      description: '加载器：fabric（默认）或 neoforge',
+      required: false,
+    },
+  ],
+  category: 'write',
+  requiresApproval: true,
+  execute: async (args) => {
+    const specJson = String(args.spec_json);
+    const loader = String(args.loader ?? 'fabric');
+    let specObj: Record<string, unknown>;
+    try {
+      specObj = JSON.parse(specJson);
+    } catch (e) {
+      return `错误：spec_json 不是有效的 JSON: ${(e as Error).message}`;
+    }
+
+    try {
+      const { ModGenerator } = await import('@mc-creator/core');
+      const { ModSpec: ModSpecSchema } = await import('@mc-creator/shared');
+
+      // 用 Zod 校验+填充默认值
+      const parsed = ModSpecSchema.safeParse(specObj);
+      if (!parsed.success) {
+        return `错误：ModSpec 校验失败:\n${parsed.error.issues.map((issue) => `  ${issue.path.join('.')}: ${issue.message}`).join('\n')}`;
+      }
+
+      const gen = new ModGenerator();
+      const ctx = {
+        loader,
+        mcVersion: '1.21.11',
+        modId: parsed.data.modId,
+        spec: parsed.data,
+        projectPath: '',
+      } as never;
+
+      const result = await gen.generate(ctx);
+
+      // 将生成的文件写入 store
+      const storeState = useModStore.getState();
+      const existingPaths = new Set(storeState.files.map((f) => f.path));
+      for (const file of result.files) {
+        if (existingPaths.has(file.path)) {
+          storeState.updateFileContent(file.path, file.content);
+        } else {
+          storeState.createFile(file.path, file.content);
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      storeState.setSpec(parsed.data as any);
+
+      const summary = [
+        `✅ Mod 生成成功！`,
+        `modId: ${parsed.data.modId} | loader: ${loader}`,
+        `生成文件: ${result.files.length} 个`,
+        ...Object.entries({
+          items: parsed.data.items.length,
+          blocks: parsed.data.blocks.length,
+          recipes: parsed.data.recipes.length,
+          entities: parsed.data.entities.length,
+          machines: parsed.data.machines.length,
+          multiblocks: parsed.data.multiblocks.length,
+          eventHandlers: parsed.data.eventHandlers.length,
+          procedures: parsed.data.procedures.length,
+          customCode: parsed.data.customCode.length,
+        })
+          .filter(([, count]) => count > 0)
+          .map(([key, count]) => `  ${key}: ${count}`),
+      ];
+      if (result.warnings.length > 0) {
+        summary.push(`警告: ${result.warnings.join(', ')}`);
+      }
+      return summary.join('\n');
+    } catch (e) {
+      return `错误：生成 Mod 失败: ${(e as Error).message}`;
+    }
+  },
+};
+
+/**
  * 获取项目上下文（spec + 文件结构概览）
  */
 const getProjectContextTool: ToolDefinition = {
@@ -668,6 +765,7 @@ export const agentTools: ToolDefinition[] = [
   runCommandTool,
   applyContentTemplateTool,
   generateDatapackTool,
+  generateModTool,
   getProjectContextTool,
 ];
 

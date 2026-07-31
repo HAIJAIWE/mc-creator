@@ -50,18 +50,19 @@ function resetStore() {
 }
 
 describe('agent-tools 注册表', () => {
-  it('注册 10 个工具', () => {
-    expect(agentTools).toHaveLength(10);
+  it('注册 11 个工具', () => {
+    expect(agentTools).toHaveLength(11);
   });
 
   it('findTool 按名查找', () => {
     expect(findTool('read_file')?.name).toBe('read_file');
+    expect(findTool('generate_mod')?.name).toBe('generate_mod');
     expect(findTool('no_such')).toBeUndefined();
   });
 
   it('toolsToFunctionDefinitions 生成 OpenAI 兼容定义', () => {
     const defs = toolsToFunctionDefinitions();
-    expect(defs.length).toBe(10);
+    expect(defs.length).toBe(11);
     const readFile = defs.find((d) => d.function.name === 'read_file')!;
     expect(readFile.type).toBe('function');
     expect(readFile.function.parameters.type).toBe('object');
@@ -275,5 +276,58 @@ describe('run_command', () => {
     );
     const result = await tool.execute({ command: 'echo hi' });
     expect(result).toContain('终端不可用');
+  });
+});
+
+describe('generate_mod', () => {
+  beforeEach(resetStore);
+
+  it('生成 Fabric Mod 文件并写入 store', async () => {
+    const tool = findTool('generate_mod')!;
+    const specJson = JSON.stringify({
+      modId: 'ruby_tools',
+      version: '1.0.0',
+      name: 'Ruby Tools',
+      description: 'A test mod',
+      license: 'MIT',
+      authors: [],
+      credits: '',
+      website: '',
+      dependencies: [],
+      items: [
+        {
+          id: 'ruby',
+          name: 'Ruby',
+          maxStackSize: 64,
+          rarity: 'common',
+          maxDamage: 0,
+          fuelTick: 0,
+          lore: '',
+        },
+      ],
+      blocks: [],
+    });
+    const result = await tool.execute({ spec_json: specJson, loader: 'fabric' });
+    expect(result).toContain('Mod 生成成功');
+    expect(result).toContain('ruby_tools');
+    expect(result).toContain('items: 1');
+    // 文件写入 store
+    const files = useModStore.getState().files;
+    expect(files.some((f) => f.path.endsWith('ModItems.java'))).toBe(true);
+    expect(files.some((f) => f.path === 'src/main/resources/fabric.mod.json')).toBe(true);
+  });
+
+  it('无效 JSON 返回错误', async () => {
+    const tool = findTool('generate_mod')!;
+    const result = await tool.execute({ spec_json: 'not json' });
+    expect(result).toContain('不是有效的 JSON');
+  });
+
+  it('ModSpec 校验失败返回错误明细', async () => {
+    const tool = findTool('generate_mod')!;
+    const result = await tool.execute({
+      spec_json: JSON.stringify({ modId: 'bad id!', version: '1.0.0', name: '', description: '' }),
+    });
+    expect(result).toContain('ModSpec 校验失败');
   });
 });
