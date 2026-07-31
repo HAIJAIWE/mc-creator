@@ -312,6 +312,67 @@ describe('DatapackGenerator', () => {
     expect(parsed.precipitation).toBe('rain');
     expect(parsed.temperature).toBe(0.7);
     expect(parsed.effects.sky_color).toBe(0x78a7ff);
+    // 1.21+：输出 surface_rule（替代废弃的 surface_builder），不再输出 surface_builder
+    expect(parsed.surface_rule).toEqual({ type: 'minecraft:grass' });
+    expect(parsed.surface_builder).toBeUndefined();
+  });
+
+  it('surfaceRule 对象直通输出（优先级高于 surfaceBuilder 推断）', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        biomes: [
+          {
+            id: 'custom_surface',
+            precipitation: 'rain',
+            temperature: 0.7,
+            temperatureModifier: 'none',
+            downfall: 0.4,
+            skyColor: 0x78a7ff,
+            waterColor: 0x3f76e4,
+            waterFogColor: 0x050533,
+            fogColor: 0xc0d8ff,
+            surfaceBuilder: 'minecraft:grass',
+            surfaceRule: { type: 'minecraft:stone' },
+          },
+        ],
+      }),
+    );
+    const biome = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/biome/custom_surface.json',
+    );
+    expect(biome).toBeDefined();
+    const parsed = JSON.parse(biome!.content);
+    expect(parsed.surface_rule).toEqual({ type: 'minecraft:stone' });
+    expect(parsed.surface_builder).toBeUndefined();
+  });
+
+  it('surfaceRule 为 JSON 字符串对象时按原样解析', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        biomes: [
+          {
+            id: 'json_surface',
+            precipitation: 'none',
+            temperature: 0.7,
+            temperatureModifier: 'none',
+            downfall: 0.4,
+            skyColor: 0x78a7ff,
+            waterColor: 0x3f76e4,
+            waterFogColor: 0x050533,
+            fogColor: 0xc0d8ff,
+            surfaceBuilder: '{"type":"minecraft:the_end"}',
+          },
+        ],
+      }),
+    );
+    const biome = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/biome/json_surface.json',
+    );
+    expect(biome).toBeDefined();
+    const parsed = JSON.parse(biome!.content);
+    expect(parsed.surface_rule).toEqual({ type: 'minecraft:the_end' });
   });
 
   it('生成 noise 维度', async () => {

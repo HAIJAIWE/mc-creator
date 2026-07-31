@@ -166,8 +166,10 @@ export const BiomeSpec = z.object({
   foliageColor: z.number().int().optional(),
   /** 雾颜色 */
   fogColor: z.number().int().default(12638463),
-  /** 表面建筑者类型 */
+  /** 表面建筑者类型（1.21+ 已废弃，仅用于推断 surface_rule） */
   surfaceBuilder: z.string().default('minecraft:grass'),
+  /** 完整 surface_rule JSON（1.21+ 生效，优先级高于 surfaceBuilder 推断） */
+  surfaceRule: z.record(z.unknown()).optional(),
 });
 
 /** 噪声设置（世界生成参数） */

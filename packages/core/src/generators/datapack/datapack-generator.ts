@@ -48,6 +48,30 @@ function safeJsonParse(json: string, fallback: unknown): unknown {
 }
 
 /**
+ * 解析 surface_rule 输出（1.21+ 生效，替代废弃的 surface_builder）：
+ * - surfaceRule 为对象时直接使用（完整 surface_rule JSON，优先级最高）
+ * - 否则按 surfaceBuilder 字符串映射常见类型（minecraft:grass / minecraft:stone）
+ * - 字符串为 JSON 对象文本时按原样解析
+ * - 无法解析时返回 null（不输出 surface_rule 字段）
+ */
+function resolveSurfaceRule(
+  surfaceRule: Record<string, unknown> | undefined,
+  surfaceBuilder: string,
+): Record<string, unknown> | null {
+  if (surfaceRule && Object.keys(surfaceRule).length > 0) return surfaceRule;
+  const trimmed = (surfaceBuilder ?? '').trim();
+  if (trimmed === 'minecraft:grass') return { type: 'minecraft:grass' };
+  if (trimmed === 'minecraft:stone') return { type: 'minecraft:stone' };
+  if (trimmed.startsWith('{')) {
+    const parsed = safeJsonParse(trimmed, null);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  }
+  return null;
+}
+
+/**
  * MC 1.20.5+ 配方成分（Ingredient）格式：`{ item: "minecraft:x" }` 或 `{ tag: "minecraft:x" }`。
  * 输入字符串以 `#` 开头表示标签引用，否则为物品 ID（G-3 修复：旧格式 `{ id: ... }` 无法加载）。
  */
@@ -512,14 +536,10 @@ export class DatapackGenerator implements Generator {
       downfall: b.downfall,
       effects: effectsObj,
     };
-    // P2 dogfood：1.18+ 废弃 surface_builder，改用 surface_rule
-    // 旧格式 { type: b.surfaceBuilder } 不正确且 Minecraft 1.21+ 忽略此字段
-    // TODO: 添加 surface_rule 支持（需要 DensityFunction schema）
-    // 仅在解析成功时写入字段；无效 JSON 时不设置（避免生成已知无效的旧格式）
-    if (b.surfaceBuilder) {
-      const parsed = safeJsonParse(b.surfaceBuilder, null);
-      if (parsed) obj.surface_builder = parsed;
-    }
+    // P2 dogfood：1.18+ 废弃 surface_builder，1.21+ 忽略该字段，改用 surface_rule。
+    // 取值优先级：spec.surfaceRule（完整 JSON 对象）> surfaceBuilder 字符串映射 > 无字段。
+    const surfaceRule = resolveSurfaceRule(b.surfaceRule, b.surfaceBuilder);
+    if (surfaceRule) obj.surface_rule = surfaceRule;
     return {
       path: `data/${namespace}/worldgen/biome/${sanitizePathSegment(b.id)}.json`,
       content: JSON.stringify(obj, null, 2),
