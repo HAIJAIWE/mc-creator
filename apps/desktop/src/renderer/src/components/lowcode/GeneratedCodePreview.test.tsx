@@ -96,6 +96,7 @@ const SIMPLE_GRAPH: NodeGraph = {
         disabled: false,
         collapsed: false,
         codeLocked: false,
+        formatVersion: 1,
         itemId: 'test_item',
         displayName: '测试物品',
         category: 'misc',
@@ -136,6 +137,7 @@ const DEMO_SPEC: ModSpec = {
   eventHandlers: [],
   conditions: [],
   actions: [],
+  procedures: [],
 };
 
 const DEMO_FILES: FileNode[] = [
