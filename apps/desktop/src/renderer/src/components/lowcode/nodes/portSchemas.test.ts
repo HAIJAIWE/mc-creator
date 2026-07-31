@@ -55,6 +55,12 @@ function makeData(kind: NodeData['kind']): NodeData {
         cookTime: 200,
         experience: 0,
         pattern: [],
+        template: 'minecraft:netherite_upgrade_smithing_template',
+        base: '',
+        addition: '',
+        inputPotion: 'minecraft:water',
+        ingredientItem: '',
+        outputPotion: '',
       } as NodeData;
     case 'condition':
       return {

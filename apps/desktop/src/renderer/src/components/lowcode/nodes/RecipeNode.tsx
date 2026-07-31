@@ -11,7 +11,11 @@ const RECIPE_TYPE_LABELS: Record<RecipeNodeData['recipeType'], string> = {
   smelting: '熔炼',
   blasting: '高炉',
   smoking: '烟熏',
+  campfire_cooking: '营火',
   stonecutting: '切石',
+  smithing_transform: '锻造升级',
+  smithing_trim: '锻造纹饰',
+  brewing: '酿造',
 };
 
 /**

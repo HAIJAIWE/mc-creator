@@ -99,7 +99,11 @@ const RECIPE_FIELDS: FieldSchema[] = [
       'smelting',
       'blasting',
       'smoking',
+      'campfire_cooking',
       'stonecutting',
+      'smithing_transform',
+      'smithing_trim',
+      'brewing',
     ],
   },
   { key: 'outputCount', label: '产出数量', type: 'number', min: 1, max: 64, step: 1 },
@@ -119,7 +123,45 @@ const RECIPE_FIELDS: FieldSchema[] = [
     min: 0,
     max: 99,
     step: 0.1,
-    condition: { field: 'recipeType', in: ['smelting', 'blasting', 'smoking'] },
+    condition: { field: 'recipeType', in: ['smelting', 'blasting', 'smoking', 'campfire_cooking'] },
+  },
+  // P41：smithing_transform / smithing_trim 特有字段
+  {
+    key: 'template',
+    label: '升级模板',
+    type: 'resourceId',
+    condition: { field: 'recipeType', in: ['smithing_transform', 'smithing_trim'] },
+  },
+  {
+    key: 'base',
+    label: '合成基座',
+    type: 'resourceId',
+    condition: { field: 'recipeType', in: ['smithing_transform', 'smithing_trim'] },
+  },
+  {
+    key: 'addition',
+    label: '附加物品',
+    type: 'resourceId',
+    condition: { field: 'recipeType', in: ['smithing_transform', 'smithing_trim'] },
+  },
+  // P41：brewing 特有字段
+  {
+    key: 'inputPotion',
+    label: '输入药水',
+    type: 'resourceId',
+    condition: { field: 'recipeType', equals: 'brewing' },
+  },
+  {
+    key: 'ingredientItem',
+    label: '酿造材料',
+    type: 'resourceId',
+    condition: { field: 'recipeType', equals: 'brewing' },
+  },
+  {
+    key: 'outputPotion',
+    label: '输出药水',
+    type: 'resourceId',
+    condition: { field: 'recipeType', equals: 'brewing' },
   },
 ];
 

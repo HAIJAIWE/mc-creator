@@ -223,7 +223,11 @@ export const RecipeNodeData = BaseNodeData.extend({
       'smelting',
       'blasting',
       'smoking',
+      'campfire_cooking',
       'stonecutting',
+      'smithing_transform',
+      'smithing_trim',
+      'brewing',
     ])
     .default('crafting_shaped'),
   /** 产出物品数量 */
@@ -234,6 +238,18 @@ export const RecipeNodeData = BaseNodeData.extend({
   experience: z.number().min(0).default(0),
   /** 形状配方模式（仅 shaped 用） */
   pattern: z.array(z.string()).max(3).default([]),
+  /** P41：smithing_transform 的升级模板物品 ID */
+  template: z.string().default('minecraft:netherite_upgrade_smithing_template'),
+  /** P41：smithing_transform 的合成基座物品 ID */
+  base: z.string().default(''),
+  /** P41：smithing_transform 的附加物品 ID */
+  addition: z.string().default(''),
+  /** P41：brewing 的输入药水 ID */
+  inputPotion: z.string().default('minecraft:water'),
+  /** P41：brewing 的酿造材料物品 ID */
+  ingredientItem: z.string().default(''),
+  /** P41：brewing 的输出药水 ID */
+  outputPotion: z.string().default(''),
 });
 export type RecipeNodeData = z.infer<typeof RecipeNodeData>;
 

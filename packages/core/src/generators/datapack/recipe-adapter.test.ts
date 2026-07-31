@@ -222,6 +222,113 @@ describe('modRecipeToDatapackRecipe', () => {
     expect(result.ingredients).toBeUndefined();
   });
 
+  // ===== P41：新增 4 种配方类型 =====
+
+  it('P41: campfire_cooking 第一个 input → ingredient', () => {
+    const result = modRecipeToDatapackRecipe(
+      ModRecipeSpec.parse({
+        recipeId: 'camp_beef',
+        recipeType: 'campfire_cooking',
+        inputs: [{ item: 'minecraft:beef', count: 1, slot: '' }],
+        output: 'minecraft:cooked_beef',
+        outputCount: 1,
+        cookTime: 600,
+        experience: 0.35,
+        pattern: [],
+      }),
+    );
+    expect(result.type).toBe('campfire_cooking');
+    expect(result.ingredient).toBe('minecraft:beef');
+    expect(result.cookingTime).toBe(600);
+    expect(result.experience).toBe(0.35);
+  });
+
+  it('P41: smithing_transform 前三个 input → template/base/addition，缺省回退字段', () => {
+    const result = modRecipeToDatapackRecipe(
+      ModRecipeSpec.parse({
+        recipeId: 'smith_netherite',
+        recipeType: 'smithing_transform',
+        inputs: [
+          { item: 'minecraft:netherite_upgrade_smithing_template', count: 1, slot: '' },
+          { item: 'minecraft:diamond_sword', count: 1, slot: '' },
+          { item: 'minecraft:netherite_ingot', count: 1, slot: '' },
+        ],
+        output: 'minecraft:netherite_sword',
+        outputCount: 1,
+        cookTime: 200,
+        experience: 0,
+        pattern: [],
+      }),
+    );
+    expect(result.template).toBe('minecraft:netherite_upgrade_smithing_template');
+    expect(result.base).toBe('minecraft:diamond_sword');
+    expect(result.addition).toBe('minecraft:netherite_ingot');
+  });
+
+  it('P41: smithing_transform 空 inputs 时用 ModRecipeSpec 默认字段', () => {
+    const result = modRecipeToDatapackRecipe(
+      ModRecipeSpec.parse({
+        recipeId: 'smith_default',
+        recipeType: 'smithing_transform',
+        inputs: [],
+        output: 'minecraft:netherite_sword',
+        outputCount: 1,
+        cookTime: 200,
+        experience: 0,
+        pattern: [],
+        template: 'minecraft:netherite_upgrade_smithing_template',
+        base: 'minecraft:diamond_sword',
+        addition: 'minecraft:netherite_ingot',
+      }),
+    );
+    expect(result.template).toBe('minecraft:netherite_upgrade_smithing_template');
+    expect(result.base).toBe('minecraft:diamond_sword');
+    expect(result.addition).toBe('minecraft:netherite_ingot');
+  });
+
+  it('P41: smithing_trim 同样映射 template/base/addition', () => {
+    const result = modRecipeToDatapackRecipe(
+      ModRecipeSpec.parse({
+        recipeId: 'trim_armor',
+        recipeType: 'smithing_trim',
+        inputs: [
+          { item: 'minecraft:coast_armor_trim_smithing_template', count: 1, slot: '' },
+          { item: 'minecraft:diamond_helmet', count: 1, slot: '' },
+          { item: 'minecraft:emerald', count: 1, slot: '' },
+        ],
+        output: 'minecraft:diamond_helmet',
+        outputCount: 1,
+        cookTime: 200,
+        experience: 0,
+        pattern: [],
+      }),
+    );
+    expect(result.template).toBe('minecraft:coast_armor_trim_smithing_template');
+    expect(result.base).toBe('minecraft:diamond_helmet');
+    expect(result.addition).toBe('minecraft:emerald');
+  });
+
+  it('P41: brewing inputs[0] → ingredientItem，药水字段直通', () => {
+    const result = modRecipeToDatapackRecipe(
+      ModRecipeSpec.parse({
+        recipeId: 'brew_awkward',
+        recipeType: 'brewing',
+        inputs: [{ item: 'minecraft:nether_wart', count: 1, slot: '' }],
+        output: 'minecraft:awkward_potion',
+        outputCount: 1,
+        cookTime: 200,
+        experience: 0,
+        pattern: [],
+        inputPotion: 'minecraft:water',
+        ingredientItem: 'minecraft:nether_wart',
+        outputPotion: 'minecraft:awkward_potion',
+      }),
+    );
+    expect(result.ingredientItem).toBe('minecraft:nether_wart');
+    expect(result.inputPotion).toBe('minecraft:water');
+    expect(result.outputPotion).toBe('minecraft:awkward_potion');
+  });
+
   // ===== 空 inputs 边界情况 =====
 
   it('空 inputs 时各 recipeType 不报错（生成最小有效结构）', () => {
@@ -369,6 +476,38 @@ describe('modRecipeToDatapackRecipe', () => {
           recipeId: 'v_stonecutting',
           recipeType: 'stonecutting',
           inputs: [{ item: 'minecraft:stone', count: 1, slot: '' }],
+          pattern: [],
+        },
+        {
+          recipeId: 'v_campfire',
+          recipeType: 'campfire_cooking',
+          inputs: [{ item: 'minecraft:beef', count: 1, slot: '' }],
+          pattern: [],
+        },
+        {
+          recipeId: 'v_smithing_transform',
+          recipeType: 'smithing_transform',
+          inputs: [
+            { item: 'minecraft:netherite_upgrade_smithing_template', count: 1, slot: '' },
+            { item: 'minecraft:diamond_sword', count: 1, slot: '' },
+            { item: 'minecraft:netherite_ingot', count: 1, slot: '' },
+          ],
+          pattern: [],
+        },
+        {
+          recipeId: 'v_smithing_trim',
+          recipeType: 'smithing_trim',
+          inputs: [
+            { item: 'minecraft:coast_armor_trim_smithing_template', count: 1, slot: '' },
+            { item: 'minecraft:diamond_helmet', count: 1, slot: '' },
+            { item: 'minecraft:emerald', count: 1, slot: '' },
+          ],
+          pattern: [],
+        },
+        {
+          recipeId: 'v_brewing',
+          recipeType: 'brewing',
+          inputs: [{ item: 'minecraft:nether_wart', count: 1, slot: '' }],
           pattern: [],
         },
       ];

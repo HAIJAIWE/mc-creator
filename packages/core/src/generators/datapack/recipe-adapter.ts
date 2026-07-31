@@ -71,11 +71,30 @@ export function modRecipeToDatapackRecipe(modRecipe: ModRecipeSpec): RecipeSpec 
     }
     case 'smelting':
     case 'blasting':
-    case 'smoking': {
+    case 'smoking':
+    case 'campfire_cooking': {
       // 取第一个 input.item → ingredient，其他 inputs 忽略
       // 空 inputs 时使用空字符串兜底（datapack-generator 会进一步处理）
       const first = modRecipe.inputs[0];
       base.ingredient = first?.item ?? '';
+      break;
+    }
+    case 'smithing_transform':
+    case 'smithing_trim': {
+      // smithing：inputs 取前三个作为 template/base/addition（顺序约定），
+      // 其余输入忽略；空 inputs 时用 ModRecipeSpec 默认字段兜底
+      const [t, b, a] = modRecipe.inputs.map((input) => input.item);
+      base.template = t ?? modRecipe.template;
+      base.base = b ?? modRecipe.base;
+      base.addition = a ?? modRecipe.addition;
+      break;
+    }
+    case 'brewing': {
+      // brewing：inputs[0] 是酿造材料，inputPotion/outputPotion 直接映射
+      const first = modRecipe.inputs[0];
+      base.ingredientItem = first?.item ?? modRecipe.ingredientItem;
+      base.inputPotion = modRecipe.inputPotion;
+      base.outputPotion = modRecipe.outputPotion;
       break;
     }
     case 'stonecutting': {

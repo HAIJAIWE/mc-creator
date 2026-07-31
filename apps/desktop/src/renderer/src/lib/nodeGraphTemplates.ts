@@ -114,6 +114,12 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         cookTime: 200,
         experience: 0,
         pattern: [],
+        template: 'minecraft:netherite_upgrade_smithing_template',
+        base: '',
+        addition: '',
+        inputPotion: 'minecraft:water',
+        ingredientItem: '',
+        outputPotion: '',
       } as NodeData;
     case 'machine':
       return {

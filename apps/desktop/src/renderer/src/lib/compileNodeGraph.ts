@@ -430,6 +430,13 @@ function compileRecipeNode(
     cookTime: data.cookTime,
     experience: data.experience,
     pattern: data.pattern,
+    // P41：smithing/brewing 扩展字段（RecipeNodeData 新字段，旧数据回退默认值）
+    template: data.template ?? 'minecraft:netherite_upgrade_smithing_template',
+    base: data.base ?? '',
+    addition: data.addition ?? '',
+    inputPotion: data.inputPotion ?? 'minecraft:water',
+    ingredientItem: data.ingredientItem ?? '',
+    outputPotion: data.outputPotion ?? '',
   };
 }
 

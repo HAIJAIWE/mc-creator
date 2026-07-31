@@ -291,7 +291,11 @@ export const ModRecipeSpec = z.object({
       'smelting',
       'blasting',
       'smoking',
+      'campfire_cooking',
       'stonecutting',
+      'smithing_transform',
+      'smithing_trim',
+      'brewing',
     ])
     .default('crafting_shaped'),
   /** 输入物品列表 */
@@ -300,12 +304,24 @@ export const ModRecipeSpec = z.object({
   output: z.string(),
   /** 输出数量 */
   outputCount: z.number().int().min(1).default(1),
-  /** 烧炼时间（tick，仅 smelting/blasting/smoking） */
+  /** 烧炼时间（tick，仅烧炼类） */
   cookTime: z.number().int().min(1).default(200),
   /** 经验值（仅烧炼类） */
   experience: z.number().min(0).default(0),
   /** shaped 配方的形状（如 ['AB', 'BA']，最多 3 行） */
   pattern: z.array(z.string()).max(3).default([]),
+  /** P41：smithing_transform 的升级模板物品 ID（如 minecraft:netherite_upgrade_smithing_template） */
+  template: z.string().default('minecraft:netherite_upgrade_smithing_template'),
+  /** P41：smithing_transform 的合成基座物品 ID（输出物品的原料） */
+  base: z.string().default(''),
+  /** P41：smithing_transform 的附加物品 ID */
+  addition: z.string().default(''),
+  /** P41：brewing 的输入药水 ID（如 minecraft:water） */
+  inputPotion: z.string().default('minecraft:water'),
+  /** P41：brewing 的酿造材料物品 ID */
+  ingredientItem: z.string().default(''),
+  /** P41：brewing 的输出药水 ID */
+  outputPotion: z.string().default(''),
 });
 
 /** 实体/生物条目（loader 无关） */
