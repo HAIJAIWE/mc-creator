@@ -240,20 +240,19 @@ export function AgentPanel() {
     }
   };
 
-  const placeholder =
-    generatorType === 'mod'
-      ? '描述你想要的 mod…'
-      : generatorType === 'datapack'
-        ? '描述你想要的数据包…'
-        : generatorType === 'modpack'
-          ? '描述你想要的整合包…'
-          : generatorType === 'server'
-            ? '描述你想要的服务器配置…'
-            : generatorType === 'resource_pack'
-              ? '描述你想要的资源包…'
-              : generatorType === 'skin'
-                ? '描述你想要的皮肤…'
-                : '描述你想要的启动器配置…';
+  const PLACEHOLDERS: Record<string, string> = {
+    mod: '描述你想要的 mod…',
+    datapack: '描述你想要的数据包…',
+    modpack: '描述你想要的整合包…',
+    server: '描述你想要的服务器配置…',
+    resource_pack: '描述你想要的资源包…',
+    skin: '描述你想要的皮肤…',
+    launcher: '描述你想要的启动器配置…',
+    kubejs: '描述你想要的 KubeJS 脚本…',
+    crafttweaker: '描述你想要的 CraftTweaker 脚本…',
+    behavior_pack: '描述你想要的行为包…',
+  };
+  const placeholder = PLACEHOLDERS[generatorType] ?? '描述你想要的内容…';
 
   return (
     <div className="relative flex h-full flex-col bg-mc-surface">

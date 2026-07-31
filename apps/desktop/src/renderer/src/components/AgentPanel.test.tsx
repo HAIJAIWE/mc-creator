@@ -98,6 +98,30 @@ describe('AgentPanel', () => {
     expect(screen.getByPlaceholderText('描述你想要的整合包…')).toBeTruthy();
   });
 
+  it('generatorType=launcher 时 placeholder 为「描述你想要的启动器配置…」', () => {
+    useModStore.setState({ generatorType: 'launcher' });
+    render(<AgentPanel />);
+    expect(screen.getByPlaceholderText('描述你想要的启动器配置…')).toBeTruthy();
+  });
+
+  it('generatorType=kubejs 时 placeholder 为「描述你想要的 KubeJS 脚本…」', () => {
+    useModStore.setState({ generatorType: 'kubejs' });
+    render(<AgentPanel />);
+    expect(screen.getByPlaceholderText('描述你想要的 KubeJS 脚本…')).toBeTruthy();
+  });
+
+  it('generatorType=crafttweaker 时 placeholder 为「描述你想要的 CraftTweaker 脚本…」', () => {
+    useModStore.setState({ generatorType: 'crafttweaker' });
+    render(<AgentPanel />);
+    expect(screen.getByPlaceholderText('描述你想要的 CraftTweaker 脚本…')).toBeTruthy();
+  });
+
+  it('generatorType=behavior_pack 时 placeholder 为「描述你想要的行为包…」', () => {
+    useModStore.setState({ generatorType: 'behavior_pack' });
+    render(<AgentPanel />);
+    expect(screen.getByPlaceholderText('描述你想要的行为包…')).toBeTruthy();
+  });
+
   it('描述为空时「生成 Spec」按钮被禁用', () => {
     render(<AgentPanel />);
     const generateBtn = screen.getByRole('button', { name: /生成 Spec/ }) as HTMLButtonElement;
