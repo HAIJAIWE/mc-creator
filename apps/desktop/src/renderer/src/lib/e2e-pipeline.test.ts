@@ -646,11 +646,12 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
       expect(eventsFile!.content).toContain('execute_a1(event);');
     });
 
-    it('ModEvents.java 包含 check_ 方法定义（条件检查，return true 占位）', () => {
+    it('ModEvents.java 包含 check_ 方法定义（条件检查，has_item 生成真实逻辑）', () => {
       expect(eventsFile!.content).toMatch(
         /private\s+static\s+boolean\s+check_c1\s*\(\s*Object\s+event\s*\)/,
       );
-      expect(eventsFile!.content).toContain('return true;');
+      expect(eventsFile!.content).toContain('countItem(');
+      expect(eventsFile!.content).not.toContain('// TODO: 实现 has_item 检查逻辑');
     });
 
     it('ModEvents.java 包含 execute_ 方法定义（TODO 占位）', () => {
@@ -758,6 +759,88 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
       expect(eventsFile).toBeDefined();
       expect(eventsFile!.content).toContain('handle_e1');
       expect(eventsFile!.content).toContain('// (无关联 condition 与 action)');
+    });
+  });
+
+  describe('场景 5：loop 循环体含 condition/procedure 节点', () => {
+    // 主图：一个 loop 节点（body 引用子图 loop_body_1）
+    const nodes = [
+      makeNode('l1', 'loop', {
+        loopType: 'for',
+        init: 'int i = 0',
+        condition: 'i < 10',
+        update: 'i++',
+        loopVarName: 'i',
+        loopVarType: 'int',
+        bodySubgraphId: 'loop_body_1',
+      }),
+    ];
+    // 子图：condition(has_item) → action(give_item) + procedure 节点
+    const sgNodes = [
+      makeNode('lc1', 'condition', {
+        conditionType: 'has_item',
+        conditionArgs: '{"item": "minecraft:stick"}',
+        invert: false,
+      }),
+      makeNode('la1', 'action', {
+        actionType: 'give_item',
+        actionArgs: '{"item": "minecraft:diamond", "count": 1}',
+      }),
+      makeNode('lp1', 'procedure', { procedureName: 'loopProc' }),
+    ];
+    const sgEdges = [
+      makeEdge('lca1', 'lc1', 'la1', {
+        sourceHandle: 'true',
+        targetHandle: 'in',
+        kind: 'control',
+      }),
+    ];
+    const graph = makeGraph(nodes, [], 'test_mod');
+    graph.subgraphs = {
+      loop_body_1: {
+        id: 'loop_body_1',
+        name: 'Loop Body',
+        nodes: sgNodes,
+        edges: sgEdges,
+        portMappings: [],
+      },
+    };
+    const compileResult = compileNodeGraph(graph);
+
+    it('spec.conditions 含循环体子图的条件节点 lc1', () => {
+      expect(compileResult.errors).toEqual([]);
+      expect(compileResult.spec.conditions.map((c) => c.conditionId)).toContain('lc1');
+    });
+
+    it('spec.procedures 含循环体子图的过程节点 lp1', () => {
+      expect(compileResult.spec.procedures.map((p) => p.procedureId)).toContain('lp1');
+      expect(
+        compileResult.spec.procedures.find((p) => p.procedureId === 'lp1')?.procedureName,
+      ).toBe('loopProc');
+    });
+
+    it('编译无「loop body ... not yet compiled」占位 warning', () => {
+      expect(compileResult.warnings.some((w) => w.includes('not yet compiled'))).toBe(false);
+    });
+
+    it('ModEvents.java 含 check_lc1 方法与 procedure_loopProc 方法定义', () => {
+      const eventsFile = generateFiles(compileResult.spec).find(
+        (f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java',
+      );
+      expect(eventsFile).toBeDefined();
+      expect(eventsFile!.content).toContain('check_lc1');
+      expect(eventsFile!.content).toContain('procedure_loopProc');
+    });
+
+    it('loop 生成的 Java 代码包含 if (check_lc1(event)) 与 execute_la1 调用', () => {
+      const codeFile = generateFiles(compileResult.spec).find(
+        (f) => f.path === 'src/main/java/com/example/test_mod/ModCustomCode.java',
+      );
+      expect(codeFile).toBeDefined();
+      expect(codeFile!.content).toContain('if (check_lc1(event))');
+      expect(codeFile!.content).toContain('execute_la1(event);');
+      expect(codeFile!.content).toContain('procedure_loopProc(event);');
+      expect(codeFile!.content).not.toContain('TODO: loop body');
     });
   });
 });
