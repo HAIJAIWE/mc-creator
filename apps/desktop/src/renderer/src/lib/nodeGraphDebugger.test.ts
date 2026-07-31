@@ -35,6 +35,7 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
     disabled: false,
     collapsed: false,
     codeLocked: false,
+    formatVersion: 1,
   };
   switch (kind) {
     case 'item':
@@ -182,6 +183,14 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         update: 'i++',
         loopVarName: 'i',
         loopVarType: 'int',
+      } as NodeData;
+    case 'procedure':
+      // P1-3：过程节点默认数据（测试辅助）
+      return {
+        ...base,
+        kind: 'procedure',
+        procedureName: 'myProcedure',
+        displayName: '新过程',
       } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);

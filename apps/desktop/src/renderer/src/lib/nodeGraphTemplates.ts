@@ -1,4 +1,5 @@
 import type { NodeGraph, ModNode, ModEdge, NodeData, NodeKind, NodePort } from '@mc-creator/shared';
+import { LATEST_FORMAT_VERSION } from '@mc-creator/shared';
 
 /**
  * 节点图模板
@@ -58,6 +59,8 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
     disabled: false,
     collapsed: false,
     codeLocked: false,
+    // P1-1：新建节点使用最新 formatVersion
+    formatVersion: LATEST_FORMAT_VERSION,
   };
 
   switch (kind) {
@@ -206,6 +209,14 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         update: 'i++',
         loopVarName: 'i',
         loopVarType: 'int',
+      } as NodeData;
+    case 'procedure':
+      // P1-3：过程节点默认数据
+      return {
+        ...base,
+        kind: 'procedure',
+        procedureName: 'myProcedure',
+        displayName: '新过程',
       } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);

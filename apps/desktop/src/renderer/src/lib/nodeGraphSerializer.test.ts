@@ -11,6 +11,7 @@ import {
   SERIALIZER_FORMAT,
 } from './nodeGraphSerializer.js';
 import type { NodeGraph, ModNode, ModEdge, NodeData, NodeKind, NodePort } from '@mc-creator/shared';
+import { LATEST_FORMAT_VERSION } from '@mc-creator/shared';
 
 // === 测试辅助函数 ===
 // 复刻 node-graph-store.ts 中的 createDefaultNodeData / createDefaultPorts 逻辑，
@@ -24,6 +25,8 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
     disabled: false,
     collapsed: false,
     codeLocked: false,
+    // P1-1：复刻 store 的 createDefaultNodeData，含 formatVersion（反序列化时 migrateGraph 会校验/补全）
+    formatVersion: LATEST_FORMAT_VERSION,
   };
   switch (kind) {
     case 'item':
@@ -171,6 +174,14 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         update: 'i++',
         loopVarName: 'i',
         loopVarType: 'int',
+      } as NodeData;
+    case 'procedure':
+      // P1-3：过程节点默认数据（测试辅助）
+      return {
+        ...base,
+        kind: 'procedure',
+        procedureName: 'myProcedure',
+        displayName: '新过程',
       } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);

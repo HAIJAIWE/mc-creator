@@ -194,7 +194,7 @@ const MC_SCHEMAS: Array<{
     },
   },
   {
-    filePattern: '/loot_tables/',
+    filePattern: '/loot_table/',
     name: 'Loot Table JSON',
     schema: {
       type: 'object',
@@ -230,7 +230,7 @@ const MC_SCHEMAS: Array<{
     },
   },
   {
-    filePattern: '/advancements/',
+    filePattern: '/advancement/',
     name: 'Advancement JSON',
     schema: {
       type: 'object',
