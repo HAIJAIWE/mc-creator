@@ -26,14 +26,14 @@
 
 ## 实施顺序
 
-1. **Task A**: shared schema(FeatureSpec/PlacedFeatureSpec/TemplatePoolSpec/ProcessorListSpec)+ datapack-generator 生成 + 测试
-2. **Task B**: shared schema(JukeboxSongSpec/PaintingVariantSpec/WolfVariantSpec/BannerPatternSpec/ChatTypeSpec)+ 生成 + 测试
-3. **Task C**: DensityFunctionSpec/NoiseSpec/FlatPresetSpec + 生成 + 测试
-4. **Task D**: FluidSpec + fabric/neoforge adapter 注册 + 测试
-5. **Task E**: loot condition/function、advancement criteria、structure 池引用 + 测试
-6. 全量验证 + 分组提交
+1. **[已完成] Task A**: shared schema(FeatureSpec/PlacedFeatureSpec/TemplatePoolSpec/ProcessorListSpec)+ datapack-generator 生成 + 测试 — d86e46b
+2. **[已完成] Task B**: shared schema(JukeboxSongSpec/PaintingVariantSpec/WolfVariantSpec/BannerPatternSpec/ChatTypeSpec)+ 生成 + 测试 — d86e46b
+3. **[已完成] Task C**: DensityFunctionSpec/NoiseSpec/FlatPresetSpec + 生成 + 测试 — f60e4da
+4. **[已完成] Task D**: FluidSpec + fabric/neoforge adapter 注册 + 测试 — f28a3f2
+5. **[已完成] Task E**: loot condition/function、advancement criteria、structure 池引用 + 测试 — c401804
+6. 全量验证 + 分组提交 — 全绿
 
 ## 验收
 
-- 每个 Task: typecheck + 相关测试绿
-- 最终:`pnpm -r test` 全绿,独立 commit
+- 每个 Task: typecheck + 相关测试绿 ✓
+- 最终:`pnpm -r test` 全绿(shared 82 / core 430 / desktop 1301)✓
