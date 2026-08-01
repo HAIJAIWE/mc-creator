@@ -119,7 +119,7 @@ function sanitizePathSegment(segment: string): string {
 export class DatapackGenerator implements Generator {
   readonly type = 'datapack';
   readonly loaders: Loader[] = ['fabric', 'neoforge'];
-  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1'];
+  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1', '26.2'];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     const spec = ctx.spec as unknown as DatapackSpec;

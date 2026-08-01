@@ -2,8 +2,8 @@
 export const LOADERS = ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'vanilla'] as const;
 export type Loader = (typeof LOADERS)[number];
 
-/** MC 版本（规格 §1.2：1.21.11 为主，预留 26.1） */
-export const MC_VERSIONS = ['1.21.11', '1.21.1', '26.1'] as const;
+/** MC 版本（规格 §1.2：1.21.11 为主，26.x 为年度版） */
+export const MC_VERSIONS = ['1.21.11', '1.21.1', '26.1', '26.2'] as const;
 export type McVersion = (typeof MC_VERSIONS)[number];
 
 /** 默认目标版本 */
@@ -11,7 +11,7 @@ export const DEFAULT_MC_VERSION: McVersion = '1.21.11';
 
 /** 每个 loader+版本 对应的 Java 版本（规格 §5 错误处理） */
 export function javaVersionFor(_loader: Loader, mc: McVersion): number {
-  if (mc === '26.1') return 25;
+  if (mc === '26.1' || mc === '26.2') return 25;
   return 21; // 1.21.x 需 Java 21
 }
 
@@ -79,14 +79,26 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     neoforgeVersionRange: '[21.1,)',
   },
   '26.1': {
-    fabricLoaderVersion: '0.16.9',
-    fabricApiVersion: '0.110.5+1.21',
-    fabricLoomVersion: '1.7-SNAPSHOT',
-    fabricLoaderMinVersion: '>=0.16.0',
-    neoforgeVersion: '21.1.1',
-    neoforgeModdevVersion: '1.0.21',
+    // 实测版本（2026-07 在线核验）：26.1 已于 2026-03-24 正式发布
+    fabricLoaderVersion: '0.19.3',
+    fabricApiVersion: '0.155.2+26.1.2',
+    fabricLoomVersion: '1.17.17',
+    fabricLoaderMinVersion: '>=0.19.0',
+    neoforgeVersion: '26.1.2.94',
+    neoforgeModdevVersion: '2.0.143',
     neoforgeLoaderVersionRange: '[4,)',
-    neoforgeVersionRange: '[21.1,)',
+    neoforgeVersionRange: '[26.1,)',
+  },
+  '26.2': {
+    // 26.2 已于 2026-06-16 发布；NeoForge 26.2 尚在 beta，标注实验性
+    fabricLoaderVersion: '0.19.3',
+    fabricApiVersion: '0.155.2+26.1.2',
+    fabricLoomVersion: '1.17.17',
+    fabricLoaderMinVersion: '>=0.19.0',
+    neoforgeVersion: '26.2.0.41-beta',
+    neoforgeModdevVersion: '2.0.143',
+    neoforgeLoaderVersionRange: '[4,)',
+    neoforgeVersionRange: '[26.2,)',
     isPlaceholder: true,
   },
 };
@@ -95,18 +107,15 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
  * 获取指定 MC 版本的 Loader 版本配置。
  * MC 版本不在映射表中时回退到 DEFAULT_MC_VERSION 的配置。
  *
- * Major 修复：26.1 是未来版本，尚未有真实 loader 版本号。
- * 此前 26.1 条目复用了 1.21.x 的版本号（fabricApi '+1.21'、NeoForge '21.1.1'），
- * 与 Java 25 要求矛盾，会导致生成的构建配置必然失败。
- * 现在 26.1 条目标记为 placeholder，调用方应检查并提示用户。
+ * 26.1 已于 2026-03-24 发布，loader 版本号为真实值；
+ * 26.2（2026-06-16 发布）的 NeoForge 尚在 beta（26.2.0.41-beta），标记占位并警告。
  */
 export function getLoaderVersions(mcVersion: string): LoaderVersionConfig {
-  if (mcVersion === '26.1') {
-    // 26.1 尚未发布真实 loader 版本，回退到最新已知配置但发出警告
-    // 调用方可在 warnings 中提示用户手动确认版本号
+  if (mcVersion === '26.2') {
+    // 26.2 的 NeoForge 版本尚为 beta，提示用户确认
     console.warn(
-      `[mc-creator] MC 26.1 的 loader 版本配置为占位值，` +
-        `生成的构建文件可能需要手动调整版本号。`,
+      `[mc-creator] MC 26.2 的 NeoForge 版本为 beta（26.2.0.41-beta），` +
+        `正式版发布后可升级 neoforgeVersion。`,
     );
   }
   if (mcVersion in LOADER_VERSIONS) {

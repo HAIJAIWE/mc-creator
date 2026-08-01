@@ -239,10 +239,10 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
             </option>
           ))}
         </select>
-        {mcVersion === '26.1' && (
+        {mcVersion === '26.2' && (
           <span
             className="text-[10px] text-mc-gold"
-            title="26.1 的 loader 版本号为占位值，生成的构建文件可能需要手动调整版本号"
+            title="26.2 的 NeoForge 版本为 beta，构建配置可能需手动调整"
           >
             实验性
           </span>

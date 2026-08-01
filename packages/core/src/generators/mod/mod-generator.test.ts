@@ -37,10 +37,10 @@ describe('ModGenerator', () => {
   it('type/loaders/versions 声明正确', () => {
     expect(gen.type).toBe('mod');
     expect(gen.loaders).toEqual(['fabric', 'neoforge', 'quilt', 'legacy_fabric']);
-    expect(gen.versions).toEqual(['1.21.11', '1.21.1', '26.1']);
+    expect(gen.versions).toEqual(['1.21.11', '1.21.1', '26.1', '26.2']);
   });
 
-  it('26.1 生成时给出占位版本警告', async () => {
+  it('26.1 生成真实 loader 版本（不再占位）', async () => {
     const ctx: GeneratorContext = {
       loader: 'fabric',
       mcVersion: '26.1',
@@ -49,7 +49,24 @@ describe('ModGenerator', () => {
       projectPath: '/proj',
     };
     const result = await gen.generate(ctx);
-    expect(result.warnings.some((w) => w.includes('26.1'))).toBe(true);
+    // 26.1 已发布：无占位警告
+    expect(result.warnings.some((w) => w.includes('26.1'))).toBe(false);
+    // gradle.properties 含真实 Fabric API 版本
+    const gp = result.files.find((f) => f.path === 'gradle.properties');
+    expect(gp!.content).toContain('minecraft_version=26.1');
+    expect(gp!.content).toContain('0.155.2+26.1.2');
+  });
+
+  it('26.2 生成时给出 beta 版本警告', async () => {
+    const ctx: GeneratorContext = {
+      loader: 'fabric',
+      mcVersion: '26.2',
+      modId: 'demo',
+      spec: SPEC,
+      projectPath: '/proj',
+    };
+    const result = await gen.generate(ctx);
+    expect(result.warnings.some((w) => w.includes('26.2'))).toBe(true);
   });
 
   it('版本切换生效：1.21.1 生成对应 build.gradle Java 21', async () => {

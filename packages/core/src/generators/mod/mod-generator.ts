@@ -25,7 +25,7 @@ export interface IncrementalGenerationResult extends GenerationResult {
 export class ModGenerator implements Generator {
   readonly type = 'mod';
   readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt', 'legacy_fabric'];
-  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1'];
+  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1', '26.2'];
 
   // vanilla 没有 mod adapter（原版无 mod 加载器），故用 Partial。
   private readonly adapters: Partial<Record<Loader, LoaderAdapter>> = {
@@ -67,11 +67,9 @@ export class ModGenerator implements Generator {
     ) {
       warnings.push('ModSpec 中所有内容字段均为空，生成的项目将仅包含框架代码');
     }
-    // 版本感知：26.1 的 loader 版本为占位值
-    if (ctx.mcVersion === '26.1') {
-      warnings.push(
-        'MC 26.1 的 loader 版本号为占位值，生成的 build.gradle/gradle.properties 可能需要手动调整版本号',
-      );
+    // 版本感知：26.2 的 NeoForge 尚为 beta（26.1 已发布，版本号为真实值）
+    if (ctx.mcVersion === '26.2') {
+      warnings.push('MC 26.2 的 NeoForge 版本为 beta（26.2.0.41-beta），正式版发布后请更新版本号');
     }
     return warnings;
   }

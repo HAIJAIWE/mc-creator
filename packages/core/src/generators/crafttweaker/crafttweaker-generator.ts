@@ -36,7 +36,7 @@ import type {
 export class CraftTweakerGenerator implements Generator {
   readonly type = 'crafttweaker';
   readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt'];
-  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1'];
+  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1', '26.2'];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     // 运行时校验：确保 ctx.spec 是合法 CraftTweakerSpec

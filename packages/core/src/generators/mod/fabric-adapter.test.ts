@@ -1204,6 +1204,29 @@ describe('FabricAdapter 版本切换', () => {
     const gp = files26.find((f) => f.path === 'gradle.properties');
     expect(gp!.content).toContain('minecraft_version=26.1');
   });
+
+  it('26.1 使用真实 Fabric/NeoForge 版本号（2026 在线核验）', () => {
+    const files26 = new FabricAdapter().translate({
+      loader: 'fabric',
+      mcVersion: '26.1',
+      modId: 'ruby_tools',
+      spec: SPEC_P40_FLUID,
+      projectPath: '/proj',
+    });
+    const gp = files26.find((f) => f.path === 'gradle.properties');
+    expect(gp!.content).toContain('loader_version=0.19.3');
+    expect(gp!.content).toContain('fabric_version=0.155.2+26.1.2');
+    // 26.2 也在版本列表
+    const files262 = new FabricAdapter().translate({
+      loader: 'fabric',
+      mcVersion: '26.2',
+      modId: 'ruby_tools',
+      spec: SPEC_P40_FLUID,
+      projectPath: '/proj',
+    });
+    const gp262 = files262.find((f) => f.path === 'gradle.properties');
+    expect(gp262!.content).toContain('minecraft_version=26.2');
+  });
 });
 
 // === Mod 侧世界生成（生物群系 + 维度）===
