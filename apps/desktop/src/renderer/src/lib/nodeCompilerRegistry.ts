@@ -49,6 +49,9 @@ import type {
   ConditionSpec,
   ActionSpec,
   ProcedureSpec,
+  ModBiomeSpec,
+  ModDimensionSpec,
+  FluidSpec,
 } from '@mc-creator/shared';
 
 // === 类型 ===
@@ -72,9 +75,15 @@ export interface CompilerOutput {
   actions?: ActionSpec[];
   /** P1-3：过程（由 procedure 节点编译） */
   procedures?: ProcedureSpec[];
-  /** 非致命警告（合并到 CompileResult.warnings） */
+  /** 世界生成：生物群系（biome 节点） */
+  biomes?: ModBiomeSpec[];
+  /** 世界生成：维度（dimension 节点） */
+  dimensions?: ModDimensionSpec[];
+  /** 流体（fluid 节点） */
+  fluids?: FluidSpec[];
+  /** 编译警告（合并到 CompileResult.warnings） */
   warnings?: string[];
-  /** 致命错误（合并到 CompileResult.errors，spec 仍可部分使用） */
+  /** 编译错误（合并到 CompileResult.errors，spec 仍可部分使用） */
   errors?: string[];
 }
 
@@ -151,6 +160,9 @@ export function mergeOutput(dst: CompilerOutput, src: CompilerOutput): void {
   if (src.conditions) (dst.conditions ??= []).push(...src.conditions);
   if (src.actions) (dst.actions ??= []).push(...src.actions);
   if (src.procedures) (dst.procedures ??= []).push(...src.procedures);
+  if (src.biomes) (dst.biomes ??= []).push(...src.biomes);
+  if (src.dimensions) (dst.dimensions ??= []).push(...src.dimensions);
+  if (src.fluids) (dst.fluids ??= []).push(...src.fluids);
   if (src.warnings) (dst.warnings ??= []).push(...src.warnings);
   if (src.errors) (dst.errors ??= []).push(...src.errors);
 }

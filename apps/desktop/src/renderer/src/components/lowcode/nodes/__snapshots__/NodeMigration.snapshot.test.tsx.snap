@@ -270,6 +270,204 @@ exports[`节点迁移快照测试 > action 节点选中状态快照 1`] = `
 </div>
 `;
 
+exports[`节点迁移快照测试 > biome 节点展开状态快照 1`] = `
+<div
+  aria-label="新生物群系 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新生物群系
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      生物群系
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-mute"
+    >
+      ID: 
+      my_biome
+    </div>
+    <div
+      class="flex gap-2 text-mc-dim"
+    >
+      <span>
+        rain
+      </span>
+      <span>
+        0.5
+        °C
+      </span>
+      <span>
+        降 
+        0.5
+      </span>
+    </div>
+    <div
+      class="text-mc-dim"
+    >
+      权重 
+      10
+       · 
+      minecraft:grass
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > biome 节点折叠状态快照 1`] = `
+<div
+  aria-label="新生物群系 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新生物群系
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      生物群系
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="展开"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▸
+    </button>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > biome 节点选中状态快照 1`] = `
+<div
+  aria-label="新生物群系 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新生物群系
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      生物群系
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-mute"
+    >
+      ID: 
+      my_biome
+    </div>
+    <div
+      class="flex gap-2 text-mc-dim"
+    >
+      <span>
+        rain
+      </span>
+      <span>
+        0.5
+        °C
+      </span>
+      <span>
+        降 
+        0.5
+      </span>
+    </div>
+    <div
+      class="text-mc-dim"
+    >
+      权重 
+      10
+       · 
+      minecraft:grass
+    </div>
+  </div>
+</div>
+`;
+
 exports[`节点迁移快照测试 > block 节点展开状态快照 1`] = `
 <div
   aria-label="新方块 节点"
@@ -1247,6 +1445,216 @@ exports[`节点迁移快照测试 > condition 节点选中状态快照 1`] = `
 </div>
 `;
 
+exports[`节点迁移快照测试 > dimension 节点展开状态快照 1`] = `
+<div
+  aria-label="新维度 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <img
+      alt="globe"
+      class="shrink-0"
+      height="14"
+      src="/src/renderer/src/assets/mc-ui/pixel/globe.svg"
+      style="image-rendering: pixelated; display: inline-block;"
+      width="14"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新维度
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      overworld
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-mute"
+    >
+      ID: 
+      my_dimension
+    </div>
+    <div
+      class="flex gap-2 text-mc-dim"
+    >
+      <span>
+        -64
+        ~
+        320
+      </span>
+      <span>
+        天空光
+      </span>
+    </div>
+    <div
+      class="text-mc-dim"
+    >
+      昼夜循环
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > dimension 节点折叠状态快照 1`] = `
+<div
+  aria-label="新维度 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <img
+      alt="globe"
+      class="shrink-0"
+      height="14"
+      src="/src/renderer/src/assets/mc-ui/pixel/globe.svg"
+      style="image-rendering: pixelated; display: inline-block;"
+      width="14"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新维度
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      overworld
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="展开"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▸
+    </button>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > dimension 节点选中状态快照 1`] = `
+<div
+  aria-label="新维度 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <img
+      alt="globe"
+      class="shrink-0"
+      height="14"
+      src="/src/renderer/src/assets/mc-ui/pixel/globe.svg"
+      style="image-rendering: pixelated; display: inline-block;"
+      width="14"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新维度
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      overworld
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-mute"
+    >
+      ID: 
+      my_dimension
+    </div>
+    <div
+      class="flex gap-2 text-mc-dim"
+    >
+      <span>
+        -64
+        ~
+        320
+      </span>
+      <span>
+        天空光
+      </span>
+    </div>
+    <div
+      class="text-mc-dim"
+    >
+      昼夜循环
+    </div>
+  </div>
+</div>
+`;
+
 exports[`节点迁移快照测试 > entity 节点展开状态快照 1`] = `
 <div
   aria-label="新生物 节点"
@@ -1714,6 +2122,194 @@ exports[`节点迁移快照测试 > event 节点选中状态快照 1`] = `
           style="width: 8px; height: 8px; border-radius: 0; background: rgb(154, 122, 198); border: 1px solid rgba(0, 0, 0, 0.8); box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);"
         />
       </div>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > fluid 节点展开状态快照 1`] = `
+<div
+  aria-label="新流体 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新流体
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      流体
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-mute"
+    >
+      ID: 
+      my_fluid
+    </div>
+    <div
+      class="flex gap-2 text-mc-dim"
+    >
+      <span>
+        300
+        K
+      </span>
+      <span>
+        黏 
+        1000
+      </span>
+    </div>
+    <div
+      class="text-mc-dim"
+    >
+      #
+      00aaff
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > fluid 节点折叠状态快照 1`] = `
+<div
+  aria-label="新流体 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新流体
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      流体
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="展开"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▸
+    </button>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > fluid 节点选中状态快照 1`] = `
+<div
+  aria-label="新流体 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新流体
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      流体
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-mute"
+    >
+      ID: 
+      my_fluid
+    </div>
+    <div
+      class="flex gap-2 text-mc-dim"
+    >
+      <span>
+        300
+        K
+      </span>
+      <span>
+        黏 
+        1000
+      </span>
+    </div>
+    <div
+      class="text-mc-dim"
+    >
+      #
+      00aaff
     </div>
   </div>
 </div>

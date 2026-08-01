@@ -14,6 +14,9 @@ import { VariableNode } from './VariableNode.js';
 import { SubgraphNode } from './SubgraphNode.js';
 import { LoopNode } from './LoopNode.js';
 import { ProcedureNode } from './ProcedureNode.js';
+import { BiomeNode } from './BiomeNode.js';
+import { DimensionNode } from './DimensionNode.js';
+import { FluidNode } from './FluidNode.js';
 
 /**
  * 节点类型注册表
@@ -39,6 +42,10 @@ export const nodeTypes = {
   loop: LoopNode,
   // P1-3 新增
   procedure: ProcedureNode,
+  // 世界生成
+  biome: BiomeNode,
+  dimension: DimensionNode,
+  fluid: FluidNode,
 } as const;
 
 export type NodeTypeRegistry = typeof nodeTypes;
@@ -181,6 +188,31 @@ export const NODE_METADATA: NodeMeta[] = [
     icon: 'link',
     category: 'logic',
     color: 'indigo',
+  },
+  // 世界生成
+  {
+    kind: 'biome',
+    label: '生物群系',
+    description: 'Mod 侧生物群系：降水/温度/颜色/地表/生成权重',
+    icon: 'tree',
+    category: 'content',
+    color: 'teal',
+  },
+  {
+    kind: 'dimension',
+    label: '维度',
+    description: 'Mod 侧维度：类型模板/高度/天空光/时间',
+    icon: 'globe',
+    category: 'content',
+    color: 'blue',
+  },
+  {
+    kind: 'fluid',
+    label: '流体',
+    description: 'Mod 侧流体：颜色/温度/黏度/发光',
+    icon: 'droplet',
+    category: 'content',
+    color: 'cyan',
   },
 ];
 

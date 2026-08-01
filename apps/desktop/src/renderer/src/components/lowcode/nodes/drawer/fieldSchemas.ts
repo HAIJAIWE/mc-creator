@@ -395,8 +395,87 @@ const PROCEDURE_FIELDS: FieldSchema[] = [
   },
 ];
 
-/** loop 节点字段（阶段 C） */
-const LOOP_FIELDS: FieldSchema[] = [
+/** biome 节点字段（世界生成） */
+const BIOME_FIELDS: FieldSchema[] = [
+  { key: 'biomeId', label: '生物群系 ID', type: 'resourceId', required: true },
+  { key: 'displayName', label: '显示名', type: 'text', required: true },
+  {
+    key: 'precipitation',
+    label: '降水',
+    type: 'dropdown',
+    options: ['none', 'rain', 'snow'],
+  },
+  { key: 'temperature', label: '温度', type: 'number', min: -2, max: 2, step: 0.1 },
+  {
+    key: 'temperatureModifier',
+    label: '温度修饰',
+    type: 'dropdown',
+    options: ['none', 'frozen'],
+  },
+  { key: 'downfall', label: '降水量', type: 'number', min: 0, max: 1, step: 0.05 },
+  { key: 'skyColor', label: '天空颜色', type: 'color' },
+  { key: 'waterColor', label: '水面颜色', type: 'color' },
+  { key: 'fogColor', label: '雾颜色', type: 'color' },
+  { key: 'surfaceBuilder', label: '地表构建器', type: 'text' },
+  { key: 'spawnWeight', label: '生成权重', type: 'number', min: 0, max: 100, step: 1 },
+];
+
+/** dimension 节点字段（世界生成） */
+const DIMENSION_FIELDS: FieldSchema[] = [
+  { key: 'dimensionId', label: '维度 ID', type: 'resourceId', required: true },
+  { key: 'displayName', label: '显示名', type: 'text', required: true },
+  {
+    key: 'baseType',
+    label: '类型模板',
+    type: 'dropdown',
+    options: ['overworld', 'nether', 'end'],
+  },
+  { key: 'fixedTime', label: '固定时间 (tick)', type: 'number', min: -1, max: 24000, step: 100 },
+  {
+    key: 'hasSkyLight',
+    label: '天空光',
+    type: 'segmented',
+    options: ['true', 'false'],
+  },
+  {
+    key: 'hasCeiling',
+    label: '天花板',
+    type: 'segmented',
+    options: ['false', 'true'],
+  },
+  {
+    key: 'ultrawarm',
+    label: '超热',
+    type: 'segmented',
+    options: ['false', 'true'],
+  },
+  { key: 'minY', label: '最小 Y', type: 'number', min: -2048, max: 2047, step: 16 },
+  { key: 'height', label: '高度', type: 'number', min: 16, max: 4064, step: 16 },
+  {
+    key: 'effects',
+    label: '效果',
+    type: 'dropdown',
+    options: ['overworld', 'the_nether', 'the_end', 'none'],
+  },
+];
+
+/** fluid 节点字段（流体） */
+const FLUID_FIELDS: FieldSchema[] = [
+  { key: 'fluidId', label: '流体 ID', type: 'resourceId', required: true },
+  { key: 'displayName', label: '显示名', type: 'text', required: true },
+  { key: 'color', label: '颜色', type: 'color' },
+  { key: 'temperature', label: '温度 (K)', type: 'number', min: 0, max: 2000, step: 10 },
+  { key: 'viscosity', label: '黏度', type: 'number', min: 1, max: 10000, step: 10 },
+  { key: 'density', label: '密度', type: 'number', min: 1, max: 10000, step: 10 },
+  {
+    key: 'luminous',
+    label: '发光',
+    type: 'segmented',
+    options: ['false', 'true'],
+  },
+];
+
+/** loop 节点字段（阶段 C） */ const LOOP_FIELDS: FieldSchema[] = [
   {
     key: 'loopType',
     label: '循环类型',
@@ -451,6 +530,9 @@ export function getFieldSchemas(kind: NodeKind): FieldSchema[] {
     subgraph: SUBGRAPH_FIELDS,
     loop: LOOP_FIELDS,
     procedure: PROCEDURE_FIELDS,
+    biome: BIOME_FIELDS,
+    dimension: DIMENSION_FIELDS,
+    fluid: FLUID_FIELDS,
   };
   return [...COMMON_FIELDS, ...(specific[kind] ?? [])].filter(
     (f) => !f.excludeKinds?.includes(kind),

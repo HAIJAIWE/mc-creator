@@ -16,6 +16,9 @@ import type {
   ActionSpec,
   ProcedureSpec,
   ProcedureNodeData,
+  ModBiomeSpec,
+  ModDimensionSpec,
+  FluidSpec,
 } from '@mc-creator/shared';
 import { compileVariable } from './compileVariable.js';
 import { inlineSubgraphNodes } from './compileSubgraph.js';
@@ -168,6 +171,9 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   const entities = dispatched.entities ?? [];
   const machines = dispatched.machines ?? [];
   const multiblocks = dispatched.multiblocks ?? [];
+  const biomes = dispatched.biomes ?? [];
+  const dimensions = dispatched.dimensions ?? [];
+  const fluids = dispatched.fluids ?? [];
   const eventHandlers = dispatched.eventHandlers ?? [];
   const conditions = dispatched.conditions ?? [];
   const actions = dispatched.actions ?? [];
@@ -304,11 +310,10 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     machines,
     customCode: dedupedCustomCode,
     multiblocks,
-    // Task D：流体（当前无流体节点，恒为空数组；为 ModSpec 兼容保留）
-    fluids: [],
-    // Mod 侧世界生成（当前无节点，恒为空数组；为 ModSpec 兼容保留）
-    biomes: [],
-    dimensions: [],
+    // Mod 侧世界生成（由 biome/dimension/fluid 节点编译）
+    biomes,
+    dimensions,
+    fluids,
     eventHandlers,
     conditions,
     actions,
@@ -482,6 +487,74 @@ function compileMachineNode(node: ModNode): MachineSpec {
     defaultEnergyPerTick: data.defaultEnergyPerTick,
     guiWidth: data.guiWidth,
     guiHeight: data.guiHeight,
+  };
+}
+
+/** 编译生物群系节点 */
+function compileBiomeNode(node: ModNode): ModBiomeSpec {
+  if (node.data.kind !== 'biome') {
+    throw new Error(`节点 ${node.id} 不是 biome 类型`);
+  }
+  const data = node.data;
+  return {
+    biomeId: data.biomeId,
+    displayName: data.displayName || data.biomeId,
+    precipitation: data.precipitation,
+    temperature: data.temperature,
+    temperatureModifier: data.temperatureModifier,
+    downfall: data.downfall,
+    skyColor: data.skyColor,
+    waterColor: data.waterColor,
+    waterFogColor: data.waterFogColor,
+    fogColor: data.fogColor,
+    surfaceBuilder: data.surfaceBuilder,
+    category: 'plains',
+    spawnWeight: data.spawnWeight,
+    spawnDimensions: data.spawnDimensions,
+  };
+}
+
+/** 编译维度节点 */
+function compileDimensionNode(node: ModNode): ModDimensionSpec {
+  if (node.data.kind !== 'dimension') {
+    throw new Error(`节点 ${node.id} 不是 dimension 类型`);
+  }
+  const data = node.data;
+  return {
+    dimensionId: data.dimensionId,
+    displayName: data.displayName || data.dimensionId,
+    baseType: data.baseType,
+    fixedTime: data.fixedTime,
+    hasSkyLight: data.hasSkyLight,
+    hasCeiling: data.hasCeiling,
+    ultrawarm: data.ultrawarm,
+    natural: data.natural,
+    coordinateScale: 1.0,
+    minY: data.minY,
+    height: data.height,
+    logicalHeight: data.height,
+    ambientLight: 0,
+    piglinSafe: false,
+    bedWorks: true,
+    respawnAnchorWorks: false,
+    effects: data.effects,
+  };
+}
+
+/** 编译流体节点 */
+function compileFluidNode(node: ModNode): FluidSpec {
+  if (node.data.kind !== 'fluid') {
+    throw new Error(`节点 ${node.id} 不是 fluid 类型`);
+  }
+  const data = node.data;
+  return {
+    fluidId: data.fluidId,
+    displayName: data.displayName || data.fluidId,
+    color: data.color,
+    temperature: data.temperature,
+    viscosity: data.viscosity,
+    density: data.density,
+    luminous: data.luminous,
   };
 }
 
@@ -1179,6 +1252,21 @@ registerCompiler({
 registerCompiler({
   kind: 'machine',
   compile: (node) => ({ machines: [compileMachineNode(node)] }),
+});
+
+registerCompiler({
+  kind: 'biome',
+  compile: (node) => ({ biomes: [compileBiomeNode(node)] }),
+});
+
+registerCompiler({
+  kind: 'dimension',
+  compile: (node) => ({ dimensions: [compileDimensionNode(node)] }),
+});
+
+registerCompiler({
+  kind: 'fluid',
+  compile: (node) => ({ fluids: [compileFluidNode(node)] }),
 });
 
 registerCompiler({

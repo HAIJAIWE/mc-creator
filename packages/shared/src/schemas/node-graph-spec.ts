@@ -32,8 +32,12 @@ export const NodeKind = z.enum([
   'variable',
   'subgraph',
   'loop',
-  // P1-3 新增：过程节点（对标 MCreator procedure）
+  // P1-3 过程中的过程节点（对标 MCreator procedure）
   'procedure',
+  // 世界生成节点
+  'biome',
+  'dimension',
+  'fluid',
 ]);
 export type NodeKind = z.infer<typeof NodeKind>;
 
@@ -465,6 +469,88 @@ export const LoopNodeData = BaseNodeData.extend({
 });
 export type LoopNodeData = z.infer<typeof LoopNodeData>;
 
+// === 世界生成节点（biome / dimension / fluid） ===
+
+/** 生物群系节点 */
+export const BiomeNodeData = BaseNodeData.extend({
+  kind: z.literal('biome'),
+  /** 生物群系 id（小写下划线） */
+  biomeId: z.string().default('my_biome'),
+  /** 显示名 */
+  displayName: z.string().default('新生物群系'),
+  /** 降水 */
+  precipitation: z.enum(['none', 'rain', 'snow']).default('rain'),
+  /** 温度（-2~2） */
+  temperature: z.number().default(0.5),
+  /** 温度修饰 */
+  temperatureModifier: z.enum(['none', 'frozen']).default('none'),
+  /** 降水量 0~1 */
+  downfall: z.number().default(0.5),
+  /** 天空颜色（0xRRGGBB） */
+  skyColor: z.number().int().default(0x78a7ff),
+  /** 水面颜色 */
+  waterColor: z.number().int().default(0x3f76e4),
+  /** 水雾颜色 */
+  waterFogColor: z.number().int().default(0x050533),
+  /** 雾颜色 */
+  fogColor: z.number().int().default(0xc0d8ff),
+  /** 地表构建器 */
+  surfaceBuilder: z.string().default('minecraft:grass'),
+  /** 生成权重 */
+  spawnWeight: z.number().int().min(0).default(10),
+  /** 生成维度 */
+  spawnDimensions: z.array(z.string()).default(['minecraft:overworld']),
+});
+export type BiomeNodeData = z.infer<typeof BiomeNodeData>;
+
+/** 维度节点 */
+export const DimensionNodeData = BaseNodeData.extend({
+  kind: z.literal('dimension'),
+  /** 维度 id（小写下划线） */
+  dimensionId: z.string().default('my_dimension'),
+  /** 显示名 */
+  displayName: z.string().default('新维度'),
+  /** 维度类型模板 */
+  baseType: z.enum(['overworld', 'nether', 'end']).default('overworld'),
+  /** 固定时间（null = 正常昼夜） */
+  fixedTime: z.number().nullable().default(null),
+  /** 天空光 */
+  hasSkyLight: z.boolean().default(true),
+  /** 天花板 */
+  hasCeiling: z.boolean().default(false),
+  /** 超热 */
+  ultrawarm: z.boolean().default(false),
+  /** 自然 */
+  natural: z.boolean().default(true),
+  /** 最小 Y */
+  minY: z.number().int().default(-64),
+  /** 高度 */
+  height: z.number().int().default(384),
+  /** 效果 */
+  effects: z.enum(['overworld', 'the_nether', 'the_end', 'none']).default('overworld'),
+});
+export type DimensionNodeData = z.infer<typeof DimensionNodeData>;
+
+/** 流体节点 */
+export const FluidNodeData = BaseNodeData.extend({
+  kind: z.literal('fluid'),
+  /** 流体 id（小写下划线） */
+  fluidId: z.string().default('my_fluid'),
+  /** 显示名 */
+  displayName: z.string().default('新流体'),
+  /** 颜色（0xRRGGBB） */
+  color: z.number().int().default(0x00aaff),
+  /** 温度 */
+  temperature: z.number().int().min(0).default(300),
+  /** 黏度 */
+  viscosity: z.number().int().min(1).default(1000),
+  /** 密度 */
+  density: z.number().int().default(1000),
+  /** 发光 */
+  luminous: z.boolean().default(false),
+});
+export type FluidNodeData = z.infer<typeof FluidNodeData>;
+
 // === P1-3：过程节点（对标 MCreator procedure） ===
 
 /**
@@ -518,6 +604,10 @@ export const NodeData = z.discriminatedUnion('kind', [
   LoopNodeData,
   // P1-3 新增
   ProcedureNodeData,
+  // 世界生成节点
+  BiomeNodeData,
+  DimensionNodeData,
+  FluidNodeData,
 ]);
 export type NodeData = z.infer<typeof NodeData>;
 

@@ -20,6 +20,9 @@ import { VariableNode } from './VariableNode.js';
 import { SubgraphNode } from './SubgraphNode.js';
 import { LoopNode } from './LoopNode.js';
 import { ProcedureNode } from './ProcedureNode.js';
+import { BiomeNode } from './BiomeNode.js';
+import { DimensionNode } from './DimensionNode.js';
+import { FluidNode } from './FluidNode.js';
 
 const NODE_COMPONENTS: Record<NodeKind, React.ComponentType<any>> = {
   item: ItemNode,
@@ -37,6 +40,9 @@ const NODE_COMPONENTS: Record<NodeKind, React.ComponentType<any>> = {
   subgraph: SubgraphNode,
   loop: LoopNode,
   procedure: ProcedureNode,
+  biome: BiomeNode,
+  dimension: DimensionNode,
+  fluid: FluidNode,
 };
 
 function renderWithProvider(ui: ReactElement) {

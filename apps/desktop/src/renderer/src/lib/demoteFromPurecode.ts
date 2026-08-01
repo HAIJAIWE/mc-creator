@@ -243,6 +243,52 @@ function createDefaultNodeData(kind: NodeKind, id: string): NodeData {
         procedureName: 'myProcedure',
         displayName: '新过程',
       } as NodeData;
+    case 'biome':
+      return {
+        ...base,
+        kind: 'biome',
+        biomeId: 'my_biome',
+        displayName: '新生物群系',
+        precipitation: 'rain',
+        temperature: 0.5,
+        temperatureModifier: 'none',
+        downfall: 0.5,
+        skyColor: 0x78a7ff,
+        waterColor: 0x3f76e4,
+        waterFogColor: 0x050533,
+        fogColor: 0xc0d8ff,
+        surfaceBuilder: 'minecraft:grass',
+        spawnWeight: 10,
+        spawnDimensions: ['minecraft:overworld'],
+      } as NodeData;
+    case 'dimension':
+      return {
+        ...base,
+        kind: 'dimension',
+        dimensionId: 'my_dimension',
+        displayName: '新维度',
+        baseType: 'overworld',
+        fixedTime: null,
+        hasSkyLight: true,
+        hasCeiling: false,
+        ultrawarm: false,
+        natural: true,
+        minY: -64,
+        height: 384,
+        effects: 'overworld',
+      } as NodeData;
+    case 'fluid':
+      return {
+        ...base,
+        kind: 'fluid',
+        fluidId: 'my_fluid',
+        displayName: '新流体',
+        color: 0x00aaff,
+        temperature: 300,
+        viscosity: 1000,
+        density: 1000,
+        luminous: false,
+      } as NodeData;
     default: {
       // 类型安全：穷尽性检查
       const _exhaustive: never = kind;

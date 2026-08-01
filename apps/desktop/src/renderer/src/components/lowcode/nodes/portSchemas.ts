@@ -194,6 +194,12 @@ export function getPorts(data: NodeData, graph?: NodeGraph): NodePort[] {
     case 'comment':
       return [];
 
+    // 世界生成节点：无端口（独立内容节点）
+    case 'biome':
+    case 'dimension':
+    case 'fluid':
+      return [];
+
     // === 阶段 C 新增 3 分支 ===
     case 'variable': {
       const v = data as VariableNodeData;

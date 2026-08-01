@@ -194,6 +194,52 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         procedureName: 'myProcedure',
         displayName: '新过程',
       } as NodeData;
+    case 'biome':
+      return {
+        ...base,
+        kind: 'biome',
+        biomeId: 'my_biome',
+        displayName: '新生物群系',
+        precipitation: 'rain',
+        temperature: 0.5,
+        temperatureModifier: 'none',
+        downfall: 0.5,
+        skyColor: 0x78a7ff,
+        waterColor: 0x3f76e4,
+        waterFogColor: 0x050533,
+        fogColor: 0xc0d8ff,
+        surfaceBuilder: 'minecraft:grass',
+        spawnWeight: 10,
+        spawnDimensions: ['minecraft:overworld'],
+      } as NodeData;
+    case 'dimension':
+      return {
+        ...base,
+        kind: 'dimension',
+        dimensionId: 'my_dimension',
+        displayName: '新维度',
+        baseType: 'overworld',
+        fixedTime: null,
+        hasSkyLight: true,
+        hasCeiling: false,
+        ultrawarm: false,
+        natural: true,
+        minY: -64,
+        height: 384,
+        effects: 'overworld',
+      } as NodeData;
+    case 'fluid':
+      return {
+        ...base,
+        kind: 'fluid',
+        fluidId: 'my_fluid',
+        displayName: '新流体',
+        color: 0x00aaff,
+        temperature: 300,
+        viscosity: 1000,
+        density: 1000,
+        luminous: false,
+      } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);
   }
@@ -1101,6 +1147,87 @@ describe('compileNodeGraph', () => {
     ];
     const result = compileNodeGraph(makeGraph(nodes, edges));
     expect(result.spec.eventHandlers[0].procedureCallArgs).toEqual({ p1: [''] });
+  });
+
+  it('世界生成: biome 节点编译进 spec.biomes', () => {
+    const nodes = [
+      makeNode('b1', 'biome', {
+        biomeId: 'ruby_plains',
+        displayName: 'Ruby Plains',
+        precipitation: 'snow',
+        temperature: -0.5,
+        temperatureModifier: 'frozen',
+        downfall: 0.9,
+        skyColor: 0x78a7ff,
+        waterColor: 0x3f76e4,
+        waterFogColor: 0x050533,
+        fogColor: 0xc0d8ff,
+        surfaceBuilder: 'minecraft:grass',
+        spawnWeight: 5,
+        spawnDimensions: ['minecraft:overworld'],
+      }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes));
+    expect(result.spec.biomes).toHaveLength(1);
+    const biome = result.spec.biomes[0];
+    expect(biome.biomeId).toBe('ruby_plains');
+    expect(biome.precipitation).toBe('snow');
+    expect(biome.temperatureModifier).toBe('frozen');
+    expect(biome.spawnWeight).toBe(5);
+  });
+
+  it('世界生成: dimension 节点编译进 spec.dimensions', () => {
+    const nodes = [
+      makeNode('d1', 'dimension', {
+        dimensionId: 'ruby_dim',
+        displayName: 'Ruby Dimension',
+        baseType: 'nether',
+        fixedTime: 18000,
+        hasSkyLight: false,
+        hasCeiling: true,
+        ultrawarm: true,
+        natural: false,
+        minY: 0,
+        height: 256,
+        effects: 'the_nether',
+      }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes));
+    expect(result.spec.dimensions).toHaveLength(1);
+    const dim = result.spec.dimensions[0];
+    expect(dim.dimensionId).toBe('ruby_dim');
+    expect(dim.baseType).toBe('nether');
+    expect(dim.fixedTime).toBe(18000);
+    expect(dim.ultrawarm).toBe(true);
+    expect(dim.height).toBe(256);
+  });
+
+  it('世界生成: fluid 节点编译进 spec.fluids', () => {
+    const nodes = [
+      makeNode('f1', 'fluid', {
+        fluidId: 'ruby_juice',
+        displayName: 'Ruby Juice',
+        color: 0xff0000,
+        temperature: 300,
+        viscosity: 1000,
+        density: 1000,
+        luminous: true,
+      }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes));
+    expect(result.spec.fluids).toHaveLength(1);
+    const fluid = result.spec.fluids[0];
+    expect(fluid.fluidId).toBe('ruby_juice');
+    expect(fluid.color).toBe(0xff0000);
+    expect(fluid.luminous).toBe(true);
+  });
+
+  it('世界生成: 无世界生成节点时为空数组', () => {
+    const nodes = [makeNode('i1', 'item', { itemId: 'ruby', displayName: 'Ruby' })];
+    const result = compileNodeGraph(makeGraph(nodes));
+    expect(result.spec.biomes).toEqual([]);
+    expect(result.spec.dimensions).toEqual([]);
+    expect(result.spec.fluids).toEqual([]);
   });
 
   it('comment 节点被跳过（不产生 spec/warning/unsupported）', () => {
