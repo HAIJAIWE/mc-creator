@@ -515,6 +515,43 @@ export const ChatTypeSpec = z.object({
 });
 
 // ===== 结构集（data/<namespace>/worldgen/structure_set/<id>.json）=====
+
+/** 密度函数（data/<namespace>/worldgen/density_function/<id>.json，1.18+） */
+export const DensityFunctionSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 密度函数 JSON（完整内联，如 {"type":"minecraft:noise","noise":"minecraft:overworld/continents"}） */
+  function: z.record(z.unknown()),
+  /** 描述（仅供 UI 展示） */
+  description: z.string().optional(),
+});
+
+/** 噪声参数（data/<namespace>/worldgen/noise/<id>.json，1.18+） */
+export const NoiseSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 噪声参数 JSON（完整内联，如 {"firstOctave":-7,"amplitudes":[1,1]}） */
+  parameters: z.record(z.unknown()),
+  /** 描述（仅供 UI 展示） */
+  description: z.string().optional(),
+});
+
+/** 超平坦预设（data/<namespace>/worldgen/flat_level_generator_preset/<id>.json，1.18+） */
+export const FlatPresetSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 显示名称翻译键 */
+  displayName: z.string().default(''),
+  /** 平坦层列表（按从下到上，如 {"block":"minecraft:bedrock","height":1}） */
+  layers: z
+    .array(z.object({ block: z.string(), height: z.number().int().min(1).default(1) }))
+    .default([]),
+  /** 生物群系 ID */
+  biome: z.string().default('minecraft:plains'),
+  /** 结构/特性引用（可选，如 ["minecraft:village"]） */
+  features: z.array(z.string()).default([]),
+  /** 描述（仅供 UI 展示） */
+  description: z.string().optional(),
+});
+
+// ===== 结构集（data/<namespace>/worldgen/structure_set/<id>.json）=====
 /** 结构集放置类型 */
 export const StructureSetPlacementSpec = z.object({
   /** 放置类型 */
@@ -607,6 +644,13 @@ export const DatapackSpec = z.object({
   bannerPatterns: z.array(BannerPatternSpec).default([]),
   // 聊天类型（chat_type）
   chatTypes: z.array(ChatTypeSpec).default([]),
+  // ===== 世界生成辅助（Task C）=====
+  // 密度函数（worldgen/density_function）
+  densityFunctions: z.array(DensityFunctionSpec).default([]),
+  // 噪声参数（worldgen/noise）
+  noises: z.array(NoiseSpec).default([]),
+  // 超平坦预设（worldgen/flat_level_generator_preset）
+  flatPresets: z.array(FlatPresetSpec).default([]),
 });
 
 export type DatapackSpec = z.infer<typeof DatapackSpec>;
@@ -645,3 +689,6 @@ export type PaintingVariantSpec = z.infer<typeof PaintingVariantSpec>;
 export type WolfVariantSpec = z.infer<typeof WolfVariantSpec>;
 export type BannerPatternSpec = z.infer<typeof BannerPatternSpec>;
 export type ChatTypeSpec = z.infer<typeof ChatTypeSpec>;
+export type DensityFunctionSpec = z.infer<typeof DensityFunctionSpec>;
+export type NoiseSpec = z.infer<typeof NoiseSpec>;
+export type FlatPresetSpec = z.infer<typeof FlatPresetSpec>;

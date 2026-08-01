@@ -842,7 +842,7 @@ describe('DatapackGenerator', () => {
     const result = await gen.generate(
       makeCtx({
         packId: 'my_pack',
-        bannerPatterns: [{ id: 'my_pattern', assetId: 'my_pack:my_pattern' }],
+        bannerPatterns: [{ id: 'my_pattern', assetId: 'my_pack:my_pattern', translationKey: '' }],
       }),
     );
     const bp = result.files.find((f) => f.path === 'data/my_pack/banner_pattern/my_pattern.json');
@@ -871,6 +871,72 @@ describe('DatapackGenerator', () => {
     const parsed = JSON.parse(ct!.content);
     expect(parsed.chat.translation_key).toBe('chat.type.my_chat');
     expect(parsed.narration.parameters).toContain('sender');
+  });
+
+  it('Task C: 生成密度函数 density_function', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        densityFunctions: [
+          {
+            id: 'my_density',
+            function: { type: 'minecraft:noise', noise: 'minecraft:overworld/continents' },
+          },
+        ],
+      }),
+    );
+    const df = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/density_function/my_density.json',
+    );
+    expect(df).toBeDefined();
+    const parsed = JSON.parse(df!.content);
+    expect(parsed.type).toBe('minecraft:noise');
+    expect(parsed.noise).toBe('minecraft:overworld/continents');
+  });
+
+  it('Task C: 生成噪声参数 worldgen/noise', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        noises: [{ id: 'my_noise', parameters: { firstOctave: -7, amplitudes: [1, 1] } }],
+      }),
+    );
+    const nz = result.files.find((f) => f.path === 'data/my_pack/worldgen/noise/my_noise.json');
+    expect(nz).toBeDefined();
+    const parsed = JSON.parse(nz!.content);
+    expect(parsed.firstOctave).toBe(-7);
+    expect(parsed.amplitudes).toEqual([1, 1]);
+  });
+
+  it('Task C: 生成超平坦预设 flat_level_generator_preset', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        flatPresets: [
+          {
+            id: 'my_flat',
+            displayName: 'flat.my_pack.my_flat',
+            biome: 'minecraft:plains',
+            features: ['minecraft:village'],
+            layers: [
+              { block: 'minecraft:bedrock', height: 1 },
+              { block: 'minecraft:dirt', height: 2 },
+              { block: 'minecraft:grass_block', height: 1 },
+            ],
+          },
+        ],
+      }),
+    );
+    const fp = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/flat_level_generator_preset/my_flat.json',
+    );
+    expect(fp).toBeDefined();
+    const parsed = JSON.parse(fp!.content);
+    expect(parsed.display_name).toBe('flat.my_pack.my_flat');
+    expect(parsed.settings.biome).toBe('minecraft:plains');
+    expect(parsed.settings.features).toContain('minecraft:village');
+    expect(parsed.settings.layers).toHaveLength(3);
+    expect(parsed.settings.layers[0].block).toBe('minecraft:bedrock');
   });
 
   it('生成多噪声参数维度', async () => {

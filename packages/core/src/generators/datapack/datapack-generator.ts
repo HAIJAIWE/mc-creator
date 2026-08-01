@@ -38,6 +38,9 @@ import type {
   WolfVariantSpec,
   BannerPatternSpec,
   ChatTypeSpec,
+  DensityFunctionSpec,
+  NoiseSpec,
+  FlatPresetSpec,
 } from '@mc-creator/shared';
 import { isModRecipe, modRecipeToDatapackRecipe } from './recipe-adapter.js';
 
@@ -281,6 +284,18 @@ export class DatapackGenerator implements Generator {
     // 聊天类型（chat_type）
     for (const ct of spec.chatTypes ?? []) {
       files.push(this.generateChatType(ns, ct));
+    }
+    // 密度函数（worldgen/density_function）
+    for (const df of spec.densityFunctions ?? []) {
+      files.push(this.generateDensityFunction(ns, df));
+    }
+    // 噪声参数（worldgen/noise）
+    for (const nz of spec.noises ?? []) {
+      files.push(this.generateNoise(ns, nz));
+    }
+    // 超平坦预设（worldgen/flat_level_generator_preset）
+    for (const fp of spec.flatPresets ?? []) {
+      files.push(this.generateFlatPreset(ns, fp));
     }
 
     return {
@@ -956,6 +971,38 @@ export class DatapackGenerator implements Generator {
     const obj = { chat, narration };
     return {
       path: `data/${namespace}/chat_type/${sanitizePathSegment(ct.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 密度函数 → data/<namespace>/worldgen/density_function/<id>.json（1.18+） */
+  private generateDensityFunction(namespace: string, df: DensityFunctionSpec): FileNode {
+    return {
+      path: `data/${namespace}/worldgen/density_function/${sanitizePathSegment(df.id)}.json`,
+      content: JSON.stringify(df.function, null, 2),
+    };
+  }
+
+  /** 噪声参数 → data/<namespace>/worldgen/noise/<id>.json（1.18+） */
+  private generateNoise(namespace: string, nz: NoiseSpec): FileNode {
+    return {
+      path: `data/${namespace}/worldgen/noise/${sanitizePathSegment(nz.id)}.json`,
+      content: JSON.stringify(nz.parameters, null, 2),
+    };
+  }
+
+  /** 超平坦预设 → data/<namespace>/worldgen/flat_level_generator_preset/<id>.json（1.18+） */
+  private generateFlatPreset(namespace: string, fp: FlatPresetSpec): FileNode {
+    const obj: Record<string, unknown> = {
+      display_name: fp.displayName,
+      settings: {
+        biome: fp.biome,
+        features: fp.features,
+        layers: fp.layers,
+      },
+    };
+    return {
+      path: `data/${namespace}/worldgen/flat_level_generator_preset/${sanitizePathSegment(fp.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }
