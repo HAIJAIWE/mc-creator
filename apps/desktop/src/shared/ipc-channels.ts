@@ -34,6 +34,47 @@ export const IMPORT_SPEC = 'spec:import';
 export const LAUNCHER_LIST_VERSIONS = 'launcher:listVersions';
 export const LAUNCHER_DOWNLOAD = 'launcher:download';
 export const LAUNCHER_LAUNCH = 'launcher:launch';
+export const LAUNCHER_INSTALL_LOADER = 'launcher:installLoader';
+export const LAUNCHER_LIST_MODS = 'launcher:listMods';
+export const LAUNCHER_INSTALL_MOD = 'launcher:installMod';
+export const LAUNCHER_REMOVE_MOD = 'launcher:removeMod';
+export const LAUNCHER_INSTALL_SKIN = 'launcher:installSkin';
+
+export const LauncherInstallLoaderRequest = z.object({
+  version: z.string(),
+  loader: z.enum(['fabric', 'neoforge']),
+});
+export const LauncherInstallLoaderResponse = z.object({
+  ok: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+
+export const LauncherListModsResponse = z.object({
+  mods: z.array(z.string()),
+  error: z.string().nullable().optional(),
+});
+
+export const LauncherInstallModRequest = z.object({
+  version: z.string(),
+  name: z.string(),
+  url: z.string(),
+});
+export const LauncherInstallModResponse = z.object({
+  ok: z.boolean(),
+  path: z.string().nullable(),
+  error: z.string().nullable().optional(),
+});
+
+export const LauncherRemoveModRequest = z.object({ version: z.string(), name: z.string() });
+
+export const LauncherInstallSkinRequest = z.object({
+  version: z.string(),
+  skinApiUrl: z.string().default('https://littleskin.cn/api/yggdrasil'),
+});
+export const LauncherInstallSkinResponse = z.object({
+  ok: z.boolean(),
+  error: z.string().nullable().optional(),
+});
 
 export const LauncherListVersionsResponse = z.object({
   versions: z.array(

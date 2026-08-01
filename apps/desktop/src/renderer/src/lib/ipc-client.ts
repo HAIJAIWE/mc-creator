@@ -105,6 +105,15 @@ export const ipcClient = {
   launcherDownload: (req: { version: string }) => window.mcApi.launcherDownload(req),
   launcherLaunch: (req: { version: string; username: string; memory: string; gameDir?: string }) =>
     window.mcApi.launcherLaunch(req),
+  launcherInstallLoader: (req: { version: string; loader: 'fabric' | 'neoforge' }) =>
+    window.mcApi.launcherInstallLoader(req),
+  launcherListMods: (version: string) => window.mcApi.launcherListMods(version),
+  launcherInstallMod: (req: { version: string; name: string; url: string }) =>
+    window.mcApi.launcherInstallMod(req),
+  launcherRemoveMod: (req: { version: string; name: string }) =>
+    window.mcApi.launcherRemoveMod(req),
+  launcherInstallSkin: (req: { version: string; skinApiUrl?: string }) =>
+    window.mcApi.launcherInstallSkin(req),
   modrinthSearch: (req: {
     query: string;
     loader?: string;

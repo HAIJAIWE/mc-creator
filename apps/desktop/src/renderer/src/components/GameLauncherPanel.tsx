@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Download, Play, Square, RefreshCw, Gamepad2, Loader2 } from 'lucide-react';
+import {
+  Download,
+  Play,
+  Square,
+  RefreshCw,
+  Gamepad2,
+  Loader2,
+  Puzzle,
+  Trash2,
+  User,
+  Wrench,
+} from 'lucide-react';
 import { ipcClient } from '../lib/ipc-client.js';
 
 interface VersionEntry {
@@ -25,6 +36,12 @@ export function GameLauncherPanel() {
   const [runningPid, setRunningPid] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // 加载器 / Mod / 皮肤
+  const [installingLoader, setInstallingLoader] = useState(false);
+  const [mods, setMods] = useState<string[]>([]);
+  const [skinInstalling, setSkinInstalling] = useState(false);
+  const [skinApiUrl, setSkinApiUrl] = useState('https://littleskin.cn/api/yggdrasil');
+
   const loadVersions = async () => {
     setLoadingVersions(true);
     setError(null);
@@ -49,6 +66,12 @@ export function GameLauncherPanel() {
     loadVersions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 版本切换时刷新 Mod 列表
+  useEffect(() => {
+    if (selected) refreshMods();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   const handleDownload = async () => {
     if (!selected) return;
@@ -90,6 +113,56 @@ export function GameLauncherPanel() {
     } finally {
       setLaunching(false);
     }
+  };
+
+  const refreshMods = async () => {
+    if (!selected) return;
+    const res = await ipcClient.launcherListMods(selected);
+    setMods(res.mods ?? []);
+  };
+
+  const handleInstallLoader = async (loader: 'fabric' | 'neoforge') => {
+    if (!selected) return;
+    setInstallingLoader(true);
+    setError(null);
+    try {
+      const res = await ipcClient.launcherInstallLoader({ version: selected, loader });
+      if (!res.ok) {
+        setError(res.error ?? '加载器安装失败');
+      } else {
+        setDownloadStatus(`${loader === 'fabric' ? 'Fabric' : 'NeoForge'} 加载器安装完成`);
+        await refreshMods();
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setInstallingLoader(false);
+    }
+  };
+
+  const handleInstallSkin = async () => {
+    if (!selected) return;
+    setSkinInstalling(true);
+    setError(null);
+    try {
+      const res = await ipcClient.launcherInstallSkin({ version: selected, skinApiUrl });
+      if (!res.ok) {
+        setError(res.error ?? '皮肤支持安装失败');
+      } else {
+        setDownloadStatus('离线皮肤支持已安装（CustomSkinLoader）');
+        await refreshMods();
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSkinInstalling(false);
+    }
+  };
+
+  const handleRemoveMod = async (name: string) => {
+    if (!selected) return;
+    await ipcClient.launcherRemoveMod({ version: selected, name });
+    await refreshMods();
   };
 
   return (
@@ -157,6 +230,108 @@ export function GameLauncherPanel() {
               />
             </div>
           </div>
+        </div>
+
+        {/* 加载器安装 */}
+        <div className="rounded-mc border border-mc-border bg-mc-surface-2 p-3">
+          <span className="mb-2 flex items-center gap-1.5 text-xs font-medium text-mc-text">
+            <Wrench className="h-3 w-3" /> 加载器安装（Mod 支持）
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleInstallLoader('fabric')}
+              disabled={!selected || installingLoader}
+              className="mc-btn-primary flex-1"
+            >
+              {installingLoader && <Loader2 className="h-3 w-3 animate-spin" />} 安装 Fabric
+            </button>
+            <button
+              onClick={() => handleInstallLoader('neoforge')}
+              disabled={!selected || installingLoader}
+              className="mc-btn-primary flex-1"
+            >
+              {installingLoader && <Loader2 className="h-3 w-3 animate-spin" />} 安装 NeoForge
+            </button>
+          </div>
+          <p className="mt-1 text-[10px] text-mc-mute">
+            安装后版本目录出现 fabric-loader-&lt;版本&gt;，用于启动 Mod。
+          </p>
+        </div>
+
+        {/* Mod 管理 */}
+        <div className="rounded-mc border border-mc-border bg-mc-surface-2 p-3">
+          <div className="mb-2 flex items-center gap-1.5">
+            <Puzzle className="h-3 w-3" />
+            <span className="text-xs font-medium text-mc-text">已装 Mod</span>
+            <button
+              onClick={refreshMods}
+              className="ml-auto flex items-center gap-1 rounded-mc bg-mc-surface-3 px-1.5 py-0.5 text-[10px] text-mc-dim hover:text-mc-text"
+              title="刷新 Mod 列表"
+            >
+              <RefreshCw className="h-2.5 w-2.5" /> 刷新
+            </button>
+          </div>
+          {mods.length === 0 ? (
+            <div className="py-3 text-center text-[11px] text-mc-mute">
+              暂无 Mod（可先在「包管理」搜索 Modrinth，复制文件 URL 后在此安装）
+            </div>
+          ) : (
+            <ul className="space-y-1">
+              {mods.map((m) => (
+                <li
+                  key={m}
+                  className="flex items-center gap-2 rounded-mc bg-mc-surface px-2 py-1 text-[11px]"
+                >
+                  <Puzzle className="h-3 w-3 flex-shrink-0 text-mc-mute" />
+                  <span className="min-w-0 flex-1 truncate text-mc-text">{m}</span>
+                  <button
+                    onClick={() => handleRemoveMod(m)}
+                    className="text-mc-mute hover:text-mc-redstone"
+                    title="删除 Mod"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* 离线皮肤 */}
+        <div className="rounded-mc border border-mc-border bg-mc-surface-2 p-3">
+          <span className="mb-2 flex items-center gap-1.5 text-xs font-medium text-mc-text">
+            <User className="h-3 w-3" /> 离线皮肤
+          </span>
+          <div className="flex items-center gap-2">
+            <select
+              value={skinApiUrl}
+              onChange={(e) => setSkinApiUrl(e.target.value)}
+              className="mc-select flex-1"
+              aria-label="皮肤站"
+            >
+              <option value="https://littleskin.cn/api/yggdrasil">LittleSkin（国内主流）</option>
+              <option value="https://skin.mualliance.ltd/api/yggdrasil">MUA 皮肤站</option>
+              <option value="https://littleskin.cn/api/yggdrasil">自定义（下方输入）</option>
+            </select>
+            <input
+              value={skinApiUrl}
+              onChange={(e) => setSkinApiUrl(e.target.value)}
+              placeholder="Yggdrasil API URL"
+              className="mc-input flex-1"
+            />
+          </div>
+          <button
+            onClick={handleInstallSkin}
+            disabled={!selected || skinInstalling}
+            className="mc-btn-primary mt-2 w-full"
+          >
+            {skinInstalling ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <User className="h-3 w-3" />
+            )}
+            {skinInstalling ? '安装中…' : '安装离线皮肤支持'}
+          </button>
         </div>
 
         {/* 状态与错误 */}

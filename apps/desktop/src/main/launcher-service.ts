@@ -17,7 +17,6 @@ import { join, dirname } from 'node:path';
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-
 /** 下载进度回调 */
 export type DownloadProgress = (
   stage: 'versions' | 'client' | 'assets' | 'libraries',
@@ -252,5 +251,184 @@ export class LauncherService {
 
     const child: ChildProcess = spawn(java, args, { stdio: 'ignore' });
     return { pid: child.pid ?? 0 };
+  }
+
+  // ===== 加载器安装（Fabric / NeoForge）=====
+
+  /** 已安装加载器检测：versions 目录含 fabric-loader-<ver> 或 neoforge-<ver> */
+  async isLoaderInstalled(version: string, loader: 'fabric' | 'neoforge'): Promise<boolean> {
+    const prefix = loader === 'fabric' ? 'fabric-loader' : 'neoforge';
+    const versionsDir = join(this.baseDir, 'versions');
+    try {
+      const entries = await import('node:fs/promises').then((f) => f.readdir(versionsDir));
+      return entries.some((e) => e.startsWith(prefix) && e.includes(version));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 一键安装加载器（Fabric / NeoForge）。
+   * 原理：下载官方 installer jar → 静默运行 client 安装到 launcher 目录。
+   * 安装产物: versions/fabric-loader-<ver>/ 或 versions/neoforge-<ver>/（官方 installer 生成）。
+   */
+  async installLoader(
+    version: string,
+    loader: 'fabric' | 'neoforge',
+    onProgress?: DownloadProgress,
+  ): Promise<void> {
+    const java = process.env.JAVA_HOME
+      ? join(process.env.JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java')
+      : 'java';
+    onProgress?.('versions', 0, 1);
+
+    if (loader === 'fabric') {
+      const installerPath = join(this.baseDir, 'fabric-installer.jar');
+      if (!(await exists(installerPath))) {
+        const url =
+          'https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar';
+        const buf = await this.download(url);
+        await writeFileAtomic(installerPath, buf);
+      }
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(
+          java,
+          [
+            '-jar',
+            installerPath,
+            'client',
+            '-mcversion',
+            version,
+            '-dir',
+            this.baseDir,
+            '-loader',
+            'latest',
+            '-noprofile',
+          ],
+          { stdio: 'ignore' },
+        );
+        child.on('close', (code) => {
+          if (code === 0) resolve();
+          else reject(new Error(`Fabric 安装失败（退出码 ${code}）`));
+        });
+        child.on('error', reject);
+      });
+    } else {
+      // NeoForge: 先解析版本对应的 installer URL（maven 元数据）
+      const metadataUrl =
+        'https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml';
+      const metaBuf = await this.download(metadataUrl);
+      const metaText = metaBuf.toString('utf-8');
+      // 匹配该 MC 版本的最新稳定 installer（如 26.1.x 系列取最大 build）
+      const re = new RegExp(`<version>${version.replace(/\./g, '\\.')}\\.(\\d+)</version>`, 'g');
+      let m: RegExpExecArray | null;
+      let best = '';
+      while ((m = re.exec(metaText)) !== null) {
+        best = `${version}.${m[1]}`;
+      }
+      if (!best) throw new Error(`未找到 NeoForge ${version} 的 installer`);
+      const installerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${best}/neoforge-${best}-installer.jar`;
+      const installerPath = join(this.baseDir, `neoforge-${best}-installer.jar`);
+      if (!(await exists(installerPath))) {
+        const buf = await this.download(installerUrl);
+        await writeFileAtomic(installerPath, buf);
+      }
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(java, ['-jar', installerPath, '--installClient', this.baseDir], {
+          stdio: 'ignore',
+        });
+        child.on('close', (code) => {
+          if (code === 0) resolve();
+          else reject(new Error(`NeoForge 安装失败（退出码 ${code}）`));
+        });
+        child.on('error', reject);
+      });
+    }
+    onProgress?.('versions', 1, 1);
+  }
+
+  // ===== Mod 管理 =====
+
+  /** 版本 mods 目录（Fabric 加载器版 mods 在版本目录，vanilla 版在 gameDir） */
+  modsDir(version: string): string {
+    return join(this.baseDir, 'versions', version, 'mods');
+  }
+
+  /** 列出已安装 Mod（.jar 文件） */
+  async listMods(version: string): Promise<string[]> {
+    const dir = this.modsDir(version);
+    try {
+      const entries = await import('node:fs/promises').then((f) => f.readdir(dir));
+      return entries.filter((e) => e.endsWith('.jar'));
+    } catch {
+      return [];
+    }
+  }
+
+  /** 下载 Mod jar 到版本 mods 目录（url 为 Modrinth 版本文件直链） */
+  async installMod(version: string, name: string, url: string): Promise<string> {
+    const dir = this.modsDir(version);
+    const dest = join(dir, name.endsWith('.jar') ? name : `${name}.jar`);
+    if (await exists(dest)) return dest;
+    const buf = await this.download(url);
+    await writeFileAtomic(dest, buf);
+    return dest;
+  }
+
+  /** 删除已装 Mod */
+  async removeMod(version: string, name: string): Promise<void> {
+    const dest = join(this.modsDir(version), name);
+    await import('node:fs/promises').then((f) => f.rm(dest, { force: true }));
+  }
+
+  // ===== 离线皮肤（CustomSkinLoader）=====
+
+  /**
+   * 安装离线皮肤支持：
+   * 1. 下载 CustomSkinLoader mod（Fabric，Modrinth）到 mods 目录
+   * 2. 生成 CustomSkinLoader 配置（皮肤站 API 列表）到 game 目录 config/
+   * 皮肤站: LittleSkin 为国内主流（https://littleskin.cn/api/yggdrasil）
+   */
+  async installSkinSupport(
+    version: string,
+    skinApiUrl: string,
+    onProgress?: DownloadProgress,
+  ): Promise<void> {
+    onProgress?.('versions', 0, 2);
+    // CustomSkinLoader 最新 Fabric 版本（Modrinth 项目 customskinloader）
+    const projUrl =
+      'https://api.modrinth.com/v2/project/customskinloader/version?loaders=%5B%22fabric%22%5D&game_versions=%5B%2226.1%22%5D';
+    try {
+      const projBuf = await this.download(projUrl);
+      const versions = JSON.parse(projBuf.toString('utf-8'));
+      const latest = versions[0];
+      const file = latest?.files?.[0];
+      if (!file?.url) throw new Error('未找到 CustomSkinLoader 下载');
+      await this.installMod(version, latest.files[0].filename, file.url);
+      onProgress?.('versions', 1, 2);
+
+      // 生成配置（放 game 目录的 config/ 下，CustomSkinLoader 读取）
+      const gameDir = join(this.baseDir, 'game', version);
+      const configDir = join(gameDir, 'config');
+      const cfgPath = join(configDir, 'CustomSkinLoader', 'CustomSkinLoader.json');
+      const config = {
+        version: 2,
+        loadlist: [
+          {
+            name: 'LittleSkin',
+            type: 'CustomSkinAPI',
+            root: skinApiUrl || 'https://littleskin.cn/api/yggdrasil',
+          },
+        ],
+        enableDynamicSkull: true,
+        enableTransparentSkin: true,
+        forceUseHttpsPing: true,
+        enableCape: true,
+      };
+      await writeFileAtomic(cfgPath, Buffer.from(JSON.stringify(config, null, 2)));
+      onProgress?.('versions', 2, 2);
+    } catch (e) {
+      throw new Error(`皮肤支持安装失败: ${(e as Error).message}`);
+    }
   }
 }

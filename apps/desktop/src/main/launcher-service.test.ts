@@ -36,6 +36,25 @@ function makeFetch(manifest: unknown, versionJson: unknown) {
           ),
       } as Response;
     }
+    if (url.includes('api.modrinth.com')) {
+      const skinVersions = [
+        {
+          files: [
+            {
+              url: 'https://cdn.modrinth.com/data/csl/customskinloader-1.0.0.jar',
+              filename: 'customskinloader-1.0.0.jar',
+            },
+          ],
+        },
+      ];
+      const skinBuf = Buffer.from(JSON.stringify(skinVersions));
+      return {
+        ok: true,
+        status: 200,
+        arrayBuffer: async () =>
+          skinBuf.buffer.slice(skinBuf.byteOffset, skinBuf.byteOffset + skinBuf.byteLength),
+      } as Response;
+    }
     if (url.includes('resources.download')) {
       const b = Buffer.from('asset-data');
       return {
@@ -197,5 +216,53 @@ describe('LauncherService', () => {
     await expect(
       service.launchGame(detail, { username: 'Steve', memory: '2G', gameDir: join(dir, 'game') }),
     ).rejects.toThrow('客户端未下载');
+  });
+});
+
+describe('LauncherService 增强（加载器/Mod/皮肤）', () => {
+  let dir: string;
+  let service: LauncherService;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'mc-launcher-test2-'));
+    service = new LauncherService(
+      dir,
+      makeFetch(MANIFEST, VERSION_JSON) as unknown as typeof fetch,
+    );
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('listMods 空目录返回空数组', async () => {
+    expect(await service.listMods('26.2')).toEqual([]);
+  });
+
+  it('installMod 下载 jar 到版本 mods 目录', async () => {
+    const p = await service.installMod(
+      '26.2',
+      'my_mod.jar',
+      'https://cdn.modrinth.com/data/x/my_mod.jar',
+    );
+    expect(p.replace(/\\/g, '/')).toContain('versions/26.2/mods/my_mod.jar');
+    expect(await service.listMods('26.2')).toEqual(['my_mod.jar']);
+  });
+
+  it('removeMod 删除 jar', async () => {
+    await service.installMod('26.2', 'my_mod.jar', 'https://cdn.modrinth.com/data/x/my_mod.jar');
+    await service.removeMod('26.2', 'my_mod.jar');
+    expect(await service.listMods('26.2')).toEqual([]);
+  });
+
+  it('installSkinSupport 生成皮肤配置并安装 mod', async () => {
+    // modrinth API + jar 下载都走 mock（jar 分支返回 jar-data）
+    await service.installSkinSupport('26.2', 'https://littleskin.cn/api/yggdrasil');
+    const mods = await service.listMods('26.2');
+    expect(mods.length).toBeGreaterThan(0);
+    // 配置文件存在且含皮肤站 URL
+    const cfg = join(dir, 'game', '26.2', 'config', 'CustomSkinLoader', 'CustomSkinLoader.json');
+    const content = await import('node:fs/promises').then((f) => f.readFile(cfg, 'utf-8'));
+    expect(content).toContain('littleskin.cn');
   });
 });

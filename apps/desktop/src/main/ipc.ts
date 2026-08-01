@@ -46,11 +46,24 @@ import {
   LAUNCHER_LIST_VERSIONS,
   LAUNCHER_DOWNLOAD,
   LAUNCHER_LAUNCH,
+  LAUNCHER_INSTALL_LOADER,
+  LAUNCHER_LIST_MODS,
+  LAUNCHER_INSTALL_MOD,
+  LAUNCHER_REMOVE_MOD,
+  LAUNCHER_INSTALL_SKIN,
   LauncherListVersionsResponse,
   LauncherDownloadRequest,
   LauncherDownloadResponse,
   LauncherLaunchRequest,
   LauncherLaunchResponse,
+  LauncherInstallLoaderRequest,
+  LauncherInstallLoaderResponse,
+  LauncherListModsResponse,
+  LauncherInstallModRequest,
+  LauncherInstallModResponse,
+  LauncherRemoveModRequest,
+  LauncherInstallSkinRequest,
+  LauncherInstallSkinResponse,
   GenerateSpecRequest,
   GenerateFilesRequest,
   BuildRequest,
@@ -610,6 +623,73 @@ ${req.buildLog}
         return { pid: result.pid };
       } catch (e) {
         return { pid: 0, error: (e as Error).message };
+      }
+    },
+  );
+
+  // 安装加载器（Fabric / NeoForge）
+  ipcMain.handle(
+    LAUNCHER_INSTALL_LOADER,
+    async (_e, raw: unknown): Promise<z.infer<typeof LauncherInstallLoaderResponse>> => {
+      try {
+        const req = LauncherInstallLoaderRequest.parse(raw);
+        await launcher.installLoader(req.version, req.loader);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: (e as Error).message };
+      }
+    },
+  );
+
+  // 列出已装 Mod
+  ipcMain.handle(
+    LAUNCHER_LIST_MODS,
+    async (_e, raw: unknown): Promise<z.infer<typeof LauncherListModsResponse>> => {
+      try {
+        const req = z.object({ version: z.string() }).parse(raw);
+        const mods = await launcher.listMods(req.version);
+        return { mods };
+      } catch (e) {
+        return { mods: [], error: (e as Error).message };
+      }
+    },
+  );
+
+  // 安装 Mod（Modrinth 文件直链）
+  ipcMain.handle(
+    LAUNCHER_INSTALL_MOD,
+    async (_e, raw: unknown): Promise<z.infer<typeof LauncherInstallModResponse>> => {
+      try {
+        const req = LauncherInstallModRequest.parse(raw);
+        const path = await launcher.installMod(req.version, req.name, req.url);
+        return { ok: true, path };
+      } catch (e) {
+        return { ok: false, path: null, error: (e as Error).message };
+      }
+    },
+  );
+
+  // 删除 Mod
+  ipcMain.handle(LAUNCHER_REMOVE_MOD, async (_e, raw: unknown) => {
+    try {
+      const req = LauncherRemoveModRequest.parse(raw);
+      await launcher.removeMod(req.version, req.name);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+  // 安装离线皮肤支持（CustomSkinLoader + 皮肤站配置）
+  ipcMain.handle(
+    LAUNCHER_INSTALL_SKIN,
+    async (_e, raw: unknown): Promise<z.infer<typeof LauncherInstallSkinResponse>> => {
+      try {
+        const req = LauncherInstallSkinRequest.parse(raw);
+        await launcher.installSkinSupport(req.version, req.skinApiUrl);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: (e as Error).message };
       }
     },
   );

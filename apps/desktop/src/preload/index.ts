@@ -8,6 +8,11 @@ import {
   LAUNCHER_LIST_VERSIONS,
   LAUNCHER_DOWNLOAD,
   LAUNCHER_LAUNCH,
+  LAUNCHER_INSTALL_LOADER,
+  LAUNCHER_LIST_MODS,
+  LAUNCHER_INSTALL_MOD,
+  LAUNCHER_REMOVE_MOD,
+  LAUNCHER_INSTALL_SKIN,
   SAVE_ALL_FILES,
   PREPARE_BUILD_DIR,
   EXPORT_PROJECT,
@@ -170,6 +175,15 @@ const api = {
   launcherDownload: (req: { version: string }) => ipcRenderer.invoke(LAUNCHER_DOWNLOAD, req),
   launcherLaunch: (req: { version: string; username: string; memory: string; gameDir?: string }) =>
     ipcRenderer.invoke(LAUNCHER_LAUNCH, req),
+  launcherInstallLoader: (req: { version: string; loader: 'fabric' | 'neoforge' }) =>
+    ipcRenderer.invoke(LAUNCHER_INSTALL_LOADER, req),
+  launcherListMods: (version: string) => ipcRenderer.invoke(LAUNCHER_LIST_MODS, { version }),
+  launcherInstallMod: (req: { version: string; name: string; url: string }) =>
+    ipcRenderer.invoke(LAUNCHER_INSTALL_MOD, req),
+  launcherRemoveMod: (req: { version: string; name: string }) =>
+    ipcRenderer.invoke(LAUNCHER_REMOVE_MOD, req),
+  launcherInstallSkin: (req: { version: string; skinApiUrl?: string }) =>
+    ipcRenderer.invoke(LAUNCHER_INSTALL_SKIN, req),
   saveAllFiles: (req: { files: { path: string; content: string }[] }) =>
     ipcRenderer.invoke(SAVE_ALL_FILES, req),
   prepareBuildDir: (files: { path: string; content: string }[]) =>
