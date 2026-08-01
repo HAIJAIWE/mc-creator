@@ -638,6 +638,241 @@ describe('DatapackGenerator', () => {
     expect(parsed.placement.frequency_modifier).toBe('minecraft:beards');
   });
 
+  it('Task A: 生成已配置特性 configured_feature', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        configuredFeatures: [
+          {
+            id: 'ruby_ore',
+            type: 'minecraft:ore',
+            config: {
+              size: 8,
+              discard_chance_on_air_exposure: 0.5,
+              targets: [
+                {
+                  target: { block: 'minecraft:stone', state: {} },
+                  state: { Name: 'my_pack:ruby_ore' },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    const cf = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/configured_feature/ruby_ore.json',
+    );
+    expect(cf).toBeDefined();
+    const parsed = JSON.parse(cf!.content);
+    expect(parsed.type).toBe('minecraft:ore');
+    expect(parsed.config.size).toBe(8);
+    expect(parsed.config.targets[0].state.Name).toBe('my_pack:ruby_ore');
+  });
+
+  it('Task A: type 无 minecraft: 前缀时自动补齐', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        configuredFeatures: [{ id: 'f1', type: 'ore', config: {} }],
+      }),
+    );
+    const cf = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/configured_feature/f1.json',
+    );
+    expect(JSON.parse(cf!.content).type).toBe('minecraft:ore');
+  });
+
+  it('Task A: 生成已放置特性 placed_feature', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        placedFeatures: [
+          {
+            id: 'ruby_ore_placed',
+            feature: 'my_pack:ruby_ore',
+            placements: [
+              { type: 'minecraft:count', count: 12 },
+              { type: 'minecraft:heightmap', heightmap: 'OCEAN_FLOOR_WG' },
+            ],
+          },
+        ],
+      }),
+    );
+    const pf = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/placed_feature/ruby_ore_placed.json',
+    );
+    expect(pf).toBeDefined();
+    const parsed = JSON.parse(pf!.content);
+    expect(parsed.feature).toBe('my_pack:ruby_ore');
+    expect(parsed.placement).toHaveLength(2);
+    expect(parsed.placement[0].count).toBe(12);
+  });
+
+  it('Task A: 生成模板池 template_pool', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        templatePools: [
+          {
+            id: 'house/base',
+            fallback: 'minecraft:empty',
+            entries: [
+              { template: 'my_pack:house/base_1', weight: 2 },
+              { template: 'my_pack:house/base_2', weight: 1 },
+            ],
+          },
+        ],
+      }),
+    );
+    const pool = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/template_pool/house/base.json',
+    );
+    expect(pool).toBeDefined();
+    const parsed = JSON.parse(pool!.content);
+    expect(parsed.fallback).toBe('minecraft:empty');
+    expect(parsed.elements).toHaveLength(2);
+    expect(parsed.elements[0].element.location).toBe('my_pack:house/base_1');
+    expect(parsed.elements[0].element.element_type).toBe('minecraft:single_pool_element');
+    expect(parsed.elements[1].weight).toBe(1);
+  });
+
+  it('Task A: 生成处理器列表 processor_list', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        processorLists: [
+          {
+            id: 'crystal_towers_processors',
+            processors: [
+              { type: 'minecraft:block_age', config: { mossiness: 0.5 } },
+              { type: 'minecraft:block_rotate', config: {} },
+            ],
+          },
+        ],
+      }),
+    );
+    const pl = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/processor_list/crystal_towers_processors.json',
+    );
+    expect(pl).toBeDefined();
+    const parsed = JSON.parse(pl!.content);
+    expect(parsed.processors).toHaveLength(2);
+    expect(parsed.processors[0].processor_type).toBe('minecraft:block_age');
+    expect(parsed.processors[0].mossiness).toBe(0.5);
+  });
+
+  it('Task A: processor type 无前缀时自动补齐', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        processorLists: [{ id: 'p1', processors: [{ type: 'block_ignore', config: {} }] }],
+      }),
+    );
+    const pl = result.files.find((f) => f.path === 'data/my_pack/worldgen/processor_list/p1.json');
+    expect(JSON.parse(pl!.content).processors[0].processor_type).toBe('minecraft:block_ignore');
+  });
+
+  it('Task B: 生成唱片机歌曲 jukebox_song', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        jukeboxSongs: [
+          {
+            id: 'my_disc',
+            songItem: 'my_pack:my_disc',
+            soundEvent: 'my_pack:music_disc.my_disc',
+            lengthInSeconds: 200,
+            comparatorOutput: 7,
+            description: 'item.my_pack.my_disc.desc',
+          },
+        ],
+      }),
+    );
+    const js = result.files.find((f) => f.path === 'data/my_pack/jukebox_song/my_disc.json');
+    expect(js).toBeDefined();
+    const parsed = JSON.parse(js!.content);
+    expect(parsed.song_item).toBe('my_pack:my_disc');
+    expect(parsed.length_in_seconds).toBe(200);
+    expect(parsed.comparator_output).toBe(7);
+  });
+
+  it('Task B: 生成画作变体 painting_variant', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        paintingVariants: [
+          { id: 'wide_art', assetId: 'my_pack:painting/wide_art', width: 2, height: 1 },
+        ],
+      }),
+    );
+    const pv = result.files.find((f) => f.path === 'data/my_pack/painting_variant/wide_art.json');
+    expect(pv).toBeDefined();
+    const parsed = JSON.parse(pv!.content);
+    expect(parsed.asset_id).toBe('my_pack:painting/wide_art');
+    expect(parsed.width).toBe(2);
+    expect(parsed.height).toBe(1);
+  });
+
+  it('Task B: 生成狼变体 wolf_variant', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        wolfVariants: [
+          {
+            id: 'snowy_wolf',
+            wildTexture: 'my_pack:entity/wolf/snowy_wolf',
+            tameTexture: 'my_pack:entity/wolf/snowy_wolf_tame',
+            angryTexture: 'my_pack:entity/wolf/snowy_wolf_angry',
+            biomes: '#minecraft:is_snowy',
+          },
+        ],
+      }),
+    );
+    const wv = result.files.find((f) => f.path === 'data/my_pack/wolf_variant/snowy_wolf.json');
+    expect(wv).toBeDefined();
+    const parsed = JSON.parse(wv!.content);
+    expect(parsed.wild_texture).toBe('my_pack:entity/wolf/snowy_wolf');
+    expect(parsed.tame_texture).toBe('my_pack:entity/wolf/snowy_wolf_tame');
+    expect(parsed.angry_texture).toBe('my_pack:entity/wolf/snowy_wolf_angry');
+    expect(parsed.biomes).toBe('#minecraft:is_snowy');
+  });
+
+  it('Task B: 生成旗帜图案 banner_pattern', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        bannerPatterns: [{ id: 'my_pattern', assetId: 'my_pack:my_pattern' }],
+      }),
+    );
+    const bp = result.files.find((f) => f.path === 'data/my_pack/banner_pattern/my_pattern.json');
+    expect(bp).toBeDefined();
+    expect(JSON.parse(bp!.content).asset_id).toBe('my_pack:my_pattern');
+  });
+
+  it('Task B: 生成聊天类型 chat_type', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        chatTypes: [
+          {
+            id: 'my_chat',
+            chat: { translationKey: 'chat.type.my_chat', parameters: ['sender', 'content'] },
+            narration: {
+              translationKey: 'chat.type.my_chat.narrate',
+              parameters: ['sender', 'content'],
+            },
+          },
+        ],
+      }),
+    );
+    const ct = result.files.find((f) => f.path === 'data/my_pack/chat_type/my_chat.json');
+    expect(ct).toBeDefined();
+    const parsed = JSON.parse(ct!.content);
+    expect(parsed.chat.translation_key).toBe('chat.type.my_chat');
+    expect(parsed.narration.parameters).toContain('sender');
+  });
+
   it('生成多噪声参数维度', async () => {
     const result = await gen.generate(
       makeCtx({

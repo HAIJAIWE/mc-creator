@@ -29,6 +29,15 @@ import type {
   InstrumentSpec,
   StructureSetSpec,
   ModRecipeSpec,
+  ConfiguredFeatureSpec,
+  PlacedFeatureSpec,
+  TemplatePoolSpec,
+  ProcessorListSpec,
+  JukeboxSongSpec,
+  PaintingVariantSpec,
+  WolfVariantSpec,
+  BannerPatternSpec,
+  ChatTypeSpec,
 } from '@mc-creator/shared';
 import { isModRecipe, modRecipeToDatapackRecipe } from './recipe-adapter.js';
 
@@ -236,6 +245,42 @@ export class DatapackGenerator implements Generator {
     // 结构集
     for (const ss of spec.structureSets ?? []) {
       files.push(this.generateStructureSet(ns, ss));
+    }
+    // 已配置特性（worldgen/configured_feature）
+    for (const cf of spec.configuredFeatures ?? []) {
+      files.push(this.generateConfiguredFeature(ns, cf));
+    }
+    // 已放置特性（worldgen/placed_feature）
+    for (const pf of spec.placedFeatures ?? []) {
+      files.push(this.generatePlacedFeature(ns, pf));
+    }
+    // 模板池（worldgen/template_pool）
+    for (const pool of spec.templatePools ?? []) {
+      files.push(this.generateTemplatePool(ns, pool));
+    }
+    // 处理器列表（worldgen/processor_list）
+    for (const pl of spec.processorLists ?? []) {
+      files.push(this.generateProcessorList(ns, pl));
+    }
+    // 唱片机歌曲（jukebox_song）
+    for (const js of spec.jukeboxSongs ?? []) {
+      files.push(this.generateJukeboxSong(ns, js));
+    }
+    // 画作变体（painting_variant）
+    for (const pv of spec.paintingVariants ?? []) {
+      files.push(this.generatePaintingVariant(ns, pv));
+    }
+    // 狼变体（wolf_variant）
+    for (const wv of spec.wolfVariants ?? []) {
+      files.push(this.generateWolfVariant(ns, wv));
+    }
+    // 旗帜图案（banner_pattern）
+    for (const bp of spec.bannerPatterns ?? []) {
+      files.push(this.generateBannerPattern(ns, bp));
+    }
+    // 聊天类型（chat_type）
+    for (const ct of spec.chatTypes ?? []) {
+      files.push(this.generateChatType(ns, ct));
     }
 
     return {
@@ -775,6 +820,142 @@ export class DatapackGenerator implements Generator {
     };
     return {
       path: `data/${namespace}/worldgen/structure_set/${sanitizePathSegment(ss.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 已配置特性 → data/<namespace>/worldgen/configured_feature/<id>.json */
+  private generateConfiguredFeature(namespace: string, cf: ConfiguredFeatureSpec): FileNode {
+    const obj = {
+      type: cf.type.startsWith('minecraft:') ? cf.type : `minecraft:${cf.type}`,
+      config: cf.config,
+    };
+    return {
+      path: `data/${namespace}/worldgen/configured_feature/${sanitizePathSegment(cf.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 已放置特性 → data/<namespace>/worldgen/placed_feature/<id>.json */
+  private generatePlacedFeature(namespace: string, pf: PlacedFeatureSpec): FileNode {
+    const obj = {
+      feature: pf.feature,
+      placement: pf.placements,
+    };
+    return {
+      path: `data/${namespace}/worldgen/placed_feature/${sanitizePathSegment(pf.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 模板池 → data/<namespace>/worldgen/template_pool/<id>.json */
+  private generateTemplatePool(namespace: string, pool: TemplatePoolSpec): FileNode {
+    const obj = {
+      fallback: pool.fallback,
+      elements: pool.entries.map((e) => ({
+        weight: e.weight,
+        element: {
+          element_type: 'minecraft:single_pool_element',
+          location: e.template,
+          processors: 'minecraft:empty',
+          projection: 'rigid',
+        },
+      })),
+    };
+    return {
+      path: `data/${namespace}/worldgen/template_pool/${sanitizePathSegment(pool.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 处理器列表 → data/<namespace>/worldgen/processor_list/<id>.json */
+  private generateProcessorList(namespace: string, pl: ProcessorListSpec): FileNode {
+    const obj = {
+      processors: pl.processors.map((p) => ({
+        processor_type: p.type.startsWith('minecraft:') ? p.type : `minecraft:${p.type}`,
+        ...p.config,
+      })),
+    };
+    return {
+      path: `data/${namespace}/worldgen/processor_list/${sanitizePathSegment(pl.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 唱片机歌曲 → data/<namespace>/jukebox_song/<id>.json（1.21+） */
+  private generateJukeboxSong(namespace: string, js: JukeboxSongSpec): FileNode {
+    const obj: Record<string, unknown> = {
+      song_item: js.songItem,
+      sound_event: js.soundEvent,
+      length_in_seconds: js.lengthInSeconds,
+      comparator_output: js.comparatorOutput,
+    };
+    if (js.description) {
+      obj.description = js.description;
+    }
+    return {
+      path: `data/${namespace}/jukebox_song/${sanitizePathSegment(js.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 画作变体 → data/<namespace>/painting_variant/<id>.json（1.21+） */
+  private generatePaintingVariant(namespace: string, pv: PaintingVariantSpec): FileNode {
+    const obj = {
+      asset_id: pv.assetId,
+      width: pv.width,
+      height: pv.height,
+    };
+    return {
+      path: `data/${namespace}/painting_variant/${sanitizePathSegment(pv.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 狼变体 → data/<namespace>/wolf_variant/<id>.json（1.21+） */
+  private generateWolfVariant(namespace: string, wv: WolfVariantSpec): FileNode {
+    const obj: Record<string, unknown> = {
+      wild_texture: wv.wildTexture,
+      tame_texture: wv.tameTexture,
+      angry_texture: wv.angryTexture,
+    };
+    if (wv.biomes) {
+      obj.biomes = wv.biomes;
+    }
+    return {
+      path: `data/${namespace}/wolf_variant/${sanitizePathSegment(wv.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 旗帜图案 → data/<namespace>/banner_pattern/<id>.json（1.21+） */
+  private generateBannerPattern(namespace: string, bp: BannerPatternSpec): FileNode {
+    const obj: Record<string, unknown> = {
+      asset_id: bp.assetId,
+    };
+    if (bp.translationKey) {
+      obj.translation_key = bp.translationKey;
+    }
+    return {
+      path: `data/${namespace}/banner_pattern/${sanitizePathSegment(bp.id)}.json`,
+      content: JSON.stringify(obj, null, 2),
+    };
+  }
+
+  /** 聊天类型 → data/<namespace>/chat_type/<id>.json（1.20.3+） */
+  private generateChatType(namespace: string, ct: ChatTypeSpec): FileNode {
+    // schema 用 camelCase（translationKey/parameters），MC JSON 需 snake_case（translation_key）
+    const chat = {
+      translation_key: ct.chat.translationKey,
+      parameters: ct.chat.parameters,
+    };
+    const narration = {
+      translation_key: ct.narration.translationKey,
+      parameters: ct.narration.parameters,
+    };
+    const obj = { chat, narration };
+    return {
+      path: `data/${namespace}/chat_type/${sanitizePathSegment(ct.id)}.json`,
       content: JSON.stringify(obj, null, 2),
     };
   }

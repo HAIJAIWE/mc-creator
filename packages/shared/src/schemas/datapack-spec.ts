@@ -385,8 +385,136 @@ export const InstrumentSpec = z.object({
   description: z.string().default(''),
 });
 
-// ===== 结构集（data/<namespace>/worldgen/structure_set/<id>.json）=====
+// ===== 世界生成:configured_feature / placed_feature / template_pool / processor_list =====
 
+/** 已配置特性（data/<namespace>/worldgen/configured_feature/<id>.json） */
+export const ConfiguredFeatureSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 特性类型，如 minecraft:ore / minecraft:tree / minecraft:lake / minecraft:flower / minecraft:random_patch */
+  type: z.string().default('minecraft:ore'),
+  /** 特性配置 JSON（完整内联，字段随 type 变化，如矿石的 size/targets 数组） */
+  config: z.record(z.unknown()).default({}),
+  /** 描述（仅供 UI 展示，不写入 JSON） */
+  description: z.string().optional(),
+});
+
+/** 已放置特性（data/<namespace>/worldgen/placed_feature/<id>.json） */
+export const PlacedFeatureSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 引用的已配置特性 ID */
+  feature: z.string(),
+  /** 放置修饰器列表（JSON 字符串数组，如 {"type":"minecraft:heightmap","heightmap":"OCEAN_FLOOR_WG"}） */
+  placements: z.array(z.record(z.unknown())).default([]),
+  /** 描述（仅供 UI 展示） */
+  description: z.string().optional(),
+});
+
+/** 模板池条目（data/<namespace>/worldgen/template_pool/<id>.json） */
+export const TemplatePoolEntrySpec = z.object({
+  /** 结构模板文件路径（不含 .nbt 后缀，如 my_mod:house/base） */
+  template: z.string(),
+  /** 权重 */
+  weight: z.number().int().min(1).default(1),
+});
+
+/** 模板池（data/<namespace>/worldgen/template_pool/<id>.json） */
+export const TemplatePoolSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 回退池 ID（无匹配时用） */
+  fallback: z.string().default('minecraft:empty'),
+  /** 池条目 */
+  entries: z.array(TemplatePoolEntrySpec).default([]),
+  /** 描述（仅供 UI 展示） */
+  description: z.string().optional(),
+});
+
+/** 处理器列表条目（data/<namespace>/worldgen/processor_list/<id>.json） */
+export const ProcessorSpec = z.object({
+  /** 处理器类型，如 minecraft:block_rotate / minecraft:block_age / minecraft:rule / minecraft:block_ignore */
+  type: z.string(),
+  /** 处理器配置 JSON */
+  config: z.record(z.unknown()).default({}),
+});
+
+/** 处理器列表（data/<namespace>/worldgen/processor_list/<id>.json） */
+export const ProcessorListSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 处理器列表（按顺序应用） */
+  processors: z.array(ProcessorSpec).default([]),
+  /** 描述（仅供 UI 展示） */
+  description: z.string().optional(),
+});
+
+// ===== 1.21 新注册表:jukebox_song / painting_variant / wolf_variant / banner_pattern / chat_type =====
+
+/** 唱片机歌曲（data/<namespace>/jukebox_song/<id>.json，1.21+） */
+export const JukeboxSongSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 唱片物品 ID（如 minecraft:music_disc_13） */
+  songItem: z.string(),
+  /** 声音事件（如 minecraft:music_disc.13） */
+  soundEvent: z.string().default('minecraft:music_disc.13'),
+  /** 描述翻译键（可选，留空用默认） */
+  description: z.string().default(''),
+  /** 长度（tick，至少 1） */
+  lengthInSeconds: z.number().min(0.1).default(185),
+  /** 比较器输出信号强度（0-15） */
+  comparatorOutput: z.number().int().min(0).max(15).default(1),
+});
+
+/** 画作变体（data/<namespace>/painting_variant/<id>.json，1.21+） */
+export const PaintingVariantSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 画作宽度（格） */
+  width: z.number().int().min(1).default(1),
+  /** 画作高度（格） */
+  height: z.number().int().min(1).default(1),
+  /** 资源位置（贴图路径，如 my_pack:painting/my_art） */
+  assetId: z.string(),
+});
+
+/** 狼变体（data/<namespace>/wolf_variant/<id>.json，1.21+） */
+export const WolfVariantSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 野生贴图路径 */
+  wildTexture: z.string(),
+  /** 驯服贴图路径 */
+  tameTexture: z.string(),
+  /** 愤怒贴图路径 */
+  angryTexture: z.string(),
+  /** 生物群系标签（如 #minecraft:is_snowy，可选） */
+  biomes: z.string().default(''),
+});
+
+/** 旗帜图案（data/<namespace>/banner_pattern/<id>.json，1.21+） */
+export const BannerPatternSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 图案物品 ID（如 my_pack:my_pattern） */
+  assetId: z.string(),
+  /** 翻译键（可选） */
+  translationKey: z.string().default(''),
+});
+
+/** 聊天类型（data/<namespace>/chat_type/<id>.json，1.20.3+） */
+export const ChatTypeSpec = z.object({
+  id: z.string().regex(/^[a-z0-9_/]+$/),
+  /** 聊天组件类型：chat / narration（1.20.3+） */
+  chat: z
+    .object({
+      translationKey: z.string().default('chat.type.text'),
+      parameters: z.array(z.string()).default(['sender', 'content']),
+    })
+    .default({}),
+  /** 叙述组件 */
+  narration: z
+    .object({
+      translationKey: z.string().default('chat.type.text.narrate'),
+      parameters: z.array(z.string()).default(['sender', 'content']),
+    })
+    .default({}),
+});
+
+// ===== 结构集（data/<namespace>/worldgen/structure_set/<id>.json）=====
 /** 结构集放置类型 */
 export const StructureSetPlacementSpec = z.object({
   /** 放置类型 */
@@ -459,6 +587,26 @@ export const DatapackSpec = z.object({
   instruments: z.array(InstrumentSpec).default([]),
   // 结构集（1.16.2+）
   structureSets: z.array(StructureSetSpec).default([]),
+  // ===== 世界生成（Task A）=====
+  // 已配置特性（worldgen/configured_feature）
+  configuredFeatures: z.array(ConfiguredFeatureSpec).default([]),
+  // 已放置特性（worldgen/placed_feature）
+  placedFeatures: z.array(PlacedFeatureSpec).default([]),
+  // 模板池（worldgen/template_pool）
+  templatePools: z.array(TemplatePoolSpec).default([]),
+  // 处理器列表（worldgen/processor_list）
+  processorLists: z.array(ProcessorListSpec).default([]),
+  // ===== 1.21 新注册表（Task B）=====
+  // 唱片机歌曲（jukebox_song）
+  jukeboxSongs: z.array(JukeboxSongSpec).default([]),
+  // 画作变体（painting_variant）
+  paintingVariants: z.array(PaintingVariantSpec).default([]),
+  // 狼变体（wolf_variant）
+  wolfVariants: z.array(WolfVariantSpec).default([]),
+  // 旗帜图案（banner_pattern）
+  bannerPatterns: z.array(BannerPatternSpec).default([]),
+  // 聊天类型（chat_type）
+  chatTypes: z.array(ChatTypeSpec).default([]),
 });
 
 export type DatapackSpec = z.infer<typeof DatapackSpec>;
@@ -486,3 +634,14 @@ export type InstrumentSpec = z.infer<typeof InstrumentSpec>;
 export type StructureSetSpec = z.infer<typeof StructureSetSpec>;
 export type StructureSetPlacementSpec = z.infer<typeof StructureSetPlacementSpec>;
 export type StructureSetEntrySpec = z.infer<typeof StructureSetEntrySpec>;
+export type ConfiguredFeatureSpec = z.infer<typeof ConfiguredFeatureSpec>;
+export type PlacedFeatureSpec = z.infer<typeof PlacedFeatureSpec>;
+export type TemplatePoolSpec = z.infer<typeof TemplatePoolSpec>;
+export type TemplatePoolEntrySpec = z.infer<typeof TemplatePoolEntrySpec>;
+export type ProcessorListSpec = z.infer<typeof ProcessorListSpec>;
+export type ProcessorSpec = z.infer<typeof ProcessorSpec>;
+export type JukeboxSongSpec = z.infer<typeof JukeboxSongSpec>;
+export type PaintingVariantSpec = z.infer<typeof PaintingVariantSpec>;
+export type WolfVariantSpec = z.infer<typeof WolfVariantSpec>;
+export type BannerPatternSpec = z.infer<typeof BannerPatternSpec>;
+export type ChatTypeSpec = z.infer<typeof ChatTypeSpec>;
