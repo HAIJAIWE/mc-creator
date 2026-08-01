@@ -1302,3 +1302,68 @@ describe('FabricAdapter Mod 侧世界生成', () => {
     expect(main!.content).toContain('ModDimensions.initialize();');
   });
 });
+
+// === Task 3: GUI 界面 ===
+
+const SPEC_P40_GUI: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'GUI test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  guis: [
+    {
+      guiId: 'ruby_furnace_gui',
+      displayName: 'Ruby Furnace GUI',
+      width: 176,
+      height: 166,
+      slots: [
+        { slotId: 'in_0', slotType: 'input', x: 0, y: 0 },
+        { slotId: 'out_0', slotType: 'output', x: 80, y: 0 },
+        { slotId: 'fuel_0', slotType: 'fuel', x: 0, y: 40 },
+      ],
+      showEnergyBar: true,
+      showProgressBar: false,
+    },
+  ],
+});
+
+describe('FabricAdapter Task 3 GUI', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate({
+    loader: 'fabric',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_GUI,
+    projectPath: '/proj',
+  });
+
+  it('生成 ModGuis.java 含 Menu 槽位布局', () => {
+    const guis = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModGuis.java');
+    expect(guis).toBeDefined();
+    expect(guis!.content).toContain('public class ModGuis');
+    expect(guis!.content).toContain('RubyFurnaceGuiMenu');
+    expect(guis!.content).toContain('addSlot');
+    expect(guis!.content).toContain('ruby_furnace_gui');
+  });
+
+  it('ModGuis 含 Screen 渲染与能源条', () => {
+    const guis = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModGuis.java');
+    expect(guis!.content).toContain('AbstractContainerScreen');
+    expect(guis!.content).toContain('renderBg');
+    expect(guis!.content).toContain('energy_bar.png');
+  });
+
+  it('mainClass 调用 ModGuis.initialize()', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main!.content).toContain('ModGuis.initialize();');
+  });
+});

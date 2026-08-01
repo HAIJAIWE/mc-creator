@@ -240,6 +240,18 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         density: 1000,
         luminous: false,
       } as NodeData;
+    case 'gui':
+      return {
+        ...base,
+        kind: 'gui',
+        guiId: 'my_gui',
+        displayName: '新 GUI',
+        width: 176,
+        height: 166,
+        slotsJson: '[]',
+        showEnergyBar: false,
+        showProgressBar: false,
+      } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);
   }
@@ -1228,6 +1240,37 @@ describe('compileNodeGraph', () => {
     expect(result.spec.biomes).toEqual([]);
     expect(result.spec.dimensions).toEqual([]);
     expect(result.spec.fluids).toEqual([]);
+  });
+
+  it('GUI: gui 节点编译进 spec.guis（slotsJson 解析）', () => {
+    const nodes = [
+      makeNode('g1', 'gui', {
+        guiId: 'my_furnace',
+        displayName: 'My Furnace',
+        width: 176,
+        height: 166,
+        slotsJson: JSON.stringify([
+          { slotId: 'in_0', slotType: 'input', x: 0, y: 0 },
+          { slotId: 'out_0', slotType: 'output', x: 80, y: 0 },
+        ]),
+        showEnergyBar: true,
+        showProgressBar: false,
+      }),
+    ];
+    const result = compileNodeGraph(makeGraph(nodes));
+    expect(result.spec.guis).toHaveLength(1);
+    const gui = result.spec.guis[0];
+    expect(gui.guiId).toBe('my_furnace');
+    expect(gui.slots).toHaveLength(2);
+    expect(gui.slots[0].slotType).toBe('input');
+    expect(gui.slots[1].slotType).toBe('output');
+    expect(gui.showEnergyBar).toBe(true);
+  });
+
+  it('GUI: slotsJson 非法时回退空槽位', () => {
+    const nodes = [makeNode('g1', 'gui', { guiId: 'bad_gui', slotsJson: 'not json' })];
+    const result = compileNodeGraph(makeGraph(nodes));
+    expect(result.spec.guis[0].slots).toEqual([]);
   });
 
   it('comment 节点被跳过（不产生 spec/warning/unsupported）', () => {

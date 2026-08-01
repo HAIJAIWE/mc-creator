@@ -795,3 +795,59 @@ describe('NeoForgeAdapter Mod 侧世界生成', () => {
     expect(main!.content).toContain('ModDimensions.register(modEventBus);');
   });
 });
+
+// === Task 3: GUI 界面（NeoForge）===
+
+const SPEC_P40_GUI_NEO: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'GUI test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  guis: [
+    {
+      guiId: 'ruby_furnace_gui',
+      displayName: 'Ruby Furnace GUI',
+      width: 176,
+      height: 166,
+      slots: [
+        { slotId: 'in_0', slotType: 'input', x: 0, y: 0 },
+        { slotId: 'out_0', slotType: 'output', x: 80, y: 0 },
+      ],
+      showEnergyBar: false,
+      showProgressBar: false,
+    },
+  ],
+});
+
+describe('NeoForgeAdapter Task 3 GUI', () => {
+  const adapter = new NeoForgeAdapter();
+  const files = adapter.translate({
+    loader: 'neoforge',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_GUI_NEO,
+    projectPath: '/proj',
+  });
+
+  it('生成 ModGuis.java 用 DeferredRegister.MENU', () => {
+    const guis = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModGuis.java');
+    expect(guis).toBeDefined();
+    expect(guis!.content).toContain('DeferredRegister');
+    expect(guis!.content).toContain('IMenuTypeExtension');
+    expect(guis!.content).toContain('RubyFurnaceGuiMenu');
+  });
+
+  it('mainClass 调用 ModGuis.register(modEventBus)', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main!.content).toContain('ModGuis.register(modEventBus);');
+  });
+});

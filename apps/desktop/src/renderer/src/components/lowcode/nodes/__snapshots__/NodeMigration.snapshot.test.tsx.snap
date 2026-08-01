@@ -2315,6 +2315,184 @@ exports[`节点迁移快照测试 > fluid 节点选中状态快照 1`] = `
 </div>
 `;
 
+exports[`节点迁移快照测试 > gui 节点展开状态快照 1`] = `
+<div
+  aria-label="新 GUI 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新 GUI
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      GUI
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-mute"
+    >
+      ID: 
+      my_gui
+    </div>
+    <div
+      class="flex gap-2 text-mc-dim"
+    >
+      <span>
+        176
+        ×
+        166
+      </span>
+      <span>
+        0
+         槽
+      </span>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > gui 节点折叠状态快照 1`] = `
+<div
+  aria-label="新 GUI 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)]  "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新 GUI
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      GUI
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="展开"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▸
+    </button>
+  </div>
+</div>
+`;
+
+exports[`节点迁移快照测试 > gui 节点选中状态快照 1`] = `
+<div
+  aria-label="新 GUI 节点"
+  class="min-w-[180px] max-w-[280px] border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-surface shadow-[4px_4px_0_rgba(0,0,0,0.5)] !border-mc-accent "
+  role="group"
+  style="background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 3px 3px;"
+>
+  <div
+    class="flex items-center gap-1.5 border-2 border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2"
+    style="height: 28px;"
+  >
+    <div
+      class="h-4 w-1"
+      style="background-color: rgb(154, 154, 154);"
+    />
+    <span
+      class="truncate text-[10px] font-medium"
+      style="color: rgb(154, 154, 154);"
+    >
+      新 GUI
+    </span>
+    <span
+      class="text-[10px] text-mc-text"
+    >
+      GUI
+    </span>
+    <button
+      aria-label="设置"
+      class="ml-auto border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ⚙
+    </button>
+    <button
+      aria-label="折叠"
+      class="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-1 text-[10px] hover:bg-mc-btn-hover active:bg-mc-btn-active"
+      type="button"
+    >
+      ▾
+    </button>
+  </div>
+  <div
+    class="space-y-0.5 px-3 py-2 text-[11px] text-mc-text"
+  >
+    <div
+      class="text-mc-mute"
+    >
+      ID: 
+      my_gui
+    </div>
+    <div
+      class="flex gap-2 text-mc-dim"
+    >
+      <span>
+        176
+        ×
+        166
+      </span>
+      <span>
+        0
+         槽
+      </span>
+    </div>
+  </div>
+</div>
+`;
+
 exports[`节点迁移快照测试 > item 节点展开状态快照 1`] = `
 <div
   aria-label="新物品 节点"

@@ -198,6 +198,7 @@ export function getPorts(data: NodeData, graph?: NodeGraph): NodePort[] {
     case 'biome':
     case 'dimension':
     case 'fluid':
+    case 'gui':
       return [];
 
     // === 阶段 C 新增 3 分支 ===

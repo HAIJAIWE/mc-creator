@@ -475,6 +475,32 @@ const FLUID_FIELDS: FieldSchema[] = [
   },
 ];
 
+/** gui 节点字段（容器界面） */
+const GUI_FIELDS: FieldSchema[] = [
+  { key: 'guiId', label: 'GUI ID', type: 'resourceId', required: true },
+  { key: 'displayName', label: '显示名', type: 'text', required: true },
+  { key: 'width', label: '宽度', type: 'number', min: 176, max: 256, step: 1 },
+  { key: 'height', label: '高度', type: 'number', min: 166, max: 256, step: 1 },
+  {
+    key: 'slotsJson',
+    label: '槽位布局 (JSON)',
+    type: 'nbt',
+    placeholder: '[{"slotId":"in_0","slotType":"input","x":0,"y":0}]',
+  },
+  {
+    key: 'showEnergyBar',
+    label: '能源条',
+    type: 'segmented',
+    options: ['false', 'true'],
+  },
+  {
+    key: 'showProgressBar',
+    label: '进度条',
+    type: 'segmented',
+    options: ['false', 'true'],
+  },
+];
+
 /** loop 节点字段（阶段 C） */ const LOOP_FIELDS: FieldSchema[] = [
   {
     key: 'loopType',
@@ -533,6 +559,7 @@ export function getFieldSchemas(kind: NodeKind): FieldSchema[] {
     biome: BIOME_FIELDS,
     dimension: DIMENSION_FIELDS,
     fluid: FLUID_FIELDS,
+    gui: GUI_FIELDS,
   };
   return [...COMMON_FIELDS, ...(specific[kind] ?? [])].filter(
     (f) => !f.excludeKinds?.includes(kind),

@@ -52,6 +52,7 @@ import type {
   ModBiomeSpec,
   ModDimensionSpec,
   FluidSpec,
+  GuiSpec,
 } from '@mc-creator/shared';
 
 // === 类型 ===
@@ -81,6 +82,8 @@ export interface CompilerOutput {
   dimensions?: ModDimensionSpec[];
   /** 流体（fluid 节点） */
   fluids?: FluidSpec[];
+  /** GUI 界面（gui 节点） */
+  guis?: GuiSpec[];
   /** 编译警告（合并到 CompileResult.warnings） */
   warnings?: string[];
   /** 编译错误（合并到 CompileResult.errors，spec 仍可部分使用） */
@@ -163,6 +166,7 @@ export function mergeOutput(dst: CompilerOutput, src: CompilerOutput): void {
   if (src.biomes) (dst.biomes ??= []).push(...src.biomes);
   if (src.dimensions) (dst.dimensions ??= []).push(...src.dimensions);
   if (src.fluids) (dst.fluids ??= []).push(...src.fluids);
+  if (src.guis) (dst.guis ??= []).push(...src.guis);
   if (src.warnings) (dst.warnings ??= []).push(...src.warnings);
   if (src.errors) (dst.errors ??= []).push(...src.errors);
 }

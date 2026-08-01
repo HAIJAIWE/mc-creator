@@ -17,6 +17,7 @@ import { ProcedureNode } from './ProcedureNode.js';
 import { BiomeNode } from './BiomeNode.js';
 import { DimensionNode } from './DimensionNode.js';
 import { FluidNode } from './FluidNode.js';
+import { GuiNode } from './GuiNode.js';
 
 /**
  * 节点类型注册表
@@ -46,6 +47,8 @@ export const nodeTypes = {
   biome: BiomeNode,
   dimension: DimensionNode,
   fluid: FluidNode,
+  // GUI 界面
+  gui: GuiNode,
 } as const;
 
 export type NodeTypeRegistry = typeof nodeTypes;
@@ -213,6 +216,14 @@ export const NODE_METADATA: NodeMeta[] = [
     icon: 'droplet',
     category: 'content',
     color: 'cyan',
+  },
+  {
+    kind: 'gui',
+    label: 'GUI 界面',
+    description: '容器界面：槽位布局 + 能源/进度条（对标 MCreator GUI）',
+    icon: 'window',
+    category: 'content',
+    color: 'gold',
   },
 ];
 

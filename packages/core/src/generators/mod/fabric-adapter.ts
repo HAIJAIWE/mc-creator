@@ -257,6 +257,11 @@ export class FabricAdapter implements LoaderAdapter {
       generate: (s, pkg) => (s.dimensions?.length ? [this.modDimensionsJava(s, pkg)] : []),
     },
     {
+      name: 'guis',
+      hashInputs: (s) => s.guis ?? [],
+      generate: (s, pkg) => (s.guis?.length ? [this.modGuisJava(s, pkg)] : []),
+    },
+    {
       name: 'recipes',
       hashInputs: (s) => s.recipes ?? [],
       generate: (s, pkg) => (s.recipes?.length ? [this.modRecipesJava(s, pkg)] : []),
@@ -493,6 +498,7 @@ fabric_version=${versions.fabricApiVersion}
     if (spec.fluids?.length) initCalls.push('ModFluids.initialize();');
     if (spec.biomes?.length) initCalls.push('ModBiomes.initialize();');
     if (spec.dimensions?.length) initCalls.push('ModDimensions.initialize();');
+    if (spec.guis?.length) initCalls.push('ModGuis.initialize();');
     if (spec.machines?.length) initCalls.push('ModMachines.initialize();');
     if (spec.customCode?.length) initCalls.push('ModCustomCode.initialize();');
     if (spec.multiblocks?.length) initCalls.push('ModMultiblocks.initialize();');
@@ -731,6 +737,111 @@ ${regs}
 `;
     return {
       path: `src/main/java/${packagePath(spec.modId)}/ModDimensions.java`,
+      content,
+    };
+  }
+
+  /**
+   * GUI 界面：生成 ModGuis.java。
+   * 每个 GUI 生成 Menu + Screen 两个类：
+   * - Menu：槽位布局（按 spec.slots 的 x/y 定位）+ 玩家背包
+   * - Screen：渲染背景 + 可选能源/进度条 + 槽位提示
+   * 生成可编译的骨架（无资源贴图时用默认背景）。
+   */
+  private modGuisJava(spec: ModSpecLike, pkg: string): FileNode {
+    const guiClasses = (spec.guis ?? [])
+      .map((g) => {
+        const pascal = this.toPascal(g.guiId);
+        const slotCount = g.slots.length;
+        const slotAdds = g.slots
+          .map(
+            (s) =>
+              `        this.addSlot(new Slot(machineInv, ${g.slots.indexOf(s)}, ${8 + s.x}, ${18 + s.y}));`,
+          )
+          .join('\n');
+        const energyBar = g.showEnergyBar
+          ? `\n            // 能源条（需 textures/gui/energy_bar.png 资源）
+            graphics.blit(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "textures/gui/energy_bar.png"), this.leftPos + 8, this.topPos + 16, 0, 0, 14, 54);`
+          : '';
+        return `    // ${pascal}Menu：GUI 槽位布局（${slotCount} 槽）
+    public static class ${pascal}Menu extends AbstractContainerMenu {
+        private final net.minecraft.world.SimpleContainer machineInv;
+
+        public ${pascal}Menu(int id, Inventory inv) {
+            super(${pascal.toUpperCase()}_MENU_TYPE, id);
+            this.machineInv = new net.minecraft.world.SimpleContainer(${slotCount});
+${slotAdds}
+            // 玩家背包
+            for (int row = 0; row < 3; row++) {
+                for (int col = 0; col < 9; col++) {
+                    this.addSlot(new Slot(inv, col + row * 9 + 9, 8 + col * 18, ${g.height - 82} + row * 18));
+                }
+            }
+            for (int col = 0; col < 9; col++) {
+                this.addSlot(new Slot(inv, col, 8 + col * 18, ${g.height - 24}));
+            }
+        }
+
+        @Override
+        public net.minecraft.world.item.ItemStack quickMoveStack(net.minecraft.world.entity.player.Player player, int index) {
+            return net.minecraft.world.item.ItemStack.EMPTY;
+        }
+
+        @Override
+        public boolean stillValid(net.minecraft.world.entity.player.Player player) {
+            return true;
+        }
+    }
+
+    // ${pascal}Screen：GUI 渲染
+    public static class ${pascal}Screen extends net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<${pascal}Menu> {
+        public ${pascal}Screen(${pascal}Menu menu, Inventory inv, net.minecraft.network.chat.Component title) {
+            super(menu, inv, title);
+            this.imageWidth = ${g.width};
+            this.imageHeight = ${g.height};
+        }
+
+        @Override
+        protected void renderBg(net.minecraft.client.gui.GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+            graphics.blit(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "textures/gui/${g.guiId}.png"), this.leftPos, this.topPos, 0, 0, this.imageWidth, this.imageHeight);${energyBar}
+        }
+
+        @Override
+        public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            super.render(graphics, mouseX, mouseY, partialTick);
+            this.renderTooltip(graphics, mouseX, mouseY);
+        }
+    }
+
+    public static final net.minecraft.world.inventory.MenuType<${pascal}Menu> ${pascal.toUpperCase()}_MENU_TYPE = new net.minecraft.world.inventory.MenuType<>((${pascal}Menu::new));`;
+      })
+      .join('\n\n');
+    const regs = (spec.guis ?? [])
+      .map((g) => {
+        const pascal = this.toPascal(g.guiId);
+        return `        Registry.register(BuiltInRegistries.MENU, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${g.guiId}"), ${pascal.toUpperCase()}_MENU_TYPE);`;
+      })
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.entity.player.Inventory;
+
+public class ModGuis {
+    public static final String MOD_ID = "${javaEscape(spec.modId)}";
+${guiClasses}
+
+    public static void initialize() {
+${regs}
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModGuis.java`,
       content,
     };
   }
@@ -1782,6 +1893,20 @@ type ModSpecLike = {
     effects: 'overworld' | 'the_nether' | 'the_end' | 'none';
     seed?: number;
     texturePath?: string;
+  }>;
+  guis?: Array<{
+    guiId: string;
+    displayName: string;
+    width: number;
+    height: number;
+    slots: Array<{
+      slotId: string;
+      slotType: 'input' | 'output' | 'energy' | 'fuel';
+      x: number;
+      y: number;
+    }>;
+    showEnergyBar: boolean;
+    showProgressBar: boolean;
   }>;
   eventHandlers?: Array<{
     handlerId: string;

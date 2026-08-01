@@ -42,6 +42,7 @@ function makeSpec(overrides: Partial<ModSpec> = {}): ModSpec {
     fluids: [],
     biomes: [],
     dimensions: [],
+    guis: [],
     eventHandlers: [],
     conditions: [],
     actions: [],

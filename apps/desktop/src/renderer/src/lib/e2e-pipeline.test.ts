@@ -233,6 +233,18 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         density: 1000,
         luminous: false,
       } as NodeData;
+    case 'gui':
+      return {
+        ...base,
+        kind: 'gui',
+        guiId: 'my_gui',
+        displayName: '新 GUI',
+        width: 176,
+        height: 166,
+        slotsJson: '[]',
+        showEnergyBar: false,
+        showProgressBar: false,
+      } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);
   }

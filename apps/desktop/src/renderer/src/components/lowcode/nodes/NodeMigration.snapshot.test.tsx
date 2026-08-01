@@ -23,6 +23,7 @@ import { ProcedureNode } from './ProcedureNode.js';
 import { BiomeNode } from './BiomeNode.js';
 import { DimensionNode } from './DimensionNode.js';
 import { FluidNode } from './FluidNode.js';
+import { GuiNode } from './GuiNode.js';
 
 const NODE_COMPONENTS: Record<NodeKind, React.ComponentType<any>> = {
   item: ItemNode,
@@ -43,6 +44,7 @@ const NODE_COMPONENTS: Record<NodeKind, React.ComponentType<any>> = {
   biome: BiomeNode,
   dimension: DimensionNode,
   fluid: FluidNode,
+  gui: GuiNode,
 };
 
 function renderWithProvider(ui: ReactElement) {

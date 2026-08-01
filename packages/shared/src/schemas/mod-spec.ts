@@ -408,47 +408,77 @@ export const ModBiomeSpec = z.object({
   texturePath: z.string().optional(),
 });
 
-/** Mod 侧维度条目（对标 MCreator 维度：维度类型 + 生成参数） */
-export const ModDimensionSpec = z.object({
-  /** 维度 id（小写下划线） */
-  dimensionId: z.string().regex(/^[a-z0-9_]+$/),
+/** GUI 槽位（对标 MCreator GUI 槽位） */
+export const GuiSlotSpec = z.object({
+  /** 槽位 id（小写下划线） */
+  slotId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 槽位类型：input/output/energy/fuel */
+  slotType: z.enum(['input', 'output', 'energy', 'fuel']).default('input'),
+  /** 槽位 X 坐标（相对 GUI 左上） */
+  x: z.number().int().min(0).default(0),
+  /** 槽位 Y 坐标 */
+  y: z.number().int().min(0).default(0),
+});
+
+/** GUI 界面条目（对标 MCreator GUI：容器 + 槽位布局） */
+export const GuiSpec = z.object({
+  /** GUI id（小写下划线，对应 menu/screen 类名） */
+  guiId: z.string().regex(/^[a-z0-9_]+$/),
   /** 显示名 */
   displayName: z.string(),
-  /** 维度类型模板：overworld/nether/end（自定义参数覆盖） */
-  baseType: z.enum(['overworld', 'nether', 'end']).default('overworld'),
-  /** 固定时间（null = 正常昼夜，1000 = 正午，0 = 午夜，18000 = 黄昏） */
-  fixedTime: z.number().nullable().default(null),
-  /** 是否有天空光 */
-  hasSkyLight: z.boolean().default(true),
-  /** 是否有天花板 */
-  hasCeiling: z.boolean().default(false),
-  /** 超热（末地/下界风格，水蒸发） */
-  ultrawarm: z.boolean().default(false),
-  /** 自然（可睡/重生锚影响） */
-  natural: z.boolean().default(true),
-  /** 坐标缩放 */
-  coordinateScale: z.number().default(1.0),
-  /** 最小 Y */
-  minY: z.number().int().default(-64),
-  /** 高度 */
-  height: z.number().int().default(384),
-  /** 逻辑高度 */
-  logicalHeight: z.number().int().default(384),
-  /** 环境光（0~1） */
-  ambientLight: z.number().min(0).max(1).default(0),
-  /** 是否猪灵安全 */
-  piglinSafe: z.boolean().default(false),
-  /** 床是否可用 */
-  bedWorks: z.boolean().default(true),
-  /** 重生锚是否可用 */
-  respawnAnchorWorks: z.boolean().default(false),
-  /** 背景/效果（overworld/the_nether/the_end） */
-  effects: z.enum(['overworld', 'the_nether', 'the_end', 'none']).default('overworld'),
-  /** 维度种子（留空用世界种子） */
-  seed: z.number().optional(),
-  /** 贴图路径（相对 resources/） */
-  texturePath: z.string().optional(),
+  /** GUI 宽度（像素） */
+  width: z.number().int().min(176).max(256).default(176),
+  /** GUI 高度 */
+  height: z.number().int().min(166).max(256).default(166),
+  /** 槽位列表 */
+  slots: z.array(GuiSlotSpec).default([]),
+  /** 是否显示能源条 */
+  showEnergyBar: z.boolean().default(false),
+  /** 是否显示进度条 */
+  showProgressBar: z.boolean().default(false),
 });
+
+/** Mod 侧维度条目（对标 MCreator 维度：维度类型 + 生成参数） */ export const ModDimensionSpec =
+  z.object({
+    /** 维度 id（小写下划线） */
+    dimensionId: z.string().regex(/^[a-z0-9_]+$/),
+    /** 显示名 */
+    displayName: z.string(),
+    /** 维度类型模板：overworld/nether/end（自定义参数覆盖） */
+    baseType: z.enum(['overworld', 'nether', 'end']).default('overworld'),
+    /** 固定时间（null = 正常昼夜，1000 = 正午，0 = 午夜，18000 = 黄昏） */
+    fixedTime: z.number().nullable().default(null),
+    /** 是否有天空光 */
+    hasSkyLight: z.boolean().default(true),
+    /** 是否有天花板 */
+    hasCeiling: z.boolean().default(false),
+    /** 超热（末地/下界风格，水蒸发） */
+    ultrawarm: z.boolean().default(false),
+    /** 自然（可睡/重生锚影响） */
+    natural: z.boolean().default(true),
+    /** 坐标缩放 */
+    coordinateScale: z.number().default(1.0),
+    /** 最小 Y */
+    minY: z.number().int().default(-64),
+    /** 高度 */
+    height: z.number().int().default(384),
+    /** 逻辑高度 */
+    logicalHeight: z.number().int().default(384),
+    /** 环境光（0~1） */
+    ambientLight: z.number().min(0).max(1).default(0),
+    /** 是否猪灵安全 */
+    piglinSafe: z.boolean().default(false),
+    /** 床是否可用 */
+    bedWorks: z.boolean().default(true),
+    /** 重生锚是否可用 */
+    respawnAnchorWorks: z.boolean().default(false),
+    /** 背景/效果（overworld/the_nether/the_end） */
+    effects: z.enum(['overworld', 'the_nether', 'the_end', 'none']).default('overworld'),
+    /** 维度种子（留空用世界种子） */
+    seed: z.number().optional(),
+    /** 贴图路径（相对 resources/） */
+    texturePath: z.string().optional(),
+  });
 
 /** 机器条目（loader 无关，方块实体 + GUI + 能源） */
 export const MachineSpec = z.object({
@@ -695,6 +725,8 @@ export const ModSpec = z.object({
   biomes: z.array(ModBiomeSpec).default([]),
   // 新增：Mod 侧维度（对标 MCreator）
   dimensions: z.array(ModDimensionSpec).default([]),
+  // 新增：GUI 界面（对标 MCreator GUI 编辑器）
+  guis: z.array(GuiSpec).default([]),
   // 新增：事件处理器（P1.4 从 EventNode 编译，扁平结构；P1.5 通过 conditionIds/actionIds 建立控制流链引用）
   eventHandlers: z.array(EventHandlerSpec).default([]),
   // 新增：条件（P1.4 从 ConditionNode 编译，扁平列表，被 eventHandlers[].conditionIds 引用）
@@ -723,6 +755,8 @@ export type MachineSpec = z.infer<typeof MachineSpec>;
 export type FluidSpec = z.infer<typeof FluidSpec>;
 export type ModBiomeSpec = z.infer<typeof ModBiomeSpec>;
 export type ModDimensionSpec = z.infer<typeof ModDimensionSpec>;
+export type GuiSpec = z.infer<typeof GuiSpec>;
+export type GuiSlotSpec = z.infer<typeof GuiSlotSpec>;
 export type CustomCodeSnippetSpec = z.infer<typeof CustomCodeSnippetSpec>;
 export type MultiBlockSpec = z.infer<typeof MultiBlockSpec>;
 export type EventHandlerSpec = z.infer<typeof EventHandlerSpec>;

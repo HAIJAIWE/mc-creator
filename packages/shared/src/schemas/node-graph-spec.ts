@@ -38,6 +38,8 @@ export const NodeKind = z.enum([
   'biome',
   'dimension',
   'fluid',
+  // GUI 界面
+  'gui',
 ]);
 export type NodeKind = z.infer<typeof NodeKind>;
 
@@ -551,6 +553,26 @@ export const FluidNodeData = BaseNodeData.extend({
 });
 export type FluidNodeData = z.infer<typeof FluidNodeData>;
 
+/** GUI 节点 */
+export const GuiNodeData = BaseNodeData.extend({
+  kind: z.literal('gui'),
+  /** GUI id（小写下划线） */
+  guiId: z.string().default('my_gui'),
+  /** 显示名 */
+  displayName: z.string().default('新 GUI'),
+  /** GUI 宽度 */
+  width: z.number().int().min(176).max(256).default(176),
+  /** GUI 高度 */
+  height: z.number().int().min(166).max(256).default(166),
+  /** 槽位配置 JSON（[{slotId,slotType,x,y}]） */
+  slotsJson: z.string().default('[]'),
+  /** 显示能源条 */
+  showEnergyBar: z.boolean().default(false),
+  /** 显示进度条 */
+  showProgressBar: z.boolean().default(false),
+});
+export type GuiNodeData = z.infer<typeof GuiNodeData>;
+
 // === P1-3：过程节点（对标 MCreator procedure） ===
 
 /**
@@ -608,6 +630,8 @@ export const NodeData = z.discriminatedUnion('kind', [
   BiomeNodeData,
   DimensionNodeData,
   FluidNodeData,
+  // GUI 界面
+  GuiNodeData,
 ]);
 export type NodeData = z.infer<typeof NodeData>;
 

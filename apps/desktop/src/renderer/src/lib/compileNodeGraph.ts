@@ -19,6 +19,8 @@ import type {
   ModBiomeSpec,
   ModDimensionSpec,
   FluidSpec,
+  GuiSpec,
+  GuiSlotSpec,
 } from '@mc-creator/shared';
 import { compileVariable } from './compileVariable.js';
 import { inlineSubgraphNodes } from './compileSubgraph.js';
@@ -174,6 +176,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   const biomes = dispatched.biomes ?? [];
   const dimensions = dispatched.dimensions ?? [];
   const fluids = dispatched.fluids ?? [];
+  const guis = dispatched.guis ?? [];
   const eventHandlers = dispatched.eventHandlers ?? [];
   const conditions = dispatched.conditions ?? [];
   const actions = dispatched.actions ?? [];
@@ -314,6 +317,8 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     biomes,
     dimensions,
     fluids,
+    // GUI 界面（由 gui 节点编译）
+    guis,
     eventHandlers,
     conditions,
     actions,
@@ -555,6 +560,32 @@ function compileFluidNode(node: ModNode): FluidSpec {
     viscosity: data.viscosity,
     density: data.density,
     luminous: data.luminous,
+  };
+}
+
+/** 编译 GUI 节点：解析 slotsJson → GuiSlotSpec[] */
+function compileGuiNode(node: ModNode): GuiSpec {
+  if (node.data.kind !== 'gui') {
+    throw new Error(`节点 ${node.id} 不是 gui 类型`);
+  }
+  const data = node.data;
+  let slots: GuiSlotSpec[] = [];
+  try {
+    const parsed = JSON.parse(data.slotsJson || '[]');
+    if (Array.isArray(parsed)) {
+      slots = parsed as GuiSlotSpec[];
+    }
+  } catch {
+    // 解析失败：空槽位
+  }
+  return {
+    guiId: data.guiId,
+    displayName: data.displayName || data.guiId,
+    width: data.width,
+    height: data.height,
+    slots,
+    showEnergyBar: data.showEnergyBar,
+    showProgressBar: data.showProgressBar,
   };
 }
 
@@ -1267,6 +1298,11 @@ registerCompiler({
 registerCompiler({
   kind: 'fluid',
   compile: (node) => ({ fluids: [compileFluidNode(node)] }),
+});
+
+registerCompiler({
+  kind: 'gui',
+  compile: (node) => ({ guis: [compileGuiNode(node)] }),
 });
 
 registerCompiler({

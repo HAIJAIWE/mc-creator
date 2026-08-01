@@ -170,6 +170,7 @@ describe('AgentPanel', () => {
         fluids: [],
         biomes: [],
         dimensions: [],
+        guis: [],
         eventHandlers: [],
         conditions: [],
         actions: [],

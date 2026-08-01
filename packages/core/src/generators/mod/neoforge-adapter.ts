@@ -243,6 +243,11 @@ export class NeoForgeAdapter implements LoaderAdapter {
       generate: (s, pkg) => (s.dimensions?.length ? [this.modDimensionsJava(s, pkg)] : []),
     },
     {
+      name: 'guis',
+      hashInputs: (s) => s.guis ?? [],
+      generate: (s, pkg) => (s.guis?.length ? [this.modGuisJava(s, pkg)] : []),
+    },
+    {
       name: 'recipes',
       hashInputs: (s) => s.recipes ?? [],
       generate: (s, pkg) => (s.recipes?.length ? [this.modRecipesJava(s, pkg)] : []),
@@ -402,6 +407,7 @@ export class NeoForgeAdapter implements LoaderAdapter {
     if (spec.fluids?.length) registerCalls.push('ModFluids.register(modEventBus);');
     if (spec.biomes?.length) registerCalls.push('ModBiomes.register(modEventBus);');
     if (spec.dimensions?.length) registerCalls.push('ModDimensions.register(modEventBus);');
+    if (spec.guis?.length) registerCalls.push('ModGuis.register(modEventBus);');
     if (spec.machines?.length) registerCalls.push('ModMachines.register(modEventBus);');
     if (spec.customCode?.length) registerCalls.push('ModCustomCode.initialize();');
     if (spec.multiblocks?.length) registerCalls.push('ModMultiblocks.initialize();');
@@ -612,6 +618,101 @@ ${fields}
 `;
     return {
       path: `src/main/java/${packagePath(spec.modId)}/ModDimensions.java`,
+      content,
+    };
+  }
+
+  /**
+   * GUI 界面：生成 ModGuis.java（NeoForge）。
+   * 每个 GUI 生成 Menu（槽位布局）+ Screen（渲染骨架）。
+   */
+  private modGuisJava(spec: ModSpecLike, pkg: string): FileNode {
+    const guiClasses = (spec.guis ?? [])
+      .map((g) => {
+        const pascal = this.toPascal(g.guiId);
+        const slotCount = g.slots.length;
+        const slotAdds = g.slots
+          .map(
+            (s) =>
+              `        this.addSlot(new Slot(machineInv, ${g.slots.indexOf(s)}, ${8 + s.x}, ${18 + s.y}));`,
+          )
+          .join('\n');
+        return `    // ${pascal}Menu：GUI 槽位布局（${slotCount} 槽）
+    public static class ${pascal}Menu extends AbstractContainerMenu {
+        private final net.minecraft.world.SimpleContainer machineInv;
+
+        public ${pascal}Menu(int id, Inventory inv) {
+            super(${pascal.toUpperCase()}_MENU_TYPE.get(), id);
+            this.machineInv = new net.minecraft.world.SimpleContainer(${slotCount});
+${slotAdds}
+            for (int row = 0; row < 3; row++) {
+                for (int col = 0; col < 9; col++) {
+                    this.addSlot(new Slot(inv, col + row * 9 + 9, 8 + col * 18, ${g.height - 82} + row * 18));
+                }
+            }
+            for (int col = 0; col < 9; col++) {
+                this.addSlot(new Slot(inv, col, 8 + col * 18, ${g.height - 24}));
+            }
+        }
+
+        @Override
+        public net.minecraft.world.item.ItemStack quickMoveStack(net.minecraft.world.entity.player.Player player, int index) {
+            return net.minecraft.world.item.ItemStack.EMPTY;
+        }
+
+        @Override
+        public boolean stillValid(net.minecraft.world.entity.player.Player player) {
+            return true;
+        }
+    }
+
+    // ${pascal}Screen：GUI 渲染骨架（客户端）
+    public static class ${pascal}Screen extends net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<${pascal}Menu> {
+        public ${pascal}Screen(${pascal}Menu menu, Inventory inv, net.minecraft.network.chat.Component title) {
+            super(menu, inv, title);
+            this.imageWidth = ${g.width};
+            this.imageHeight = ${g.height};
+        }
+
+        @Override
+        protected void renderBg(net.minecraft.client.gui.GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+            graphics.blit(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "textures/gui/${g.guiId}.png"), this.leftPos, this.topPos, 0, 0, this.imageWidth, this.imageHeight);
+        }
+
+        @Override
+        public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            super.render(graphics, mouseX, mouseY, partialTick);
+            this.renderTooltip(graphics, mouseX, mouseY);
+        }
+    }
+
+    public static final net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.world.inventory.MenuType<?>, net.minecraft.world.inventory.MenuType<${pascal}Menu>> ${pascal.toUpperCase()}_MENU_TYPE = MENUS.register("${g.guiId}", () -> IMenuTypeExtension.create(${pascal}Menu::new));`;
+      })
+      .join('\n\n');
+    const content = `package ${pkg};
+
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+public class ModGuis {
+    public static final String MOD_ID = "${javaEscape(spec.modId)}";
+    public static final DeferredRegister<net.minecraft.world.inventory.MenuType<?>> MENUS = DeferredRegister.create(net.minecraft.core.registries.Registries.MENU, MOD_ID);
+${guiClasses}
+
+    public static void initialize() {
+        // NeoForge DeferredRegister 通过 register() 注册
+    }
+
+    public static void register(net.neoforged.bus.api.IEventBus modEventBus) {
+        MENUS.register(modEventBus);
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModGuis.java`,
       content,
     };
   }
@@ -1625,6 +1726,20 @@ type ModSpecLike = {
     effects: 'overworld' | 'the_nether' | 'the_end' | 'none';
     seed?: number;
     texturePath?: string;
+  }>;
+  guis?: Array<{
+    guiId: string;
+    displayName: string;
+    width: number;
+    height: number;
+    slots: Array<{
+      slotId: string;
+      slotType: 'input' | 'output' | 'energy' | 'fuel';
+      x: number;
+      y: number;
+    }>;
+    showEnergyBar: boolean;
+    showProgressBar: boolean;
   }>;
   eventHandlers?: Array<{
     handlerId: string;
