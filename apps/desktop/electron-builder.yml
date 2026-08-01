@@ -1,0 +1,30 @@
+appId: com.mc-creator.app
+productName: MC Creator
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: MC Creator
+linux:
+  target:
+    - AppImage
+  category: Game
+  artifactName: ${productName}-${version}.${ext}
+mac:
+  target:
+    - dmg
+  artifactName: ${productName}-${version}.${ext}
