@@ -21,6 +21,9 @@ import {
   Package,
   FileText,
   Copy,
+  Rocket,
+  Cloud,
+  Monitor,
 } from 'lucide-react';
 
 type SubTab =
@@ -29,6 +32,7 @@ type SubTab =
   | 'players'
   | 'network'
   | 'memory'
+  | 'deploy'
   | 'ops'
   | 'whitelist'
   | 'mods'
@@ -128,6 +132,7 @@ export function ServerPreviewPanel() {
     { key: 'players', label: '玩家', icon: Users },
     { key: 'network', label: '网络', icon: FileText },
     { key: 'memory', label: '内存', icon: FileText },
+    { key: 'deploy', label: '部署', icon: Rocket },
     { key: 'ops', label: 'OP', icon: Shield, count: server.ops.length },
     { key: 'whitelist', label: '白名单', icon: Users, count: server.whitelistEntries.length },
     { key: 'mods', label: 'Mod', icon: Package, count: server.mods.length },
@@ -345,6 +350,94 @@ export function ServerPreviewPanel() {
               onChange={(v) => updateField('javaPath', v)}
             />
           </FieldGroup>
+        )}
+
+        {/* ===== 部署（一键开服） ===== */}
+        {activeTab === 'deploy' && (
+          <div className="space-y-4">
+            <FieldGroup title="服务端类型">
+              <SelectField
+                label="服务端"
+                value={server.serverType}
+                options={[
+                  { value: 'vanilla', label: 'Vanilla 原版' },
+                  { value: 'paper', label: 'Paper（优化 + 插件支持）' },
+                  { value: 'fabric', label: 'Fabric（Mod 支持）' },
+                ]}
+                onChange={(v) => updateField('serverType', v as ServerSpec['serverType'])}
+              />
+              <TextField
+                label="MC 版本（下载用）"
+                value={server.serverVersion}
+                onChange={(v) => updateField('serverVersion', v)}
+              />
+              <TextField
+                label="服务端文件名"
+                value={server.jarName}
+                onChange={(v) => updateField('jarName', v)}
+              />
+              <p className="text-[11px] text-mc-mute">
+                install.sh / install.bat 会按此类型自动下载服务端（原版官方源 / PaperMC API / Fabric
+                Installer）。
+              </p>
+            </FieldGroup>
+
+            <FieldGroup title="云服务器部署（24h 在线）">
+              <SelectField
+                label="部署目标"
+                value={server.deployTarget}
+                options={[
+                  { value: 'none', label: '不生成部署文件' },
+                  { value: 'systemd', label: 'systemd 服务（开机自启）' },
+                  { value: 'docker', label: 'Docker 容器' },
+                  { value: 'both', label: 'systemd + Docker' },
+                ]}
+                onChange={(v) => updateField('deployTarget', v as ServerSpec['deployTarget'])}
+              />
+              <TextField
+                label="服务用户"
+                value={server.serviceUser}
+                onChange={(v) => updateField('serviceUser', v)}
+              />
+              <TextField
+                label="服务目录"
+                value={server.serviceDir}
+                onChange={(v) => updateField('serviceDir', v)}
+              />
+              <ToggleField
+                label="崩溃自动重启"
+                value={server.restartOnCrash}
+                onChange={(v) => updateField('restartOnCrash', v)}
+              />
+              <NumberField
+                label="备份间隔（小时，0 = 不备份）"
+                value={server.backupInterval}
+                min={0}
+                max={168}
+                onChange={(v) => updateField('backupInterval', v)}
+              />
+              <div className="mt-2 flex items-start gap-2 rounded-mc border border-mc-border bg-mc-surface-2/60 p-2">
+                <Cloud className="mt-0.5 h-3 w-3 flex-shrink-0 text-mc-accent" />
+                <div className="text-[11px] leading-relaxed text-mc-mute">
+                  云服务器流程：把生成文件上传到服务器 → 执行{' '}
+                  <code className="text-mc-text">bash install.sh</code> → 自动装
+                  Java、下载服务端、安装 systemd 开机自启。
+                </div>
+              </div>
+            </FieldGroup>
+
+            <FieldGroup title="本地开服（局域网联机）">
+              <div className="flex items-start gap-2 rounded-mc border border-mc-border bg-mc-surface-2/60 p-2">
+                <Monitor className="mt-0.5 h-3 w-3 flex-shrink-0 text-mc-accent" />
+                <div className="text-[11px] leading-relaxed text-mc-mute">
+                  本地流程：双击 <code className="text-mc-text">install.bat</code> 检查 Java
+                  并下载服务端 → 运行 <code className="text-mc-text">start.bat</code> 开服 → 同一
+                  WiFi 玩家连
+                  <code className="text-mc-text"> 你电脑IP:{server.port}</code>。
+                </div>
+              </div>
+            </FieldGroup>
+          </div>
         )}
 
         {/* ===== OP 管理 ===== */}
