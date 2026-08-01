@@ -177,6 +177,7 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   const dimensions = dispatched.dimensions ?? [];
   const fluids = dispatched.fluids ?? [];
   const guis = dispatched.guis ?? [];
+  const structures = dispatched.structures ?? [];
   const eventHandlers = dispatched.eventHandlers ?? [];
   const conditions = dispatched.conditions ?? [];
   const actions = dispatched.actions ?? [];
@@ -319,6 +320,8 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     fluids,
     // GUI 界面（由 gui 节点编译）
     guis,
+    // Mod 侧结构（当前无结构节点，恒为空数组；为 ModSpec 兼容保留）
+    structures: [],
     eventHandlers,
     conditions,
     actions,

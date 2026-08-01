@@ -139,6 +139,7 @@ const DEMO_SPEC: ModSpec = {
   biomes: [],
   dimensions: [],
   guis: [],
+  structures: [],
   eventHandlers: [],
   conditions: [],
   actions: [],

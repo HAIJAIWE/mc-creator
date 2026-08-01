@@ -53,6 +53,7 @@ import type {
   ModDimensionSpec,
   FluidSpec,
   GuiSpec,
+  ModStructureSpec,
 } from '@mc-creator/shared';
 
 // === 类型 ===
@@ -84,6 +85,8 @@ export interface CompilerOutput {
   fluids?: FluidSpec[];
   /** GUI 界面（gui 节点） */
   guis?: GuiSpec[];
+  /** Mod 侧结构（structure 节点） */
+  structures?: ModStructureSpec[];
   /** 编译警告（合并到 CompileResult.warnings） */
   warnings?: string[];
   /** 编译错误（合并到 CompileResult.errors，spec 仍可部分使用） */

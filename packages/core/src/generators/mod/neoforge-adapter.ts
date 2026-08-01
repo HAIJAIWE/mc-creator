@@ -248,6 +248,11 @@ export class NeoForgeAdapter implements LoaderAdapter {
       generate: (s, pkg) => (s.guis?.length ? [this.modGuisJava(s, pkg)] : []),
     },
     {
+      name: 'structures',
+      hashInputs: (s) => s.structures ?? [],
+      generate: (s, pkg) => (s.structures?.length ? [this.modStructuresJava(s, pkg)] : []),
+    },
+    {
       name: 'recipes',
       hashInputs: (s) => s.recipes ?? [],
       generate: (s, pkg) => (s.recipes?.length ? [this.modRecipesJava(s, pkg)] : []),
@@ -408,6 +413,7 @@ export class NeoForgeAdapter implements LoaderAdapter {
     if (spec.biomes?.length) registerCalls.push('ModBiomes.register(modEventBus);');
     if (spec.dimensions?.length) registerCalls.push('ModDimensions.register(modEventBus);');
     if (spec.guis?.length) registerCalls.push('ModGuis.register(modEventBus);');
+    if (spec.structures?.length) registerCalls.push('ModStructures.register(modEventBus);');
     if (spec.machines?.length) registerCalls.push('ModMachines.register(modEventBus);');
     if (spec.customCode?.length) registerCalls.push('ModCustomCode.initialize();');
     if (spec.multiblocks?.length) registerCalls.push('ModMultiblocks.initialize();');
@@ -713,6 +719,46 @@ ${guiClasses}
 `;
     return {
       path: `src/main/java/${packagePath(spec.modId)}/ModGuis.java`,
+      content,
+    };
+  }
+
+  /**
+   * Mod 侧结构：生成 ModStructures.java（NeoForge DeferredRegister 风格）。
+   */
+  private modStructuresJava(spec: ModSpecLike, pkg: string): FileNode {
+    const fields = (spec.structures ?? [])
+      .map(
+        (s) =>
+          `    public static final DeferredHolder<net.minecraft.world.level.levelgen.structure.Structure, net.minecraft.world.level.levelgen.structure.Structure> ${s.structureId.toUpperCase()} = STRUCTURES.register("${s.structureId}", () -> new net.minecraft.world.level.levelgen.structure.structures.JigsawStructure(
+                net.minecraft.world.level.levelgen.structure.Structure.StructureSettingsHolder.empty(),
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "${s.startPool}"),
+                ${s.size},
+                net.minecraft.world.level.levelgen.heightproviders.ConstantHeight.of(net.minecraft.world.level.levelgen.WorldGenContext.EMPTY),
+                false,
+                net.minecraft.world.level.levelgen.structure.terrainadaptation.TerrainAdjustment.${s.terrainAdaptation.toUpperCase()}
+            ));`,
+      )
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.core.registries.Registries;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+public class ModStructures {
+    public static final String MOD_ID = "${javaEscape(spec.modId)}";
+    public static final DeferredRegister<net.minecraft.world.level.levelgen.structure.Structure> STRUCTURES = DeferredRegister.create(Registries.STRUCTURE, MOD_ID);
+${fields}
+
+    public static void register(IEventBus modEventBus) {
+        STRUCTURES.register(modEventBus);
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModStructures.java`,
       content,
     };
   }
@@ -1740,6 +1786,18 @@ type ModSpecLike = {
     }>;
     showEnergyBar: boolean;
     showProgressBar: boolean;
+  }>;
+  structures?: Array<{
+    structureId: string;
+    displayName: string;
+    startPool: string;
+    size: number;
+    maxDistance: number;
+    biomes: string;
+    terrainAdaptation: string;
+    spacing: number;
+    separation: number;
+    salt: number;
   }>;
   eventHandlers?: Array<{
     handlerId: string;

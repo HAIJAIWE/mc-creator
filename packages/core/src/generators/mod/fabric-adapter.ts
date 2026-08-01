@@ -262,6 +262,11 @@ export class FabricAdapter implements LoaderAdapter {
       generate: (s, pkg) => (s.guis?.length ? [this.modGuisJava(s, pkg)] : []),
     },
     {
+      name: 'structures',
+      hashInputs: (s) => s.structures ?? [],
+      generate: (s, pkg) => (s.structures?.length ? [this.modStructuresJava(s, pkg)] : []),
+    },
+    {
       name: 'recipes',
       hashInputs: (s) => s.recipes ?? [],
       generate: (s, pkg) => (s.recipes?.length ? [this.modRecipesJava(s, pkg)] : []),
@@ -499,6 +504,7 @@ fabric_version=${versions.fabricApiVersion}
     if (spec.biomes?.length) initCalls.push('ModBiomes.initialize();');
     if (spec.dimensions?.length) initCalls.push('ModDimensions.initialize();');
     if (spec.guis?.length) initCalls.push('ModGuis.initialize();');
+    if (spec.structures?.length) initCalls.push('ModStructures.initialize();');
     if (spec.machines?.length) initCalls.push('ModMachines.initialize();');
     if (spec.customCode?.length) initCalls.push('ModCustomCode.initialize();');
     if (spec.multiblocks?.length) initCalls.push('ModMultiblocks.initialize();');
@@ -842,6 +848,61 @@ ${regs}
 `;
     return {
       path: `src/main/java/${packagePath(spec.modId)}/ModGuis.java`,
+      content,
+    };
+  }
+
+  /**
+   * Mod 侧结构：生成 ModStructures.java。
+   * 注册 Structure 与 StructureSet（jigsaw 结构，配套数据包 template_pool）。
+   * 结构实际生成需数据包 worldgen 文件配合（structure/structure_set JSON）。
+   */
+  private modStructuresJava(spec: ModSpecLike, pkg: string): FileNode {
+    const fields = (spec.structures ?? [])
+      .map(
+        (s) =>
+          `    public static net.minecraft.world.level.levelgen.structure.Structure ${s.structureId.toUpperCase()};
+    public static net.minecraft.world.level.levelgen.structure.StructureSet ${s.structureId.toUpperCase()}_SET;`,
+      )
+      .join('\n');
+    const regs = (spec.structures ?? [])
+      .map((s) => {
+        const id = s.structureId.toUpperCase();
+        return `        // Structure: ${s.structureId} — ${s.displayName}
+        // startPool=${s.startPool}, size=${s.size}, maxDistance=${s.maxDistance}
+        // biomes=${s.biomes}, terrainAdaptation=${s.terrainAdaptation}
+        // spacing=${s.spacing}, separation=${s.separation}, salt=${s.salt}
+        ${id} = Registry.register(BuiltInRegistries.STRUCTURE, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${s.structureId}"), new net.minecraft.world.level.levelgen.structure.structures.JigsawStructure(
+            net.minecraft.world.level.levelgen.structure.Structure.StructureSettingsHolder.empty(),
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "${s.startPool}"),
+            ${s.size},
+            net.minecraft.world.level.levelgen.heightproviders.ConstantHeight.of(net.minecraft.world.level.levelgen.WorldGenContext.EMPTY),
+            false,
+            net.minecraft.world.level.levelgen.structure.terrainadaptation.TerrainAdjustment.${s.terrainAdaptation.toUpperCase()}
+        ));
+        ${id}_SET = Registry.register(BuiltInRegistries.STRUCTURE_SET, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${s.structureId}"), new net.minecraft.world.level.levelgen.structure.StructureSet(
+            java.util.List.of(new net.minecraft.world.level.levelgen.structure.StructureSetEntry(${id}, 1)),
+            new net.minecraft.world.level.levelgen.placement.RandomSpreadStructurePlacement(${s.spacing}, ${s.separation}, ${s.salt}, net.minecraft.core.Direction.HORIZONTAL)
+        ));`;
+      })
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+
+public class ModStructures {
+    public static final String MOD_ID = "${javaEscape(spec.modId)}";
+${fields}
+
+    public static void initialize() {
+${regs}
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModStructures.java`,
       content,
     };
   }
@@ -1907,6 +1968,18 @@ type ModSpecLike = {
     }>;
     showEnergyBar: boolean;
     showProgressBar: boolean;
+  }>;
+  structures?: Array<{
+    structureId: string;
+    displayName: string;
+    startPool: string;
+    size: number;
+    maxDistance: number;
+    biomes: string;
+    terrainAdaptation: string;
+    spacing: number;
+    separation: number;
+    salt: number;
   }>;
   eventHandlers?: Array<{
     handlerId: string;

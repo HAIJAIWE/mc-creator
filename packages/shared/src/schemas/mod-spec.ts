@@ -408,6 +408,30 @@ export const ModBiomeSpec = z.object({
   texturePath: z.string().optional(),
 });
 
+/** Mod 侧结构条目（对标 MCreator 结构：jigsaw 模板池 + 放置配置） */
+export const ModStructureSpec = z.object({
+  /** 结构 id（小写下划线） */
+  structureId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 显示名 */
+  displayName: z.string(),
+  /** 起始模板池 ID（如 modid:house/start_pool） */
+  startPool: z.string(),
+  /** 结构规模（jigsaw size） */
+  size: z.number().int().min(1).default(7),
+  /** 最大距中心距离 */
+  maxDistance: z.number().int().min(1).default(80),
+  /** 生物群系标签 */
+  biomes: z.string().default('#minecraft:is_overworld'),
+  /** 地形适应（terrain_adaptation） */
+  terrainAdaptation: z.string().default('none'),
+  /** 放置间距（chunk） */
+  spacing: z.number().int().min(1).default(32),
+  /** 放置间隔 */
+  separation: z.number().int().min(0).default(8),
+  /** 放置盐值 */
+  salt: z.number().int().min(0).default(0),
+});
+
 /** GUI 槽位（对标 MCreator GUI 槽位） */
 export const GuiSlotSpec = z.object({
   /** 槽位 id（小写下划线） */
@@ -727,6 +751,8 @@ export const ModSpec = z.object({
   dimensions: z.array(ModDimensionSpec).default([]),
   // 新增：GUI 界面（对标 MCreator GUI 编辑器）
   guis: z.array(GuiSpec).default([]),
+  // 新增：Mod 侧结构（对标 MCreator 结构）
+  structures: z.array(ModStructureSpec).default([]),
   // 新增：事件处理器（P1.4 从 EventNode 编译，扁平结构；P1.5 通过 conditionIds/actionIds 建立控制流链引用）
   eventHandlers: z.array(EventHandlerSpec).default([]),
   // 新增：条件（P1.4 从 ConditionNode 编译，扁平列表，被 eventHandlers[].conditionIds 引用）
@@ -757,6 +783,7 @@ export type ModBiomeSpec = z.infer<typeof ModBiomeSpec>;
 export type ModDimensionSpec = z.infer<typeof ModDimensionSpec>;
 export type GuiSpec = z.infer<typeof GuiSpec>;
 export type GuiSlotSpec = z.infer<typeof GuiSlotSpec>;
+export type ModStructureSpec = z.infer<typeof ModStructureSpec>;
 export type CustomCodeSnippetSpec = z.infer<typeof CustomCodeSnippetSpec>;
 export type MultiBlockSpec = z.infer<typeof MultiBlockSpec>;
 export type EventHandlerSpec = z.infer<typeof EventHandlerSpec>;

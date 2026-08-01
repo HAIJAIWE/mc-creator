@@ -851,3 +851,61 @@ describe('NeoForgeAdapter Task 3 GUI', () => {
     expect(main!.content).toContain('ModGuis.register(modEventBus);');
   });
 });
+
+// === Task 4: Mod 侧结构（NeoForge）===
+
+const SPEC_P40_STRUCTURE_NEO: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Structure test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  structures: [
+    {
+      structureId: 'ruby_tower',
+      displayName: 'Ruby Tower',
+      startPool: 'ruby_tools:tower/start_pool',
+      size: 7,
+      maxDistance: 80,
+      biomes: '#minecraft:is_overworld',
+      terrainAdaptation: 'none',
+      spacing: 48,
+      separation: 16,
+      salt: 12345,
+    },
+  ],
+});
+
+describe('NeoForgeAdapter Task 4 Mod 侧结构', () => {
+  const adapter = new NeoForgeAdapter();
+  const files = adapter.translate({
+    loader: 'neoforge',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_STRUCTURE_NEO,
+    projectPath: '/proj',
+  });
+
+  it('生成 ModStructures.java 用 DeferredRegister<Structure>', () => {
+    const structures = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModStructures.java',
+    );
+    expect(structures).toBeDefined();
+    expect(structures!.content).toContain('Registries.STRUCTURE');
+    expect(structures!.content).toContain('STRUCTURES.register("ruby_tower"');
+    expect(structures!.content).toContain('JigsawStructure');
+  });
+
+  it('mainClass 调用 ModStructures.register(modEventBus)', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main!.content).toContain('ModStructures.register(modEventBus);');
+  });
+});

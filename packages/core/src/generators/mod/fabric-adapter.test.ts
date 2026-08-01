@@ -1367,3 +1367,65 @@ describe('FabricAdapter Task 3 GUI', () => {
     expect(main!.content).toContain('ModGuis.initialize();');
   });
 });
+
+// === Task 4: Mod 侧结构 ===
+
+const SPEC_P40_STRUCTURE: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Structure test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  structures: [
+    {
+      structureId: 'ruby_tower',
+      displayName: 'Ruby Tower',
+      startPool: 'ruby_tools:tower/start_pool',
+      size: 7,
+      maxDistance: 80,
+      biomes: '#minecraft:is_overworld',
+      terrainAdaptation: 'beard_thin',
+      spacing: 48,
+      separation: 16,
+      salt: 12345,
+    },
+  ],
+});
+
+describe('FabricAdapter Task 4 Mod 侧结构', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate({
+    loader: 'fabric',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_STRUCTURE,
+    projectPath: '/proj',
+  });
+
+  it('生成 ModStructures.java 注册结构与结构集', () => {
+    const structures = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModStructures.java',
+    );
+    expect(structures).toBeDefined();
+    expect(structures!.content).toContain('public class ModStructures');
+    expect(structures!.content).toContain('BuiltInRegistries.STRUCTURE');
+    expect(structures!.content).toContain('BuiltInRegistries.STRUCTURE_SET');
+    expect(structures!.content).toContain('ruby_tower');
+    expect(structures!.content).toContain('JigsawStructure');
+    expect(structures!.content).toContain('TerrainAdjustment.BEARD_THIN');
+    expect(structures!.content).toContain('RandomSpreadStructurePlacement');
+  });
+
+  it('mainClass 调用 ModStructures.initialize()', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main!.content).toContain('ModStructures.initialize();');
+  });
+});
