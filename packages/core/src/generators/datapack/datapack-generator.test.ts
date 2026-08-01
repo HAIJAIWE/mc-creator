@@ -121,9 +121,25 @@ describe('DatapackGenerator', () => {
             pools: [
               {
                 rolls: 2,
+                conditions: [],
+                bonusRolls: 0,
                 entries: [
-                  { name: 'my_pack:custom_item', weight: 3, count: 1 },
-                  { name: 'minecraft:stick', weight: 1, count: 2 },
+                  {
+                    name: 'my_pack:custom_item',
+                    weight: 3,
+                    count: 1,
+                    type: 'item',
+                    conditions: [],
+                    functions: [],
+                  },
+                  {
+                    name: 'minecraft:stick',
+                    weight: 1,
+                    count: 2,
+                    type: 'item',
+                    conditions: [],
+                    functions: [],
+                  },
                 ],
               },
             ],
@@ -153,7 +169,18 @@ describe('DatapackGenerator', () => {
             pools: [
               {
                 rolls: 1,
-                entries: [{ name: 'minecraft:diamond', weight: 1, count: 1 }],
+                conditions: [],
+                bonusRolls: 0,
+                entries: [
+                  {
+                    name: 'minecraft:diamond',
+                    weight: 1,
+                    count: 1,
+                    type: 'item',
+                    conditions: [],
+                    functions: [],
+                  },
+                ],
               },
             ],
           },
@@ -520,6 +547,7 @@ describe('DatapackGenerator', () => {
             biomes: '#my_pack:has_crystal_tower',
             step: 'beard',
             useExpansionHack: false,
+            maxDepth: 7,
           },
         ],
       }),
@@ -718,8 +746,8 @@ describe('DatapackGenerator', () => {
             id: 'house/base',
             fallback: 'minecraft:empty',
             entries: [
-              { template: 'my_pack:house/base_1', weight: 2 },
-              { template: 'my_pack:house/base_2', weight: 1 },
+              { template: 'my_pack:house/base_1', weight: 2, processors: '', projection: 'rigid' },
+              { template: 'my_pack:house/base_2', weight: 1, processors: '', projection: 'rigid' },
             ],
           },
         ],
@@ -735,6 +763,152 @@ describe('DatapackGenerator', () => {
     expect(parsed.elements[0].element.location).toBe('my_pack:house/base_1');
     expect(parsed.elements[0].element.element_type).toBe('minecraft:single_pool_element');
     expect(parsed.elements[1].weight).toBe(1);
+  });
+
+  it('Task E: 战利品表支持条目函数/条件/额外掷骰', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        lootTables: [
+          {
+            namespace: 'my_pack',
+            path: 'blocks/rich_ore',
+            type: 'block',
+            pools: [
+              {
+                rolls: 1,
+                conditions: [
+                  {
+                    condition: 'minecraft:match_tool',
+                    predicate: { enchantments: [{ enchantment: 'minecraft:silk_touch' }] },
+                  },
+                ],
+                bonusRolls: 1,
+                entries: [
+                  {
+                    name: 'minecraft:diamond',
+                    weight: 1,
+                    count: 1,
+                    type: 'item',
+                    conditions: [{ condition: 'minecraft:random_chance', chance: 0.5 }],
+                    functions: [
+                      {
+                        function: 'minecraft:set_count',
+                        count: { type: 'minecraft:uniform', min: 1, max: 3 },
+                      },
+                      {
+                        function: 'minecraft:enchant_with_levels',
+                        levels: { type: 'minecraft:uniform', min: 10, max: 20 },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const loot = result.files.find(
+      (f) => f.path === 'data/my_pack/loot_table/block/blocks/rich_ore.json',
+    );
+    expect(loot).toBeDefined();
+    const parsed = JSON.parse(loot!.content);
+    const pool = parsed.pools[0];
+    expect(pool.bonus_rolls).toBe(1);
+    expect(pool.conditions[0].condition).toBe('minecraft:match_tool');
+    const entry = pool.entries[0];
+    expect(entry.functions).toHaveLength(2);
+    expect(entry.functions[0].function).toBe('minecraft:set_count');
+    expect(entry.functions[1].function).toBe('minecraft:enchant_with_levels');
+    expect(entry.conditions[0].condition).toBe('minecraft:random_chance');
+  });
+
+  it('Task E: 进度支持高级多条件 criteria', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        advancements: [
+          {
+            id: 'mine_diamond',
+            title: '获得钻石',
+            description: '挖到钻石',
+            icon: 'minecraft:diamond',
+            frame: 'goal',
+            trigger: 'minecraft:inventory_changed',
+            criteria: {
+              has_diamond: {
+                trigger: 'minecraft:inventory_changed',
+                conditions: { items: [{ items: ['minecraft:diamond'] }] },
+              },
+              has_iron: {
+                trigger: 'minecraft:inventory_changed',
+                conditions: { items: [{ items: ['minecraft:iron_ingot'] }] },
+              },
+            },
+          },
+        ],
+      }),
+    );
+    const adv = result.files.find((f) => f.path === 'data/my_pack/advancement/mine_diamond.json');
+    expect(adv).toBeDefined();
+    const parsed = JSON.parse(adv!.content);
+    expect(Object.keys(parsed.criteria)).toEqual(['has_diamond', 'has_iron']);
+    expect(parsed.criteria.has_diamond.conditions.items[0].items).toContain('minecraft:diamond');
+    // 不再使用简单 trigger 模式（criteria 键不是进度 id）
+    expect(parsed.criteria.mine_diamond).toBeUndefined();
+  });
+
+  it('Task E: 模板池条目支持自定义处理器与投影', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        templatePools: [
+          {
+            id: 'house/base',
+            fallback: 'minecraft:empty',
+            entries: [
+              {
+                template: 'my_pack:house/base_1',
+                weight: 1,
+                processors: 'my_pack:house_processors',
+                projection: 'terrain_matching',
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const pool = result.files.find(
+      (f) => f.path === 'data/my_pack/worldgen/template_pool/house/base.json',
+    );
+    const parsed = JSON.parse(pool!.content);
+    expect(parsed.elements[0].element.processors).toBe('my_pack:house_processors');
+    expect(parsed.elements[0].element.projection).toBe('terrain_matching');
+  });
+
+  it('Task E: 结构含 max_depth 字段', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        structures: [
+          {
+            id: 'tower',
+            templatePool: 'my_pack:tower/start',
+            placementType: 'jigsaw',
+            maxDistance: 7,
+            size: 7,
+            startHeight: '{"type":"minecraft:uniform","min":{"absolute":0},"max":{"absolute":63}}',
+            biomes: '#minecraft:is_overworld',
+            step: 'none',
+            useExpansionHack: false,
+            maxDepth: 5,
+          },
+        ],
+      }),
+    );
+    const st = result.files.find((f) => f.path === 'data/my_pack/worldgen/structure/tower.json');
+    expect(JSON.parse(st!.content).max_depth).toBe(5);
   });
 
   it('Task A: 生成处理器列表 processor_list', async () => {

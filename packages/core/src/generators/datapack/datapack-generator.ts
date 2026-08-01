@@ -460,12 +460,16 @@ export class DatapackGenerator implements Generator {
     if (a.frame && a.frame !== 'task') displayObj.frame = a.frame;
     const advObj: Record<string, unknown> = {
       display: displayObj,
-      criteria: {
-        [a.id]: {
-          trigger: a.trigger,
-          conditions: parsedConditions,
-        },
-      },
+      // Task E：高级 criteria 配置优先（多条件进度），否则回退简单 trigger 模式
+      criteria:
+        a.criteria && Object.keys(a.criteria).length > 0
+          ? a.criteria
+          : {
+              [a.id]: {
+                trigger: a.trigger,
+                conditions: parsedConditions,
+              },
+            },
     };
     if (a.parent) advObj.parent = a.parent;
     return {
@@ -476,17 +480,31 @@ export class DatapackGenerator implements Generator {
 
   /** P10：生成战利品表 → data/<namespace>/loot_table/<type>/<path>.json（目录为单数，G-11 修复） */
   private generateLootTable(l: LootTableSpec): FileNode {
-    const lootObj = {
+    const lootObj: Record<string, unknown> = {
       type: `minecraft:${l.type}`,
-      pools: l.pools.map((p) => ({
-        rolls: p.rolls,
-        entries: p.entries.map((e) => ({
-          type: 'minecraft:item',
-          name: e.name,
-          weight: e.weight,
-          count: e.count,
-        })),
-      })),
+      pools: l.pools.map((p) => {
+        const poolObj: Record<string, unknown> = {
+          rolls: p.rolls,
+          entries: p.entries.map((e) => {
+            const entryObj: Record<string, unknown> = {
+              type: `minecraft:${e.type}`,
+              name: e.name,
+              weight: e.weight,
+              count: e.count,
+            };
+            // Task E：条目函数（set_count/enchant_with_levels 等）
+            if (e.functions.length > 0) entryObj.functions = e.functions;
+            // Task E：条目条件
+            if (e.conditions.length > 0) entryObj.conditions = e.conditions;
+            return entryObj;
+          }),
+        };
+        // Task E：额外掷骰（附魔幸运）
+        if (p.bonusRolls > 0) poolObj.bonus_rolls = p.bonusRolls;
+        // Task E：池条件（如方块被正确工具挖掘）
+        if (p.conditions.length > 0) poolObj.conditions = p.conditions;
+        return poolObj;
+      }),
     };
     return {
       path: `data/${sanitizePathSegment(l.namespace)}/loot_table/${sanitizePathSegment(l.type)}/${sanitizePathSegment(l.path)}.json`,
@@ -752,6 +770,8 @@ export class DatapackGenerator implements Generator {
       use_expansion_hack: s.useExpansionHack,
       start_pool: s.templatePool,
       max_distance_from_center: s.maxDistance,
+      // Task E：jigsaw 递归深度
+      max_depth: s.maxDepth,
     };
     return {
       path: `data/${namespace}/worldgen/structure/${sanitizePathSegment(s.id)}.json`,
@@ -872,8 +892,9 @@ export class DatapackGenerator implements Generator {
         element: {
           element_type: 'minecraft:single_pool_element',
           location: e.template,
-          processors: 'minecraft:empty',
-          projection: 'rigid',
+          // Task E：自定义处理器列表（留空用 minecraft:empty）
+          processors: e.processors || 'minecraft:empty',
+          projection: e.projection,
         },
       })),
     };

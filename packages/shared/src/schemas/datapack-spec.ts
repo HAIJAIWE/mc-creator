@@ -68,6 +68,15 @@ export const AdvancementSpec = z.object({
   parent: z.string().optional(),
   /** P1 dogfood：进度框架类型（task/challenge/goal） */
   frame: z.enum(['task', 'challenge', 'goal']).default('task').optional(),
+  /** Task E：高级 criteria 配置（{ 条件名: { trigger, conditions } }，提供时替代简单 trigger 模式） */
+  criteria: z
+    .record(
+      z.object({
+        trigger: z.string(),
+        conditions: z.record(z.unknown()).default({}),
+      }),
+    )
+    .optional(),
 });
 
 /** 战利品表条目 */
@@ -75,12 +84,22 @@ export const LootEntrySpec = z.object({
   name: z.string(),
   weight: z.number().int().min(1).default(1),
   count: z.number().int().min(1).default(1),
+  /** Task E：条目类型（item/loot_table/empty/alternatives/group） */
+  type: z.enum(['item', 'loot_table', 'empty', 'alternatives', 'group']).default('item'),
+  /** Task E：条目函数（如 set_count/enchant_with_levels/apply_bonus，JSON 数组） */
+  functions: z.array(z.record(z.unknown())).default([]),
+  /** Task E：条目条件（如 minecraft:random_chance，JSON 数组） */
+  conditions: z.array(z.record(z.unknown())).default([]),
 });
 
 /** 战利品池 */
 export const LootPoolSpec = z.object({
   rolls: z.number().int().min(1).default(1),
   entries: z.array(LootEntrySpec).default([]),
+  /** Task E：额外掷骰（如附魔幸运加成） */
+  bonusRolls: z.number().min(0).default(0),
+  /** Task E：池条件（JSON 数组） */
+  conditions: z.array(z.record(z.unknown())).default([]),
 });
 
 /** 战利品表（P10 新增） */
@@ -337,6 +356,10 @@ export const StructureSpec = z.object({
   step: z.enum(['none', 'beard', 'beard_thin', 'encapsulate']).default('none'),
   /** 使用扩展距离 */
   useExpansionHack: z.boolean().default(false),
+  /** Task E：处理器列表引用（自定义 processor_list ID，jigsaw 结构用） */
+  processorList: z.string().optional(),
+  /** Task E：模板池条目数上限（max_depth，jigsaw 递归深度） */
+  maxDepth: z.number().int().min(1).default(7),
 });
 
 // ===== 自定义粒子（data/<namespace>/particle/<id>.json） =====
@@ -415,6 +438,10 @@ export const TemplatePoolEntrySpec = z.object({
   template: z.string(),
   /** 权重 */
   weight: z.number().int().min(1).default(1),
+  /** Task E：处理器列表引用（如 my_mod:house_processors，留空用 minecraft:empty） */
+  processors: z.string().default(''),
+  /** Task E：投影类型（rigid/terrain_matching） */
+  projection: z.enum(['rigid', 'terrain_matching']).default('rigid'),
 });
 
 /** 模板池（data/<namespace>/worldgen/template_pool/<id>.json） */
