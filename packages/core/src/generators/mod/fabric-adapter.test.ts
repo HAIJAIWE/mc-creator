@@ -875,6 +875,24 @@ describe('FabricAdapter P1.3 字段消费（recipes/entities/machines 非空时�
     expect(machines!.content).toContain('Ruby Furnace');
   });
 
+  it('Task 2: ModMachines 含能源/槽位/加工逻辑（非空壳）', () => {
+    const machines = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModMachines.java',
+    );
+    // BlockEntity 能源存储
+    expect(machines!.content).toContain('ENERGY_CAPACITY');
+    expect(machines!.content).toContain('receiveEnergy');
+    expect(machines!.content).toContain('extractEnergy');
+    // 加工逻辑
+    expect(machines!.content).toContain('tickServer');
+    expect(machines!.content).toContain('PROCESS_TIME');
+    // Menu 槽位
+    expect(machines!.content).toContain('quickMoveStack');
+    expect(machines!.content).toContain('addSlot');
+    // 无遗留 TODO 占位
+    expect(machines!.content).not.toContain('// TODO');
+  });
+
   it('mainClass 的 onInitialize 调用 P1.3 模块的 initialize', () => {
     const main = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',

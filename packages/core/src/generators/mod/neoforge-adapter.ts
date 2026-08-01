@@ -728,17 +728,84 @@ ${comments}
       .map((m) => {
         const pascal = this.toPascal(m.machineId);
         const id = m.machineId.toUpperCase();
-        return `    // TODO: 替换为实际的 ${pascal}BlockEntity 实现
+        const totalSlots = m.inputSlots + m.outputSlots;
+        return `    // ${pascal}BlockEntity：能源存储 + 输入/输出槽位 + 简易加工
     public static class ${pascal}BlockEntity extends BlockEntity {
+        public static final int ENERGY_CAPACITY = ${m.energyCapacity};
+        public static final int ENERGY_PER_TICK = ${m.defaultEnergyPerTick};
+        public static final int PROCESS_TIME = ${m.defaultProcessTime};
+        private int energy = 0;
+        private int progress = 0;
+        private final net.minecraft.world.SimpleContainer inventory = new net.minecraft.world.SimpleContainer(${totalSlots});
+
         public ${pascal}BlockEntity(BlockPos pos, BlockState state) {
             super(${id}_BE.get(), pos, state);
         }
+
+        public int getEnergy() { return energy; }
+        public int getMaxEnergy() { return ENERGY_CAPACITY; }
+        public int receiveEnergy(int amount) {
+            int accepted = Math.min(amount, ENERGY_CAPACITY - energy);
+            energy += accepted;
+            return accepted;
+        }
+        public int extractEnergy(int amount) {
+            int taken = Math.min(amount, energy);
+            energy -= taken;
+            return taken;
+        }
+
+        public net.minecraft.world.SimpleContainer getInventory() { return inventory; }
+
+        public void tickServer() {
+            if (energy >= ENERGY_PER_TICK && progress < PROCESS_TIME) {
+                energy -= ENERGY_PER_TICK;
+                progress++;
+            } else if (progress >= PROCESS_TIME) {
+                progress = 0;
+                for (int i = 0; i < ${m.inputSlots}; i++) {
+                    var stack = inventory.getItem(i);
+                    if (!stack.isEmpty()) {
+                        var outStack = inventory.getItem(${m.inputSlots});
+                        if (outStack.isEmpty()) {
+                            inventory.setItem(${m.inputSlots}, stack.copyWithCount(1));
+                            stack.shrink(1);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
     }
 
-    // TODO: 替换为实际的 ${pascal}Menu 实现
+    // ${pascal}Menu：输入槽(0..${m.inputSlots - 1}) + 输出槽(${m.inputSlots}..${totalSlots - 1}) + 玩家背包(9×3)
     public static class ${pascal}Menu extends AbstractContainerMenu {
+        private final net.minecraft.world.SimpleContainer machineInv;
+
         public ${pascal}Menu(int id, Inventory inv) {
             super(${id}_MENU.get(), id);
+            this.machineInv = new net.minecraft.world.SimpleContainer(${totalSlots});
+            for (int i = 0; i < ${totalSlots}; i++) {
+                this.addSlot(new Slot(machineInv, i, 8 + (i % 9) * 18, 18 + (i / 9) * 18));
+            }
+            for (int row = 0; row < 3; row++) {
+                for (int col = 0; col < 9; col++) {
+                    this.addSlot(new Slot(inv, col + row * 9 + 9, 8 + col * 18, 84 + row * 18));
+                }
+            }
+            for (int col = 0; col < 9; col++) {
+                this.addSlot(new Slot(inv, col, 8 + col * 18, 142));
+            }
+        }
+
+        @Override
+        public net.minecraft.world.item.ItemStack quickMoveStack(net.minecraft.world.entity.player.Player player, int index) {
+            return net.minecraft.world.item.ItemStack.EMPTY;
+        }
+
+        @Override
+        public boolean stillValid(net.minecraft.world.entity.player.Player player) {
+            return true;
         }
     }`;
       })
