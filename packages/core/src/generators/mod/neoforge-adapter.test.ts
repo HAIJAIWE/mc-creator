@@ -616,3 +616,59 @@ describe('NeoForgeAdapter P40 过程输入参数', () => {
     expect(events!.content).toContain('procedure_grantReward(ctx, 5, "");');
   });
 });
+
+// === Task D: 流体（NeoForge 侧） ===
+
+const SPEC_P40_FLUID_NEO: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Fluid test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  fluids: [
+    {
+      fluidId: 'ruby_juice',
+      displayName: 'Ruby Juice',
+      color: 0xff0000,
+      temperature: 300,
+      viscosity: 1000,
+      density: 1000,
+      luminous: false,
+    },
+  ],
+});
+
+describe('NeoForgeAdapter Task D 流体', () => {
+  const adapter = new NeoForgeAdapter();
+  const files = adapter.translate({
+    loader: 'neoforge',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_FLUID_NEO,
+    projectPath: '/proj',
+  });
+
+  it('生成 ModFluids.java 用 DeferredRegister.Fluids', () => {
+    const fluids = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModFluids.java',
+    );
+    expect(fluids).toBeDefined();
+    expect(fluids!.content).toContain('public class ModFluids');
+    expect(fluids!.content).toContain('DeferredRegister.Fluids FLUIDS');
+    expect(fluids!.content).toContain('FLUIDS.register("ruby_juice"');
+    expect(fluids!.content).toContain('DeferredFluid');
+  });
+
+  it('mainClass 调用 ModFluids.register(modEventBus)', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main!.content).toContain('ModFluids.register(modEventBus);');
+  });
+});

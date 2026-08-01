@@ -221,6 +221,12 @@ export class NeoForgeAdapter implements LoaderAdapter {
       generate: (s, pkg, mainCls) => [this.modBlocksJava(s, pkg, mainCls)],
     },
     {
+      name: 'fluids',
+      hashInputs: (s) => s.fluids ?? [],
+      generate: (s, pkg, mainCls) =>
+        s.fluids?.length ? [this.modFluidsJava(s, pkg, mainCls)] : [],
+    },
+    {
       name: 'recipes',
       hashInputs: (s) => s.recipes ?? [],
       generate: (s, pkg) => (s.recipes?.length ? [this.modRecipesJava(s, pkg)] : []),
@@ -377,6 +383,7 @@ export class NeoForgeAdapter implements LoaderAdapter {
     ];
     if (spec.recipes?.length) registerCalls.push('ModRecipes.initialize();');
     if (spec.entities?.length) registerCalls.push('ModEntities.register(modEventBus);');
+    if (spec.fluids?.length) registerCalls.push('ModFluids.register(modEventBus);');
     if (spec.machines?.length) registerCalls.push('ModMachines.register(modEventBus);');
     if (spec.customCode?.length) registerCalls.push('ModCustomCode.initialize();');
     if (spec.multiblocks?.length) registerCalls.push('ModMultiblocks.initialize();');
@@ -469,6 +476,40 @@ ${fields}
 `;
     return {
       path: `src/main/java/${packagePath(spec.modId)}/ModBlocks.java`,
+      content,
+    };
+  }
+
+  /**
+   * Task D：生成 ModFluids.java（NeoForge DeferredRegister 风格）。
+   * 流体用 DeferredRegister.Fluids + 自定义 SimpleFluid 子类。
+   */
+  private modFluidsJava(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
+    const fields = (spec.fluids ?? [])
+      .map(
+        (f) =>
+          `    public static final DeferredFluid<net.minecraft.world.level.material.Fluid> ${f.fluidId.toUpperCase()} = FLUIDS.register("${f.fluidId}", () -> new SimpleFluid());`,
+      )
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.world.level.material.SimpleFluid;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredFluid;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+public class ModFluids {
+    public static final DeferredRegister.Fluids FLUIDS = DeferredRegister.createFluids(${mainCls}.MOD_ID);
+
+${fields}
+
+    public static void register(IEventBus modEventBus) {
+        FLUIDS.register(modEventBus);
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModFluids.java`,
       content,
     };
   }
@@ -1365,6 +1406,16 @@ type ModSpecLike = {
     depth: number;
     hollow: boolean;
     controllerOffset: { x: number; y: number; z: number };
+  }>;
+  fluids?: Array<{
+    fluidId: string;
+    displayName: string;
+    color: number;
+    temperature: number;
+    viscosity: number;
+    density: number;
+    luminous: boolean;
+    texturePath?: string;
   }>;
   eventHandlers?: Array<{
     handlerId: string;

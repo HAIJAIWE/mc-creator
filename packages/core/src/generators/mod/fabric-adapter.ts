@@ -237,6 +237,11 @@ export class FabricAdapter implements LoaderAdapter {
       generate: (s, pkg, mainCls) => [this.modBlocksJava(s, pkg, mainCls)],
     },
     {
+      name: 'fluids',
+      hashInputs: (s) => s.fluids ?? [],
+      generate: (s, pkg) => (s.fluids?.length ? [this.modFluidsJava(s, pkg)] : []),
+    },
+    {
       name: 'recipes',
       hashInputs: (s) => s.recipes ?? [],
       generate: (s, pkg) => (s.recipes?.length ? [this.modRecipesJava(s, pkg)] : []),
@@ -467,6 +472,7 @@ fabric_version=${versions.fabricApiVersion}
     const initCalls: string[] = ['ModItems.initialize();', 'ModBlocks.initialize();'];
     if (spec.recipes?.length) initCalls.push('ModRecipes.initialize();');
     if (spec.entities?.length) initCalls.push('ModEntities.initialize();');
+    if (spec.fluids?.length) initCalls.push('ModFluids.initialize();');
     if (spec.machines?.length) initCalls.push('ModMachines.initialize();');
     if (spec.customCode?.length) initCalls.push('ModCustomCode.initialize();');
     if (spec.multiblocks?.length) initCalls.push('ModMultiblocks.initialize();');
@@ -559,6 +565,47 @@ ${regs}
 `;
     return {
       path: `src/main/java/${packagePath(spec.modId)}/ModBlocks.java`,
+      content,
+    };
+  }
+
+  /**
+   * Task D：生成 ModFluids.java。
+   * 流体注册：Registry.register(BuiltInRegistries.FLUID, ...)，SimpleFluid 为
+   * net.minecraft.world.level.material.SimpleFluid 的自定义子类（流经/静止状态）。
+   * 同时注册流体桶物品（ModItems.FLUID_BUCKET）。
+   */
+  private modFluidsJava(spec: ModSpecLike, pkg: string): FileNode {
+    const fields = (spec.fluids ?? [])
+      .map((f) => {
+        const upper = f.fluidId.toUpperCase();
+        return `    public static net.minecraft.world.level.material.Fluid ${upper};`;
+      })
+      .join('\n');
+    const regs = (spec.fluids ?? [])
+      .map((f) => {
+        const upper = f.fluidId.toUpperCase();
+        return `        ${upper} = Registry.register(BuiltInRegistries.FLUID, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${f.fluidId}"), new SimpleFluid());`;
+      })
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.material.SimpleFluid;
+
+public class ModFluids {
+    public static final String MOD_ID = "${javaEscape(spec.modId)}";
+${fields}
+
+    public static void initialize() {
+${regs}
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModFluids.java`,
       content,
     };
   }
@@ -1488,6 +1535,16 @@ type ModSpecLike = {
     depth: number;
     hollow: boolean;
     controllerOffset: { x: number; y: number; z: number };
+  }>;
+  fluids?: Array<{
+    fluidId: string;
+    displayName: string;
+    color: number;
+    temperature: number;
+    viscosity: number;
+    density: number;
+    luminous: boolean;
+    texturePath?: string;
   }>;
   eventHandlers?: Array<{
     handlerId: string;

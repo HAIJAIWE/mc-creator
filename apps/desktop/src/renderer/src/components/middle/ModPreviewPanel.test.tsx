@@ -39,6 +39,7 @@ function makeSpec(overrides: Partial<ModSpec> = {}): ModSpec {
     machines: [],
     customCode: [],
     multiblocks: [],
+    fluids: [],
     eventHandlers: [],
     conditions: [],
     actions: [],

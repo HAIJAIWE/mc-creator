@@ -304,6 +304,8 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     machines,
     customCode: dedupedCustomCode,
     multiblocks,
+    // Task D：流体（当前无流体节点，恒为空数组；为 ModSpec 兼容保留）
+    fluids: [],
     eventHandlers,
     conditions,
     actions,

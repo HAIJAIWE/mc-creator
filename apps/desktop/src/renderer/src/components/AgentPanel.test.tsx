@@ -167,6 +167,7 @@ describe('AgentPanel', () => {
         machines: [],
         customCode: [],
         multiblocks: [],
+        fluids: [],
         eventHandlers: [],
         conditions: [],
         actions: [],

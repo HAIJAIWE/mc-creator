@@ -134,6 +134,7 @@ const DEMO_SPEC: ModSpec = {
   machines: [],
   customCode: [],
   multiblocks: [],
+  fluids: [],
   eventHandlers: [],
   conditions: [],
   actions: [],

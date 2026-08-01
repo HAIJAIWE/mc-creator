@@ -1090,3 +1090,68 @@ describe('FabricAdapter P1.5 真实事件处理逻辑生成', () => {
     expect(events!.content).not.toContain('event instanceof');
   });
 });
+
+// === Task D: 流体 ===
+
+const SPEC_P40_FLUID: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Fluid test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  fluids: [
+    {
+      fluidId: 'ruby_juice',
+      displayName: 'Ruby Juice',
+      color: 0xff0000,
+      temperature: 300,
+      viscosity: 1000,
+      density: 1000,
+      luminous: false,
+    },
+  ],
+});
+
+describe('FabricAdapter Task D 流体', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate({
+    loader: 'fabric',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_FLUID,
+    projectPath: '/proj',
+  });
+
+  it('生成 ModFluids.java 并注册流体', () => {
+    const fluids = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModFluids.java',
+    );
+    expect(fluids).toBeDefined();
+    expect(fluids!.content).toContain('public class ModFluids');
+    expect(fluids!.content).toContain(
+      'public static net.minecraft.world.level.material.Fluid RUBY_JUICE;',
+    );
+    expect(fluids!.content).toContain('BuiltInRegistries.FLUID');
+    expect(fluids!.content).toContain('new SimpleFluid()');
+  });
+
+  it('mainClass 调用 ModFluids.initialize()', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main!.content).toContain('ModFluids.initialize();');
+  });
+
+  it('无 fluids 时不生成 ModFluids.java', () => {
+    const files2 = new FabricAdapter().translate(CTX);
+    expect(files2.map((f) => f.path)).not.toContain(
+      'src/main/java/com/example/ruby_tools/ModFluids.java',
+    );
+  });
+});

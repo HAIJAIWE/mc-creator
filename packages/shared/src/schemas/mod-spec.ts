@@ -350,6 +350,26 @@ export const EntitySpec = z.object({
   texturePath: z.string().optional(),
 });
 
+/** 流体条目（loader 无关，水/熔岩风格流体 + 桶物品） */
+export const FluidSpec = z.object({
+  /** 流体 id（小写下划线） */
+  fluidId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 显示名 */
+  displayName: z.string(),
+  /** 流体颜色（0xRRGGBB，桶/材质用） */
+  color: z.number().int().default(0x00aaff),
+  /** 温度（水=300，熔岩=1300） */
+  temperature: z.number().int().min(0).default(300),
+  /** 黏度（水=1000，熔岩=6000） */
+  viscosity: z.number().int().min(1).default(1000),
+  /** 密度 */
+  density: z.number().int().default(1000),
+  /** 是否像熔岩一样发光 */
+  luminous: z.boolean().default(false),
+  /** 贴图路径（相对 resources/） */
+  texturePath: z.string().optional(),
+});
+
 /** 机器条目（loader 无关，方块实体 + GUI + 能源） */
 export const MachineSpec = z.object({
   /** 机器 id（小写下划线） */
@@ -589,6 +609,8 @@ export const ModSpec = z.object({
   customCode: z.array(CustomCodeSnippetSpec).default([]),
   // 新增：多方块结构（P1.4 从 MultiBlockNode 编译）
   multiblocks: z.array(MultiBlockSpec).default([]),
+  // 新增：流体（Task D）
+  fluids: z.array(FluidSpec).default([]),
   // 新增：事件处理器（P1.4 从 EventNode 编译，扁平结构；P1.5 通过 conditionIds/actionIds 建立控制流链引用）
   eventHandlers: z.array(EventHandlerSpec).default([]),
   // 新增：条件（P1.4 从 ConditionNode 编译，扁平列表，被 eventHandlers[].conditionIds 引用）
@@ -614,6 +636,7 @@ export type ModRecipeSpec = z.infer<typeof ModRecipeSpec>;
 export type ModRecipeInputSpec = z.infer<typeof ModRecipeInputSpec>;
 export type EntitySpec = z.infer<typeof EntitySpec>;
 export type MachineSpec = z.infer<typeof MachineSpec>;
+export type FluidSpec = z.infer<typeof FluidSpec>;
 export type CustomCodeSnippetSpec = z.infer<typeof CustomCodeSnippetSpec>;
 export type MultiBlockSpec = z.infer<typeof MultiBlockSpec>;
 export type EventHandlerSpec = z.infer<typeof EventHandlerSpec>;
