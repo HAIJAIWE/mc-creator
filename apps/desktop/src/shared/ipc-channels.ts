@@ -30,6 +30,39 @@ export const EXPORT_ZIP = 'mod:exportZip';
 export const EXPORT_SPEC = 'spec:export';
 export const IMPORT_SPEC = 'spec:import';
 
+/** 游戏启动器（下载客户端 + 离线启动） */
+export const LAUNCHER_LIST_VERSIONS = 'launcher:listVersions';
+export const LAUNCHER_DOWNLOAD = 'launcher:download';
+export const LAUNCHER_LAUNCH = 'launcher:launch';
+
+export const LauncherListVersionsResponse = z.object({
+  versions: z.array(
+    z.object({
+      id: z.string(),
+      type: z.string(),
+      releaseTime: z.string(),
+    }),
+  ),
+  error: z.string().nullable().optional(),
+});
+
+export const LauncherDownloadRequest = z.object({ version: z.string() });
+export const LauncherDownloadResponse = z.object({
+  ok: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+
+export const LauncherLaunchRequest = z.object({
+  version: z.string(),
+  username: z.string().default('Steve'),
+  memory: z.string().default('2G'),
+  gameDir: z.string().default(''),
+});
+export const LauncherLaunchResponse = z.object({
+  pid: z.number(),
+  error: z.string().nullable().optional(),
+});
+
 /** Spec 快照文件格式：{ meta, spec } */
 export const SpecSnapshotSchema = z.object({
   meta: z.object({

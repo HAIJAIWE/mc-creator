@@ -7,6 +7,7 @@ import { homedir } from 'node:os';
 import JSZip from 'jszip';
 import { z } from 'zod';
 import { IPty, spawn as ptySpawn } from 'node-pty';
+import { LauncherService } from './launcher-service.js';
 import {
   Orchestrator,
   runGradleBuild,
@@ -42,6 +43,14 @@ import {
   ExportSpecRequest,
   ImportSpecResponse,
   SpecSnapshotSchema,
+  LAUNCHER_LIST_VERSIONS,
+  LAUNCHER_DOWNLOAD,
+  LAUNCHER_LAUNCH,
+  LauncherListVersionsResponse,
+  LauncherDownloadRequest,
+  LauncherDownloadResponse,
+  LauncherLaunchRequest,
+  LauncherLaunchResponse,
   GenerateSpecRequest,
   GenerateFilesRequest,
   BuildRequest,
@@ -548,6 +557,62 @@ ${req.buildLog}
       return { snapshot: null, canceled: false, error: `读取失败：${(e as Error).message}` };
     }
   });
+
+  // ===== 游戏启动器（下载客户端 + 离线启动）=====
+
+  const launcherDir = join(app.getPath('userData'), 'mc-launcher');
+  const launcher = new LauncherService(launcherDir);
+
+  // 版本清单
+  ipcMain.handle(
+    LAUNCHER_LIST_VERSIONS,
+    async (): Promise<z.infer<typeof LauncherListVersionsResponse>> => {
+      try {
+        const versions = await launcher.listVersions();
+        return {
+          versions: versions.map((v) => ({ id: v.id, type: v.type, releaseTime: v.releaseTime })),
+        };
+      } catch (e) {
+        return { versions: [], error: (e as Error).message };
+      }
+    },
+  );
+
+  // 下载客户端（jar + assets + libraries 顺序执行）
+  ipcMain.handle(
+    LAUNCHER_DOWNLOAD,
+    async (_e, raw: unknown): Promise<z.infer<typeof LauncherDownloadResponse>> => {
+      try {
+        const req = LauncherDownloadRequest.parse(raw);
+        const detail = await launcher.resolveVersion(req.version);
+        await launcher.downloadClient(detail);
+        await launcher.downloadAssets(detail);
+        await launcher.downloadLibraries(detail);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: (e as Error).message };
+      }
+    },
+  );
+
+  // 启动游戏（离线模式）
+  ipcMain.handle(
+    LAUNCHER_LAUNCH,
+    async (_e, raw: unknown): Promise<z.infer<typeof LauncherLaunchResponse>> => {
+      try {
+        const req = LauncherLaunchRequest.parse(raw);
+        const detail = await launcher.resolveVersion(req.version);
+        const result = await launcher.launchGame(detail, {
+          username: req.username,
+          memory: req.memory,
+          gameDir: req.gameDir,
+        });
+        return { pid: result.pid };
+      } catch (e) {
+        return { pid: 0, error: (e as Error).message };
+      }
+    },
+  );
 
   // 保存全部文件到磁盘（选择目录后按相对路径写入）
   ipcMain.handle(SAVE_ALL_FILES, async (_e, raw: unknown): Promise<SaveAllFilesRes> => {

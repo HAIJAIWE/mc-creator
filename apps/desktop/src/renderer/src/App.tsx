@@ -17,6 +17,7 @@ import { McLauncherPanel } from './components/McLauncherPanel.js';
 import { EntityAiEditor } from './components/EntityAiEditor.js';
 import { AudioPanel } from './components/AudioPanel.js';
 import { CiCdPanel } from './components/CiCdPanel.js';
+import { GameLauncherPanel } from './components/GameLauncherPanel.js';
 import { BuildPanel } from './components/BuildPanel.js';
 import { TerminalPanel } from './components/TerminalPanel.js';
 import { Dashboard } from './components/Dashboard.js';
@@ -34,7 +35,8 @@ type Activity =
   | 'mc'
   | 'entity'
   | 'audio'
-  | 'cicd';
+  | 'cicd'
+  | 'game';
 
 /** 工作台视图（三栏布局） */
 function Workbench() {
@@ -76,6 +78,8 @@ function Workbench() {
         return <AudioPanel />;
       case 'cicd':
         return <CiCdPanel />;
+      case 'game':
+        return <GameLauncherPanel />;
       case 'settings':
         return (
           <SettingsPanel

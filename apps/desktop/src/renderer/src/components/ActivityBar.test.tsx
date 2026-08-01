@@ -55,10 +55,10 @@ describe('ActivityBar 渲染与 ARIA 结构', () => {
     expect(toolbar.getAttribute('aria-orientation')).toBe('vertical');
   });
 
-  it('渲染 10 个活动按钮 + 1 个设置按钮 + 1 个品牌标按钮 = 12 个 button', () => {
+  it('渲染 11 个活动按钮 + 1 个设置按钮 + 1 个品牌标按钮 = 13 个 button', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
     const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(12);
+    expect(buttons.length).toBe(13);
   });
 
   it('每个活动按钮都有 type="button"（防止表单提交）', () => {
@@ -90,8 +90,8 @@ describe('ActivityBar 渲染与 ARIA 结构', () => {
 
   it('非激活按钮 aria-pressed=false、tabIndex=-1（Roving Tabindex）', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    // 抽查 search / items / cicd 三个非激活按钮
-    for (const id of ['search', 'items', 'cicd'] as const) {
+    // 抽查 search / items / game 三个非激活按钮
+    for (const id of ['search', 'items', 'game'] as const) {
       const btn = screen.getByLabelText(labelFor(id));
       expect(btn.getAttribute('aria-pressed')).toBe('false');
       expect(btn.tabIndex).toBe(-1);
@@ -186,19 +186,19 @@ describe('ActivityBar 键盘导航（WAI-ARIA Toolbar 模式）', () => {
     expect(onChange).toHaveBeenCalledWith('explorer');
   });
 
-  it('ArrowUp 在第一个活动时循环到最后一个（cicd）', () => {
+  it('ArrowUp 在第一个活动时循环到最后一个（game）', () => {
     const onChange = vi.fn();
     render(<ActivityBar active="explorer" onChange={onChange} />);
     const explorerBtn = screen.getByLabelText('资源管理器');
     fireEvent.keyDown(explorerBtn, { key: 'ArrowUp' });
-    expect(onChange).toHaveBeenCalledWith('cicd');
+    expect(onChange).toHaveBeenCalledWith('game');
   });
 
   it('ArrowDown 在最后一个活动时循环到第一个（explorer）', () => {
     const onChange = vi.fn();
-    render(<ActivityBar active="cicd" onChange={onChange} />);
-    const cicdBtn = screen.getByLabelText('CI/CD');
-    fireEvent.keyDown(cicdBtn, { key: 'ArrowDown' });
+    render(<ActivityBar active="game" onChange={onChange} />);
+    const gameBtn = screen.getByLabelText('游戏启动器');
+    fireEvent.keyDown(gameBtn, { key: 'ArrowDown' });
     expect(onChange).toHaveBeenCalledWith('explorer');
   });
 
@@ -210,12 +210,12 @@ describe('ActivityBar 键盘导航（WAI-ARIA Toolbar 模式）', () => {
     expect(onChange).toHaveBeenCalledWith('explorer');
   });
 
-  it('End 键跳到最后一个活动（cicd）', () => {
+  it('End 键跳到最后一个活动（game）', () => {
     const onChange = vi.fn();
     render(<ActivityBar active="explorer" onChange={onChange} />);
     const explorerBtn = screen.getByLabelText('资源管理器');
     fireEvent.keyDown(explorerBtn, { key: 'End' });
-    expect(onChange).toHaveBeenCalledWith('cicd');
+    expect(onChange).toHaveBeenCalledWith('game');
   });
 
   it('ArrowDown 切换后焦点移动到新激活按钮（requestAnimationFrame 回调）', () => {
@@ -235,8 +235,8 @@ describe('ActivityBar 键盘导航（WAI-ARIA Toolbar 模式）', () => {
     const explorerBtn = screen.getByLabelText('资源管理器');
     explorerBtn.focus();
     fireEvent.keyDown(explorerBtn, { key: 'End' });
-    const cicdBtn = screen.getByLabelText('CI/CD');
-    expect(document.activeElement).toBe(cicdBtn);
+    const gameBtn = screen.getByLabelText('游戏启动器');
+    expect(document.activeElement).toBe(gameBtn);
   });
 
   it('Home 键切换后焦点移动到第一个按钮', () => {
@@ -305,6 +305,7 @@ function labelFor(id: string): string {
     entity: '实体 AI',
     audio: '音效管理',
     cicd: 'CI/CD',
+    game: '游戏启动器',
     settings: '设置',
   };
   return map[id] ?? '';

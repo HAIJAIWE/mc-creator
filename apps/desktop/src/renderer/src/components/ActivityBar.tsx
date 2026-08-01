@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { GitBranch } from 'lucide-react';
+import { GitBranch, Gamepad2 } from 'lucide-react';
 import { McMark } from './McMark.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
 
@@ -14,6 +14,7 @@ type Activity =
   | 'entity'
   | 'audio'
   | 'cicd'
+  | 'game'
   | 'settings';
 
 interface ActivityBarProps {
@@ -37,6 +38,7 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
     { id: 'entity', icon: <McIcon scope="pixel" name="box" size={20} />, label: '实体 AI' },
     { id: 'audio', icon: <McIcon scope="pixel" name="image" size={20} />, label: '音效管理' },
     { id: 'cicd', icon: <McIcon scope="pixel" name="terminal" size={20} />, label: 'CI/CD' },
+    { id: 'game', icon: <Gamepad2 className="h-5 w-5" />, label: '游戏启动器' },
   ];
 
   /**

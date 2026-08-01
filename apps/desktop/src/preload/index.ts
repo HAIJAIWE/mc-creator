@@ -5,6 +5,9 @@ import {
   SAVE_FILE,
   EXPORT_SPEC,
   IMPORT_SPEC,
+  LAUNCHER_LIST_VERSIONS,
+  LAUNCHER_DOWNLOAD,
+  LAUNCHER_LAUNCH,
   SAVE_ALL_FILES,
   PREPARE_BUILD_DIR,
   EXPORT_PROJECT,
@@ -163,6 +166,10 @@ const api = {
   exportSpec: (req: { spec: unknown; generatorType: string; description?: string }) =>
     ipcRenderer.invoke(EXPORT_SPEC, req),
   importSpec: () => ipcRenderer.invoke(IMPORT_SPEC),
+  launcherListVersions: () => ipcRenderer.invoke(LAUNCHER_LIST_VERSIONS),
+  launcherDownload: (req: { version: string }) => ipcRenderer.invoke(LAUNCHER_DOWNLOAD, req),
+  launcherLaunch: (req: { version: string; username: string; memory: string; gameDir?: string }) =>
+    ipcRenderer.invoke(LAUNCHER_LAUNCH, req),
   saveAllFiles: (req: { files: { path: string; content: string }[] }) =>
     ipcRenderer.invoke(SAVE_ALL_FILES, req),
   prepareBuildDir: (files: { path: string; content: string }[]) =>

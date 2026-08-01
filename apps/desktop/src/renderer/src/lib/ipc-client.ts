@@ -101,6 +101,10 @@ export const ipcClient = {
   exportSpec: (req: { spec: unknown; generatorType: string; description?: string }) =>
     window.mcApi.exportSpec(req),
   importSpec: () => window.mcApi.importSpec(),
+  launcherListVersions: () => window.mcApi.launcherListVersions(),
+  launcherDownload: (req: { version: string }) => window.mcApi.launcherDownload(req),
+  launcherLaunch: (req: { version: string; username: string; memory: string; gameDir?: string }) =>
+    window.mcApi.launcherLaunch(req),
   modrinthSearch: (req: {
     query: string;
     loader?: string;
