@@ -46,6 +46,10 @@ export class ServerGenerator implements Generator {
     const deployFiles = this.generateDeployFiles(spec);
     files.push(...deployFiles);
 
+    // 一键部署：云服务器 install.sh + 本地 install.bat
+    files.push(this.generateInstallSh(spec));
+    files.push(this.generateInstallBat(spec));
+
     return {
       files,
       warnings: [],
@@ -297,5 +301,165 @@ echo "备份完成: $BACKUP_DIR"
     const content = `0 */${spec.backupInterval} * * * ${shellEscape(spec.serviceUser)} /path/to/deploy/backup.sh >> /var/log/minecraft-backup.log 2>&1
 `;
     return { path: 'deploy/backup-cron', content };
+  }
+
+  /**
+   * 一键部署脚本（云服务器 Linux，24h 在线）：
+   * 1. 安装 Java 21
+   * 2. 按 serverType 下载服务端（vanilla/paper/fabric）
+   * 3. 放入配置文件
+   * 4. systemd 服务开机自启（重启不掉线）
+   */
+  private generateInstallSh(spec: ServerSpecType): FileNode {
+    // 按 serverType 生成下载服务端的 shell 片段
+    let downloadCmd: string;
+    if (spec.serverType === 'paper') {
+      downloadCmd = `echo "下载 Paper 服务端 (${shellEscape(spec.serverVersion)})..."
+PAPER_API="https://api.papermc.io/v2/projects/paper/versions/${shellEscape(spec.serverVersion)}/builds"
+PAPER_BUILD=$(curl -s "$PAPER_API" | grep -o '"build":[0-9]*' | tail -1 | cut -d: -f2)
+curl -o "\${jarName}" "\${PAPER_API}/\${PAPER_BUILD}/downloads/paper-${shellEscape(spec.serverVersion)}-\${PAPER_BUILD}.jar"`;
+    } else if (spec.serverType === 'fabric') {
+      downloadCmd = `echo "下载 Fabric 服务端 (${shellEscape(spec.serverVersion)})..."
+curl -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar"
+java -jar fabric-installer.jar server -mcversion ${shellEscape(spec.serverVersion)} -dir . -loader latest
+mv fabric-server-launch.jar "\${jarName}" 2>/dev/null || true`;
+    } else {
+      downloadCmd = `echo "下载 Vanilla 服务端 (${shellEscape(spec.serverVersion)})..."
+MANIFEST=$(curl -s https://piston-meta.mojang.com/mc/game/version_manifest_v2.json)
+URL=$(echo "$MANIFEST" | python3 -c "import sys,json; d=json.load(sys.stdin); v=[x for x in d['versions'] if x['id']=='${shellEscape(spec.serverVersion)}'][0]; import urllib.request; print(json.load(urllib.request.urlopen(v['url']))['downloads']['server']['url'])")
+curl -o "\${jarName}" "$URL"`;
+    }
+
+    const content = `#!/bin/bash
+set -e
+# ============================================
+# MC Creator 一键部署脚本（云服务器，24h 在线）
+# 用法: bash install.sh
+# ============================================
+SERVER_DIR="${shellEscape(spec.serviceDir)}"
+SERVER_USER="${shellEscape(spec.serviceUser)}"
+jarName="${shellEscape(spec.jarName)}"
+MC_VERSION="${shellEscape(spec.serverVersion)}"
+
+echo "=== [1/4] 安装 Java 21 ==="
+if ! command -v java &>/dev/null || ! java -version 2>&1 | grep -q "21"; then
+  apt-get update -y
+  apt-get install -y openjdk-21-jre-headless curl python3 || {
+    # Ubuntu 22.04 默认源可能无 21，装 17 兜底（1.21 需要 21，提示手动装）
+    apt-get install -y openjdk-17-jre-headless
+    echo "警告: 未找到 Java 21，已装 17。1.21+ 服务端需要 Java 21，请手动: apt install openjdk-21-jre-headless"
+  }
+fi
+
+echo "=== [2/4] 创建目录并下载服务端 ==="
+mkdir -p "$SERVER_DIR"
+cd "$SERVER_DIR"
+
+if [ ! -f "$jarName" ]; then
+${downloadCmd
+  .split('\n')
+  .map((l) => '  ' + l)
+  .join('\n')}
+else
+  echo "$jarName 已存在，跳过下载"
+fi
+
+echo "=== [3/4] 复制配置文件 ==="
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cp -f "$SCRIPT_DIR"/server.properties "$SCRIPT_DIR"/eula.txt "$SCRIPT_DIR"/ops.json "$SCRIPT_DIR"/whitelist.json "$SERVER_DIR"/ 2>/dev/null || true
+cp -f "$SCRIPT_DIR"/mods/modlist.txt "$SERVER_DIR"/mods/ 2>/dev/null || true
+
+echo "=== [4/4] 安装 systemd 服务（开机自启） ==="
+cat > /etc/systemd/system/minecraft.service << 'EOF'
+[Unit]
+Description=Minecraft Server
+After=network.target
+
+[Service]
+Type=simple
+User=${shellEscape(spec.serviceUser)}
+WorkingDirectory=${shellEscape(spec.serviceDir)}
+ExecStart=${shellEscape(spec.javaPath || 'java')} -Xmx${shellEscape(spec.maxMemory)} -Xms${shellEscape(spec.startMemory)} -jar "${shellEscape(spec.jarName)}" nogui
+Restart=${spec.restartOnCrash ? 'on-failure' : 'no'}
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable minecraft
+systemctl restart minecraft
+
+echo ""
+echo "=============================================="
+echo "部署完成！服务器已启动并设为开机自启（24h 在线）"
+echo "查看状态: systemctl status minecraft"
+echo "查看日志: journalctl -u minecraft -f"
+echo "玩家连接: 你的公网IP:${spec.port}"
+echo "=============================================="
+`;
+    return { path: 'install.sh', content };
+  }
+
+  /**
+   * 一键部署脚本（Windows 本地，局域网联机）：
+   * 1. 检查 Java
+   * 2. 按 serverType 下载服务端
+   * 3. 提示运行 start.bat 开服
+   */
+  private generateInstallBat(spec: ServerSpecType): FileNode {
+    let downloadCmd: string;
+    if (spec.serverType === 'paper') {
+      downloadCmd = `echo 下载 Paper 服务端 (%MC_VERSION%)...
+powershell -Command "Invoke-WebRequest -Uri 'https://api.papermc.io/v2/projects/paper/versions/%MC_VERSION%/builds' -OutFile paper_builds.json"
+for /f "delims=" %%i in ('powershell -Command "(Get-Content paper_builds.json | ConvertFrom-Json).builds[-1].build"') do set BUILD=%%i
+powershell -Command "Invoke-WebRequest -Uri ('https://api.papermc.io/v2/projects/paper/versions/%MC_VERSION%/builds/' + $env:BUILD + '/downloads/paper-%MC_VERSION%-' + $env:BUILD + '.jar') -OutFile %JAR%"
+del paper_builds.json`;
+    } else if (spec.serverType === 'fabric') {
+      downloadCmd = `echo 下载 Fabric 服务端 (%MC_VERSION%)...
+powershell -Command "Invoke-WebRequest -Uri 'https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar' -OutFile fabric-installer.jar"
+java -jar fabric-installer.jar server -mcversion %MC_VERSION% -dir . -loader latest
+echo Fabric 安装完成`;
+    } else {
+      downloadCmd = `echo 下载 Vanilla 服务端 (%MC_VERSION%)...
+powershell -Command "$m=(Invoke-WebRequest 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json' -UseBasicParsing).Content | ConvertFrom-Json; $v=$m.versions | Where-Object { $_.id -eq '%MC_VERSION%' }; $url=(Invoke-WebRequest $v.url -UseBasicParsing).Content | ConvertFrom-Json; Invoke-WebRequest $url.downloads.server.url -OutFile '%JAR%'"`;
+    }
+
+    const content = `@echo off
+REM ============================================
+REM MC Creator 一键部署脚本（Windows 本地，局域网联机）
+REM 用法: 双击 install.bat
+REM ============================================
+setlocal
+set JAR=${shellEscape(spec.jarName)}
+set MC_VERSION=${shellEscape(spec.serverVersion)}
+
+echo === [1/3] 检查 Java ===
+java -version 2>nul || (
+  echo 未检测到 Java，请先安装 Java 21:
+  echo   https://adoptium.net/temurin/releases/?version=21
+  pause
+  exit /b 1
+)
+
+echo === [2/3] 下载服务端 ===
+if exist "%JAR%" (
+  echo %JAR% 已存在，跳过下载
+) else (
+${downloadCmd
+  .split('\n')
+  .map((l) => '  ' + l)
+  .join('\n')}
+)
+
+echo === [3/3] 完成 ===
+echo.
+echo 服务器文件已就绪。现在运行 start.bat 即可开服。
+echo 局域网玩家连接: 本机IP:${spec.port}
+echo 查看本机IP: ipconfig（找 IPv4 地址）
+echo.
+pause
+`;
+    return { path: 'install.bat', content };
   }
 }

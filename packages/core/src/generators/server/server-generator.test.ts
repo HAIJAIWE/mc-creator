@@ -60,11 +60,13 @@ describe('ServerGenerator', () => {
       }),
     );
 
-    expect(result.files).toHaveLength(8);
+    expect(result.files).toHaveLength(10);
     const paths = result.files.map((f) => f.path).sort();
     expect(paths).toEqual([
       'README.txt',
       'eula.txt',
+      'install.bat',
+      'install.sh',
       'mods/modlist.txt',
       'ops.json',
       'server.properties',
@@ -155,13 +157,13 @@ describe('ServerGenerator', () => {
     expect(sh!.content).toContain('"java" -Xmx4G -Xms2G -jar "server.jar" nogui');
   });
 
-  it('空配置（最小 Spec）不崩溃且生成 8 个文件', async () => {
+  it('空配置（最小 Spec）不崩溃且生成 10 个文件', async () => {
     const result = await gen.generate(
       makeCtx({
         serverName: 'Minimal',
       }),
     );
-    expect(result.files).toHaveLength(8);
+    expect(result.files).toHaveLength(10);
     const props = result.files.find((f) => f.path === 'server.properties');
     expect(props).toBeDefined();
     // 默认值
@@ -207,8 +209,44 @@ describe('ServerGenerator', () => {
     const result = await gen.generate(makeCtx({ serverName: 'S' }));
     const deployFiles = result.files.filter((f) => f.path.startsWith('deploy/'));
     expect(deployFiles).toHaveLength(0);
-    // 总共仍为 8 个文件
-    expect(result.files).toHaveLength(8);
+    // 基础 10 个 + 无 deploy 文件
+    expect(result.files).toHaveLength(10);
+  });
+
+  it('一键部署: 生成 install.sh（云服务器）与 install.bat（本地）', async () => {
+    const result = await gen.generate(
+      makeCtx({ serverName: 'Srv', serverType: 'vanilla', serverVersion: '1.21.1' }),
+    );
+    const sh = result.files.find((f) => f.path === 'install.sh');
+    expect(sh).toBeDefined();
+    expect(sh!.content).toContain('openjdk-21-jre-headless');
+    expect(sh!.content).toContain('systemctl enable minecraft');
+    expect(sh!.content).toContain('piston-meta.mojang.com');
+    expect(sh!.content).toContain('MC_VERSION="1.21.1"');
+
+    const bat = result.files.find((f) => f.path === 'install.bat');
+    expect(bat).toBeDefined();
+    expect(bat!.content).toContain('start.bat');
+    expect(bat!.content).toContain('set MC_VERSION=1.21.1');
+  });
+
+  it('一键部署: serverType=paper 下载 PaperMC API', async () => {
+    const result = await gen.generate(
+      makeCtx({ serverName: 'Srv', serverType: 'paper', serverVersion: '1.21.1' }),
+    );
+    const sh = result.files.find((f) => f.path === 'install.sh');
+    expect(sh!.content).toContain('api.papermc.io');
+    const bat = result.files.find((f) => f.path === 'install.bat');
+    expect(bat!.content).toContain('api.papermc.io');
+  });
+
+  it('一键部署: serverType=fabric 下载 fabric-installer', async () => {
+    const result = await gen.generate(
+      makeCtx({ serverName: 'Srv', serverType: 'fabric', serverVersion: '1.21.1' }),
+    );
+    const sh = result.files.find((f) => f.path === 'install.sh');
+    expect(sh!.content).toContain('maven.fabricmc.net');
+    expect(sh!.content).toContain('fabric-installer.jar server -mcversion');
   });
 
   it("deployTarget='systemd' 生成 minecraft.service + install-systemd.sh", async () => {
@@ -221,8 +259,8 @@ describe('ServerGenerator', () => {
     const deployFiles = result.files.filter((f) => f.path.startsWith('deploy/'));
     const paths = deployFiles.map((f) => f.path).sort();
     expect(paths).toEqual(['deploy/install-systemd.sh', 'deploy/minecraft.service']);
-    // 总共 8 + 2
-    expect(result.files).toHaveLength(10);
+    // 总共 10 + 2
+    expect(result.files).toHaveLength(12);
   });
 
   it("deployTarget='docker' 生成 Dockerfile + docker-compose.yml + build-docker.sh", async () => {
@@ -239,8 +277,8 @@ describe('ServerGenerator', () => {
       'deploy/build-docker.sh',
       'deploy/docker-compose.yml',
     ]);
-    // 总共 8 + 3
-    expect(result.files).toHaveLength(11);
+    // 总共 10 + 3
+    expect(result.files).toHaveLength(13);
   });
 
   it("deployTarget='both' 生成全部 5 个部署文件", async () => {
@@ -259,8 +297,8 @@ describe('ServerGenerator', () => {
       'deploy/install-systemd.sh',
       'deploy/minecraft.service',
     ]);
-    // 总共 8 + 5
-    expect(result.files).toHaveLength(13);
+    // 总共 10 + 5
+    expect(result.files).toHaveLength(15);
   });
 
   it('backupInterval=6 生成 backup.sh + backup-cron', async () => {
@@ -276,8 +314,8 @@ describe('ServerGenerator', () => {
     // backup-cron 包含正确的间隔
     const cron = result.files.find((f) => f.path === 'deploy/backup-cron');
     expect(cron!.content).toContain('0 */6 * * *');
-    // 总共 8 + 2
-    expect(result.files).toHaveLength(10);
+    // 总共 10 + 2
+    expect(result.files).toHaveLength(12);
   });
 
   it('backupInterval=0（默认）不生成 backup 相关文件', async () => {
@@ -447,7 +485,7 @@ describe('ServerGenerator', () => {
       'deploy/install-systemd.sh',
       'deploy/minecraft.service',
     ]);
-    // 总共 8 + 7
-    expect(result.files).toHaveLength(15);
+    // 总共 10 + 7
+    expect(result.files).toHaveLength(17);
   });
 });

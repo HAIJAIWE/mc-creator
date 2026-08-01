@@ -66,6 +66,9 @@ export const ServerSpec = z.object({
   maxRamPercent: z.number().int().min(1).max(100).default(80),
   serviceUser: z.string().default('minecraft'),
   serviceDir: z.string().default('/opt/minecraft'),
+  // 一键部署：服务端类型与版本（install.sh / install.bat 下载用）
+  serverType: z.enum(['vanilla', 'paper', 'fabric']).default('vanilla'),
+  serverVersion: z.string().default('1.21.1'),
 });
 
 export type ServerModEntry = z.infer<typeof ServerModEntry>;
