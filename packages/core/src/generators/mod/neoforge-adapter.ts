@@ -1,5 +1,10 @@
 import type { FileNode, GeneratorContext } from '@mc-creator/shared';
-import { getLoaderVersions, type LoaderVersionConfig } from '@mc-creator/shared';
+import {
+  getLoaderVersions,
+  javaVersionFor,
+  type LoaderVersionConfig,
+  type McVersion,
+} from '@mc-creator/shared';
 import type { LoaderAdapter } from './adapter.js';
 import { mainClassName, packageName, packagePath, javaEscape } from './templates.js';
 import { BuildCache, hashCategory, type IncrementalResult } from '../../builder/BuildCache.js';
@@ -1253,9 +1258,11 @@ description = "${tomlEscape(spec.description)}"
 
   private buildGradle(
     spec: ModSpecLike,
-    _mcVersion: string,
+    mcVersion: string,
     versions: LoaderVersionConfig,
   ): FileNode {
+    // 版本感知：1.21.x → Java 21，26.1 → Java 25
+    const javaVersion = javaVersionFor('neoforge', mcVersion as McVersion);
     const content = `plugins {
     id 'net.neoforged.moddev' version '${versions.neoforgeModdevVersion}'
 }
@@ -1265,7 +1272,7 @@ group = 'com.example.${spec.modId}'
 
 base { archivesName = '${spec.modId}' }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.toolchain.languageVersion = JavaLanguageVersion.of(${javaVersion})
 
 neoForge {
     version = "${versions.neoforgeVersion}"

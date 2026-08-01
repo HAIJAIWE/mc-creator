@@ -40,6 +40,31 @@ describe('ModGenerator', () => {
     expect(gen.versions).toEqual(['1.21.11', '1.21.1', '26.1']);
   });
 
+  it('26.1 生成时给出占位版本警告', async () => {
+    const ctx: GeneratorContext = {
+      loader: 'fabric',
+      mcVersion: '26.1',
+      modId: 'demo',
+      spec: SPEC,
+      projectPath: '/proj',
+    };
+    const result = await gen.generate(ctx);
+    expect(result.warnings.some((w) => w.includes('26.1'))).toBe(true);
+  });
+
+  it('版本切换生效：1.21.1 生成对应 build.gradle Java 21', async () => {
+    const ctx: GeneratorContext = {
+      loader: 'fabric',
+      mcVersion: '1.21.1',
+      modId: 'demo',
+      spec: SPEC,
+      projectPath: '/proj',
+    };
+    const result = await gen.generate(ctx);
+    const bg = result.files.find((f) => f.path === 'build.gradle');
+    expect(bg!.content).toContain('JavaVersion.VERSION_21');
+  });
+
   it('fabric ctx → 生成 fabric.mod.json', async () => {
     const ctx: GeneratorContext = {
       loader: 'fabric',

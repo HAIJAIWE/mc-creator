@@ -67,6 +67,12 @@ export class ModGenerator implements Generator {
     ) {
       warnings.push('ModSpec 中所有内容字段均为空，生成的项目将仅包含框架代码');
     }
+    // 版本感知：26.1 的 loader 版本为占位值
+    if (ctx.mcVersion === '26.1') {
+      warnings.push(
+        'MC 26.1 的 loader 版本号为占位值，生成的 build.gradle/gradle.properties 可能需要手动调整版本号',
+      );
+    }
     return warnings;
   }
 

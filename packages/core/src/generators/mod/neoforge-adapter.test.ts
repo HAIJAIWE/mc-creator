@@ -672,3 +672,31 @@ describe('NeoForgeAdapter Task D 流体', () => {
     expect(main!.content).toContain('ModFluids.register(modEventBus);');
   });
 });
+
+// === 版本切换（26.1 → Java 25）===
+
+describe('NeoForgeAdapter 版本切换', () => {
+  it('1.21.x 生成 Java 21 toolchain', () => {
+    const files21 = new NeoForgeAdapter().translate({
+      loader: 'neoforge',
+      mcVersion: '1.21.1',
+      modId: 'ruby_tools',
+      spec: SPEC_P40_FLUID_NEO,
+      projectPath: '/proj',
+    });
+    const bg = files21.find((f) => f.path === 'build.gradle');
+    expect(bg!.content).toContain('JavaLanguageVersion.of(21)');
+  });
+
+  it('26.1 生成 Java 25 toolchain（版本感知）', () => {
+    const files26 = new NeoForgeAdapter().translate({
+      loader: 'neoforge',
+      mcVersion: '26.1',
+      modId: 'ruby_tools',
+      spec: SPEC_P40_FLUID_NEO,
+      projectPath: '/proj',
+    });
+    const bg = files26.find((f) => f.path === 'build.gradle');
+    expect(bg!.content).toContain('JavaLanguageVersion.of(25)');
+  });
+});

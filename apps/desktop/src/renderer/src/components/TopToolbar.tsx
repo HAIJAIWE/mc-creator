@@ -239,6 +239,14 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
             </option>
           ))}
         </select>
+        {mcVersion === '26.1' && (
+          <span
+            className="text-[10px] text-mc-gold"
+            title="26.1 的 loader 版本号为占位值，生成的构建文件可能需要手动调整版本号"
+          >
+            实验性
+          </span>
+        )}
         {loading && <Loader2 className="h-3 w-3 animate-spin text-mc-mute" />}
       </div>
 

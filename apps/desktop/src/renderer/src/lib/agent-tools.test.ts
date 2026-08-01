@@ -316,6 +316,31 @@ describe('generate_mod', () => {
     expect(files.some((f) => f.path.endsWith('ModItems.java'))).toBe(true);
     expect(files.some((f) => f.path === 'src/main/resources/fabric.mod.json')).toBe(true);
   });
+  it('使用当前项目 MC 版本生成（非硬编码）', async () => {
+    useModStore.setState({ mcVersion: '26.1' });
+    const tool = findTool('generate_mod')!;
+    const specJson = JSON.stringify({
+      modId: 'ruby_tools',
+      version: '1.0.0',
+      name: 'Ruby Tools',
+      description: 'A test mod',
+      license: 'MIT',
+      authors: [],
+      credits: '',
+      website: '',
+      dependencies: [],
+      items: [],
+      blocks: [],
+    });
+    const result = await tool.execute({ spec_json: specJson, loader: 'fabric' });
+    // 26.1 → build.gradle 用 Java 25
+    const files = useModStore.getState().files;
+    const bg = files.find((f) => f.path === 'build.gradle');
+    expect(bg!.content).toContain('JavaVersion.VERSION_25');
+    const gp = files.find((f) => f.path === 'gradle.properties');
+    expect(gp!.content).toContain('minecraft_version=26.1');
+    expect(result).toContain('警告');
+  });
 
   it('无效 JSON 返回错误', async () => {
     const tool = findTool('generate_mod')!;

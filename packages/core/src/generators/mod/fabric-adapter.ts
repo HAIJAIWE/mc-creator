@@ -1,5 +1,10 @@
 import type { FileNode, GeneratorContext, Loader } from '@mc-creator/shared';
-import { getLoaderVersions, type LoaderVersionConfig } from '@mc-creator/shared';
+import {
+  getLoaderVersions,
+  javaVersionFor,
+  type LoaderVersionConfig,
+  type McVersion,
+} from '@mc-creator/shared';
 import type { LoaderAdapter } from './adapter.js';
 import { mainClassName, packageName, packagePath, javaEscape } from './templates.js';
 import { BuildCache, hashCategory, type IncrementalResult } from '../../builder/BuildCache.js';
@@ -401,10 +406,13 @@ export class FabricAdapter implements LoaderAdapter {
   }
 
   private buildGradle(
-    _spec: ModSpecLike,
-    _mcVersion: string,
+    spec: ModSpecLike,
+    mcVersion: string,
     versions: LoaderVersionConfig,
   ): FileNode {
+    // 版本感知：1.21.x → Java 21，26.1 → Java 25
+    const javaVersion = javaVersionFor('fabric', mcVersion as McVersion);
+    const javaConstant = javaVersion === 25 ? 'VERSION_25' : `VERSION_${javaVersion}`;
     const content = `plugins {
     id 'fabric-loom' version '${versions.fabricLoomVersion}'
     id 'java'
@@ -434,8 +442,8 @@ processResources {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.${javaConstant}
+    targetCompatibility = JavaVersion.${javaConstant}
     withSourcesJar()
 }
 `;

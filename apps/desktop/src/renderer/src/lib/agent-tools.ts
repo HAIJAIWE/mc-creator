@@ -620,7 +620,8 @@ const generateModTool: ToolDefinition = {
       const gen = new ModGenerator();
       const ctx = {
         loader,
-        mcVersion: '1.21.11',
+        // 使用当前项目选择的 MC 版本（而非硬编码 1.21.11）
+        mcVersion: useModStore.getState().mcVersion,
         modId: parsed.data.modId,
         spec: parsed.data,
         projectPath: '',
