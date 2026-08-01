@@ -274,7 +274,12 @@ export class FabricAdapter implements LoaderAdapter {
     {
       name: 'entities',
       hashInputs: (s) => s.entities ?? [],
-      generate: (s, pkg) => (s.entities?.length ? [this.modEntitiesJava(s, pkg)] : []),
+      generate: (s, pkg) => {
+        const files = s.entities?.length ? [this.modEntitiesJava(s, pkg)] : [];
+        // T6: custom 模型实体的模型 JSON 骨架
+        files.push(...this.entityModels(s));
+        return files;
+      },
     },
     {
       name: 'machines',
@@ -1059,18 +1064,35 @@ ${regs}
                 progress++;
             } else if (progress >= PROCESS_TIME) {
                 progress = 0;
-                // 简化产物：把输入槽第一个物品搬到输出槽第一个空位
+                // 配方映射：输入物品 ID → 输出物品 ID（未匹配时回退原样搬运）
                 for (int i = 0; i < ${m.inputSlots}; i++) {
                     var stack = inventory.getItem(i);
                     if (!stack.isEmpty()) {
                         var outStack = inventory.getItem(${m.inputSlots});
                         if (outStack.isEmpty()) {
-                            inventory.setItem(${m.inputSlots}, stack.copyWithCount(1));
-                            stack.shrink(1);
+                            String outId = recipeOutput(stack.getItem().getDescriptionId());
+                            if (outId != null) {
+                                var output = new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse(outId)), 1);
+                                inventory.setItem(${m.inputSlots}, output);
+                                stack.shrink(1);
+                            } else {
+                                inventory.setItem(${m.inputSlots}, stack.copyWithCount(1));
+                                stack.shrink(1);
+                            }
                         }
                         break;
                     }
                 }
+            }
+        }
+
+        // 配方映射查找（从 spec 生成）
+        private static String recipeOutput(String inputItemId) {
+            String id = inputItemId.replace("item.", "").replace(".", ":");
+            switch (id) {
+${this.machineRecipeCases(m)}
+                default:
+                    return null;
             }
         }
     }
@@ -1806,6 +1828,63 @@ public class ModBlockPlaceMixin {
       ),
     }));
   }
+
+  /** T5: 机器配方映射 → Java switch case（输入物品 ID → 输出物品 ID） */
+  private machineRecipeCases(m: { recipeMap?: Record<string, string> }): string {
+    const entries = Object.entries(m.recipeMap ?? {});
+    if (entries.length === 0) {
+      return `                // 未配置配方映射，回退原样搬运`;
+    }
+    return entries
+      .map(
+        ([input, output]) =>
+          `                case "${input}":\n                    return "${output}";`,
+      )
+      .join('\n');
+  }
+
+  /** T6: 自定义模型实体的模型 JSON 骨架（供 Blockbench 导出替换） */
+  private entityModels(spec: ModSpecLike): FileNode[] {
+    const customEntities = (spec.entities ?? []).filter((e) => e.modelType === 'custom');
+    if (customEntities.length === 0) return [];
+    return customEntities.map((e) => ({
+      path: `src/main/resources/assets/${spec.modId}/models/entity/${e.entityId}.json`,
+      content: JSON.stringify(
+        {
+          // T6: 自定义模型骨架。用 Blockbench 导出替换此文件：
+          // 模型格式参考 https://minecraft.wiki/w/Tutorials/Models
+          format_version: '1.12.0',
+          description: {
+            identifier: `${spec.modId}:${e.entityId}`,
+            texture_width: 64,
+            texture_height: 32,
+          },
+          geometry: {
+            description: {
+              identifier: `geometry.${e.entityId}`,
+              texture_width: 64,
+              texture_height: 32,
+            },
+            bones: [
+              {
+                name: 'body',
+                pivot: [0, 0, 0],
+                cubes: [
+                  {
+                    origin: [-4, 0, -4],
+                    size: [8, 12, 8],
+                    uv: [0, 0],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        null,
+        2,
+      ),
+    }));
+  }
 }
 
 /** 内部用的 ModSpec 形状（避免循环导入，从 GeneratorContext 推导） */
@@ -1887,6 +1966,7 @@ type ModSpecLike = {
     defaultEnergyPerTick: number;
     guiWidth: number;
     guiHeight: number;
+    recipeMap?: Record<string, string>;
   }>;
   customCode?: Array<{
     snippetId: string;

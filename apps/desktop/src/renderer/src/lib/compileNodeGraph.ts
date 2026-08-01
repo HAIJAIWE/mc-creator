@@ -495,7 +495,22 @@ function compileMachineNode(node: ModNode): MachineSpec {
     defaultEnergyPerTick: data.defaultEnergyPerTick,
     guiWidth: data.guiWidth,
     guiHeight: data.guiHeight,
+    // T5: 配方映射（解析 recipeMapJson）
+    recipeMap: parseRecipeMap(data.recipeMapJson),
   };
+}
+
+/** T5: 解析配方映射 JSON，失败回退空对象 */
+function parseRecipeMap(json: string): Record<string, string> {
+  try {
+    const parsed = JSON.parse(json || '{}');
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>;
+    }
+  } catch {
+    // 忽略
+  }
+  return {};
 }
 
 /** 编译生物群系节点 */
@@ -772,6 +787,7 @@ function compileConditionNode(node: ModNode, warnings?: string[]): ConditionSpec
     conditionId: node.id,
     conditionType: data.conditionType,
     args: parseArgsJson(data.conditionArgs, warnings, node.id),
+    customCode: data.customCode ?? '',
     invert: data.invert,
   };
 }
@@ -786,6 +802,7 @@ function compileActionNode(node: ModNode, warnings?: string[]): ActionSpec {
     actionId: node.id,
     actionType: data.actionType,
     args: parseArgsJson(data.actionArgs, warnings, node.id),
+    customCode: data.customCode ?? '',
   };
 }
 

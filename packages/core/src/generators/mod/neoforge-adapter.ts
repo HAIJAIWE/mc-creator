@@ -910,17 +910,35 @@ ${comments}
                 progress++;
             } else if (progress >= PROCESS_TIME) {
                 progress = 0;
+                // 配方映射：输入物品 ID → 输出物品 ID（未匹配时回退原样搬运）
                 for (int i = 0; i < ${m.inputSlots}; i++) {
                     var stack = inventory.getItem(i);
                     if (!stack.isEmpty()) {
                         var outStack = inventory.getItem(${m.inputSlots});
                         if (outStack.isEmpty()) {
-                            inventory.setItem(${m.inputSlots}, stack.copyWithCount(1));
-                            stack.shrink(1);
+                            String outId = recipeOutput(stack.getItem().getDescriptionId());
+                            if (outId != null) {
+                                var output = new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse(outId)), 1);
+                                inventory.setItem(${m.inputSlots}, output);
+                                stack.shrink(1);
+                            } else {
+                                inventory.setItem(${m.inputSlots}, stack.copyWithCount(1));
+                                stack.shrink(1);
+                            }
                         }
                         break;
                     }
                 }
+            }
+        }
+
+        // 配方映射查找（从 spec 生成）
+        private static String recipeOutput(String inputItemId) {
+            String id = inputItemId.replace("item.", "").replace(".", ":");
+            switch (id) {
+${this.machineRecipeCases(m)}
+                default:
+                    return null;
             }
         }
     }
@@ -1626,6 +1644,20 @@ neoforge_version=${versions.neoforgeVersion}
 `;
     return { path: 'gradle.properties', content };
   }
+
+  /** T5: 机器配方映射 → Java switch case（输入物品 ID → 输出物品 ID） */
+  private machineRecipeCases(m: { recipeMap?: Record<string, string> }): string {
+    const entries = Object.entries(m.recipeMap ?? {});
+    if (entries.length === 0) {
+      return `                // 未配置配方映射，回退原样搬运`;
+    }
+    return entries
+      .map(
+        ([input, output]) =>
+          `                case "${input}":\n                    return "${output}";`,
+      )
+      .join('\n');
+  }
 }
 
 type ModSpecLike = {
@@ -1705,6 +1737,7 @@ type ModSpecLike = {
     defaultEnergyPerTick: number;
     guiWidth: number;
     guiHeight: number;
+    recipeMap?: Record<string, string>;
   }>;
   customCode?: Array<{
     snippetId: string;

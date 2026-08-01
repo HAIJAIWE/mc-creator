@@ -526,6 +526,8 @@ export const MachineSpec = z.object({
   guiWidth: z.number().int().min(176).max(256).default(176),
   /** GUI 高度 */
   guiHeight: z.number().int().min(166).max(256).default(166),
+  /** T5: 配方映射（输入物品 ID → 输出物品 ID，如 { "minecraft:iron_ore": "minecraft:iron_ingot" }） */
+  recipeMap: z.record(z.string()).default({}),
 });
 
 // === 自定义代码/多方块/事件链（P1.4 新增，从节点图编译） ===
@@ -633,6 +635,8 @@ export const ConditionSpec = z.object({
   ]),
   /** 条件参数（解析自 ConditionNodeData.conditionArgs JSON） */
   args: z.record(z.unknown()).default({}),
+  /** T2: custom 条件的 Java 代码（conditionType=custom 时使用） */
+  customCode: z.string().default(''),
   /** 是否取反 */
   invert: z.boolean().default(false),
 });
@@ -659,6 +663,8 @@ export const ActionSpec = z.object({
   ]),
   /** 动作参数（解析自 ActionNodeData.actionArgs JSON） */
   args: z.record(z.unknown()).default({}),
+  /** T2: custom 动作的 Java 代码（actionType=custom 时使用） */
+  customCode: z.string().default(''),
 });
 
 /**

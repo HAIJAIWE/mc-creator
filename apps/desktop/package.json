@@ -8,8 +8,8 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "package": "pnpm build && electron-builder",
-    "package:dir": "pnpm build && electron-builder --dir",
+    "package": "node scripts/generate-icon.mjs && pnpm build && electron-builder",
+    "package:dir": "node scripts/generate-icon.mjs && pnpm build && electron-builder --dir",
     "preview": "electron-vite preview",
     "dev:clean": "node scripts/dev-clean.mjs",
     "preview:web": "vite --config vite.renderer-preview.config.ts",

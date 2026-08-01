@@ -105,6 +105,7 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         defaultEnergyPerTick: 10,
         guiWidth: 176,
         guiHeight: 166,
+        recipeMapJson: '{}',
       } as NodeData;
     case 'multiblock':
       return {
@@ -629,6 +630,7 @@ describe('compileNodeGraph', () => {
       defaultEnergyPerTick: 20,
       guiWidth: 176,
       guiHeight: 166,
+      recipeMapJson: '{}',
     });
     const result = compileNodeGraph(makeGraph([machineNode]));
 

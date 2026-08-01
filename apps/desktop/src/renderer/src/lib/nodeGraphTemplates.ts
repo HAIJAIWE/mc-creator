@@ -135,6 +135,7 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         defaultEnergyPerTick: 10,
         guiWidth: 176,
         guiHeight: 166,
+        recipeMapJson: '{}',
       } as NodeData;
     case 'multiblock':
       return {
@@ -682,6 +683,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
             defaultEnergyPerTick: 20,
             guiWidth: 176,
             guiHeight: 166,
+            recipeMapJson: '{}',
             isBlockEntity: true,
             note: '高速熔炉，消耗红宝石能源加速烧炼',
           },
@@ -1065,6 +1067,7 @@ export const NODE_GRAPH_TEMPLATES: NodeGraphTemplate[] = [
             defaultEnergyPerTick: 50,
             guiWidth: 176,
             guiHeight: 166,
+            recipeMapJson: '{}',
             note: '消耗燃料生成 FE 能源，50000 容量',
           },
           [

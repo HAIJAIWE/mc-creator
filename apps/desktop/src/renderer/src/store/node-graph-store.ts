@@ -231,6 +231,7 @@ function createDefaultNodeData(kind: NodeKind, _modId: string): NodeData {
         defaultEnergyPerTick: 10,
         guiWidth: 176,
         guiHeight: 166,
+        recipeMapJson: '{}',
       } as NodeData;
     case 'multiblock':
       return {

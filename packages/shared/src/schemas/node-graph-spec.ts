@@ -279,6 +279,8 @@ export const MachineNodeData = BaseNodeData.extend({
   guiWidth: z.number().int().min(176).max(256).default(176),
   /** GUI 高度 */
   guiHeight: z.number().int().min(166).max(256).default(166),
+  /** T5: 配方映射 JSON（{ "输入物品ID": "输出物品ID" }） */
+  recipeMapJson: z.string().default('{}'),
 });
 export type MachineNodeData = z.infer<typeof MachineNodeData>;
 
@@ -344,6 +346,8 @@ export const ConditionNodeData = BaseNodeData.extend({
   ]),
   /** 条件参数（JSON 字符串） */
   conditionArgs: z.string().default('{}'),
+  /** T2: custom 条件的 Java 代码（conditionType=custom 时使用，替代 TODO） */
+  customCode: z.string().default(''),
   /** 取反 */
   invert: z.boolean().default(false),
 });
@@ -369,6 +373,8 @@ export const ActionNodeData = BaseNodeData.extend({
   ]),
   /** 动作参数（JSON 字符串） */
   actionArgs: z.string().default('{}'),
+  /** T2: custom 动作的 Java 代码（actionType=custom 时使用，替代 TODO） */
+  customCode: z.string().default(''),
 });
 export type ActionNodeData = z.infer<typeof ActionNodeData>;
 

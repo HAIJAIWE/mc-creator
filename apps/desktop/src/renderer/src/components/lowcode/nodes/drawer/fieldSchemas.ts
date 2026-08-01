@@ -181,6 +181,12 @@ const MACHINE_FIELDS: FieldSchema[] = [
     max: 9999,
     step: 1,
   },
+  {
+    key: 'recipeMapJson',
+    label: '配方映射 (JSON)',
+    type: 'nbt',
+    placeholder: '{"minecraft:iron_ore":"minecraft:iron_ingot"}',
+  },
 ];
 
 /** multiblock 节点字段 */
@@ -239,6 +245,15 @@ const CONDITION_FIELDS: FieldSchema[] = [
     ],
   },
   { key: 'conditionArgs', label: '条件参数 (JSON)', type: 'nbt' },
+  {
+    key: 'customCode',
+    label: '自定义 Java 条件',
+    type: 'code',
+    language: 'java',
+    placeholder:
+      '// 使用 ctx 编写返回 boolean 的表达式\n// 如: return ctx.player != null && ctx.player.getHealth() < 5.0f;',
+    condition: { field: 'conditionType', equals: 'custom' },
+  },
   { key: 'invert', label: '取反', type: 'segmented', options: ['false', 'true'] },
 ];
 
@@ -265,6 +280,15 @@ const ACTION_FIELDS: FieldSchema[] = [
     ],
   },
   { key: 'actionArgs', label: '动作参数 (JSON)', type: 'nbt' },
+  {
+    key: 'customCode',
+    label: '自定义 Java 动作',
+    type: 'code',
+    language: 'java',
+    placeholder:
+      '// 使用 ctx 编写动作语句\n// 如: if (ctx.player != null) { ctx.player.sendSystemMessage(net.minecraft.network.chat.Component.literal("hi")); }',
+    condition: { field: 'actionType', equals: 'custom' },
+  },
 ];
 
 /** code 节点字段 */

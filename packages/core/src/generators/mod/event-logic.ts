@@ -17,6 +17,7 @@ export interface ConditionLike {
   conditionId?: string;
   conditionType: string;
   args?: Record<string, unknown>;
+  customCode?: string;
   invert?: boolean;
 }
 
@@ -25,6 +26,7 @@ export interface ActionLike {
   actionId?: string;
   actionType: string;
   args?: Record<string, unknown>;
+  customCode?: string;
 }
 
 /** 从 args 读取数值参数（兼容 number 与字符串），缺省返回默认值 */
@@ -96,6 +98,15 @@ function conditionExpr(cond: ConditionLike): string | null {
       return `if (ctx.state != null) {\n            return ctx.state.is(${blockLookupExpr(block)});\n        }\n        return false;`;
     }
     case 'custom':
+      // T2: 用户自定义条件代码（原样嵌入，需返回 boolean；按行加 8 空格缩进）
+      if (cond.customCode && cond.customCode.trim()) {
+        return cond.customCode
+          .trim()
+          .split('\n')
+          .map((l) => `        ${l}`)
+          .join('\n');
+      }
+      return null;
     default:
       return null;
   }
@@ -163,6 +174,15 @@ function actionStatements(action: ActionLike): string | null {
       return `if (ctx.level != null && ctx.pos != null) {\n            net.minecraft.world.entity.EntityType<?> type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.get(net.minecraft.resources.ResourceLocation.parse("${entityType}"));\n            if (type != null) {\n                net.minecraft.world.entity.Entity e = type.create(ctx.level);\n                if (e != null) {\n                    e.moveTo(ctx.pos.getX() + 0.5, ctx.pos.getY(), ctx.pos.getZ() + 0.5);\n                    ctx.level.addFreshEntity(e);\n                }\n            }\n        }`;
     }
     case 'custom':
+      // T2: 用户自定义动作代码（原样嵌入；按行加 8 空格缩进）
+      if (action.customCode && action.customCode.trim()) {
+        return action.customCode
+          .trim()
+          .split('\n')
+          .map((l) => `        ${l}`)
+          .join('\n');
+      }
+      return null;
     default:
       return null;
   }

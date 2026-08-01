@@ -102,7 +102,14 @@ export function AgentPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await ipcClient.generateSpec(description, generatorType);
+      // T3: 失败自动重试 1 次（短暂延迟），仍失败才报错
+      let res;
+      try {
+        res = await ipcClient.generateSpec(description, generatorType);
+      } catch (firstErr) {
+        await new Promise((r) => setTimeout(r, 800));
+        res = await ipcClient.generateSpec(description, generatorType);
+      }
       const text = JSON.stringify(res.spec, null, 2);
       setSpec(res.spec as unknown as ModSpec);
       setEditorText(text);

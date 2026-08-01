@@ -1429,3 +1429,106 @@ describe('FabricAdapter Task 4 Mod 侧结构', () => {
     expect(main!.content).toContain('ModStructures.initialize();');
   });
 });
+
+// === T2/T5/T6: custom 代码 + 配方映射 + 自定义模型 ===
+
+const SPEC_P40_POLISH: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Polish test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  conditions: [
+    {
+      conditionId: 'cond_custom',
+      conditionType: 'custom',
+      args: {},
+      invert: false,
+      customCode: 'return ctx.player != null && ctx.player.getHealth() < 5.0f;',
+    },
+  ],
+  actions: [
+    {
+      actionId: 'act_custom',
+      actionType: 'custom',
+      args: {},
+      customCode:
+        'ctx.player.sendSystemMessage(net.minecraft.network.chat.Component.literal("hi"));',
+    },
+  ],
+  machines: [
+    {
+      machineId: 'smelter',
+      displayName: 'Smelter',
+      energyCapacity: 10000,
+      maxEnergyTransfer: 100,
+      inputSlots: 1,
+      outputSlots: 1,
+      defaultProcessTime: 200,
+      defaultEnergyPerTick: 10,
+      guiWidth: 176,
+      guiHeight: 166,
+      recipeMap: { 'minecraft:iron_ore': 'minecraft:iron_ingot' },
+    },
+  ],
+  entities: [
+    {
+      entityId: 'custom_mob',
+      displayName: 'Custom Mob',
+      maxHealth: 20,
+      attackDamage: 2,
+      movementSpeed: 0.3,
+      classification: 'misc',
+      modelType: 'custom',
+      spawnWeight: 0,
+      spawnBiomes: [],
+    },
+  ],
+});
+
+describe('FabricAdapter T2/T5/T6', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate({
+    loader: 'fabric',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_POLISH,
+    projectPath: '/proj',
+  });
+
+  it('T2: custom 条件代码嵌入 check_ 方法（替代 TODO）', () => {
+    const events = files.find((f) => f.path.endsWith('ModEvents.java'));
+    expect(events!.content).toContain(
+      'return ctx.player != null && ctx.player.getHealth() < 5.0f;',
+    );
+    expect(events!.content).not.toContain('TODO: 实现 custom 检查逻辑');
+  });
+
+  it('T2: custom 动作代码嵌入 execute_ 方法', () => {
+    const events = files.find((f) => f.path.endsWith('ModEvents.java'));
+    expect(events!.content).toContain('Component.literal("hi")');
+  });
+
+  it('T5: 配方映射生成 recipeOutput switch', () => {
+    const machines = files.find((f) => f.path.endsWith('ModMachines.java'));
+    expect(machines!.content).toContain('recipeOutput');
+    expect(machines!.content).toContain('case "minecraft:iron_ore"');
+    expect(machines!.content).toContain('return "minecraft:iron_ingot"');
+  });
+
+  it('T6: custom 模型实体生成模型 JSON 骨架', () => {
+    const model = files.find(
+      (f) => f.path === 'src/main/resources/assets/ruby_tools/models/entity/custom_mob.json',
+    );
+    expect(model).toBeDefined();
+    const parsed = JSON.parse(model!.content);
+    expect(parsed.format_version).toBe('1.12.0');
+    expect(parsed.geometry.bones).toHaveLength(1);
+  });
+});
