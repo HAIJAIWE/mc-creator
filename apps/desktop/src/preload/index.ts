@@ -3,6 +3,8 @@ import {
   IPC,
   EXPORT_ZIP,
   SAVE_FILE,
+  EXPORT_SPEC,
+  IMPORT_SPEC,
   SAVE_ALL_FILES,
   PREPARE_BUILD_DIR,
   EXPORT_PROJECT,
@@ -158,6 +160,9 @@ const api = {
     ipcRenderer.invoke(EXPORT_ZIP, req),
   saveFile: (req: { path: string; content: string; defaultName?: string }) =>
     ipcRenderer.invoke(SAVE_FILE, req),
+  exportSpec: (req: { spec: unknown; generatorType: string; description?: string }) =>
+    ipcRenderer.invoke(EXPORT_SPEC, req),
+  importSpec: () => ipcRenderer.invoke(IMPORT_SPEC),
   saveAllFiles: (req: { files: { path: string; content: string }[] }) =>
     ipcRenderer.invoke(SAVE_ALL_FILES, req),
   prepareBuildDir: (files: { path: string; content: string }[]) =>

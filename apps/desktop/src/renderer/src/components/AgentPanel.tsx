@@ -2,7 +2,16 @@ import { useState, useRef } from 'react';
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import Editor from '@monaco-editor/react';
-import { Loader2, Send, LayoutTemplate, History, GitCompare, Code2, FormInput } from 'lucide-react';
+import {
+  Loader2,
+  Send,
+  LayoutTemplate,
+  History,
+  GitCompare,
+  Code2,
+  FormInput,
+  Share2,
+} from 'lucide-react';
 import type { ModEntry, ModSpec } from '@mc-creator/shared';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
@@ -13,6 +22,7 @@ import { TemplatePicker } from './TemplatePicker.js';
 import { ModrinthSearchPanel } from './ModrinthSearchPanel.js';
 import { CurseForgeSearchPanel } from './CurseForgeSearchPanel.js';
 import { SpecHistoryPanel } from './SpecHistoryPanel.js';
+import { CollaborationPanel } from './CollaborationPanel.js';
 import { ModelComparePanel } from './ModelComparePanel.js';
 import { SpecFormEditor } from './SpecFormEditor.js';
 import { AgentSessionPanel } from './AgentSessionPanel.js';
@@ -67,6 +77,7 @@ export function AgentPanel() {
   const [showCurseForgeSearch, setShowCurseForgeSearch] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [showCollaboration, setShowCollaboration] = useState(false);
   const [showFormEditor, setShowFormEditor] = useState(false);
   const [agentMode, setAgentMode] = useState<'chat' | 'agent'>('agent');
 
@@ -325,6 +336,14 @@ export function AgentPanel() {
                 >
                   <GitCompare className="h-3 w-3" />
                 </button>
+                <button
+                  onClick={() => setShowCollaboration(true)}
+                  disabled={loading}
+                  className="mc-btn-ghost !px-2.5"
+                  title="协作（导出/导入 Spec）"
+                >
+                  <Share2 className="h-3 w-3" />
+                </button>
                 {generatorType === 'modpack' && (
                   <>
                     <button
@@ -573,6 +592,13 @@ export function AgentPanel() {
               setSpecError(null);
             }}
           />
+        </div>
+      )}
+
+      {/* 协作面板 */}
+      {showCollaboration && (
+        <div className="absolute inset-0 z-20 bg-mc-surface">
+          <CollaborationPanel onClose={() => setShowCollaboration(false)} />
         </div>
       )}
     </div>

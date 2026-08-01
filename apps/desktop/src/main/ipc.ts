@@ -37,6 +37,11 @@ import {
   PREPARE_BUILD_DIR,
   EXPORT_PROJECT,
   IMPORT_PROJECT,
+  EXPORT_SPEC,
+  IMPORT_SPEC,
+  ExportSpecRequest,
+  ImportSpecResponse,
+  SpecSnapshotSchema,
   GenerateSpecRequest,
   GenerateFilesRequest,
   BuildRequest,
@@ -494,6 +499,54 @@ ${req.buildLog}
       await writeFile(result.filePath, req.content, 'utf-8');
     }
     return { ok: true, canceled: false, savedPath: result.filePath };
+  });
+
+  // 协作编辑：导出 Spec 快照文件（.mc-spec.json）
+  ipcMain.handle(EXPORT_SPEC, async (_e, raw: unknown) => {
+    const req = ExportSpecRequest.parse(raw);
+    const result = await dialog.showSaveDialog({
+      defaultPath: `${req.generatorType}-spec.mc-spec.json`,
+      filters: [{ name: 'MC Spec 快照', extensions: ['mc-spec.json', 'json'] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return { ok: false, canceled: true, savedPath: null };
+    }
+    const snapshot = {
+      meta: {
+        exportedAt: new Date().toISOString(),
+        exporter: '',
+        description: req.description,
+        generatorType: req.generatorType,
+      },
+      spec: req.spec,
+    };
+    await writeFile(result.filePath, JSON.stringify(snapshot, null, 2), 'utf-8');
+    return { ok: true, canceled: false, savedPath: result.filePath };
+  });
+
+  // 协作编辑：导入 Spec 快照文件
+  ipcMain.handle(IMPORT_SPEC, async (): Promise<z.infer<typeof ImportSpecResponse>> => {
+    const result = await dialog.showOpenDialog({
+      filters: [{ name: 'MC Spec 快照', extensions: ['mc-spec.json', 'json'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { snapshot: null, canceled: true };
+    }
+    try {
+      const content = await readFile(result.filePaths[0], 'utf-8');
+      const parsed = SpecSnapshotSchema.safeParse(JSON.parse(content));
+      if (!parsed.success) {
+        return {
+          snapshot: null,
+          canceled: false,
+          error: `Spec 快照格式无效：${parsed.error.issues.map((i) => i.path.join('.') || i.message).join('; ')}`,
+        };
+      }
+      return { snapshot: parsed.data, canceled: false };
+    } catch (e) {
+      return { snapshot: null, canceled: false, error: `读取失败：${(e as Error).message}` };
+    }
   });
 
   // 保存全部文件到磁盘（选择目录后按相对路径写入）

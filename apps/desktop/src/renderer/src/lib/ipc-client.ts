@@ -98,6 +98,9 @@ export const ipcClient = {
   exportProject: (project: Project): Promise<ExportProjectRes> =>
     window.mcApi.exportProject(project),
   importProject: (): Promise<ImportProjectRes> => window.mcApi.importProject(),
+  exportSpec: (req: { spec: unknown; generatorType: string; description?: string }) =>
+    window.mcApi.exportSpec(req),
+  importSpec: () => window.mcApi.importSpec(),
   modrinthSearch: (req: {
     query: string;
     loader?: string;
