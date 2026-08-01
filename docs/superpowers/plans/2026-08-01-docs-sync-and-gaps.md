@@ -1,6 +1,6 @@
 # 文档同步与缺口修复计划 — 2026-08-01
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 将 README 与实际代码状态对齐（10 种生成器 / 15 种节点 / AgentPanel UI / 实际测试数），并修复审计发现的 UI 缺口（AgentPanel placeholder 错误兜底）。
 
@@ -39,24 +39,24 @@
 
 **范围（对照缺口清单逐项）：**
 
-- [ ] **Step 1: 功能特性表** — 从 7 行扩到 10 行，补：
+- [x] **Step 1: 功能特性表** — 从 7 行扩到 10 行，补：
 
   - **Launcher 启动器配置**：官方/PCL2/HMCL 三型 → `launcher.json` + `profiles.json` + 启动脚本（bat/sh/ps1）+ `versions.json` + `config/theme.json`
   - **KubeJS 脚本**：配方/标签/事件/工具提示/语言/注册表 → `kubejs/server_scripts/*.js` + `startup_scripts` + `client_scripts`
   - **CraftTweaker 脚本**：ZenScript 配方/标签/事件/工具提示/语言 → `scripts/*.zs`（无注册表）
   - **Behavior Pack 行为包**：实体/配方/战利品表 → `manifest.json` + `entities/` + `recipes/` + `loot_tables/`
 
-- [ ] **Step 2: 低代码节点表** — 14 → 15 种，代码节点分类补 `procedure`（过程封装/PureCode 模式）
+- [x] **Step 2: 低代码节点表** — 14 → 15 种，代码节点分类补 `procedure`（过程封装/PureCode 模式）
 
-- [ ] **Step 3: 核心能力列表** — 补：AgentPanel（agent/chat 双模式 + Spec 历史/模板/对比）、Spec 编辑器 Monaco、Project 导入导出（如 README 已有则核对措辞）、codeLock/PureCode、BuildCache、a11y 审计
+- [x] **Step 3: 核心能力列表** — 补：AgentPanel（agent/chat 双模式 + Spec 历史/模板/对比）、Spec 编辑器 Monaco、Project 导入导出（如 README 已有则核对措辞）、codeLock/PureCode、BuildCache、a11y 审计
 
-- [ ] **Step 4: 项目结构树** — 补 `packages/core/src/generators/{launcher,kubejs,crafttweaker,behavior-pack}/`、`packages/shared/src/templates/`（10 类模板）、renderer 组件改为 AgentPanel/TemplatePicker/Splitter/Toast 等实际组件
+- [x] **Step 4: 项目结构树** — 补 `packages/core/src/generators/{launcher,kubejs,crafttweaker,behavior-pack}/`、`packages/shared/src/templates/`（10 类模板）、renderer 组件改为 AgentPanel/TemplatePicker/Splitter/Toast 等实际组件
 
-- [ ] **Step 5: 使用指南** — 「选择生成器类型」列表 7 → 10；流程描述组件名同步为 AgentPanel
+- [x] **Step 5: 使用指南** — 「选择生成器类型」列表 7 → 10；流程描述组件名同步为 AgentPanel
 
-- [ ] **Step 6: 测试覆盖表** — 更新为实测数字（desktop 99 文件 1236、core 30 文件 381、shared 9 文件 82，合计 1699），低代码模块数字核对后更新
+- [x] **Step 6: 测试覆盖表** — 更新为实测数字（desktop 99 文件 1236、core 30 文件 381、shared 9 文件 82，合计 1699），低代码模块数字核对后更新
 
-- [ ] **Step 7: 路线图** — 补已完成项：
+- [x] **Step 7: 路线图** — 补已完成项：
 
   - P35：Launcher 启动器生成器
   - P36：KubeJS 脚本生成器
@@ -67,7 +67,7 @@
   - P41：BuildCache + recipe-adapter + 增量生成测试
   - P42：文档同步（本期）
 
-- [ ] **Step 8: 版本/徽章占位** — 保留 USER/REPO 占位但加注释说明发布前替换；版本号不动（发布时再 bump）
+- [x] **Step 8: 版本/徽章占位** — 保留 USER/REPO 占位但加注释说明发布前替换；版本号不动（发布时再 bump）
 
 **验证：** 无代码变更；`pnpm format:check` 通过（README 在 prettier 范围）。
 
@@ -81,7 +81,7 @@
 
 **现状（`AgentPanel.tsx:243-256`）：** 三元链只覆盖 mod/datapack/modpack/server/resource_pack/skin 六种，其余（launcher/kubejs/crafttweaker/behavior_pack）全部落入默认「描述你想要的启动器配置…」。
 
-- [ ] **Step 1:** 将三元链重构为 Record 映射表（组件级常量），补齐 10 种类型文案：
+- [x] **Step 1:** 将三元链重构为 Record 映射表（组件级常量），补齐 10 种类型文案：
 
   - `launcher`: 描述你想要的启动器配置…
   - `kubejs`: 描述你想要的 KubeJS 脚本…
@@ -89,7 +89,7 @@
   - `behavior_pack`: 描述你想要的行为包…
   - 其余沿用现有文案；未知类型兜底「描述你想要的内容…」
 
-- [ ] **Step 2:** 检查 `AgentPanel.test.tsx` 现有 placeholder 断言，新增 3 个用例覆盖 kubejs/crafttweaker/behavior_pack（或补充现有测试描述）
+- [x] **Step 2:** 检查 `AgentPanel.test.tsx` 现有 placeholder 断言，新增 3 个用例覆盖 kubejs/crafttweaker/behavior_pack（或补充现有测试描述）
 
 **验证：**
 
@@ -101,10 +101,10 @@
 
 ## Task 3: 最终验证与提交
 
-- [ ] **Step 1:** `pnpm -r typecheck` — 0 错误
-- [ ] **Step 2:** `pnpm -r test` — 1699+ 全部通过
-- [ ] **Step 3:** `pnpm lint && pnpm format:check` — 0 错误
-- [ ] **Step 4:** 提交 2 个 commit：
+- [x] **Step 1:** `pnpm -r typecheck` — 0 错误
+- [x] **Step 2:** `pnpm -r test` — 1699+ 全部通过
+- [x] **Step 3:** `pnpm lint && pnpm format:check` — 0 错误
+- [x] **Step 4:** 提交 2 个 commit：
 
   ```powershell
   git add README.md
@@ -117,9 +117,9 @@
 
 ## 验证标准
 
-- [ ] README 功能表 = 10 行，与 `registry.ts` 注册完全一致
-- [ ] README 节点数 = 15，与 `nodeTypes` 一致
-- [ ] README 测试数 = 本地实测值
-- [ ] README 路线图含 P35-P42
-- [ ] AgentPanel 10 种类型均有专属 placeholder，无错误兜底
-- [ ] 新增/更新测试用例通过，typecheck/lint/format 全绿
+- [x] README 功能表 = 10 行，与 `registry.ts` 注册完全一致
+- [x] README 节点数 = 15，与 `nodeTypes` 一致
+- [x] README 测试数 = 本地实测值
+- [x] README 路线图含 P35-P42
+- [x] AgentPanel 10 种类型均有专属 placeholder，无错误兜底
+- [x] 新增/更新测试用例通过，typecheck/lint/format 全绿
