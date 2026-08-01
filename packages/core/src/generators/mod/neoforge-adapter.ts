@@ -232,6 +232,17 @@ export class NeoForgeAdapter implements LoaderAdapter {
         s.fluids?.length ? [this.modFluidsJava(s, pkg, mainCls)] : [],
     },
     {
+      name: 'biomes',
+      hashInputs: (s) => s.biomes ?? [],
+      generate: (s, pkg, mainCls) =>
+        s.biomes?.length ? [this.modBiomesJava(s, pkg, mainCls)] : [],
+    },
+    {
+      name: 'dimensions',
+      hashInputs: (s) => s.dimensions ?? [],
+      generate: (s, pkg) => (s.dimensions?.length ? [this.modDimensionsJava(s, pkg)] : []),
+    },
+    {
       name: 'recipes',
       hashInputs: (s) => s.recipes ?? [],
       generate: (s, pkg) => (s.recipes?.length ? [this.modRecipesJava(s, pkg)] : []),
@@ -389,6 +400,8 @@ export class NeoForgeAdapter implements LoaderAdapter {
     if (spec.recipes?.length) registerCalls.push('ModRecipes.initialize();');
     if (spec.entities?.length) registerCalls.push('ModEntities.register(modEventBus);');
     if (spec.fluids?.length) registerCalls.push('ModFluids.register(modEventBus);');
+    if (spec.biomes?.length) registerCalls.push('ModBiomes.register(modEventBus);');
+    if (spec.dimensions?.length) registerCalls.push('ModDimensions.register(modEventBus);');
     if (spec.machines?.length) registerCalls.push('ModMachines.register(modEventBus);');
     if (spec.customCode?.length) registerCalls.push('ModCustomCode.initialize();');
     if (spec.multiblocks?.length) registerCalls.push('ModMultiblocks.initialize();');
@@ -520,6 +533,88 @@ ${fields}
   }
 
   // === P1.3/P1.4 新增：消费 recipes/entities/machines/customCode/multiblocks/events ===
+
+  /**
+   * Mod 侧生物群系：生成 ModBiomes.java（NeoForge DeferredRegister.Biomes 风格）。
+   */
+  private modBiomesJava(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
+    const fields = (spec.biomes ?? [])
+      .map(
+        (b) =>
+          `    public static final DeferredBiome<net.minecraft.world.level.biome.Biome> ${b.biomeId.toUpperCase()} = BIOMES.register("${b.biomeId}", () -> new net.minecraft.world.level.biome.Biome.BiomeBuilder()
+            .precipitation(net.minecraft.world.level.biome.Biome.Precipitation.${b.precipitation.toUpperCase()})
+            .temperature(${b.temperature}f)${b.temperatureModifier === 'frozen' ? '\n            .temperatureAdjustment(net.minecraft.world.level.biome.Biome.TemperatureModifier.FROZEN)' : ''}
+            .downfall(${b.downfall}f)
+            .specialEffects(new net.minecraft.world.level.biome.BiomeSpecialEffects.Builder()
+                .skyColor(${b.skyColor})
+                .waterColor(${b.waterColor})
+                .waterFogColor(${b.waterFogColor})
+                .fogColor(${b.fogColor})${b.grassColor !== undefined ? `\n                .grassColorOverride(${b.grassColor})` : ''}${b.foliageColor !== undefined ? `\n                .foliageColorOverride(${b.foliageColor})` : ''}
+                .build())
+            .mobSpawnSettings(net.minecraft.world.level.biome.MobSpawnSettings.EMPTY)
+            .generationSettings(net.minecraft.world.level.biome.BiomeGenerationSettings.EMPTY)
+            .build());`,
+      )
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredBiome;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+public class ModBiomes {
+    public static final DeferredRegister.Biomes BIOMES = DeferredRegister.createBiomes(${mainCls}.MOD_ID);
+
+${fields}
+
+    public static void register(IEventBus modEventBus) {
+        BIOMES.register(modEventBus);
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModBiomes.java`,
+      content,
+    };
+  }
+
+  /**
+   * Mod 侧维度：生成 ModDimensions.java（NeoForge）。
+   * 注册 DimensionType，维度可通过 /execute in <modid>:<dim> 访问。
+   */
+  private modDimensionsJava(spec: ModSpecLike, pkg: string): FileNode {
+    const fields = (spec.dimensions ?? [])
+      .map(
+        (d) =>
+          `    public static final DeferredHolder<DimensionType, DimensionType> ${d.dimensionId.toUpperCase()}_TYPE = DIMENSION_TYPES.register("${d.dimensionId}", () -> new DimensionType(${d.fixedTime !== null ? `OptionalLong.of(${d.fixedTime}L)` : 'OptionalLong.empty()'}, ${d.hasSkyLight}, ${d.hasCeiling}, ${d.ultrawarm}, ${d.natural}, ${d.coordinateScale}, ${d.bedWorks}, ${d.respawnAnchorWorks}, ${d.minY}, ${d.height}, ${d.logicalHeight}, ResourceLocation.parse("minecraft:infiniburn_${d.baseType === 'nether' ? 'nether' : 'overworld'}"), ${d.effects === 'none' ? 'Optional.empty()' : `Optional.of(ResourceLocation.fromNamespaceAndPath("minecraft", "${d.effects}"))`}, ${d.ambientLight}, ${d.piglinSafe}));`,
+      )
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import java.util.Optional;
+import java.util.OptionalLong;
+
+public class ModDimensions {
+    public static final DeferredRegister<DimensionType> DIMENSION_TYPES = DeferredRegister.create(Registries.DIMENSION_TYPE, "${javaEscape(spec.modId)}");
+
+${fields}
+
+    public static void register(IEventBus modEventBus) {
+        DIMENSION_TYPES.register(modEventBus);
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModDimensions.java`,
+      content,
+    };
+  }
 
   /**
    * 生成 ModRecipes.java：NeoForge 的配方也通过 datapack JSON 加载，
@@ -1422,6 +1517,46 @@ type ModSpecLike = {
     viscosity: number;
     density: number;
     luminous: boolean;
+    texturePath?: string;
+  }>;
+  biomes?: Array<{
+    biomeId: string;
+    displayName: string;
+    precipitation: 'none' | 'rain' | 'snow';
+    temperature: number;
+    temperatureModifier: 'none' | 'frozen';
+    downfall: number;
+    skyColor: number;
+    waterColor: number;
+    waterFogColor: number;
+    grassColor?: number;
+    foliageColor?: number;
+    fogColor: number;
+    surfaceBuilder: string;
+    category: string;
+    spawnWeight: number;
+    spawnDimensions: string[];
+    texturePath?: string;
+  }>;
+  dimensions?: Array<{
+    dimensionId: string;
+    displayName: string;
+    baseType: 'overworld' | 'nether' | 'end';
+    fixedTime: number | null;
+    hasSkyLight: boolean;
+    hasCeiling: boolean;
+    ultrawarm: boolean;
+    natural: boolean;
+    coordinateScale: number;
+    minY: number;
+    height: number;
+    logicalHeight: number;
+    ambientLight: number;
+    piglinSafe: boolean;
+    bedWorks: boolean;
+    respawnAnchorWorks: boolean;
+    effects: 'overworld' | 'the_nether' | 'the_end' | 'none';
+    seed?: number;
     texturePath?: string;
   }>;
   eventHandlers?: Array<{

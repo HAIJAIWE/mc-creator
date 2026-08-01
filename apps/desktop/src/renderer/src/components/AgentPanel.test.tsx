@@ -168,6 +168,8 @@ describe('AgentPanel', () => {
         customCode: [],
         multiblocks: [],
         fluids: [],
+        biomes: [],
+        dimensions: [],
         eventHandlers: [],
         conditions: [],
         actions: [],

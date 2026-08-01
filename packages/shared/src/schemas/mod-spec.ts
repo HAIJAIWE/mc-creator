@@ -370,6 +370,86 @@ export const FluidSpec = z.object({
   texturePath: z.string().optional(),
 });
 
+/** Mod 侧生物群系条目（对标 MCreator 生物群系：基础生成 + 天气 + 颜色 + 地表） */
+export const ModBiomeSpec = z.object({
+  /** 生物群系 id（小写下划线） */
+  biomeId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 显示名 */
+  displayName: z.string(),
+  /** 降水：none/rain/snow */
+  precipitation: z.enum(['none', 'rain', 'snow']).default('rain'),
+  /** 温度（-2~2，>0.15 下雨，<=0.15 下雪） */
+  temperature: z.number().min(-2).max(2).default(0.5),
+  /** 温度修饰：none/frozen */
+  temperatureModifier: z.enum(['none', 'frozen']).default('none'),
+  /** 降水量 0~1 */
+  downfall: z.number().min(0).max(1).default(0.5),
+  /** 天空颜色（0xRRGGBB） */
+  skyColor: z.number().int().default(0x78a7ff),
+  /** 水面颜色 */
+  waterColor: z.number().int().default(0x3f76e4),
+  /** 水雾颜色 */
+  waterFogColor: z.number().int().default(0x050533),
+  /** 草颜色（留空用默认） */
+  grassColor: z.number().int().optional(),
+  /** 树叶颜色（留空用默认） */
+  foliageColor: z.number().int().optional(),
+  /** 雾颜色 */
+  fogColor: z.number().int().default(0xc0d8ff),
+  /** 地表构建器（minecraft:grass/minecraft:stone/minecraft:snowy_grass 等） */
+  surfaceBuilder: z.string().default('minecraft:grass'),
+  /** 生物群系分类（用于 spawn 权重，如 plains/desert 风格） */
+  category: z.string().default('plains'),
+  /** 生成权重（0 = 不自然生成） */
+  spawnWeight: z.number().int().min(0).default(10),
+  /** 在哪些维度生成（overworld/the_nether/the_end） */
+  spawnDimensions: z.array(z.string()).default(['minecraft:overworld']),
+  /** 贴图路径（相对 resources/） */
+  texturePath: z.string().optional(),
+});
+
+/** Mod 侧维度条目（对标 MCreator 维度：维度类型 + 生成参数） */
+export const ModDimensionSpec = z.object({
+  /** 维度 id（小写下划线） */
+  dimensionId: z.string().regex(/^[a-z0-9_]+$/),
+  /** 显示名 */
+  displayName: z.string(),
+  /** 维度类型模板：overworld/nether/end（自定义参数覆盖） */
+  baseType: z.enum(['overworld', 'nether', 'end']).default('overworld'),
+  /** 固定时间（null = 正常昼夜，1000 = 正午，0 = 午夜，18000 = 黄昏） */
+  fixedTime: z.number().nullable().default(null),
+  /** 是否有天空光 */
+  hasSkyLight: z.boolean().default(true),
+  /** 是否有天花板 */
+  hasCeiling: z.boolean().default(false),
+  /** 超热（末地/下界风格，水蒸发） */
+  ultrawarm: z.boolean().default(false),
+  /** 自然（可睡/重生锚影响） */
+  natural: z.boolean().default(true),
+  /** 坐标缩放 */
+  coordinateScale: z.number().default(1.0),
+  /** 最小 Y */
+  minY: z.number().int().default(-64),
+  /** 高度 */
+  height: z.number().int().default(384),
+  /** 逻辑高度 */
+  logicalHeight: z.number().int().default(384),
+  /** 环境光（0~1） */
+  ambientLight: z.number().min(0).max(1).default(0),
+  /** 是否猪灵安全 */
+  piglinSafe: z.boolean().default(false),
+  /** 床是否可用 */
+  bedWorks: z.boolean().default(true),
+  /** 重生锚是否可用 */
+  respawnAnchorWorks: z.boolean().default(false),
+  /** 背景/效果（overworld/the_nether/the_end） */
+  effects: z.enum(['overworld', 'the_nether', 'the_end', 'none']).default('overworld'),
+  /** 维度种子（留空用世界种子） */
+  seed: z.number().optional(),
+  /** 贴图路径（相对 resources/） */
+  texturePath: z.string().optional(),
+});
+
 /** 机器条目（loader 无关，方块实体 + GUI + 能源） */
 export const MachineSpec = z.object({
   /** 机器 id（小写下划线） */
@@ -611,6 +691,10 @@ export const ModSpec = z.object({
   multiblocks: z.array(MultiBlockSpec).default([]),
   // 新增：流体（Task D）
   fluids: z.array(FluidSpec).default([]),
+  // 新增：Mod 侧生物群系（对标 MCreator）
+  biomes: z.array(ModBiomeSpec).default([]),
+  // 新增：Mod 侧维度（对标 MCreator）
+  dimensions: z.array(ModDimensionSpec).default([]),
   // 新增：事件处理器（P1.4 从 EventNode 编译，扁平结构；P1.5 通过 conditionIds/actionIds 建立控制流链引用）
   eventHandlers: z.array(EventHandlerSpec).default([]),
   // 新增：条件（P1.4 从 ConditionNode 编译，扁平列表，被 eventHandlers[].conditionIds 引用）
@@ -637,6 +721,8 @@ export type ModRecipeInputSpec = z.infer<typeof ModRecipeInputSpec>;
 export type EntitySpec = z.infer<typeof EntitySpec>;
 export type MachineSpec = z.infer<typeof MachineSpec>;
 export type FluidSpec = z.infer<typeof FluidSpec>;
+export type ModBiomeSpec = z.infer<typeof ModBiomeSpec>;
+export type ModDimensionSpec = z.infer<typeof ModDimensionSpec>;
 export type CustomCodeSnippetSpec = z.infer<typeof CustomCodeSnippetSpec>;
 export type MultiBlockSpec = z.infer<typeof MultiBlockSpec>;
 export type EventHandlerSpec = z.infer<typeof EventHandlerSpec>;

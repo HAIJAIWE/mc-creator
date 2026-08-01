@@ -135,6 +135,8 @@ const DEMO_SPEC: ModSpec = {
   customCode: [],
   multiblocks: [],
   fluids: [],
+  biomes: [],
+  dimensions: [],
   eventHandlers: [],
   conditions: [],
   actions: [],

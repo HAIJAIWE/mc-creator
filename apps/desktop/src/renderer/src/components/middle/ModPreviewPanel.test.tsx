@@ -40,6 +40,8 @@ function makeSpec(overrides: Partial<ModSpec> = {}): ModSpec {
     customCode: [],
     multiblocks: [],
     fluids: [],
+    biomes: [],
+    dimensions: [],
     eventHandlers: [],
     conditions: [],
     actions: [],

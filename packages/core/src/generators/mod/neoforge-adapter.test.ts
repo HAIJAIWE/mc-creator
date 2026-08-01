@@ -700,3 +700,98 @@ describe('NeoForgeAdapter 版本切换', () => {
     expect(bg!.content).toContain('JavaLanguageVersion.of(25)');
   });
 });
+
+// === Mod 侧世界生成（生物群系 + 维度，NeoForge）===
+
+const SPEC_P40_WORLDGEN_NEO: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Worldgen test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  biomes: [
+    {
+      biomeId: 'ruby_plains',
+      displayName: 'Ruby Plains',
+      precipitation: 'snow',
+      temperature: -0.5,
+      temperatureModifier: 'frozen',
+      downfall: 0.9,
+      skyColor: 0x78a7ff,
+      waterColor: 0x3f76e4,
+      waterFogColor: 0x050533,
+      fogColor: 0xc0d8ff,
+      surfaceBuilder: 'minecraft:grass',
+      category: 'plains',
+      spawnWeight: 10,
+      spawnDimensions: ['minecraft:overworld'],
+    },
+  ],
+  dimensions: [
+    {
+      dimensionId: 'ruby_dim',
+      displayName: 'Ruby Dimension',
+      baseType: 'overworld',
+      fixedTime: null,
+      hasSkyLight: true,
+      hasCeiling: false,
+      ultrawarm: false,
+      natural: true,
+      coordinateScale: 1.0,
+      minY: -64,
+      height: 384,
+      logicalHeight: 384,
+      ambientLight: 0,
+      piglinSafe: false,
+      bedWorks: true,
+      respawnAnchorWorks: false,
+      effects: 'overworld',
+    },
+  ],
+});
+
+describe('NeoForgeAdapter Mod 侧世界生成', () => {
+  const adapter = new NeoForgeAdapter();
+  const files = adapter.translate({
+    loader: 'neoforge',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_WORLDGEN_NEO,
+    projectPath: '/proj',
+  });
+
+  it('生成 ModBiomes.java 用 DeferredRegister.Biomes', () => {
+    const biomes = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBiomes.java',
+    );
+    expect(biomes).toBeDefined();
+    expect(biomes!.content).toContain('DeferredRegister.Biomes BIOMES');
+    expect(biomes!.content).toContain('BIOMES.register("ruby_plains"');
+    expect(biomes!.content).toContain('Precipitation.SNOW');
+    expect(biomes!.content).toContain('temperatureAdjustment');
+  });
+
+  it('生成 ModDimensions.java 用 DeferredRegister<DimensionType>', () => {
+    const dims = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModDimensions.java',
+    );
+    expect(dims).toBeDefined();
+    expect(dims!.content).toContain('Registries.DIMENSION_TYPE');
+    expect(dims!.content).toContain('DIMENSION_TYPES.register("ruby_dim"');
+    expect(dims!.content).toContain('OptionalLong.empty()');
+  });
+
+  it('mainClass 调用 ModBiomes/ModDimensions register', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main!.content).toContain('ModBiomes.register(modEventBus);');
+    expect(main!.content).toContain('ModDimensions.register(modEventBus);');
+  });
+});

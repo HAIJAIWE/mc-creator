@@ -247,6 +247,16 @@ export class FabricAdapter implements LoaderAdapter {
       generate: (s, pkg) => (s.fluids?.length ? [this.modFluidsJava(s, pkg)] : []),
     },
     {
+      name: 'biomes',
+      hashInputs: (s) => s.biomes ?? [],
+      generate: (s, pkg) => (s.biomes?.length ? [this.modBiomesJava(s, pkg)] : []),
+    },
+    {
+      name: 'dimensions',
+      hashInputs: (s) => s.dimensions ?? [],
+      generate: (s, pkg) => (s.dimensions?.length ? [this.modDimensionsJava(s, pkg)] : []),
+    },
+    {
       name: 'recipes',
       hashInputs: (s) => s.recipes ?? [],
       generate: (s, pkg) => (s.recipes?.length ? [this.modRecipesJava(s, pkg)] : []),
@@ -481,6 +491,8 @@ fabric_version=${versions.fabricApiVersion}
     if (spec.recipes?.length) initCalls.push('ModRecipes.initialize();');
     if (spec.entities?.length) initCalls.push('ModEntities.initialize();');
     if (spec.fluids?.length) initCalls.push('ModFluids.initialize();');
+    if (spec.biomes?.length) initCalls.push('ModBiomes.initialize();');
+    if (spec.dimensions?.length) initCalls.push('ModDimensions.initialize();');
     if (spec.machines?.length) initCalls.push('ModMachines.initialize();');
     if (spec.customCode?.length) initCalls.push('ModCustomCode.initialize();');
     if (spec.multiblocks?.length) initCalls.push('ModMultiblocks.initialize();');
@@ -619,6 +631,109 @@ ${regs}
   }
 
   // === P1.3/P1.4 新增：消费 recipes/entities/machines/customCode/multiblocks/events ===
+
+  /**
+   * Mod 侧生物群系：生成 ModBiomes.java。
+   * 用 Biome.biome(...) builder 构建 Biome 并注册到 BuiltInRegistries.BIOME。
+   * 注册后可通过 biome_source/multi_noise 参数用于维度生成。
+   */
+  private modBiomesJava(spec: ModSpecLike, pkg: string): FileNode {
+    const fields = (spec.biomes ?? [])
+      .map(
+        (b) =>
+          `    public static net.minecraft.world.level.biome.Biome ${b.biomeId.toUpperCase()};`,
+      )
+      .join('\n');
+    const regs = (spec.biomes ?? [])
+      .map((b) => {
+        const c = (v?: number) =>
+          v !== undefined ? `0x${v.toString(16).padStart(6, '0')}` : 'null';
+        const grass = b.grassColor !== undefined ? `, ${c(b.grassColor)}` : '';
+        const foliage = b.foliageColor !== undefined ? `, ${c(b.foliageColor)}` : '';
+        return `        ${b.biomeId.toUpperCase()} = Registry.register(BuiltInRegistries.BIOME, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${b.biomeId}"), new net.minecraft.world.level.biome.Biome.BiomeBuilder()
+            .precipitation(net.minecraft.world.level.biome.Biome.Precipitation.${b.precipitation.toUpperCase()})
+            .temperature(${b.temperature}f)${b.temperatureModifier === 'frozen' ? '\n            .temperatureAdjustment(net.minecraft.world.level.biome.Biome.TemperatureModifier.FROZEN)' : ''}
+            .downfall(${b.downfall}f)
+            .specialEffects(new net.minecraft.world.level.biome.BiomeSpecialEffects.Builder()
+                .skyColor(${c(b.skyColor)})
+                .waterColor(${c(b.waterColor)})
+                .waterFogColor(${c(b.waterFogColor)})
+                .fogColor(${c(b.fogColor)})${grass ? `.grassColorOverride(${c(b.grassColor)})` : ''}${foliage ? `.foliageColorOverride(${c(b.foliageColor)})` : ''}
+                .build())
+            .mobSpawnSettings(net.minecraft.world.level.biome.MobSpawnSettings.EMPTY)
+            .generationSettings(net.minecraft.world.level.biome.BiomeGenerationSettings.EMPTY)
+            .build());`;
+      })
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+
+public class ModBiomes {
+    public static final String MOD_ID = "${javaEscape(spec.modId)}";
+${fields}
+
+    public static void initialize() {
+${regs}
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModBiomes.java`,
+      content,
+    };
+  }
+
+  /**
+   * Mod 侧维度：生成 ModDimensions.java。
+   * 注册 DimensionType（dimension_type registry），维度可通过 /execute in <modid>:<dim> 访问。
+   * 完整世界生成（LevelStem/ChunkGenerator）需数据包 worldgen 配合，此处注册维度类型为入口。
+   */
+  private modDimensionsJava(spec: ModSpecLike, pkg: string): FileNode {
+    const fields = (spec.dimensions ?? [])
+      .map(
+        (d) =>
+          `    public static net.minecraft.world.level.dimension.DimensionType ${d.dimensionId.toUpperCase()}_TYPE;`,
+      )
+      .join('\n');
+    const regs = (spec.dimensions ?? [])
+      .map((d) => {
+        const typeId = d.dimensionId.toUpperCase();
+        const fixedTime =
+          d.fixedTime !== null ? `OptionalLong.of(${d.fixedTime}L)` : 'OptionalLong.empty()';
+        const effects =
+          d.effects === 'none'
+            ? 'Optional.empty()'
+            : `Optional.of(ResourceLocation.fromNamespaceAndPath("minecraft", "${d.effects}"))`;
+        const infiniburn = `"minecraft:infiniburn_${d.baseType === 'nether' ? 'nether' : 'overworld'}"`;
+        return `        ${typeId}_TYPE = Registry.register(BuiltInRegistries.DIMENSION_TYPE, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${d.dimensionId}"), new DimensionType(${fixedTime}, ${d.hasSkyLight}, ${d.hasCeiling}, ${d.ultrawarm}, ${d.natural}, ${d.coordinateScale}, ${d.bedWorks}, ${d.respawnAnchorWorks}, ${d.minY}, ${d.height}, ${d.logicalHeight}, ResourceLocation.parse(${infiniburn}), ${effects}, ${d.ambientLight}, ${d.piglinSafe}));`;
+      })
+      .join('\n');
+    const content = `package ${pkg};
+
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.dimension.DimensionType;
+import java.util.Optional;
+import java.util.OptionalLong;
+
+public class ModDimensions {
+    public static final String MOD_ID = "${javaEscape(spec.modId)}";
+${fields}
+
+    public static void initialize() {
+${regs}
+    }
+}
+`;
+    return {
+      path: `src/main/java/${packagePath(spec.modId)}/ModDimensions.java`,
+      content,
+    };
+  }
 
   /**
    * 生成 ModRecipes.java：仅生成 recipeId 常量定义。
@@ -1552,6 +1667,46 @@ type ModSpecLike = {
     viscosity: number;
     density: number;
     luminous: boolean;
+    texturePath?: string;
+  }>;
+  biomes?: Array<{
+    biomeId: string;
+    displayName: string;
+    precipitation: 'none' | 'rain' | 'snow';
+    temperature: number;
+    temperatureModifier: 'none' | 'frozen';
+    downfall: number;
+    skyColor: number;
+    waterColor: number;
+    waterFogColor: number;
+    grassColor?: number;
+    foliageColor?: number;
+    fogColor: number;
+    surfaceBuilder: string;
+    category: string;
+    spawnWeight: number;
+    spawnDimensions: string[];
+    texturePath?: string;
+  }>;
+  dimensions?: Array<{
+    dimensionId: string;
+    displayName: string;
+    baseType: 'overworld' | 'nether' | 'end';
+    fixedTime: number | null;
+    hasSkyLight: boolean;
+    hasCeiling: boolean;
+    ultrawarm: boolean;
+    natural: boolean;
+    coordinateScale: number;
+    minY: number;
+    height: number;
+    logicalHeight: number;
+    ambientLight: number;
+    piglinSafe: boolean;
+    bedWorks: boolean;
+    respawnAnchorWorks: boolean;
+    effects: 'overworld' | 'the_nether' | 'the_end' | 'none';
+    seed?: number;
     texturePath?: string;
   }>;
   eventHandlers?: Array<{

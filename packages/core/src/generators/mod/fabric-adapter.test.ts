@@ -1187,3 +1187,100 @@ describe('FabricAdapter 版本切换', () => {
     expect(gp!.content).toContain('minecraft_version=26.1');
   });
 });
+
+// === Mod 侧世界生成（生物群系 + 维度）===
+
+const SPEC_P40_WORLDGEN: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Worldgen test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  biomes: [
+    {
+      biomeId: 'ruby_plains',
+      displayName: 'Ruby Plains',
+      precipitation: 'rain',
+      temperature: 0.8,
+      temperatureModifier: 'none',
+      downfall: 0.4,
+      skyColor: 0x78a7ff,
+      waterColor: 0x3f76e4,
+      waterFogColor: 0x050533,
+      fogColor: 0xc0d8ff,
+      surfaceBuilder: 'minecraft:grass',
+      category: 'plains',
+      spawnWeight: 10,
+      spawnDimensions: ['minecraft:overworld'],
+    },
+  ],
+  dimensions: [
+    {
+      dimensionId: 'ruby_dim',
+      displayName: 'Ruby Dimension',
+      baseType: 'overworld',
+      fixedTime: 1000,
+      hasSkyLight: true,
+      hasCeiling: false,
+      ultrawarm: false,
+      natural: true,
+      coordinateScale: 1.0,
+      minY: -64,
+      height: 384,
+      logicalHeight: 384,
+      ambientLight: 0,
+      piglinSafe: false,
+      bedWorks: true,
+      respawnAnchorWorks: false,
+      effects: 'overworld',
+    },
+  ],
+});
+
+describe('FabricAdapter Mod 侧世界生成', () => {
+  const adapter = new FabricAdapter();
+  const files = adapter.translate({
+    loader: 'fabric',
+    mcVersion: '1.21.11',
+    modId: 'ruby_tools',
+    spec: SPEC_P40_WORLDGEN,
+    projectPath: '/proj',
+  });
+
+  it('生成 ModBiomes.java 注册生物群系', () => {
+    const biomes = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBiomes.java',
+    );
+    expect(biomes).toBeDefined();
+    expect(biomes!.content).toContain('public class ModBiomes');
+    expect(biomes!.content).toContain('BuiltInRegistries.BIOME');
+    expect(biomes!.content).toContain('ruby_plains');
+    expect(biomes!.content).toContain('Precipitation.RAIN');
+    expect(biomes!.content).toContain('0x78a7ff');
+  });
+
+  it('生成 ModDimensions.java 注册维度类型', () => {
+    const dims = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModDimensions.java',
+    );
+    expect(dims).toBeDefined();
+    expect(dims!.content).toContain('public class ModDimensions');
+    expect(dims!.content).toContain('BuiltInRegistries.DIMENSION_TYPE');
+    expect(dims!.content).toContain('ruby_dim');
+    expect(dims!.content).toContain('OptionalLong.of(1000L)');
+  });
+
+  it('mainClass 调用 ModBiomes/ModDimensions initialize', () => {
+    const main = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
+    );
+    expect(main!.content).toContain('ModBiomes.initialize();');
+    expect(main!.content).toContain('ModDimensions.initialize();');
+  });
+});

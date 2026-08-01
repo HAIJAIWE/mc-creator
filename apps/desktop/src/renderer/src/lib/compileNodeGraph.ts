@@ -306,6 +306,9 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     multiblocks,
     // Task D：流体（当前无流体节点，恒为空数组；为 ModSpec 兼容保留）
     fluids: [],
+    // Mod 侧世界生成（当前无节点，恒为空数组；为 ModSpec 兼容保留）
+    biomes: [],
+    dimensions: [],
     eventHandlers,
     conditions,
     actions,
