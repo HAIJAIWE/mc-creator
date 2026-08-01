@@ -322,7 +322,12 @@ curl -o "\${jarName}" "\${PAPER_API}/\${PAPER_BUILD}/downloads/paper-${shellEsca
       downloadCmd = `echo "下载 Fabric 服务端 (${shellEscape(spec.serverVersion)})..."
 curl -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar"
 java -jar fabric-installer.jar server -mcversion ${shellEscape(spec.serverVersion)} -dir . -loader latest
-mv fabric-server-launch.jar "\${jarName}" 2>/dev/null || true`;
+if [ -f fabric-server-launch.jar ]; then
+  mv fabric-server-launch.jar "\${jarName}"
+else
+  echo "警告: 未找到 fabric-server-launch.jar，请检查目录内容并手动重命名服务端为 \${jarName}"
+  ls -la
+fi`;
     } else {
       downloadCmd = `echo "下载 Vanilla 服务端 (${shellEscape(spec.serverVersion)})..."
 MANIFEST=$(curl -s https://piston-meta.mojang.com/mc/game/version_manifest_v2.json)
@@ -341,8 +346,13 @@ SERVER_USER="${shellEscape(spec.serviceUser)}"
 jarName="${shellEscape(spec.jarName)}"
 MC_VERSION="${shellEscape(spec.serverVersion)}"
 
-echo "=== [1/4] 安装 Java 21 ==="
-if ! command -v java &>/dev/null || ! java -version 2>&1 | grep -q "21"; then
+echo "=== [1/5] 创建服务用户 ==="
+if ! id -u "$SERVER_USER" &>/dev/null; then
+  useradd -r -m -d "$SERVER_DIR" "$SERVER_USER" || true
+fi
+
+echo "=== [2/5] 安装 Java 21 ==="
+if ! command -v java &>/dev/null || ! java -version 2>&1 | grep -qE '"21.'; then
   apt-get update -y
   apt-get install -y openjdk-21-jre-headless curl python3 || {
     # Ubuntu 22.04 默认源可能无 21，装 17 兜底（1.21 需要 21，提示手动装）
@@ -351,8 +361,9 @@ if ! command -v java &>/dev/null || ! java -version 2>&1 | grep -q "21"; then
   }
 fi
 
-echo "=== [2/4] 创建目录并下载服务端 ==="
+echo "=== [3/5] 创建目录并下载服务端 ==="
 mkdir -p "$SERVER_DIR"
+chown -R "$SERVER_USER:$SERVER_USER" "$SERVER_DIR"
 cd "$SERVER_DIR"
 
 if [ ! -f "$jarName" ]; then
@@ -366,8 +377,14 @@ fi
 
 echo "=== [3/4] 复制配置文件 ==="
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cp -f "$SCRIPT_DIR"/server.properties "$SCRIPT_DIR"/eula.txt "$SCRIPT_DIR"/ops.json "$SCRIPT_DIR"/whitelist.json "$SERVER_DIR"/ 2>/dev/null || true
-cp -f "$SCRIPT_DIR"/mods/modlist.txt "$SERVER_DIR"/mods/ 2>/dev/null || true
+if [ -f "$SCRIPT_DIR/server.properties" ]; then
+  cp -f "$SCRIPT_DIR"/server.properties "$SCRIPT_DIR"/eula.txt "$SCRIPT_DIR"/ops.json "$SCRIPT_DIR"/whitelist.json "$SERVER_DIR"/ 2>/dev/null || true
+  cp -f "$SCRIPT_DIR"/mods/modlist.txt "$SERVER_DIR"/mods/ 2>/dev/null || true
+else
+  echo "警告: 未在脚本目录找到配置文件（server.properties 等），使用服务器默认配置。"
+  echo "      请将生成的配置文件与 install.sh 放在同一目录后重新运行。"
+fi
+chown -R "$SERVER_USER:$SERVER_USER" "$SERVER_DIR"
 
 echo "=== [4/4] 安装 systemd 服务（开机自启） ==="
 cat > /etc/systemd/system/minecraft.service << 'EOF'
@@ -412,8 +429,9 @@ echo "=============================================="
     if (spec.serverType === 'paper') {
       downloadCmd = `echo 下载 Paper 服务端 (%MC_VERSION%)...
 powershell -Command "Invoke-WebRequest -Uri 'https://api.papermc.io/v2/projects/paper/versions/%MC_VERSION%/builds' -OutFile paper_builds.json"
-for /f "delims=" %%i in ('powershell -Command "(Get-Content paper_builds.json | ConvertFrom-Json).builds[-1].build"') do set BUILD=%%i
-powershell -Command "Invoke-WebRequest -Uri ('https://api.papermc.io/v2/projects/paper/versions/%MC_VERSION%/builds/' + $env:BUILD + '/downloads/paper-%MC_VERSION%-' + $env:BUILD + '.jar') -OutFile %JAR%"
+for /f "delims=" %%i in ('powershell -Command "(Get-Content paper_builds.json | ConvertFrom-Json).builds[-1].build"') do (
+  powershell -Command "Invoke-WebRequest -Uri ('https://api.papermc.io/v2/projects/paper/versions/%MC_VERSION%/builds/' + '%%i' + '/downloads/paper-%MC_VERSION%-' + '%%i' + '.jar') -OutFile %JAR%"
+)
 del paper_builds.json`;
     } else if (spec.serverType === 'fabric') {
       downloadCmd = `echo 下载 Fabric 服务端 (%MC_VERSION%)...

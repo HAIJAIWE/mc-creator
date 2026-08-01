@@ -248,7 +248,25 @@ describe('ServerGenerator', () => {
     expect(sh!.content).toContain('maven.fabricmc.net');
     expect(sh!.content).toContain('fabric-installer.jar server -mcversion');
   });
+  it('审查修复: install.sh 创建服务用户 + 精确 Java 检测 + 配置缺失警告', async () => {
+    const result = await gen.generate(makeCtx({ serverName: 'Srv' }));
+    const sh = result.files.find((f) => f.path === 'install.sh');
+    // 用户创建
+    expect(sh!.content).toContain('useradd -r -m -d "$SERVER_DIR" "$SERVER_USER"');
+    // 精确 Java 21 检测（避免 17 误判）
+    expect(sh!.content).toContain(`grep -qE '"21.`);
+    // 配置缺失警告
+    expect(sh!.content).toContain('未在脚本目录找到配置文件');
+  });
 
+  it('审查修复: install.bat Paper 分支 BUILD 变量直拼（跨进程安全）', async () => {
+    const result = await gen.generate(
+      makeCtx({ serverName: 'Srv', serverType: 'paper', serverVersion: '1.21.1' }),
+    );
+    const bat = result.files.find((f) => f.path === 'install.bat');
+    expect(bat!.content).toContain("+ '%%i' +");
+    expect(bat!.content).not.toContain('$env:BUILD');
+  });
   it("deployTarget='systemd' 生成 minecraft.service + install-systemd.sh", async () => {
     const result = await gen.generate(
       makeCtx({

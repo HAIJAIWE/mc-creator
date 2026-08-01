@@ -44,6 +44,8 @@ export function CollaborationPanel({ onClose }: CollaborationPanelProps) {
       if (res.ok && res.savedPath) {
         setExportMsg(`已导出到 ${res.savedPath}`);
       }
+    } catch (e) {
+      setExportMsg(`导出失败：${(e as Error).message}`);
     } finally {
       setExporting(false);
     }
@@ -118,7 +120,13 @@ export function CollaborationPanel({ onClose }: CollaborationPanelProps) {
             <button onClick={handleExport} disabled={!spec || exporting} className="mc-btn-primary">
               <Download className="h-3 w-3" /> {exporting ? '导出中…' : '导出'}
             </button>
-            {exportMsg && <span className="text-[11px] text-mc-accent">{exportMsg}</span>}
+            {exportMsg && (
+              <span
+                className={`text-[11px] ${exportMsg.startsWith('导出失败') ? 'text-mc-redstone' : 'text-mc-accent'}`}
+              >
+                {exportMsg}
+              </span>
+            )}
           </div>
         </div>
 
