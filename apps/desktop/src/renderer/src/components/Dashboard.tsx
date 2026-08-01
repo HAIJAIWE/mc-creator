@@ -258,6 +258,27 @@ export function Dashboard() {
                           <McIcon scope="pixel" name="file-text" size={12} />
                           {p.files.length}
                         </span>
+                        {/* 依赖摘要（mod 项目） */}
+                        {p.generatorType === 'mod' &&
+                          Array.isArray((p.spec as Record<string, unknown>)?.dependencies) &&
+                          (
+                            (p.spec as Record<string, unknown>).dependencies as Array<{
+                              modId?: string;
+                            }>
+                          ).length > 0 && (
+                            <>
+                              <span>·</span>
+                              <span className="mc-tag" title="项目依赖">
+                                {(
+                                  (p.spec as Record<string, unknown>).dependencies as Array<{
+                                    modId?: string;
+                                  }>
+                                )
+                                  .map((d) => d.modId ?? '?')
+                                  .join(', ')}
+                              </span>
+                            </>
+                          )}
                       </div>
                       <div className="mb-3 text-xs text-mc-mute">
                         更新于 {new Date(p.updatedAt).toLocaleDateString()}

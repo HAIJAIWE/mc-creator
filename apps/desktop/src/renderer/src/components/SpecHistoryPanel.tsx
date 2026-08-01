@@ -1,6 +1,8 @@
-import { History, Undo2, Trash2, Trash } from 'lucide-react';
+import { useState } from 'react';
+import { History, Undo2, Trash2, Trash, GitCompare } from 'lucide-react';
 import { useSpecHistoryStore } from '../store/spec-history-store.js';
 import { useModStore } from '../store/mod-store.js';
+import { VersionDiffPanel } from './VersionDiffPanel.js';
 
 interface SpecHistoryPanelProps {
   onClose?: () => void;
@@ -19,6 +21,7 @@ export function SpecHistoryPanel({ onClose, onRollback }: SpecHistoryPanelProps)
   const rollbackTo = useSpecHistoryStore((s) => s.rollbackTo);
   const removeVersion = useSpecHistoryStore((s) => s.removeVersion);
   const clearHistory = useSpecHistoryStore((s) => s.clearHistory);
+  const [showDiff, setShowDiff] = useState(false);
 
   const handleRollback = (id: string) => {
     const spec = rollbackTo(id);
@@ -37,6 +40,15 @@ export function SpecHistoryPanel({ onClose, onRollback }: SpecHistoryPanelProps)
       {/* 标题栏 */}
       <div className="mc-section-title border-b border-mc-border flex items-center gap-2">
         <History className="h-4 w-4" /> 历史版本
+        {versions.length >= 2 && (
+          <button
+            onClick={() => setShowDiff((v) => !v)}
+            className="rounded-mc px-1.5 py-0.5 text-xs text-mc-dim transition-colors hover:bg-mc-surface-3 hover:text-mc-text"
+            title="对比两个版本的差异"
+          >
+            <GitCompare className="h-3 w-3 inline" /> {showDiff ? '返回列表' : '对比版本'}
+          </button>
+        )}
         {onClose && (
           <button
             onClick={onClose}
@@ -48,70 +60,75 @@ export function SpecHistoryPanel({ onClose, onRollback }: SpecHistoryPanelProps)
         )}
       </div>
 
-      {/* 版本列表 */}
-      <div className="flex-1 overflow-y-auto">
-        {ordered.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-xs text-mc-dim">
-            <div className="flex h-12 w-12 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
-              <History className="h-6 w-6 text-mc-mute" />
+      {/* 版本对比视图 */}
+      {showDiff ? (
+        <VersionDiffPanel versions={versions} onClose={() => setShowDiff(false)} />
+      ) : (
+        /* 版本列表 */
+        <div className="flex-1 overflow-y-auto">
+          {ordered.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-xs text-mc-dim">
+              <div className="flex h-12 w-12 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
+                <History className="h-6 w-6 text-mc-mute" />
+              </div>
+              暂无历史版本
             </div>
-            暂无历史版本
-          </div>
-        ) : (
-          <ul className="divide-y divide-mc-border">
-            {ordered.map((v) => {
-              // ordered 是倒序的，需要换算回原索引以判断是否为当前激活版本
-              const originalIndex = versions.findIndex((x) => x.id === v.id);
-              const active = originalIndex === currentIndex;
-              return (
-                <li
-                  key={v.id}
-                  className={`flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
-                    active ? 'bg-mc-accent/15' : 'hover:bg-mc-surface-2/50'
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`font-mono ${active ? 'text-mc-accent' : 'text-mc-text'}`}
-                        title={v.label}
-                      >
-                        {v.label}
-                      </span>
-                      <span className="rounded-mc bg-mc-surface-3 px-1.5 py-0.5 text-xs text-mc-dim">
-                        {v.generatorType}
-                      </span>
-                      {active && <span className="text-xs text-mc-accent">当前</span>}
-                    </div>
-                    {v.description && (
-                      <div className="mt-0.5 truncate text-mc-mute" title={v.description}>
-                        {v.description}
+          ) : (
+            <ul className="divide-y divide-mc-border">
+              {ordered.map((v) => {
+                // ordered 是倒序的，需要换算回原索引以判断是否为当前激活版本
+                const originalIndex = versions.findIndex((x) => x.id === v.id);
+                const active = originalIndex === currentIndex;
+                return (
+                  <li
+                    key={v.id}
+                    className={`flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                      active ? 'bg-mc-accent/15' : 'hover:bg-mc-surface-2/50'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`font-mono ${active ? 'text-mc-accent' : 'text-mc-text'}`}
+                          title={v.label}
+                        >
+                          {v.label}
+                        </span>
+                        <span className="rounded-mc bg-mc-surface-3 px-1.5 py-0.5 text-xs text-mc-dim">
+                          {v.generatorType}
+                        </span>
+                        {active && <span className="text-xs text-mc-accent">当前</span>}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-1">
-                    <button
-                      onClick={() => handleRollback(v.id)}
-                      disabled={active}
-                      className="rounded-mc p-1 text-mc-dim transition-colors hover:bg-mc-surface-3 hover:text-mc-text disabled:cursor-not-allowed disabled:opacity-40"
-                      title={active ? '已是当前版本' : '回滚到此版本'}
-                    >
-                      <Undo2 className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={() => removeVersion(v.id)}
-                      className="rounded-mc p-1 text-mc-dim transition-colors hover:bg-mc-surface-3 hover:text-mc-redstone"
-                      title="删除此版本"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                      {v.description && (
+                        <div className="mt-0.5 truncate text-mc-mute" title={v.description}>
+                          {v.description}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => handleRollback(v.id)}
+                        disabled={active}
+                        className="rounded-mc p-1 text-mc-dim transition-colors hover:bg-mc-surface-3 hover:text-mc-text disabled:cursor-not-allowed disabled:opacity-40"
+                        title={active ? '已是当前版本' : '回滚到此版本'}
+                      >
+                        <Undo2 className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => removeVersion(v.id)}
+                        className="rounded-mc p-1 text-mc-dim transition-colors hover:bg-mc-surface-3 hover:text-mc-redstone"
+                        title="删除此版本"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* 底部操作栏 */}
       <div className="flex items-center justify-between border-t border-mc-border px-3 py-2">
