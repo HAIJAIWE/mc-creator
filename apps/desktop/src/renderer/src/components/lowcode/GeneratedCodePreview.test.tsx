@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, within, cleanup, act } from '@testing-library/react';
 import type { NodeGraph, FileNode, ModSpec } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
+import { useModStore } from '../../store/mod-store.js';
 
 /**
  * GeneratedCodePreview 测试
@@ -420,5 +421,54 @@ describe('GeneratedCodePreview', () => {
       vi.advanceTimersByTime(1);
     });
     expect(hoisted.compileNodeGraphMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('9. 编辑模式：readOnly=false 时默认可编辑并写回', async () => {
+    hoisted.compileNodeGraphMock.mockReturnValue({
+      spec: DEMO_SPEC,
+      warnings: [],
+      errors: [],
+    });
+    hoisted.fabricAdapterTranslateMock.mockReturnValue(DEMO_FILES);
+    useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
+
+    render(<GeneratedCodePreview readOnly={false} />);
+
+    // 等待编译完成
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // readOnly=false 默认进入编辑态（按钮文本"✎ 编辑中"，aria-label 为切换到只读预览）
+    const toggleBtn = screen.getByLabelText('切换到只读预览');
+    expect(toggleBtn).toBeTruthy();
+
+    // Monaco textarea 可编辑：输入触发 onChange → 写回 store
+    const textarea = screen.getByLabelText('Monaco 编辑器内容');
+    fireEvent.change(textarea, { target: { value: '// edited' } });
+    // 编辑内容合并到展示（编辑中）
+    const updated = useModStore.getState().files.find((f) => f.path === DEMO_FILES[0].path);
+    expect(updated?.content).toBe('// edited');
+
+    // 切回只读：按钮变为"切换到编辑模式"
+    fireEvent.click(toggleBtn);
+    expect(screen.getByLabelText('切换到编辑模式')).toBeTruthy();
+  });
+
+  it('10. 只读模式（默认）：无编辑切换按钮', async () => {
+    hoisted.compileNodeGraphMock.mockReturnValue({
+      spec: DEMO_SPEC,
+      warnings: [],
+      errors: [],
+    });
+    hoisted.fabricAdapterTranslateMock.mockReturnValue(DEMO_FILES);
+    useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
+
+    render(<GeneratedCodePreview />);
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.queryByLabelText('切换到编辑模式')).toBeNull();
   });
 });

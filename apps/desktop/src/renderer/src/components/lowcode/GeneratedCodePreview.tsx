@@ -1,6 +1,7 @@
 import { useState, useMemo, lazy, Suspense } from 'react';
 import type { FileNode } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
+import { useModStore } from '../../store/mod-store.js';
 import { useDebouncedCompile } from '../../lib/useDebouncedCompile.js';
 
 /**
@@ -96,6 +97,10 @@ export function GeneratedCodePreview({
   // 用户选中的文件路径（null 表示未选，自动回退到第一个文件）
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
 
+  // 编辑模式：readOnly=false 时 Monaco 可编辑；编辑内容存本地 override，编译结果合并展示
+  const [editing, setEditing] = useState(!readOnly);
+  const [editOverrides, setEditOverrides] = useState<Record<string, string>>({});
+
   // 有效的选中路径：若用户选择已被新编译结果淘汰，则回退到第一个文件
   const effectiveSelectedPath = useMemo<string | null>(() => {
     if (selectedPath && generatedFiles.some((f) => f.path === selectedPath)) {
@@ -104,10 +109,30 @@ export function GeneratedCodePreview({
     return generatedFiles[0]?.path ?? null;
   }, [selectedPath, generatedFiles]);
 
+  // 合并编译结果与编辑覆盖（编辑内容优先）
+  const mergedFiles = useMemo<FileNode[]>(() => {
+    return generatedFiles.map((f) =>
+      editOverrides[f.path] !== undefined ? { ...f, content: editOverrides[f.path] } : f,
+    );
+  }, [generatedFiles, editOverrides]);
+
   const selectedFile = useMemo<FileNode | null>(() => {
     if (!effectiveSelectedPath) return null;
-    return generatedFiles.find((f) => f.path === effectiveSelectedPath) ?? null;
-  }, [effectiveSelectedPath, generatedFiles]);
+    return mergedFiles.find((f) => f.path === effectiveSelectedPath) ?? null;
+  }, [effectiveSelectedPath, mergedFiles]);
+
+  const handleEditorChange = (value: string | undefined) => {
+    if (!effectiveSelectedPath) return;
+    const v = value ?? '';
+    setEditOverrides((prev) => ({ ...prev, [effectiveSelectedPath]: v }));
+    // 同步写回 mod-store（供构建/导出使用；不存在则创建）
+    const store = useModStore.getState();
+    if (store.files.some((f) => f.path === effectiveSelectedPath)) {
+      store.updateFileContent(effectiveSelectedPath, v);
+    } else {
+      store.createFile(effectiveSelectedPath, v);
+    }
+  };
 
   // 按分组组织文件列表
   const groupedFiles = useMemo(() => {
@@ -116,16 +141,16 @@ export function GeneratedCodePreview({
       资源与配置: [],
       构建脚本: [],
     };
-    for (const f of generatedFiles) {
+    for (const f of mergedFiles) {
       groups[getFileGroup(f.path)].push(f);
     }
     return groups;
-  }, [generatedFiles]);
+  }, [mergedFiles]);
 
   // 统计总行数（用于工具栏展示）
   const totalLines = useMemo(
-    () => generatedFiles.reduce((sum, f) => sum + f.content.split('\n').length, 0),
-    [generatedFiles],
+    () => mergedFiles.reduce((sum, f) => sum + f.content.split('\n').length, 0),
+    [mergedFiles],
   );
 
   // 编译状态徽章：编译中 / 错误 / 警告 / 全通过
@@ -196,6 +221,35 @@ export function GeneratedCodePreview({
           >
             {status.text}
           </span>
+        )}
+
+        <div className="ml-auto" />
+
+        {/* 编辑模式切换（仅当外部未强制只读时可用） */}
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            aria-pressed={editing}
+            aria-label={editing ? '切换到只读预览' : '切换到编辑模式'}
+            className={`rounded-mc px-2 py-0.5 text-[10px] transition-colors ${
+              editing
+                ? 'bg-mc-accent/20 text-mc-accent-bright'
+                : 'text-mc-dim hover:bg-mc-surface-2 hover:text-mc-text'
+            }`}
+          >
+            {editing ? '✎ 编辑中' : '只读'}
+          </button>
+        )}
+        {!readOnly && Object.keys(editOverrides).length > 0 && (
+          <button
+            type="button"
+            onClick={() => setEditOverrides({})}
+            aria-label="重置所有编辑"
+            className="rounded-mc bg-mc-surface-3 px-2 py-0.5 text-[10px] text-mc-dim transition-colors hover:bg-mc-border-strong hover:text-mc-text"
+          >
+            重置编辑
+          </button>
         )}
       </div>
 
@@ -297,8 +351,9 @@ export function GeneratedCodePreview({
                 language={getLanguage(selectedFile.path)}
                 value={selectedFile.content}
                 theme="vs-dark"
+                onChange={editing ? handleEditorChange : undefined}
                 options={{
-                  readOnly,
+                  readOnly: !editing,
                   minimap: { enabled: false },
                   fontSize: 12,
                   tabSize: 4,

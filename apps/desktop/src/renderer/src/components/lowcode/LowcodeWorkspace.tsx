@@ -601,7 +601,7 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
             role="region"
             aria-label="生成代码预览面板"
           >
-            <GeneratedCodePreview />
+            <GeneratedCodePreview readOnly={false} />
           </div>
         )}
       </div>
