@@ -69,6 +69,20 @@ describe('ModGenerator', () => {
     expect(result.warnings.some((w) => w.includes('26.2'))).toBe(true);
   });
 
+  it('legacy_fabric 在当前版本列表（无 1.14-1.16）下生成时给出范围警告', async () => {
+    const ctx: GeneratorContext = {
+      loader: 'legacy_fabric',
+      mcVersion: '1.20.1',
+      modId: 'demo',
+      spec: SPEC,
+      projectPath: '/proj',
+    };
+    const result = await gen.generate(ctx);
+    expect(
+      result.warnings.some((w) => w.includes('Legacy Fabric') && w.includes('1.14–1.16')),
+    ).toBe(true);
+  });
+
   it('版本切换生效：1.21.1 生成对应 build.gradle Java 21', async () => {
     const ctx: GeneratorContext = {
       loader: 'fabric',

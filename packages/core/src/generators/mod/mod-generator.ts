@@ -70,7 +70,21 @@ export class ModGenerator implements Generator {
     }
     // 版本感知：26.2 的 NeoForge 尚为 beta（26.1 已发布，版本号为真实值）
     if (ctx.mcVersion === '26.2') {
-      warnings.push('MC 26.2 的 NeoForge 版本为 beta（26.2.0.41-beta），正式版发布后请更新版本号');
+      if (ctx.loader === 'neoforge') {
+        warnings.push(
+          'MC 26.2 的 NeoForge 版本为 beta（26.2.0.41-beta），正式版发布后请更新版本号',
+        );
+      } else {
+        warnings.push('MC 26.2 的 Fabric API / Quilt 依赖版本尚未确认，构建前请核对版本号');
+      }
+    }
+    // Legacy Fabric 仅支持 MC 1.14–1.16，当前版本列表不含该范围
+    if (ctx.loader === 'legacy_fabric') {
+      warnings.push(
+        `Legacy Fabric 仅支持 MC 1.14–1.16，当前所选 ${ctx.mcVersion} 不在其范围内；` +
+          '生成的 Yarn/API 版本按 1.16.5 固定，构建前请将 gradle.properties 的 minecraft_version 改为 1.16.5，' +
+          '或改用 Fabric / Quilt 加载器',
+      );
     }
     return warnings;
   }

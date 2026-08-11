@@ -76,6 +76,13 @@ describe('IPC schema 校验', () => {
     expect(BuildRequest.safeParse({ projectPath: '' }).success).toBe(false);
   });
 
+  it('BuildRequest 接受可选 mcVersion（用于按版本提示 JDK）', () => {
+    expect(BuildRequest.safeParse({ projectPath: '/proj' }).success).toBe(true);
+    const withVer = BuildRequest.safeParse({ projectPath: '/proj', mcVersion: '26.1' });
+    expect(withVer.success).toBe(true);
+    if (withVer.success) expect(withVer.data.mcVersion).toBe('26.1');
+  });
+
   it('PrepareBuildDirRequest 校验 files 非空数组', () => {
     expect(
       PrepareBuildDirRequest.safeParse({ files: [{ path: 'a.txt', content: 'hi' }] }).success,

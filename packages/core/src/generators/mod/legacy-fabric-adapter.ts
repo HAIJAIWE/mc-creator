@@ -113,7 +113,7 @@ mod_version=${spec.version}
 maven_group=com.example.${spec.modId}
 archives_base_name=${spec.modId}
 
-# Minecraft / Legacy Fabric（面向 MC 1.14-1.16；默认 minecraft_version 为 1.21.11，请改为 1.16.5 等旧版本）
+# Minecraft / Legacy Fabric（仅支持 MC 1.14-1.16；当前版本列表不含该范围，构建前请将 minecraft_version 改为 1.16.5 等旧版本）
 minecraft_version=${mcVersion}
 loader_version=0.12.12
 yarn_version=1.16.5+build.1

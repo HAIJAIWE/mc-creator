@@ -97,9 +97,17 @@ describe('版本×loader 矩阵（防回归）', () => {
     },
   );
 
-  it('26.2 × neoforge 给出 beta 警告；1.20.1 × neoforge 给出占位提示（isPlaceholder）', async () => {
+  it('26.2 × neoforge 给出 beta 警告；26.2 × fabric 给出核对警告；1.20.1 × neoforge 给出占位提示（isPlaceholder）', async () => {
     const beta = await gen.generate(makeCtx('neoforge', '26.2'));
     expect(beta.warnings.some((w) => w.includes('beta'))).toBe(true);
+    const fabric262 = await gen.generate(makeCtx('fabric', '26.2'));
+    expect(fabric262.warnings.some((w) => w.includes('26.2'))).toBe(true);
+    expect(fabric262.warnings.some((w) => w.includes('beta'))).toBe(false);
     expect(getLoaderVersions('1.20.1').isPlaceholder).toBe(true);
+  });
+
+  it('legacy_fabric × 当前任意版本均给出 Legacy Fabric 范围警告', async () => {
+    const result = await gen.generate(makeCtx('legacy_fabric', '1.21.11'));
+    expect(result.warnings.some((w) => w.includes('Legacy Fabric'))).toBe(true);
   });
 });

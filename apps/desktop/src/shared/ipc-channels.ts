@@ -170,7 +170,11 @@ export const GenerateFilesResponse = z.object({
     .optional(),
 });
 
-export const BuildRequest = z.object({ projectPath: z.string().min(1) });
+export const BuildRequest = z.object({
+  projectPath: z.string().min(1),
+  /** 可选：用于按 MC 版本提示所需 JDK 版本 */
+  mcVersion: z.string().optional(),
+});
 export const BuildResponse = z.object({
   success: z.boolean(),
   jarPath: z.string().nullable(),

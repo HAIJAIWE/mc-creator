@@ -24,7 +24,8 @@ import {
   type SpecType,
 } from '@mc-creator/core';
 import * as nodeFs from 'fs';
-import type { ModSpec } from '@mc-creator/shared';
+import type { ModSpec, McVersion } from '@mc-creator/shared';
+import { javaVersionFor } from '@mc-creator/shared';
 import { assertWithin, parseGitStatus } from './ipc-utils.js';
 import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
 import { loadCurseForgeConfig, saveCurseForgeConfig } from './curseforge-config.js';
@@ -230,8 +231,23 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
   ipcMain.handle(IPC.BUILD, async (_e, raw: unknown): Promise<BuildRes> => {
     const req = BuildRequest.parse(raw);
     const java = await detectJavaVersion();
+    // 按所选 MC 版本提示所需 JDK（1.20.x→17、1.21.x→21、26.x→25；未传版本时按 21 提示）
+    const need = req.mcVersion ? javaVersionFor('fabric', req.mcVersion as McVersion) : 21;
     if (java === null) {
-      return { success: false, jarPath: null, log: '未检测到 Java，请安装 JDK 21+' };
+      return {
+        success: false,
+        jarPath: null,
+        log: `未检测到 Java，构建 MC ${req.mcVersion ?? '（未指定）'} 需要 JDK ${need}+。请安装对应 JDK 或配置 JAVA_HOME`,
+      };
+    }
+    if (java < need) {
+      return {
+        success: false,
+        jarPath: null,
+        log:
+          `本机 JDK 为 ${java}，构建 MC ${req.mcVersion} 需要 JDK ${need}+。` +
+          `请安装 JDK ${need} 或配置 JAVA_HOME（若 build.gradle 已配置 Gradle toolchain 自动下载，可忽略此提示）`,
+      };
     }
     const result = await runGradleBuild(req.projectPath);
     return { success: result.success, jarPath: result.jarPath, log: result.log };
