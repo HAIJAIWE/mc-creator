@@ -10,8 +10,11 @@ import {
   Trash2,
   User,
   Wrench,
+  FolderOpen,
+  Search,
 } from 'lucide-react';
 import { ipcClient } from '../lib/ipc-client.js';
+import { useModStore } from '../store/mod-store.js';
 
 interface VersionEntry {
   id: string;
@@ -41,6 +44,89 @@ export function GameLauncherPanel() {
   const [mods, setMods] = useState<string[]>([]);
   const [skinInstalling, setSkinInstalling] = useState(false);
   const [skinApiUrl, setSkinApiUrl] = useState('https://littleskin.cn/api/yggdrasil');
+
+  // 离线已有安装（定位已有 MC 目录并直接测试）
+  const [offlineDir, setOfflineDir] = useState<string | null>(null);
+  const [offlineStatus, setOfflineStatus] = useState<'idle' | 'locating' | 'found' | 'error'>(
+    'idle',
+  );
+  const [offlineError, setOfflineError] = useState<string | null>(null);
+  const [offlineMsg, setOfflineMsg] = useState<string | null>(null);
+  const [offlineInstalling, setOfflineInstalling] = useState(false);
+  const [offlineLaunching, setOfflineLaunching] = useState(false);
+
+  const jarPath = useModStore((s) => {
+    const jar = s.files.find((f) => f.path.endsWith('.jar'));
+    return jar ? jar.path : null;
+  });
+
+  const locateOffline = async () => {
+    setOfflineStatus('locating');
+    setOfflineError(null);
+    setOfflineMsg(null);
+    try {
+      const res = await ipcClient.locateMc();
+      if (res.found && res.mcDir) {
+        setOfflineDir(res.mcDir);
+        setOfflineStatus('found');
+        setOfflineMsg(`已定位：${res.mcDir}`);
+      } else {
+        setOfflineStatus('error');
+        setOfflineError(res.error ?? '未找到 Minecraft 安装');
+      }
+    } catch (e) {
+      setOfflineStatus('error');
+      setOfflineError((e as Error).message);
+    }
+  };
+
+  const chooseOfflineDir = async () => {
+    const res = await ipcClient.chooseMcDir();
+    if (res.path) {
+      setOfflineDir(res.path);
+      setOfflineStatus('found');
+      setOfflineError(null);
+      setOfflineMsg(`已选择：${res.path}`);
+    }
+  };
+
+  const installModToOffline = async () => {
+    if (!jarPath || !offlineDir) return;
+    setOfflineInstalling(true);
+    setOfflineError(null);
+    setOfflineMsg(null);
+    try {
+      const res = await ipcClient.installMod(jarPath, offlineDir);
+      if (res.ok) {
+        setOfflineMsg(`已安装到 ${res.modsDir ?? 'mods 目录'}`);
+      } else {
+        setOfflineError(res.error ?? '安装失败');
+      }
+    } catch (e) {
+      setOfflineError((e as Error).message);
+    } finally {
+      setOfflineInstalling(false);
+    }
+  };
+
+  const launchOffline = async () => {
+    if (!offlineDir) return;
+    setOfflineLaunching(true);
+    setOfflineError(null);
+    setOfflineMsg(null);
+    try {
+      const res = await ipcClient.launchMc(offlineDir);
+      if (res.ok) {
+        setOfflineMsg('Minecraft 已启动');
+      } else {
+        setOfflineError(res.error ?? '启动失败');
+      }
+    } catch (e) {
+      setOfflineError((e as Error).message);
+    } finally {
+      setOfflineLaunching(false);
+    }
+  };
 
   const loadVersions = async () => {
     setLoadingVersions(true);
@@ -295,6 +381,67 @@ export function GameLauncherPanel() {
               ))}
             </ul>
           )}
+        </div>
+
+        {/* 离线已有安装 */}
+        <div className="rounded-mc border border-mc-border bg-mc-surface-2 p-3">
+          <span className="mb-2 flex items-center gap-1.5 text-xs font-medium text-mc-text">
+            <FolderOpen className="h-3 w-3" /> 离线已有安装（定位现有 MC）
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={locateOffline}
+              disabled={offlineStatus === 'locating'}
+              className="mc-btn-ghost flex-1"
+            >
+              {offlineStatus === 'locating' ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Search className="h-3 w-3" />
+              )}
+              自动定位
+            </button>
+            <button onClick={chooseOfflineDir} className="mc-btn-ghost flex-1">
+              <FolderOpen className="h-3 w-3" /> 选择目录
+            </button>
+          </div>
+          <p className="mt-2 text-[10px] text-mc-mute">
+            支持官方启动器 / PCL2 / HMCL 的 .minecraft 目录
+          </p>
+          {offlineStatus === 'found' && offlineDir && (
+            <p className="mt-1 truncate text-[10px] text-mc-accent" title={offlineDir}>
+              {offlineDir}
+            </p>
+          )}
+          {offlineError && <p className="mt-1 text-[10px] text-mc-redstone">{offlineError}</p>}
+          {offlineMsg && <p className="mt-1 text-[10px] text-mc-accent">{offlineMsg}</p>}
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={installModToOffline}
+              disabled={!jarPath || !offlineDir || offlineInstalling}
+              className="mc-btn-primary flex-1"
+              title={!jarPath ? '请先构建生成 Mod jar 文件' : '复制构建产物到 mods 目录'}
+            >
+              {offlineInstalling ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Puzzle className="h-3 w-3" />
+              )}
+              {jarPath ? '安装当前 Mod 到该安装' : '安装 Mod（需先构建）'}
+            </button>
+            <button
+              onClick={launchOffline}
+              disabled={!offlineDir || offlineLaunching}
+              className="mc-btn-primary flex-1"
+            >
+              {offlineLaunching ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Play className="h-3 w-3" />
+              )}
+              {offlineLaunching ? '启动中…' : '启动该安装'}
+            </button>
+          </div>
         </div>
 
         {/* 离线皮肤 */}

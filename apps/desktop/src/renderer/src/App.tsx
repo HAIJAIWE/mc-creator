@@ -13,7 +13,6 @@ import { SearchPanel } from './components/SearchPanel.js';
 import { PackagesPanel } from './components/PackagesPanel.js';
 import { GitPanel } from './components/GitPanel.js';
 import { BlockEditor } from './components/BlockEditor.js';
-import { McLauncherPanel } from './components/McLauncherPanel.js';
 import { EntityAiEditor } from './components/EntityAiEditor.js';
 import { AudioPanel } from './components/AudioPanel.js';
 import { CiCdPanel } from './components/CiCdPanel.js';
@@ -32,7 +31,6 @@ type Activity =
   | 'settings'
   | 'items'
   | 'blocks'
-  | 'mc'
   | 'entity'
   | 'audio'
   | 'cicd'
@@ -70,8 +68,6 @@ function Workbench() {
         return <ItemRecipeEditor />;
       case 'blocks':
         return <BlockEditor />;
-      case 'mc':
-        return <McLauncherPanel />;
       case 'entity':
         return <EntityAiEditor />;
       case 'audio':

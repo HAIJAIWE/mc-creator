@@ -12,6 +12,10 @@ vi.mock('../lib/ipc-client.js', () => ({
     launcherListMods: vi.fn(),
     launcherRemoveMod: vi.fn(),
     launcherInstallSkin: vi.fn(),
+    locateMc: vi.fn(),
+    chooseMcDir: vi.fn(),
+    installMod: vi.fn(),
+    launchMc: vi.fn(),
   },
 }));
 
@@ -23,6 +27,10 @@ const mockLaunch = ipcClient.launcherLaunch as ReturnType<typeof vi.fn>;
 const mockInstallLoader = ipcClient.launcherInstallLoader as ReturnType<typeof vi.fn>;
 const mockListMods = ipcClient.launcherListMods as ReturnType<typeof vi.fn>;
 const mockInstallSkin = ipcClient.launcherInstallSkin as ReturnType<typeof vi.fn>;
+const mockLocateMc = ipcClient.locateMc as ReturnType<typeof vi.fn>;
+const mockChooseMcDir = ipcClient.chooseMcDir as ReturnType<typeof vi.fn>;
+const mockInstallMod = ipcClient.installMod as ReturnType<typeof vi.fn>;
+const mockLaunchMc = ipcClient.launchMc as ReturnType<typeof vi.fn>;
 
 describe('GameLauncherPanel', () => {
   beforeEach(() => {
@@ -39,6 +47,16 @@ describe('GameLauncherPanel', () => {
     mockInstallLoader.mockResolvedValue({ ok: true, error: null });
     mockListMods.mockResolvedValue({ mods: ['fabric-api.jar'], error: null });
     mockInstallSkin.mockResolvedValue({ ok: true, error: null });
+    mockLocateMc.mockResolvedValue({
+      found: true,
+      mcDir: 'D:/mc/.minecraft',
+      modsDir: 'D:/mc/.minecraft/mods',
+      launcher: 'PCL2',
+      error: null,
+    });
+    mockChooseMcDir.mockResolvedValue({ path: 'D:/custom/.minecraft', error: null });
+    mockInstallMod.mockResolvedValue({ ok: true, modsDir: 'D:/mc/.minecraft/mods', error: null });
+    mockLaunchMc.mockResolvedValue({ ok: true, error: null });
   });
 
   it('加载版本清单并选中最新版', async () => {
@@ -119,6 +137,52 @@ describe('GameLauncherPanel', () => {
         version: '26.2',
         skinApiUrl: 'https://littleskin.cn/api/yggdrasil',
       });
+    });
+  });
+
+  it('自动定位已有 MC 安装并显示目录', async () => {
+    render(<GameLauncherPanel />);
+    await waitFor(() => {
+      expect(screen.getByText('自动定位')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('自动定位'));
+    await waitFor(() => {
+      expect(mockLocateMc).toHaveBeenCalled();
+      expect(screen.getByText(/已定位/)).toBeTruthy();
+    });
+  });
+
+  it('定位失败时展示错误', async () => {
+    mockLocateMc.mockResolvedValueOnce({
+      found: false,
+      mcDir: null,
+      modsDir: null,
+      launcher: null,
+      error: '未找到 Minecraft 安装',
+    });
+    render(<GameLauncherPanel />);
+    await waitFor(() => {
+      expect(screen.getByText('自动定位')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('自动定位'));
+    await waitFor(() => {
+      expect(screen.getByText('未找到 Minecraft 安装')).toBeTruthy();
+    });
+  });
+
+  it('手动选择目录后可启动该安装', async () => {
+    render(<GameLauncherPanel />);
+    await waitFor(() => {
+      expect(screen.getByText('选择目录')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('选择目录'));
+    await waitFor(() => {
+      expect(mockChooseMcDir).toHaveBeenCalled();
+    });
+    fireEvent.click(screen.getByText('启动该安装'));
+    await waitFor(() => {
+      expect(mockLaunchMc).toHaveBeenCalledWith('D:/custom/.minecraft');
+      expect(screen.getByText('Minecraft 已启动')).toBeTruthy();
     });
   });
 });

@@ -23,7 +23,6 @@ const ACTIVITY_IDS = [
   'packages',
   'items',
   'blocks',
-  'mc',
   'entity',
   'audio',
   'cicd',
@@ -55,10 +54,10 @@ describe('ActivityBar 渲染与 ARIA 结构', () => {
     expect(toolbar.getAttribute('aria-orientation')).toBe('vertical');
   });
 
-  it('渲染 11 个活动按钮 + 1 个设置按钮 + 1 个品牌标按钮 = 13 个 button', () => {
+  it('渲染 10 个活动按钮 + 1 个设置按钮 + 1 个品牌标按钮 = 12 个 button', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
     const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(13);
+    expect(buttons.length).toBe(12);
   });
 
   it('每个活动按钮都有 type="button"（防止表单提交）', () => {
@@ -301,9 +300,8 @@ function labelFor(id: string): string {
     packages: '包管理',
     items: '物品/配方',
     blocks: '方块编辑',
-    mc: 'MC 启动器',
     entity: '实体 AI',
-    audio: '音效管理',
+    audio: '音效事件',
     cicd: 'CI/CD',
     game: '游戏启动器',
     settings: '设置',
