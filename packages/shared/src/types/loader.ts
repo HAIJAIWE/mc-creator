@@ -2,8 +2,17 @@
 export const LOADERS = ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'vanilla'] as const;
 export type Loader = (typeof LOADERS)[number];
 
-/** MC 版本（规格 §1.2：1.21.11 为主，26.x 为年度版） */
-export const MC_VERSIONS = ['1.21.11', '1.21.1', '26.1', '26.2'] as const;
+/** MC 版本（规格 §1.2：1.21.11 为主，26.x 为年度版；1.20.x/1.21.5 为生态常用旧版本） */
+export const MC_VERSIONS = [
+  '1.20.1',
+  '1.20.4',
+  '1.20.6',
+  '1.21.1',
+  '1.21.5',
+  '1.21.11',
+  '26.1',
+  '26.2',
+] as const;
 export type McVersion = (typeof MC_VERSIONS)[number];
 
 /** 默认目标版本 */
@@ -11,8 +20,9 @@ export const DEFAULT_MC_VERSION: McVersion = '1.21.11';
 
 /** 每个 loader+版本 对应的 Java 版本（规格 §5 错误处理） */
 export function javaVersionFor(_loader: Loader, mc: McVersion): number {
-  if (mc === '26.1' || mc === '26.2') return 25;
-  return 21; // 1.21.x 需 Java 21
+  if (mc === '26.1' || mc === '26.2') return 25; // 26.x 需 Java 25
+  if (mc === '1.20.1' || mc === '1.20.4') return 17; // 1.20.4 及更早需 Java 17
+  return 21; // 1.20.6+ 与 1.21.x 需 Java 21
 }
 
 // === Loader 版本配置（对标 MCreator GradleCache 版本映射） ===
@@ -58,8 +68,40 @@ export interface LoaderVersionConfig {
  * gradle.properties 模板中的版本号，我们用代码化映射表替代手动维护。
  */
 export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
-  '1.21.11': {
-    fabricLoaderVersion: '0.16.9',
+  '1.20.1': {
+    // NeoForge 官方已弃用 1.20.1（公共下载移除，推荐 Forge）；neoforgeVersion 为旧分支末版，构建需人工确认
+    fabricLoaderVersion: '0.19.3',
+    fabricApiVersion: '0.92.11+1.20.1',
+    fabricLoomVersion: '1.7-SNAPSHOT',
+    fabricLoaderMinVersion: '>=0.14.0',
+    neoforgeVersion: '20.1.110',
+    neoforgeModdevVersion: '1.0.21',
+    neoforgeLoaderVersionRange: '[4,)',
+    neoforgeVersionRange: '[20.1,)',
+    isPlaceholder: true,
+  },
+  '1.20.4': {
+    fabricLoaderVersion: '0.19.3',
+    fabricApiVersion: '0.97.3+1.20.4',
+    fabricLoomVersion: '1.7-SNAPSHOT',
+    fabricLoaderMinVersion: '>=0.14.0',
+    neoforgeVersion: '20.4.251',
+    neoforgeModdevVersion: '1.0.21',
+    neoforgeLoaderVersionRange: '[4,)',
+    neoforgeVersionRange: '[20.4,)',
+  },
+  '1.20.6': {
+    fabricLoaderVersion: '0.19.3',
+    fabricApiVersion: '0.100.8+1.20.6',
+    fabricLoomVersion: '1.7-SNAPSHOT',
+    fabricLoaderMinVersion: '>=0.14.0',
+    neoforgeVersion: '20.6.139',
+    neoforgeModdevVersion: '1.0.21',
+    neoforgeLoaderVersionRange: '[4,)',
+    neoforgeVersionRange: '[20.6,)',
+  },
+  '1.21.1': {
+    fabricLoaderVersion: '0.19.3',
     fabricApiVersion: '0.110.5+1.21',
     fabricLoomVersion: '1.7-SNAPSHOT',
     fabricLoaderMinVersion: '>=0.16.0',
@@ -68,15 +110,25 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     neoforgeLoaderVersionRange: '[4,)',
     neoforgeVersionRange: '[21.1,)',
   },
-  '1.21.1': {
-    fabricLoaderVersion: '0.16.9',
-    fabricApiVersion: '0.110.5+1.21',
-    fabricLoomVersion: '1.7-SNAPSHOT',
+  '1.21.5': {
+    fabricLoaderVersion: '0.19.3',
+    fabricApiVersion: '0.128.2+1.21.5',
+    fabricLoomVersion: '1.10-SNAPSHOT',
     fabricLoaderMinVersion: '>=0.16.0',
-    neoforgeVersion: '21.1.1',
-    neoforgeModdevVersion: '1.0.21',
+    neoforgeVersion: '21.5.81',
+    neoforgeModdevVersion: '2.0.143',
     neoforgeLoaderVersionRange: '[4,)',
-    neoforgeVersionRange: '[21.1,)',
+    neoforgeVersionRange: '[21.5,)',
+  },
+  '1.21.11': {
+    fabricLoaderVersion: '0.19.3',
+    fabricApiVersion: '0.141.6+1.21.11',
+    fabricLoomVersion: '1.17.17',
+    fabricLoaderMinVersion: '>=0.16.0',
+    neoforgeVersion: '21.11.42',
+    neoforgeModdevVersion: '2.0.143',
+    neoforgeLoaderVersionRange: '[4,)',
+    neoforgeVersionRange: '[21.11,)',
   },
   '26.1': {
     // 实测版本（2026-07 在线核验）：26.1 已于 2026-03-24 正式发布
@@ -123,4 +175,29 @@ export function getLoaderVersions(mcVersion: string): LoaderVersionConfig {
   }
   // 未知版本：回退到默认版本配置（向后兼容）
   return LOADER_VERSIONS[DEFAULT_MC_VERSION];
+}
+
+/**
+ * 各 MC 版本建议的 Gradle 版本（gradle-wrapper.properties distributionUrl 用）。
+ *
+ * 约束来源（2026-07 在线核验）：
+ * - 1.20.x / 1.21.1：Fabric Loom 1.7 需 Gradle 8.11+，ModDevGradle 1.0 需 Gradle 8.8+ → 8.12
+ * - 1.21.5：Loom 1.10 需 Gradle 8.12+ → 8.13
+ * - 1.21.11：Loom 1.17 需 Gradle 9.2+ → 9.5.1
+ * - 26.x：Loom 1.17 需 Gradle 9.2+，Fabric 官方推荐 9.4+ → 9.5.1
+ */
+const MC_VERSION_TO_GRADLE: Record<string, string> = {
+  '1.20.1': '8.12',
+  '1.20.4': '8.12',
+  '1.20.6': '8.12',
+  '1.21.1': '8.12',
+  '1.21.5': '8.13',
+  '1.21.11': '9.5.1',
+  '26.1': '9.5.1',
+  '26.2': '9.5.1',
+};
+
+/** 按 MC 版本获取建议 Gradle 版本；未知版本回退默认版本的 Gradle */
+export function gradleVersionFor(mcVersion: string): string {
+  return MC_VERSION_TO_GRADLE[mcVersion] ?? MC_VERSION_TO_GRADLE[DEFAULT_MC_VERSION];
 }

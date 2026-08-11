@@ -67,21 +67,21 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 
 ## 技术栈
 
-| 层             | 技术                                      |
-| -------------- | ----------------------------------------- |
-| 桌面框架       | Electron 31 + electron-vite 2.3           |
-| 前端           | React 18 + TypeScript 5 + Tailwind CSS 3  |
-| 节点图编辑器   | React Flow 11                             |
-| 状态管理       | Zustand 4                                 |
-| 代码编辑器     | Monaco Editor                             |
-| 3D 皮肤预览    | skinview3d                                |
-| AI 编排        | Vercel AI SDK 4 + `@ai-sdk/openai` 1.x    |
-| Schema 校验    | Zod 3                                     |
-| 打包           | JSZip 3                                   |
-| 测试           | Vitest 2 + Testing Library                |
-| 包管理         | pnpm 9 workspaces                         |
-| Minecraft 版本 | 1.21.1 / 1.21.11                          |
-| Loader         | Fabric / NeoForge / Quilt / Legacy Fabric |
+| 层             | 技术                                                               |
+| -------------- | ------------------------------------------------------------------ |
+| 桌面框架       | Electron 31 + electron-vite 2.3                                    |
+| 前端           | React 18 + TypeScript 5 + Tailwind CSS 3                           |
+| 节点图编辑器   | React Flow 11                                                      |
+| 状态管理       | Zustand 4                                                          |
+| 代码编辑器     | Monaco Editor                                                      |
+| 3D 皮肤预览    | skinview3d                                                         |
+| AI 编排        | Vercel AI SDK 4 + `@ai-sdk/openai` 1.x                             |
+| Schema 校验    | Zod 3                                                              |
+| 打包           | JSZip 3                                                            |
+| 测试           | Vitest 2 + Testing Library                                         |
+| 包管理         | pnpm 9 workspaces                                                  |
+| Minecraft 版本 | 1.20.1 / 1.20.4 / 1.20.6 / 1.21.1 / 1.21.5 / 1.21.11 / 26.1 / 26.2 |
+| Loader         | Fabric / NeoForge / Quilt / Legacy Fabric                          |
 
 ## 项目结构
 
@@ -223,7 +223,7 @@ pnpm --filter @mc-creator/desktop build
 ### 3. 选择 Loader 和 MC 版本
 
 - **Loader**：Fabric / NeoForge / Quilt / Legacy Fabric / Vanilla（Mod 类型必选；脚本 / 皮肤 / 行为包等不依赖 loader 但仍需选）
-- **MC 版本**：1.21.11（默认）/ 1.21.1
+- **MC 版本**：1.21.11（默认）/ 1.20.1 / 1.20.4 / 1.20.6 / 1.21.1 / 1.21.5 / 26.1 / 26.2
 
 ### 4. 生成流程
 
@@ -431,6 +431,8 @@ runGradleBuild
 - ✅ P40：低代码增强（ProcedureNode 过程封装 + PureCode 模式切换 + codeLock 代码锁定 + 条件代码生成）
 - ✅ P41：核心增强（BuildCache 构建缓存 + recipe-adapter 配方适配 + 增量生成测试 + 数据包模板库扩展）
 - ✅ P42：文档同步（README 与实际代码状态对齐，10 种生成器 / 15 种节点 / 实测测试数）
+
+- ✅ P43：多版本扩展（MC 版本 4→8：新增 1.20.1 / 1.20.4 / 1.20.6 / 1.21.5 / 26.1 / 26.2；资源包 pack_format 自动映射 + 警告；Mod 构建脚本按版本分支适配 Fabric Loom 混淆/非混淆 + NeoForge MDG 1.0/2.0 DSL；各版本 Gradle wrapper 版本映射；8 版本 × 4 Loader 生成矩阵测试）
 
 ### 未来可能
 

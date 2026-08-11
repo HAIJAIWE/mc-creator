@@ -1,6 +1,7 @@
 import type { FileNode, GeneratorContext } from '@mc-creator/shared';
 import {
   getLoaderVersions,
+  gradleVersionFor,
   javaVersionFor,
   type LoaderVersionConfig,
   type McVersion,
@@ -194,6 +195,11 @@ export class NeoForgeAdapter implements LoaderAdapter {
       generate: (s, _pkg, _mainCls, mcVersion, versions) => [
         this.gradleProperties(s, mcVersion, versions),
       ],
+    },
+    {
+      name: 'wrapperProperties',
+      hashInputs: (s, mcVersion) => [mcVersion],
+      generate: (s, _pkg, _mainCls, mcVersion) => [this.wrapperProperties(mcVersion)],
     },
     {
       // mainClass 依赖 modId/name + 各类别是否非空（决定 registerCalls/initCalls）
@@ -1588,8 +1594,25 @@ description = "${tomlEscape(spec.description)}"
     mcVersion: string,
     versions: LoaderVersionConfig,
   ): FileNode {
-    // 版本感知：1.21.x → Java 21，26.1 → Java 25
+    // 版本感知：1.20.x → Java 17，1.21.x → Java 21，26.x → Java 25
     const javaVersion = javaVersionFor('neoforge', mcVersion as McVersion);
+    // ModDevGradle DSL 分支：1.0.x（1.20.x / 1.21.1）用 moddev { } 包装，2.0（1.21.5+/26.x）用顶层 neoForge { }
+    const isLegacyMdg = mcVersion.startsWith('1.20.') || mcVersion === '1.21.1';
+    const neoForgeBlock = `neoForge {
+    version = "${versions.neoforgeVersion}"
+    runs {
+        client { client() }
+        server { server() }
+    }
+    mods {
+        "${spec.modId}" {
+            sourceSet sourceSets.main
+        }
+    }
+}`;
+    const dslBlock = isLegacyMdg
+      ? `moddev {\n    ${neoForgeBlock.replace(/\n/g, '\n    ')}\n}`
+      : neoForgeBlock;
     const content = `plugins {
     id 'net.neoforged.moddev' version '${versions.neoforgeModdevVersion}'
 }
@@ -1601,18 +1624,7 @@ base { archivesName = '${spec.modId}' }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(${javaVersion})
 
-neoForge {
-    version = "${versions.neoforgeVersion}"
-    runs {
-        client { client() }
-        server { server() }
-    }
-    mods {
-        "${spec.modId}" {
-            sourceSet sourceSets.main
-        }
-    }
-}
+${dslBlock}
 
 repositories {
     mavenCentral()
@@ -1643,6 +1655,23 @@ mc_version=${mcVersion}
 neoforge_version=${versions.neoforgeVersion}
 `;
     return { path: 'gradle.properties', content };
+  }
+
+  /** gradle/wrapper/gradle-wrapper.properties（按 MC 版本选择 Gradle；jar 由 gradle wrapper 命令生成） */
+  private wrapperProperties(mcVersion: string): FileNode {
+    const gradleVersion = gradleVersionFor(mcVersion);
+    const content = `# 按 MC 版本 ${mcVersion} 选择的 Gradle 版本（${gradleVersion}）
+# 首次构建前在项目目录运行：gradle wrapper --gradle-version ${gradleVersion}
+# （本机需安装 Gradle；该命令生成 gradlew、gradlew.bat 与 gradle-wrapper.jar，之后用 ./gradlew 构建）
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\\://services.gradle.org/distributions/gradle-${gradleVersion}-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+`;
+    return { path: 'gradle/wrapper/gradle-wrapper.properties', content };
   }
 
   /** T5: 机器配方映射 → Java switch case（输入物品 ID → 输出物品 ID） */

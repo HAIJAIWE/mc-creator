@@ -5,6 +5,7 @@ import type {
   Loader,
   McVersion,
 } from '@mc-creator/shared';
+import { MC_VERSIONS, getPackFormatForMcVersion } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import type {
   DatapackSpec,
@@ -119,7 +120,7 @@ function sanitizePathSegment(segment: string): string {
 export class DatapackGenerator implements Generator {
   readonly type = 'datapack';
   readonly loaders: Loader[] = ['fabric', 'neoforge'];
-  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1', '26.2'];
+  readonly versions: McVersion[] = [...MC_VERSIONS];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     const spec = ctx.spec as unknown as DatapackSpec;
@@ -129,13 +130,19 @@ export class DatapackGenerator implements Generator {
     // P2 dogfood：必填字段校验（生成 warning 而非崩溃，保持向后兼容）
     validateDatapackSpec(spec, warnings);
 
-    // pack.mcmeta
+    // pack.mcmeta（pack_format 按 MC 版本自动映射，避免默认 48 在老版本上不被加载）
+    const packFormat = getPackFormatForMcVersion(ctx.mcVersion) ?? spec.packFormat;
+    if (packFormat !== spec.packFormat) {
+      warnings.push(
+        `已按 MC 版本 ${ctx.mcVersion} 将 pack_format 从 ${spec.packFormat} 调整为 ${packFormat}（pack.mcmeta 与目标版本匹配）`,
+      );
+    }
     files.push({
       path: 'pack.mcmeta',
       content: JSON.stringify(
         {
           pack: {
-            pack_format: spec.packFormat,
+            pack_format: packFormat,
             description: spec.description ?? spec.packName,
           },
         },

@@ -5,6 +5,7 @@ import type {
   Loader,
   McVersion,
 } from '@mc-creator/shared';
+import { MC_VERSIONS } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import type {
   BehaviorPackSpec,
@@ -43,7 +44,7 @@ function generateUUID(): string {
 export class BehaviorPackGenerator implements Generator {
   readonly type = 'behavior_pack';
   readonly loaders: Loader[] = ['fabric', 'neoforge'];
-  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1', '26.2'];
+  readonly versions: McVersion[] = [...MC_VERSIONS];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     const spec = ctx.spec as unknown as BehaviorPackSpec;

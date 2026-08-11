@@ -6,7 +6,7 @@ import type {
   McVersion,
 } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
-import { ServerSpec } from '@mc-creator/shared';
+import { ServerSpec, MC_VERSIONS } from '@mc-creator/shared';
 import type { ServerSpec as ServerSpecType, OpEntry, WhitelistEntry } from '@mc-creator/shared';
 
 /**
@@ -26,7 +26,7 @@ function shellEscape(s: string): string {
 export class ServerGenerator implements Generator {
   readonly type = 'server';
   readonly loaders: Loader[] = ['fabric', 'neoforge'];
-  readonly versions: McVersion[] = ['1.21.1', '1.21.11'];
+  readonly versions: McVersion[] = [...MC_VERSIONS];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     // 运行时校验：确保 ctx.spec 是合法 ServerSpec

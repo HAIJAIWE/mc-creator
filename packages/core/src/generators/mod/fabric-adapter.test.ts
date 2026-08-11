@@ -69,6 +69,44 @@ describe('FabricAdapter 元数据与构建脚本', () => {
     expect(bg!.content).toContain('officialMojangMappings');
   });
 
+  it('fabric.mod.json 的 java 依赖按 MC 版本（1.20.x → >=17，其余 >=21）', () => {
+    const legacy = adapter.translate({ ...CTX, mcVersion: '1.20.1' });
+    const legacyFmj = legacy.find((f) => f.path === 'src/main/resources/fabric.mod.json');
+    expect(JSON.parse(legacyFmj!.content).depends.java).toBe('>=17');
+    const modern = adapter.translate({ ...CTX, mcVersion: '1.21.11' });
+    const modernFmj = modern.find((f) => f.path === 'src/main/resources/fabric.mod.json');
+    expect(JSON.parse(modernFmj!.content).depends.java).toBe('>=21');
+    const y2026 = adapter.translate({ ...CTX, mcVersion: '26.1' });
+    const y2026Fmj = y2026.find((f) => f.path === 'src/main/resources/fabric.mod.json');
+    expect(JSON.parse(y2026Fmj!.content).depends.java).toBe('>=25');
+  });
+
+  it('26.x 非混淆版构建脚本：net.fabricmc.fabric-loom、无 mappings、implementation 依赖', () => {
+    const y2026 = adapter.translate({ ...CTX, mcVersion: '26.1' });
+    const bg = y2026.find((f) => f.path === 'build.gradle');
+    expect(bg!.content).toContain("id 'net.fabricmc.fabric-loom'");
+    expect(bg!.content).not.toContain("id 'fabric-loom'");
+    expect(bg!.content).not.toContain('officialMojangMappings');
+    expect(bg!.content).not.toContain('modImplementation');
+    expect(bg!.content).toContain('implementation "net.fabricmc:fabric-loader:');
+    expect(bg!.content).toContain('VERSION_25');
+    const modern = adapter.translate({ ...CTX, mcVersion: '1.21.11' });
+    const modernBg = modern.find((f) => f.path === 'build.gradle');
+    expect(modernBg!.content).toContain("id 'fabric-loom'");
+    expect(modernBg!.content).toContain('officialMojangMappings');
+    expect(modernBg!.content).toContain('modImplementation');
+  });
+
+  it('生成 gradle-wrapper.properties 且 Gradle 版本按 MC 版本选择', () => {
+    const legacy = adapter.translate({ ...CTX, mcVersion: '1.20.4' });
+    const legacyW = legacy.find((f) => f.path === 'gradle/wrapper/gradle-wrapper.properties');
+    expect(legacyW).toBeDefined();
+    expect(legacyW!.content).toContain('gradle-8.12-bin.zip');
+    const y2026 = adapter.translate({ ...CTX, mcVersion: '26.2' });
+    const y2026W = y2026.find((f) => f.path === 'gradle/wrapper/gradle-wrapper.properties');
+    expect(y2026W!.content).toContain('gradle-9.5.1-bin.zip');
+  });
+
   it('生成 settings.gradle 与 gradle.properties', () => {
     expect(paths).toContain('settings.gradle');
     const gp = files.find((f) => f.path === 'gradle.properties');

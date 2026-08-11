@@ -5,6 +5,7 @@ import type {
   Loader,
   McVersion,
 } from '@mc-creator/shared';
+import { MC_VERSIONS } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import type { ModpackSpec } from '@mc-creator/shared';
 
@@ -16,7 +17,7 @@ import type { ModpackSpec } from '@mc-creator/shared';
 export class ModpackGenerator implements Generator {
   readonly type = 'modpack';
   readonly loaders: Loader[] = ['fabric', 'neoforge'];
-  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1', '26.2'];
+  readonly versions: McVersion[] = [...MC_VERSIONS];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     const spec = ctx.spec as unknown as ModpackSpec;

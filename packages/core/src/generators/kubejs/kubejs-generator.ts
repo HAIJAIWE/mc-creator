@@ -5,7 +5,7 @@ import type {
   Loader,
   McVersion,
 } from '@mc-creator/shared';
-import { KubejsSpec } from '@mc-creator/shared';
+import { KubejsSpec, MC_VERSIONS, getPackFormatForMcVersion } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import type {
   KubejsSpec as KubejsSpecType,
@@ -33,7 +33,7 @@ import type {
 export class KubejsGenerator implements Generator {
   readonly type = 'kubejs';
   readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt'];
-  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1', '26.2'];
+  readonly versions: McVersion[] = [...MC_VERSIONS];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     // 运行时校验：确保 ctx.spec 是合法 KubejsSpec
@@ -42,13 +42,19 @@ export class KubejsGenerator implements Generator {
     const files: FileNode[] = [];
     const warnings: string[] = [];
 
-    // pack.mcmeta
+    // pack.mcmeta（pack_format 按 MC 版本自动映射）
+    const packFormat = getPackFormatForMcVersion(ctx.mcVersion) ?? spec.packFormat;
+    if (packFormat !== spec.packFormat) {
+      warnings.push(
+        `已按 MC 版本 ${ctx.mcVersion} 将 pack_format 从 ${spec.packFormat} 调整为 ${packFormat}（pack.mcmeta 与目标版本匹配）`,
+      );
+    }
     files.push({
       path: 'pack.mcmeta',
       content: JSON.stringify(
         {
           pack: {
-            pack_format: spec.packFormat,
+            pack_format: packFormat,
             description: spec.description || spec.packName,
           },
         },

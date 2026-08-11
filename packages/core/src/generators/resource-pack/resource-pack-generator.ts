@@ -6,7 +6,11 @@ import type {
   McVersion,
 } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
-import { ResourcePackSpec } from '@mc-creator/shared';
+import {
+  ResourcePackSpec,
+  MC_VERSIONS,
+  getResourcePackFormatForMcVersion,
+} from '@mc-creator/shared';
 import type {
   ResourcePackSpec as ResourcePackSpecType,
   TextureOverrideEntry,
@@ -47,16 +51,23 @@ function sanitizePathSegment(segment: string): string {
 export class ResourcePackGenerator implements Generator {
   readonly type = 'resource_pack';
   readonly loaders: Loader[] = ['fabric', 'neoforge'];
-  readonly versions: McVersion[] = ['1.21.1', '1.21.11'];
+  readonly versions: McVersion[] = [...MC_VERSIONS];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     // 运行时校验：确保 ctx.spec 是合法 ResourcePackSpec
     const spec = ResourcePackSpec.parse(ctx.spec as unknown as ResourcePackSpecType);
 
     const files: FileNode[] = [];
+    const warnings: string[] = ['PNG/OGG 文件已 base64 编码，写入磁盘时需 decode'];
 
-    // 1. pack.mcmeta
-    files.push(this.generatePackMcmeta(spec));
+    // 1. pack.mcmeta（pack_format 按 MC 版本自动映射，资源包格式表与数据包不同）
+    const packFormat = getResourcePackFormatForMcVersion(ctx.mcVersion) ?? spec.packFormat;
+    if (packFormat !== spec.packFormat) {
+      warnings.push(
+        `已按 MC 版本 ${ctx.mcVersion} 将 pack_format 从 ${spec.packFormat} 调整为 ${packFormat}（pack.mcmeta 与目标版本匹配）`,
+      );
+    }
+    files.push(this.generatePackMcmeta(spec, packFormat));
 
     // 2. 贴图覆盖（写入 assets/minecraft/textures/<path>.png）
     const ns = sanitizePathSegment(spec.namespace);
@@ -95,19 +106,19 @@ export class ResourcePackGenerator implements Generator {
 
     return {
       files,
-      warnings: ['PNG/OGG 文件已 base64 编码，写入磁盘时需 decode'],
+      warnings,
       buildCmd: 'echo 资源包无需编译',
     };
   }
 
   /** pack.mcmeta */
-  private generatePackMcmeta(spec: ResourcePackSpecType): FileNode {
+  private generatePackMcmeta(spec: ResourcePackSpecType, packFormat: number): FileNode {
     return {
       path: 'pack.mcmeta',
       content: JSON.stringify(
         {
           pack: {
-            pack_format: spec.packFormat,
+            pack_format: packFormat,
             description: spec.packDescription || spec.packName,
           },
         },

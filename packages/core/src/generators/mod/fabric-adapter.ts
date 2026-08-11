@@ -1,6 +1,7 @@
 import type { FileNode, GeneratorContext, Loader } from '@mc-creator/shared';
 import {
   getLoaderVersions,
+  gradleVersionFor,
   javaVersionFor,
   type LoaderVersionConfig,
   type McVersion,
@@ -212,6 +213,11 @@ export class FabricAdapter implements LoaderAdapter {
       ],
     },
     {
+      name: 'wrapperProperties',
+      hashInputs: (s, mcVersion) => [mcVersion],
+      generate: (s, _pkg, _mainCls, mcVersion) => [this.wrapperProperties(mcVersion)],
+    },
+    {
       // mainClass 依赖 modId/name + 各类别是否非空（决定 initCalls）
       name: 'mainClass',
       hashInputs: (s) => [
@@ -417,7 +423,7 @@ export class FabricAdapter implements LoaderAdapter {
       depends: {
         fabricloader: versions.fabricLoaderMinVersion,
         minecraft: `~${mcVersion}`,
-        java: '>=21',
+        java: `>=${javaVersionFor('fabric', mcVersion as McVersion)}`,
         'fabric-api': '*',
       },
     };
@@ -435,11 +441,16 @@ export class FabricAdapter implements LoaderAdapter {
     mcVersion: string,
     versions: LoaderVersionConfig,
   ): FileNode {
-    // 版本感知：1.21.x → Java 21，26.1 → Java 25
+    // 版本感知：1.20.x → Java 17，1.21.x → Java 21，26.x → Java 25
     const javaVersion = javaVersionFor('fabric', mcVersion as McVersion);
     const javaConstant = javaVersion === 25 ? 'VERSION_25' : `VERSION_${javaVersion}`;
+    // 26.x 为非混淆版：插件 net.fabricmc.fabric-loom、无 mappings、依赖用 implementation（官方 26.1 模板）
+    const isUnobfuscated = mcVersion.startsWith('26.');
+    const loomPluginId = isUnobfuscated ? 'net.fabricmc.fabric-loom' : 'fabric-loom';
+    const mappingsLine = isUnobfuscated ? '' : '    mappings loom.officialMojangMappings()\n';
+    const depPrefix = isUnobfuscated ? 'implementation' : 'modImplementation';
     const content = `plugins {
-    id 'fabric-loom' version '${versions.fabricLoomVersion}'
+    id '${loomPluginId}' version '${versions.fabricLoomVersion}'
     id 'java'
 }
 
@@ -454,9 +465,8 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:\${project.minecraft_version}"
-    mappings loom.officialMojangMappings()
-    modImplementation "net.fabricmc:fabric-loader:\${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:\${project.fabric_version}"
+${mappingsLine}    ${depPrefix} "net.fabricmc:fabric-loader:\${project.loader_version}"
+    ${depPrefix} "net.fabricmc.fabric-api:fabric-api:\${project.fabric_version}"
 }
 
 processResources {
@@ -498,6 +508,23 @@ loader_version=${versions.fabricLoaderVersion}
 fabric_version=${versions.fabricApiVersion}
 `;
     return { path: 'gradle.properties', content };
+  }
+
+  /** gradle/wrapper/gradle-wrapper.properties（按 MC 版本选择 Gradle；jar 由 gradle wrapper 命令生成） */
+  private wrapperProperties(mcVersion: string): FileNode {
+    const gradleVersion = gradleVersionFor(mcVersion);
+    const content = `# 按 MC 版本 ${mcVersion} 选择的 Gradle 版本（${gradleVersion}）
+# 首次构建前在项目目录运行：gradle wrapper --gradle-version ${gradleVersion}
+# （本机需安装 Gradle；该命令生成 gradlew、gradlew.bat 与 gradle-wrapper.jar，之后用 ./gradlew 构建）
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\\://services.gradle.org/distributions/gradle-${gradleVersion}-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+`;
+    return { path: 'gradle/wrapper/gradle-wrapper.properties', content };
   }
 
   private mainClass(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {

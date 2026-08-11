@@ -62,6 +62,33 @@ const PACK_FORMAT_MAP: Record<number, string> = {
   48: '1.21.7+',
 };
 
+/** MC 版本 → 数据包 pack_format（与 PACK_FORMAT_MAP 反向，新增 MC 版本时同步维护） */
+const MC_VERSION_TO_PACK_FORMAT: Record<string, number> = {
+  '1.20.1': 14, // 1.20–1.20.1
+  '1.20.2': 15,
+  '1.20.3': 16,
+  '1.20.4': 16,
+  '1.20.5': 22,
+  '1.20.6': 22,
+  '1.21.1': 26,
+  '1.21.2': 28,
+  '1.21.3': 28,
+  '1.21.4': 32,
+  '1.21.5': 34,
+  '1.21.6': 42,
+  '1.21.11': 48,
+  '26.1': 48, // 26.x 沿用 1.21.7+ 的 48（低版本号始终可被新游戏加载）
+  '26.2': 48,
+};
+
+/**
+ * 按 MC 版本推断数据包 pack_format；未知版本返回 undefined。
+ * 生成器用它覆盖 spec 里的默认/占位值，确保 pack.mcmeta 与目标版本匹配。
+ */
+export function getPackFormatForMcVersion(mcVersion: string): number | undefined {
+  return MC_VERSION_TO_PACK_FORMAT[mcVersion];
+}
+
 /**
  * 校验整个 DatapackSpec
  */

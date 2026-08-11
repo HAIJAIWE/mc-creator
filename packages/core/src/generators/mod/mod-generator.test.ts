@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ModGenerator } from './mod-generator.js';
-import { ModSpec } from '@mc-creator/shared';
+import { ModSpec, MC_VERSIONS } from '@mc-creator/shared';
 import type { GeneratorContext } from '@mc-creator/shared';
 import { fs } from 'memfs';
 import { Filesystem } from '../../filesystem/index.js';
@@ -37,7 +37,7 @@ describe('ModGenerator', () => {
   it('type/loaders/versions 声明正确', () => {
     expect(gen.type).toBe('mod');
     expect(gen.loaders).toEqual(['fabric', 'neoforge', 'quilt', 'legacy_fabric']);
-    expect(gen.versions).toEqual(['1.21.11', '1.21.1', '26.1', '26.2']);
+    expect(gen.versions).toEqual([...MC_VERSIONS]);
   });
 
   it('26.1 生成真实 loader 版本（不再占位）', async () => {
@@ -230,6 +230,7 @@ describe('ModGenerator 黄金样本快照（防 Adapter 回归）', () => {
       [
         "build.gradle",
         "gradle.properties",
+        "gradle/wrapper/gradle-wrapper.properties",
         "settings.gradle",
         "src/main/java/com/example/golden/GoldenMod.java",
         "src/main/java/com/example/golden/ModBlocks.java",
@@ -256,6 +257,7 @@ describe('ModGenerator 黄金样本快照（防 Adapter 回归）', () => {
       [
         "build.gradle",
         "gradle.properties",
+        "gradle/wrapper/gradle-wrapper.properties",
         "settings.gradle",
         "src/main/java/com/example/golden/GoldenMod.java",
         "src/main/java/com/example/golden/ModBlocks.java",

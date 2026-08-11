@@ -1,5 +1,6 @@
 import type { GeneratorContext, GenerationResult } from '@mc-creator/shared';
 import type { Loader, McVersion } from '@mc-creator/shared';
+import { MC_VERSIONS } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import type { LoaderAdapter } from './adapter.js';
 import { FabricAdapter } from './fabric-adapter.js';
@@ -25,7 +26,7 @@ export interface IncrementalGenerationResult extends GenerationResult {
 export class ModGenerator implements Generator {
   readonly type = 'mod';
   readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt', 'legacy_fabric'];
-  readonly versions: McVersion[] = ['1.21.11', '1.21.1', '26.1', '26.2'];
+  readonly versions: McVersion[] = [...MC_VERSIONS];
 
   // vanilla 没有 mod adapter（原版无 mod 加载器），故用 Partial。
   private readonly adapters: Partial<Record<Loader, LoaderAdapter>> = {

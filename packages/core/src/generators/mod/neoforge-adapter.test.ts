@@ -66,6 +66,34 @@ describe('NeoForgeAdapter 元数据与构建脚本', () => {
     expect(bg!.content).toContain('net.neoforged.moddev');
   });
 
+  it('1.20.x / 1.21.1 用 ModDevGradle 1.0 DSL（moddev {} 包装），1.21.5+ 用顶层 neoForge {}', () => {
+    const legacy = adapter.translate({ ...CTX, mcVersion: '1.20.4' });
+    const legacyBg = legacy.find((f) => f.path === 'build.gradle');
+    expect(legacyBg!.content).toContain("id 'net.neoforged.moddev' version '1.0.21'");
+    expect(legacyBg!.content).toContain('moddev {\n    neoForge {');
+    expect(legacyBg!.content).toContain('JavaLanguageVersion.of(17)');
+    const legacy121 = adapter.translate({ ...CTX, mcVersion: '1.21.1' });
+    const legacy121Bg = legacy121.find((f) => f.path === 'build.gradle');
+    expect(legacy121Bg!.content).toContain('moddev {\n    neoForge {');
+    expect(legacy121Bg!.content).toContain('JavaLanguageVersion.of(21)');
+    const modern = adapter.translate({ ...CTX, mcVersion: '1.21.11' });
+    const modernBg = modern.find((f) => f.path === 'build.gradle');
+    expect(modernBg!.content).toContain("id 'net.neoforged.moddev' version '2.0.143'");
+    expect(modernBg!.content).toContain('\nneoForge {');
+    expect(modernBg!.content).not.toContain('moddev {');
+    expect(modernBg!.content).toContain('JavaLanguageVersion.of(21)');
+  });
+
+  it('生成 gradle-wrapper.properties 且 Gradle 版本按 MC 版本选择', () => {
+    const legacy = adapter.translate({ ...CTX, mcVersion: '1.20.6' });
+    const legacyW = legacy.find((f) => f.path === 'gradle/wrapper/gradle-wrapper.properties');
+    expect(legacyW).toBeDefined();
+    expect(legacyW!.content).toContain('gradle-8.12-bin.zip');
+    const modern = adapter.translate({ ...CTX, mcVersion: '26.1' });
+    const modernW = modern.find((f) => f.path === 'gradle/wrapper/gradle-wrapper.properties');
+    expect(modernW!.content).toContain('gradle-9.5.1-bin.zip');
+  });
+
   it('生成 gradle.properties', () => {
     const gp = files.find((f) => f.path === 'gradle.properties');
     expect(gp).toBeDefined();

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ResourcePackGenerator } from './resource-pack-generator.js';
+import { MC_VERSIONS } from '@mc-creator/shared';
 import type {
   GeneratorContext,
   ResourcePackSpec,
@@ -265,7 +266,7 @@ describe('ResourcePackGenerator', () => {
   it('type/loaders/versions 元信息正确', () => {
     expect(gen.type).toBe('resource_pack');
     expect(gen.loaders).toEqual(['fabric', 'neoforge']);
-    expect(gen.versions).toEqual(['1.21.1', '1.21.11']);
+    expect(gen.versions).toEqual([...MC_VERSIONS]);
   });
 
   it('buildCmd 与 warnings 内容正确', async () => {
@@ -278,7 +279,7 @@ describe('ResourcePackGenerator', () => {
     expect(result.warnings).toContain('PNG/OGG 文件已 base64 编码，写入磁盘时需 decode');
   });
 
-  it('pack.mcmeta 内容正确', async () => {
+  it('pack.mcmeta 内容正确（1.21.11 → 资源包 pack_format 75）', async () => {
     const result = await gen.generate(
       makeCtx({
         packName: 'My Pack',
@@ -289,8 +290,23 @@ describe('ResourcePackGenerator', () => {
     const mcmeta = result.files.find((f) => f.path === 'pack.mcmeta');
     expect(mcmeta).toBeDefined();
     const parsed = JSON.parse(mcmeta!.content);
-    expect(parsed.pack.pack_format).toBe(34);
+    expect(parsed.pack.pack_format).toBe(75);
     expect(parsed.pack.description).toBe('我的资源包');
+  });
+
+  it('资源包 pack_format 按 MC 版本自动映射（1.20.1 → 15、1.20.4 → 22、1.21.5 → 55）', async () => {
+    for (const [mc, pf] of [
+      ['1.20.1', 15],
+      ['1.20.4', 22],
+      ['1.21.5', 55],
+    ] as const) {
+      const ctx = makeCtx({ packName: 'P', packFormat: 34 });
+      ctx.mcVersion = mc;
+      const result = await gen.generate(ctx);
+      const mcmeta = result.files.find((f) => f.path === 'pack.mcmeta');
+      expect(JSON.parse(mcmeta!.content).pack.pack_format).toBe(pf);
+      expect(result.warnings.some((w) => w.includes('pack_format'))).toBe(true);
+    }
   });
 
   it('textureOverrides 渐变与棋盘格不崩溃', async () => {

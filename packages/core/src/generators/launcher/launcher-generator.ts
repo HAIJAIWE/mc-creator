@@ -6,7 +6,7 @@ import type {
   McVersion,
 } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
-import { LauncherSpec } from '@mc-creator/shared';
+import { LauncherSpec, MC_VERSIONS } from '@mc-creator/shared';
 import type { LauncherSpec as LauncherSpecType } from '@mc-creator/shared';
 
 /**
@@ -37,7 +37,7 @@ export class LauncherGenerator implements Generator {
   readonly type = 'launcher';
   // 启动器不限定 mod loader，故支持全部 5 种 loader（含 vanilla）。
   readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'vanilla'];
-  readonly versions: McVersion[] = ['1.21.1', '1.21.11'];
+  readonly versions: McVersion[] = [...MC_VERSIONS];
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     // 运行时校验：确保 ctx.spec 是合法 LauncherSpec

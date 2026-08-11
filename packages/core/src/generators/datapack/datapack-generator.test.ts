@@ -41,6 +41,15 @@ describe('DatapackGenerator', () => {
     expect(JSON.parse(meta!.content).pack.pack_format).toBe(48);
   });
 
+  it('pack_format 按 MC 版本自动映射（1.20.6 → 22，并给出 warning）', async () => {
+    const ctx = makeCtx({ packId: 'my_pack', packName: 'My Pack', packFormat: 48 });
+    ctx.mcVersion = '1.20.6';
+    const result = await gen.generate(ctx);
+    const meta = result.files.find((f) => f.path === 'pack.mcmeta');
+    expect(JSON.parse(meta!.content).pack.pack_format).toBe(22);
+    expect(result.warnings.some((w) => w.includes('pack_format'))).toBe(true);
+  });
+
   it('生成 shaped 配方', async () => {
     const result = await gen.generate(
       makeCtx({
