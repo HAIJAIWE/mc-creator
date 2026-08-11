@@ -102,7 +102,7 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
   },
   '1.21.1': {
     fabricLoaderVersion: '0.19.3',
-    fabricApiVersion: '0.110.5+1.21',
+    fabricApiVersion: '0.116.15+1.21.1',
     fabricLoomVersion: '1.7-SNAPSHOT',
     fabricLoaderMinVersion: '>=0.16.0',
     neoforgeVersion: '21.1.1',
@@ -144,7 +144,7 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
   '26.2': {
     // 26.2 已于 2026-06-16 发布；NeoForge 26.2 尚在 beta，标注实验性
     fabricLoaderVersion: '0.19.3',
-    fabricApiVersion: '0.155.2+26.1.2',
+    fabricApiVersion: '0.157.0+26.2',
     fabricLoomVersion: '1.17.17',
     fabricLoaderMinVersion: '>=0.19.0',
     neoforgeVersion: '26.2.0.41-beta',

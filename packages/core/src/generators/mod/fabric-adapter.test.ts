@@ -1264,6 +1264,7 @@ describe('FabricAdapter 版本切换', () => {
     });
     const gp262 = files262.find((f) => f.path === 'gradle.properties');
     expect(gp262!.content).toContain('minecraft_version=26.2');
+    expect(gp262!.content).toContain('fabric_version=0.157.0+26.2');
   });
 });
 

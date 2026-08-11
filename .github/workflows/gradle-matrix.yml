@@ -1,0 +1,92 @@
+name: Mod Build Matrix
+
+# 真实 Gradle 编译验证：生成器产出的 8 个 MC 版本 × Fabric/NeoForge
+# 项目逐个用 Gradle 真实编译（文本断言之外的最终防线）。
+# 注意：初版矩阵可能暴露既有生成脚本的编译问题，属预期，修复后转绿。
+
+on:
+  push:
+    paths:
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/gradle-matrix.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1' # 每周一 03:00 UTC：编译矩阵 + LOADER_VERSIONS 过期检测
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Generate mod projects for all MC versions
+        run: pnpm --filter @mc-creator/core test src/ci/export-projects
+        env:
+          CI_EXPORT_DIR: ${{ runner.temp }}/gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-projects
+          path: ${{ runner.temp }}/gen
+          retention-days: 3
+
+  build:
+    needs: generate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Gradle 版本与 gradleVersionFor() 保持一致（1.20.x/1.21.1→8.12、1.21.5→8.13、1.21.11/26.x→9.5.1）
+          - { mc: '1.20.1', loader: fabric, jdk: 17, gradle: 8.12 }
+          - { mc: '1.20.1', loader: neoforge, jdk: 17, gradle: 8.12, experimental: true } # NeoForge 官方弃用 + isPlaceholder
+          - { mc: '1.21.1', loader: fabric, jdk: 21, gradle: 8.12 }
+          - { mc: '1.21.1', loader: neoforge, jdk: 21, gradle: 8.12 }
+          - { mc: '1.21.5', loader: fabric, jdk: 21, gradle: 8.13 }
+          - { mc: '1.21.5', loader: neoforge, jdk: 21, gradle: 8.13 }
+          - { mc: '1.21.11', loader: fabric, jdk: 21, gradle: 9.5.1 }
+          - { mc: '1.21.11', loader: neoforge, jdk: 21, gradle: 9.5.1 }
+          - { mc: '26.1', loader: fabric, jdk: 25, gradle: 9.5.1 }
+          - { mc: '26.1', loader: neoforge, jdk: 25, gradle: 9.5.1 }
+          - { mc: '26.2', loader: fabric, jdk: 25, gradle: 9.5.1 }
+          - { mc: '26.2', loader: neoforge, jdk: 25, gradle: 9.5.1, experimental: true } # NeoForge beta
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: generated-projects
+          path: gen
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.jdk }}
+          cache: gradle
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ matrix.gradle }}
+      - name: Generate wrapper (gradlew + jar)
+        working-directory: gen/${{ matrix.mc }}-${{ matrix.loader }}
+        run: gradle wrapper --gradle-version ${{ matrix.gradle }} --no-daemon
+      - name: Build
+        working-directory: gen/${{ matrix.mc }}-${{ matrix.loader }}
+        run: ./gradlew build --no-daemon
+      - name: Verify jar artifact
+        run: ls gen/${{ matrix.mc }}-${{ matrix.loader }}/build/libs/*.jar
+
+  verify-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Check LOADER_VERSIONS against upstream
+        run: pnpm --filter @mc-creator/core test src/ci/verify-loader-versions
+        env:
+          VERIFY_VERSIONS: '1'
