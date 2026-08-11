@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, beforeAll, beforeEach, vi, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import 'axe-core'; // 副作用导入：在 jsdom 下挂载 window.axe
 import type * as AxeTypes from 'axe-core';
 import { ActivityBar } from '../components/ActivityBar.js';
@@ -327,8 +327,9 @@ describe('P9.3 a11y 自动化扫描', () => {
         </ToastProvider>,
       );
       const buttons = container.querySelectorAll('button');
+      // D10：用 fireEvent 而非原生 click，确保 toast 触发在 act 内
       for (const btn of Array.from(buttons)) {
-        btn.click();
+        fireEvent.click(btn);
       }
       const violations = await runAxe(container);
       expectNoViolations(violations);

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { ResourceIdEditor } from './ResourceIdEditor.js';
 import type { FieldSchema } from './types.js';
 import type { NodeGraph } from '@mc-creator/shared';
@@ -22,7 +22,7 @@ describe('ResourceIdEditor', () => {
     required: true,
   };
 
-  it('解析 modid:path 格式', () => {
+  it('解析 modid:path 格式', async () => {
     render(
       <ResourceIdEditor
         value="mymod:iron_sword"
@@ -31,19 +31,22 @@ describe('ResourceIdEditor', () => {
         graph={graph}
       />,
     );
+    // D10：flush listExternalMods 异步 promise，避免在 act 外 setState
+    await act(async () => {});
     expect(screen.getByDisplayValue('mymod')).toBeTruthy();
     expect(screen.getByDisplayValue('iron_sword')).toBeTruthy();
   });
 
-  it('只有 path 时 modid 默认为 minecraft', () => {
+  it('只有 path 时 modid 默认为 minecraft', async () => {
     render(
       <ResourceIdEditor value="iron_sword" onChange={() => {}} schema={schema} graph={graph} />,
     );
+    await act(async () => {});
     expect(screen.getByDisplayValue('minecraft')).toBeTruthy();
     expect(screen.getByDisplayValue('iron_sword')).toBeTruthy();
   });
 
-  it('编辑 path 触发 onChange 拼接 modid:path', () => {
+  it('编辑 path 触发 onChange 拼接 modid:path', async () => {
     const onChange = vi.fn();
     render(
       <ResourceIdEditor
@@ -53,12 +56,13 @@ describe('ResourceIdEditor', () => {
         graph={graph}
       />,
     );
+    await act(async () => {});
     const pathInput = screen.getByDisplayValue('iron_sword');
     fireEvent.change(pathInput, { target: { value: 'diamond_sword' } });
     expect(onChange).toHaveBeenCalledWith('mymod:diamond_sword');
   });
 
-  it('格式不合法时显示错误', () => {
+  it('格式不合法时显示错误', async () => {
     render(
       <ResourceIdEditor
         value="INVALID"
@@ -68,6 +72,7 @@ describe('ResourceIdEditor', () => {
         error="格式错误"
       />,
     );
+    await act(async () => {});
     expect(screen.getByText('格式错误')).toBeTruthy();
   });
 });

@@ -26,11 +26,14 @@ interface FlatNode {
   depth: number;
   hasChildren: boolean;
   isExpanded: boolean;
+  /** 父节点在扁平列表中的行索引（-1 = 顶层，供 ArrowLeft 键盘导航） */
+  parentIndex: number;
 }
 
 interface RowData {
   flatNodes: FlatNode[];
   selectedFile: string | null;
+  focusIndex: number;
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
@@ -97,14 +100,21 @@ function collectFolderPaths(nodes: TreeNode[]): string[] {
 
 // 将树扁平化为可见行数组；expandedSet === null 表示「全部展开」（默认），
 // 这样新生成的文件夹在用户主动折叠前始终展开，与原 useState(true) 行为一致
-function flattenTree(nodes: TreeNode[], expandedSet: Set<string> | null, depth = 0): FlatNode[] {
-  const result: FlatNode[] = [];
+// parentIndex 递归传递：当前行就是这个节点的子节点的父行
+function flattenTree(
+  nodes: TreeNode[],
+  expandedSet: Set<string> | null,
+  depth = 0,
+  parentIndex = -1,
+  result: FlatNode[] = [],
+): FlatNode[] {
   for (const node of nodes) {
     const hasChildren = node.type === 'folder' && (node.children?.length ?? 0) > 0;
     const isExpanded = expandedSet === null || expandedSet.has(node.path);
-    result.push({ node, depth, hasChildren, isExpanded });
+    const index = result.length;
+    result.push({ node, depth, hasChildren, isExpanded, parentIndex });
     if (hasChildren && isExpanded) {
-      result.push(...flattenTree(node.children ?? [], expandedSet, depth + 1));
+      flattenTree(node.children ?? [], expandedSet, depth + 1, index, result);
     }
   }
   return result;
@@ -112,15 +122,22 @@ function flattenTree(nodes: TreeNode[], expandedSet: Set<string> | null, depth =
 
 // react-window 行渲染器：无状态，所有数据经 itemData 注入
 const Row = ({ index, style, data }: ListChildComponentProps<RowData>) => {
-  const { flatNodes, selectedFile, onToggle, onSelect, onContextMenu } = data;
+  const { flatNodes, selectedFile, focusIndex, onToggle, onSelect, onContextMenu } = data;
   const { node, depth, hasChildren, isExpanded } = flatNodes[index];
   const paddingLeft = depth * 12 + 8;
+  // Roving Tabindex：仅当前聚焦行可 Tab，其余 -1，由容器 onKeyDown 统一移动焦点
+  const tabIndex = focusIndex === index ? 0 : -1;
 
   if (node.type === 'folder') {
     const FolderIcon = isExpanded ? FolderOpen : Folder;
     return (
       <div style={style} data-tree-node="true">
         <button
+          role="treeitem"
+          aria-expanded={hasChildren}
+          aria-selected={selectedFile === node.path}
+          tabIndex={tabIndex}
+          data-tree-index={index}
           onClick={() => onToggle(node.path)}
           onContextMenu={(e) => onContextMenu(e, node)}
           className="flex h-full w-full items-center gap-1 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2"
@@ -145,6 +162,10 @@ const Row = ({ index, style, data }: ListChildComponentProps<RowData>) => {
   return (
     <div style={style} data-tree-node="true">
       <button
+        role="treeitem"
+        aria-selected={isSelected}
+        tabIndex={tabIndex}
+        data-tree-index={index}
         onClick={() => onSelect(node.path)}
         onContextMenu={(e) => onContextMenu(e, node)}
         className={`flex h-full w-full items-center gap-1 border-l-2 pr-2 text-left text-xs transition-colors ${
@@ -293,6 +314,9 @@ export function FileTree() {
   // null = 全部展开（默认），首次折叠时惰性生成 Set。
   const [expandedSet, setExpandedSet] = useState<Set<string> | null>(null);
 
+  // react-window 虚拟列表引用：焦点移动时滚入视口
+  const listRef = useRef<React.ElementRef<typeof List<RowData>>>(null);
+
   const toggleExpand = useCallback(
     (path: string) => {
       setExpandedSet((prev) => {
@@ -314,6 +338,70 @@ export function FileTree() {
   // 测量列表容器高度：文件树处于 flex 布局中，高度由父级决定，需用 ResizeObserver 动态获取
   const containerRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(400);
+
+  // Roving Tabindex：当前聚焦行索引（0/正值对应可见行），方向键在此值上移动
+  const [focusIndex, setFocusIndex] = useState(0);
+
+  // a11y：焦点行变化后把浏览器焦点移到对应行（react-window 虚拟列表可能尚未渲染该行，
+  // 但 scrollToItem 已把行滚入视口，useEffect 在渲染后执行即可查询到 DOM）
+  useEffect(() => {
+    const el = containerRef.current?.querySelector<HTMLElement>(
+      `[data-tree-index="${focusIndex}"]`,
+    );
+    el?.focus();
+  }, [focusIndex, flatNodes]);
+
+  const moveFocus = useCallback(
+    (index: number) => {
+      if (flatNodes.length === 0) return;
+      const clamped = Math.max(0, Math.min(index, flatNodes.length - 1));
+      setFocusIndex(clamped);
+      listRef.current?.scrollToItem(clamped, 'smart');
+    },
+    [flatNodes.length],
+  );
+
+  // a11y：WAI-ARIA Tree 方向键导航（Roving Tabindex 由 Row 的 tabIndex 实现）
+  const handleTreeKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const current = flatNodes[focusIndex];
+      if (!current) return;
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          moveFocus(focusIndex + 1);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          moveFocus(focusIndex - 1);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (current.hasChildren) {
+            if (!current.isExpanded) toggleExpand(current.node.path);
+            else moveFocus(focusIndex + 1);
+          }
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (current.hasChildren && current.isExpanded) {
+            toggleExpand(current.node.path);
+          } else if (current.parentIndex >= 0) {
+            moveFocus(current.parentIndex);
+          }
+          break;
+        case 'Home':
+          e.preventDefault();
+          moveFocus(0);
+          break;
+        case 'End':
+          e.preventDefault();
+          moveFocus(flatNodes.length - 1);
+          break;
+      }
+    },
+    [flatNodes, focusIndex, moveFocus, toggleExpand],
+  );
 
   // 右键菜单状态
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -351,11 +439,12 @@ export function FileTree() {
     () => ({
       flatNodes,
       selectedFile,
+      focusIndex,
       onToggle: toggleExpand,
       onSelect: selectFile,
       onContextMenu: handleNodeContextMenu,
     }),
-    [flatNodes, selectedFile, toggleExpand, selectFile, handleNodeContextMenu],
+    [flatNodes, selectedFile, focusIndex, toggleExpand, selectFile, handleNodeContextMenu],
   );
 
   // 公共菜单回调：新建文件
@@ -441,8 +530,15 @@ export function FileTree() {
   return (
     <div className="flex h-full flex-col" onContextMenu={handleContainerContextMenu}>
       <div className="mc-section-title border-b border-mc-border">项目文件</div>
-      <div ref={containerRef} className="min-h-0 flex-1 px-1">
+      <div
+        ref={containerRef}
+        role="tree"
+        aria-label="项目文件"
+        className="min-h-0 flex-1 px-1"
+        onKeyDown={handleTreeKeyDown}
+      >
         <List
+          ref={listRef}
           height={height}
           itemCount={flatNodes.length}
           itemSize={ROW_HEIGHT}

@@ -1,5 +1,6 @@
 import { useState, useCallback, type ReactNode } from 'react';
 import { McIcon } from '../assets/mc-ui/McIcon';
+import { LiveRegion } from './common/LiveRegion';
 import { ToastContext, type ToastType } from './useToast';
 
 /**
@@ -85,11 +86,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     info: (m: string) => toast(m, 'info'),
   };
 
+  // a11y：最新一条 toast 朗读给屏幕阅读器（error 用 assertive 立即打断，其余 polite）
+  const latestToast = toasts[toasts.length - 1];
+
   return (
     <ToastContext.Provider value={value}>
       {children}
       {/* Toast 容器：fixed top-right，z-index 高于所有模态框 */}
-      <div className="pointer-events-none fixed right-4 top-4 z-[200] flex flex-col gap-2">
+      <div
+        data-testid="toast-stack"
+        className="pointer-events-none fixed right-4 top-4 z-[200] flex flex-col gap-2"
+      >
         {toasts.map((t) => {
           const config = TYPE_CONFIG[t.type];
           const icon = config.icon;
@@ -116,6 +123,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           );
         })}
       </div>
+      {/* a11y：朗读最新 toast，屏幕阅读器可感知通知而不必聚焦到右上角 */}
+      <LiveRegion
+        id="toast-announcer"
+        message={latestToast?.message ?? ''}
+        politeness={latestToast?.type === 'error' ? 'assertive' : 'polite'}
+      />
     </ToastContext.Provider>
   );
 }

@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 import {
   ModSpec,
   type Loader,
@@ -63,7 +63,7 @@ interface ModState {
   removeItem: (id: string) => void;
 }
 
-export const useModStore = create<ModState>((set, get) => ({
+export const useModStore = createWithEqualityFn<ModState>((set, get) => ({
   loader: 'fabric',
   mcVersion: '1.21.11',
   description: '',

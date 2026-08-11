@@ -34,6 +34,16 @@ vi.mock('./NodeGraphEditor.js', () => ({
 vi.mock('./subgraph/SubgraphWorkspace.js', () => ({
   SubgraphWorkspace: () => <div data-testid="subgraph-workspace" />,
 }));
+// D10：mock useRecentGraphs，避免 mount 后异步 refresh（localStorage 读取）在 act 外触发 setState
+vi.mock('../../lib/useRecentGraphs.js', () => ({
+  useRecentGraphs: () => ({
+    recent: [],
+    refresh: () => {},
+    remove: () => {},
+    loading: false,
+    error: null,
+  }),
+}));
 
 beforeEach(() => {
   // 重置 store 到初始空状态
@@ -103,12 +113,12 @@ describe('LowcodeWorkspace', () => {
   });
 
   it('Ctrl+Z 触发 undo（先 commit + addNode，再 Ctrl+Z，验证 undoStack 减少）', () => {
-    render(<LowcodeWorkspace />);
     // 准备：commit 当前空状态 + addNode，undoStack 应为 1
     // 注意：commit 必须在 addNode 之前调用，把「当前空图」压入 undoStack
     const { addNode, commit } = useNodeGraphStore.getState();
     commit();
     addNode('item', { x: 100, y: 100 });
+    render(<LowcodeWorkspace />);
     expect(useNodeGraphStore.getState().undoStack.length).toBe(1);
     expect(useNodeGraphStore.getState().graph.nodes.length).toBe(1);
 
@@ -123,12 +133,12 @@ describe('LowcodeWorkspace', () => {
   });
 
   it('Ctrl+Y 触发 redo', () => {
-    render(<LowcodeWorkspace />);
     // 准备：commit + addNode + undo，redoStack 应为 1
     const { addNode, commit, undo } = useNodeGraphStore.getState();
     commit();
     addNode('item', { x: 100, y: 100 });
     undo();
+    render(<LowcodeWorkspace />);
     expect(useNodeGraphStore.getState().redoStack.length).toBe(1);
     expect(useNodeGraphStore.getState().graph.nodes.length).toBe(0);
 
@@ -142,12 +152,12 @@ describe('LowcodeWorkspace', () => {
   });
 
   it('Ctrl+Shift+Z 触发 redo（等价于 Ctrl+Y）', () => {
-    render(<LowcodeWorkspace />);
     // 准备：commit + addNode + undo，redoStack 应为 1
     const { addNode, commit, undo } = useNodeGraphStore.getState();
     commit();
     addNode('block', { x: 50, y: 50 });
     undo();
+    render(<LowcodeWorkspace />);
     expect(useNodeGraphStore.getState().redoStack.length).toBe(1);
     expect(useNodeGraphStore.getState().graph.nodes.length).toBe(0);
 
@@ -161,10 +171,10 @@ describe('LowcodeWorkspace', () => {
   });
 
   it('Ctrl+D 复制选中节点（先 addNode 选中，再 Ctrl+D，验证 nodes +1）', () => {
-    render(<LowcodeWorkspace />);
     // 准备：addNode 会自动选中
     const { addNode } = useNodeGraphStore.getState();
     addNode('item', { x: 100, y: 100 });
+    render(<LowcodeWorkspace />);
     expect(useNodeGraphStore.getState().graph.nodes.length).toBe(1);
     expect(useNodeGraphStore.getState().selectedNodeId).not.toBeNull();
 
@@ -182,10 +192,10 @@ describe('LowcodeWorkspace', () => {
   });
 
   it('Escape 取消选中', () => {
-    render(<LowcodeWorkspace />);
     // 准备：addNode 自动选中
     const { addNode } = useNodeGraphStore.getState();
     addNode('item', { x: 100, y: 100 });
+    render(<LowcodeWorkspace />);
     expect(useNodeGraphStore.getState().selectedNodeId).not.toBeNull();
 
     // 触发 Escape
@@ -196,11 +206,11 @@ describe('LowcodeWorkspace', () => {
   });
 
   it('在 Monaco 编辑器内不触发快捷键', () => {
-    render(<LowcodeWorkspace />);
     // 准备：addNode + commit，undoStack 应为 1
     const { addNode, commit } = useNodeGraphStore.getState();
     addNode('item', { x: 100, y: 100 });
     commit();
+    render(<LowcodeWorkspace />);
     expect(useNodeGraphStore.getState().undoStack.length).toBe(1);
 
     // 模拟 Monaco 编辑器容器：创建带 .monaco-editor 类的元素并聚焦其内部 input
@@ -223,14 +233,13 @@ describe('LowcodeWorkspace', () => {
   });
 
   it('只读模式不响应快捷键', () => {
-    render(<LowcodeWorkspace readOnly />);
     // 只读模式下 NodePalette/工具栏不渲染，画布显示「只读预览模式」
-    expect(screen.getByText('只读预览模式')).toBeTruthy();
-
     // 直接通过 store 修改状态后触发 Ctrl+Z，应无效果
     const { addNode, commit } = useNodeGraphStore.getState();
     addNode('item', { x: 100, y: 100 });
     commit();
+    render(<LowcodeWorkspace readOnly />);
+    expect(screen.getByText('只读预览模式')).toBeTruthy();
     expect(useNodeGraphStore.getState().undoStack.length).toBe(1);
 
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true, shiftKey: false });

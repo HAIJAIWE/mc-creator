@@ -425,11 +425,21 @@ export function PurecodeWorkspace({ readOnly = false }: PurecodeWorkspaceProps) 
   // 非空时优先使用 store 中的文件；为空时回退到 PRESET_FILES 脚手架
   const promotedFiles = useModStore((s) => s.files);
 
+  // 脚手架模式下用户新建/删除的文件（PRESET_FILES 不可变，改动只保存在本地）
+  const createFile = useModStore((s) => s.createFile);
+  const deleteFile = useModStore((s) => s.deleteFile);
+  const isPresetMode = promotedFiles.length === 0;
+  // 脚手架模式：PRESET_FILES 中删除的文件集合
+  const [removedPresetPaths, setRemovedPresetPaths] = useState<Set<string>>(new Set());
+  // 脚手架模式：新建的文件（追加到 PRESET_FILES 之后，按分组归类）
+  const [addedPresetFiles, setAddedPresetFiles] = useState<PresetFile[]>([]);
+
   // 当前展示的文件列表：store 中的提升文件优先，否则用预置脚手架
-  const filesToShow = useMemo<PresetFile[]>(
-    () => (promotedFiles.length > 0 ? promotedFiles.map(fileNodeToPresetFile) : PRESET_FILES),
-    [promotedFiles],
-  );
+  const filesToShow = useMemo<PresetFile[]>(() => {
+    if (promotedFiles.length > 0) return promotedFiles.map(fileNodeToPresetFile);
+    const presets = PRESET_FILES.filter((f) => !removedPresetPaths.has(f.path));
+    return [...presets, ...addedPresetFiles];
+  }, [promotedFiles, removedPresetPaths, addedPresetFiles]);
 
   const [selectedPath, setSelectedPath] = useState<string>(filesToShow[0]?.path ?? '');
   // 文件内容缓存：path → 当前编辑器内容
@@ -495,6 +505,61 @@ export function PurecodeWorkspace({ readOnly = false }: PurecodeWorkspaceProps) 
       toast.error('保存失败');
     }
   }, [selectedFile, fileContents, toast]);
+
+  // 新建文件：脚手架模式改本地 addedPresetFiles，提升模式直接写 store
+  const handleNewFile = useCallback(() => {
+    if (readOnly) return;
+    const name = prompt('请输入文件名（含扩展名，如 new-item.java）', 'new-file.txt');
+    if (!name) return;
+    const path = name;
+    // 重名检测：完整路径或文件名相撞都算重名（预设文件位于子目录）
+    const isDuplicate = filesToShow.some(
+      (f) => f.path === path || getFileName(f.path) === getFileName(path),
+    );
+    if (isDuplicate) {
+      toast.error(`文件已存在：${path}`);
+      return;
+    }
+    if (isPresetMode) {
+      setAddedPresetFiles((prev) => [
+        ...prev,
+        {
+          path,
+          label: getFileName(path),
+          group: inferFileGroup(path),
+          language: inferLanguage(path),
+          content: '',
+        },
+      ]);
+    } else {
+      createFile(path, '');
+    }
+    setFileContents((prev) => ({ ...prev, [path]: '' }));
+    setSelectedPath(path);
+  }, [readOnly, filesToShow, isPresetMode, createFile, toast]);
+
+  // 删除文件：脚手架模式（预设文件记入 removedPresetPaths，新建文件从 addedPresetFiles 移除），提升模式直接走 store
+  const handleDeleteFile = useCallback(
+    (path: string) => {
+      if (readOnly) return;
+      if (!confirm(`确定删除 ${path}？`)) return;
+      if (isPresetMode) {
+        if (PRESET_FILES.some((f) => f.path === path)) {
+          setRemovedPresetPaths((prev) => new Set(prev).add(path));
+        } else {
+          setAddedPresetFiles((prev) => prev.filter((f) => f.path !== path));
+        }
+      } else {
+        deleteFile(path);
+      }
+      // 选中的文件被删除时回退到第一个剩余文件（filesToShow 的 effect 也会兜底）
+      if (selectedPath === path) {
+        const rest = filesToShow.filter((f) => f.path !== path);
+        setSelectedPath(rest[0]?.path ?? '');
+      }
+    },
+    [readOnly, isPresetMode, deleteFile, selectedPath, filesToShow],
+  );
 
   // 按分组组织文件树
   const groupedFiles = useMemo(() => {
@@ -593,8 +658,21 @@ export function PurecodeWorkspace({ readOnly = false }: PurecodeWorkspaceProps) 
           role="tree"
           aria-label="项目文件树"
         >
-          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-mc-mute">
-            项目文件
+          <div className="flex items-center justify-between px-3 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-mc-mute">
+              项目文件
+            </div>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={handleNewFile}
+                aria-label="新建文件"
+                title="新建文件"
+                className="rounded-mc p-0.5 text-mc-mute transition-colors hover:bg-mc-surface-3 hover:text-mc-text"
+              >
+                <McIcon scope="pixel" name="plus" size={12} aria-hidden="true" />
+              </button>
+            )}
           </div>
           {GROUP_ORDER.map((group) => (
             <div key={group} className="mb-2">
@@ -606,23 +684,38 @@ export function PurecodeWorkspace({ readOnly = false }: PurecodeWorkspaceProps) 
                   const isActive = f.path === selectedPath;
                   return (
                     <li key={f.path} role="none">
-                      <button
-                        type="button"
-                        role="treeitem"
-                        aria-selected={isActive}
-                        title={f.path}
-                        onClick={() => handleSelectFile(f.path)}
-                        className={`flex w-full items-center gap-1.5 px-3 py-1 text-left text-[11px] transition-colors ${
+                      <div
+                        className={`group flex w-full items-center gap-1.5 px-3 py-1 text-left text-[11px] transition-colors ${
                           isActive
                             ? 'bg-mc-surface-2 text-mc-text'
                             : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
                         }`}
                       >
-                        <span aria-hidden="true" className="text-[10px]">
-                          {FILE_ICON[f.language] ?? '📄'}
-                        </span>
-                        <span className="truncate">{f.label}</span>
-                      </button>
+                        <button
+                          type="button"
+                          role="treeitem"
+                          aria-selected={isActive}
+                          title={f.path}
+                          onClick={() => handleSelectFile(f.path)}
+                          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                        >
+                          <span aria-hidden="true" className="text-[10px]">
+                            {FILE_ICON[f.language] ?? '📄'}
+                          </span>
+                          <span className="truncate">{f.label}</span>
+                        </button>
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteFile(f.path)}
+                            aria-label={`删除 ${f.label}`}
+                            title="删除文件"
+                            className="hidden shrink-0 rounded-mc p-0.5 text-mc-mute transition-colors hover:text-mc-redstone group-hover:block"
+                          >
+                            <McIcon scope="pixel" name="trash" size={11} aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
                     </li>
                   );
                 })}

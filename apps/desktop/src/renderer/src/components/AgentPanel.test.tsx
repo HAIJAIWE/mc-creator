@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { AgentPanel } from './AgentPanel.js';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
@@ -192,9 +192,8 @@ describe('AgentPanel', () => {
     fireEvent.change(textarea, { target: { value: '一个测试 mod' } });
     const generateBtn = screen.getByRole('button', { name: /生成 Spec/ });
     fireEvent.click(generateBtn);
-    // 等待下一个微任务让 async 函数推进
-    await Promise.resolve();
-    await Promise.resolve();
+    // D10：等待 async 流程（setLoading/setSpec 等）在 act 内 flush，避免 act 外 setState 警告
+    await act(async () => {});
     expect(mockMcApi.generateSpec).toHaveBeenCalledWith('一个测试 mod', 'mod');
   });
 

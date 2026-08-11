@@ -787,3 +787,101 @@ describe('evaluateNode', () => {
     expect(result.outputs).toEqual({});
   });
 });
+
+// === 多入口调试（C9）：多个 event 节点依次串行遍历 ===
+
+describe('多入口调试（多个 event 节点）', () => {
+  it('31. 第一条链结束后自动进入第二个 event 入口', () => {
+    // event1 无下游 → 链结束；应自动进入 event2
+    const graph = makeGraph([
+      makeNode('n_event_1', 'event', { label: '事件A' }),
+      makeNode('n_event_2', 'event', { label: '事件B' }),
+    ]);
+    let state = initDebugger(graph);
+    expect(state.currentNodeId).toBe('n_event_1');
+    expect(state.finished).toBe(false);
+
+    // 单步：event1 评估后无下游 → 进入 event2，不结束
+    state = stepForward(graph, state);
+    expect(state.finished).toBe(false);
+    expect(state.currentNodeId).toBe('n_event_2');
+    expect(state.visitedNodeIds).toEqual(['n_event_1', 'n_event_2']);
+    expect(state.callStack).toEqual(['n_event_2']);
+    // 日志含"下一事件入口"
+    expect(state.logs.some((l) => l.message?.includes('下一事件入口'))).toBe(true);
+  });
+
+  it('32. 所有 event 入口遍历完后才 finished', () => {
+    const graph = makeGraph([makeNode('n_event_1', 'event'), makeNode('n_event_2', 'event')]);
+    let state = initDebugger(graph);
+    state = stepForward(graph, state); // → event2
+    state = stepForward(graph, state); // event2 无下游，无更多入口 → finished
+    expect(state.finished).toBe(true);
+    expect(state.currentNodeId).toBe('n_event_2');
+    expect(state.visitedNodeIds).toEqual(['n_event_1', 'n_event_2']);
+  });
+
+  it('33. 两个 event 共享下游 action：第二个 event 仍能执行共享节点', () => {
+    // event1 → action（共享）；event2 → action（共享）
+    // 多入口语义：共享下游不算环路（仅当前调用栈内才会判环）
+    const graph = makeGraph(
+      [
+        makeNode('n_event_1', 'event'),
+        makeNode('n_event_2', 'event'),
+        makeNode('n_action', 'action', { actionType: 'teleport' }),
+      ],
+      [
+        makeEdge('e1', 'n_event_1', 'n_action', { sourceHandle: 'trigger' }),
+        makeEdge('e2', 'n_event_2', 'n_action', { sourceHandle: 'trigger' }),
+      ],
+    );
+    let state = initDebugger(graph);
+    // 链1：event1 → action → 无下游 → 进入 event2
+    state = stepForward(graph, state);
+    expect(state.currentNodeId).toBe('n_action');
+    state = stepForward(graph, state);
+    expect(state.currentNodeId).toBe('n_event_2');
+    // 链2：event2 → action（共享，不算环路）
+    state = stepForward(graph, state);
+    expect(state.currentNodeId).toBe('n_action');
+    expect(state.finished).toBe(false);
+    // action 已执行两次
+    expect(state.visitedNodeIds.filter((id) => id === 'n_action').length).toBe(2);
+  });
+
+  it('34. 同链环路上重复访问仍判环终止（环形图保护不变）', () => {
+    // event1 → action1 → action1（自环：同一调用栈内重复 → 判环）
+    const graph = makeGraph(
+      [makeNode('n_event_1', 'event'), makeNode('n_action_1', 'action')],
+      [
+        makeEdge('e1', 'n_event_1', 'n_action_1', { sourceHandle: 'trigger' }),
+        makeEdge('e2', 'n_action_1', 'n_action_1', { sourceHandle: 'trigger' }),
+      ],
+    );
+    let state = initDebugger(graph);
+    state = stepForward(graph, state); // → action1
+    state = stepForward(graph, state); // 回到 action1 → 环路，finished
+    expect(state.finished).toBe(true);
+    expect(state.logs.some((l) => l.message?.includes('环路'))).toBe(true);
+  });
+
+  it('35. runUntilBreakpoint 多入口：无断点跑完所有 event 链', () => {
+    const graph = makeGraph([
+      makeNode('n_event_1', 'event'),
+      makeNode('n_event_2', 'event'),
+      makeNode('n_event_3', 'event'),
+    ]);
+    const init = initDebugger(graph);
+    const final = runUntilBreakpoint(graph, init, new Set());
+    expect(final.finished).toBe(true);
+    expect(final.visitedNodeIds).toEqual(['n_event_1', 'n_event_2', 'n_event_3']);
+  });
+
+  it('36. runUntilBreakpoint 多入口：第二个 event 设断点会暂停', () => {
+    const graph = makeGraph([makeNode('n_event_1', 'event'), makeNode('n_event_2', 'event')]);
+    const init = initDebugger(graph);
+    const paused = runUntilBreakpoint(graph, init, new Set(['n_event_2']));
+    expect(paused.finished).toBe(false);
+    expect(paused.currentNodeId).toBe('n_event_2');
+  });
+});

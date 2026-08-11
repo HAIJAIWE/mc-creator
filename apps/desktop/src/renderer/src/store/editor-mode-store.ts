@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 import type { EditorMode } from '@mc-creator/shared';
 
 /**
@@ -21,7 +21,7 @@ interface EditorModeState {
   cycleMode: () => void;
 }
 
-export const useEditorModeStore = create<EditorModeState>((set, get) => ({
+export const useEditorModeStore = createWithEqualityFn<EditorModeState>((set, get) => ({
   mode: 'lowcode',
   lastSwitchAt: Date.now(),
   setMode: (mode) => set({ mode, lastSwitchAt: Date.now() }),

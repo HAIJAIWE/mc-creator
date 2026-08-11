@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 import type {
   NodeGraph,
   ModNode,
@@ -454,7 +454,7 @@ const EMPTY_GRAPH: NodeGraph = {
   subgraphs: {},
 };
 
-export const useNodeGraphStore = create<NodeGraphState>((set, get) => ({
+export const useNodeGraphStore = createWithEqualityFn<NodeGraphState>((set, get) => ({
   graph: EMPTY_GRAPH,
   selectedNodeId: null,
   selectedEdgeId: null,

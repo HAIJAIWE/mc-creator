@@ -44,6 +44,16 @@ vi.mock('@monaco-editor/react', async () => {
   };
   return { default: MockEditor };
 });
+// D10：lowcode tab 渲染 LowcodeWorkspace，mock useRecentGraphs 避免 mount 后异步 refresh 在 act 外 setState
+vi.mock('../../lib/useRecentGraphs.js', () => ({
+  useRecentGraphs: () => ({
+    recent: [],
+    refresh: () => {},
+    remove: () => {},
+    loading: false,
+    error: null,
+  }),
+}));
 
 let mcApiMock: Record<string, ReturnType<typeof vi.fn>>;
 

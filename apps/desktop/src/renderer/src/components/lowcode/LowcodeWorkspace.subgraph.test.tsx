@@ -20,6 +20,16 @@ vi.mock('./NodeGraphEditor.js', () => ({
 vi.mock('./subgraph/SubgraphWorkspace.js', () => ({
   SubgraphWorkspace: () => <div data-testid="subgraph-workspace" />,
 }));
+// D10：mock useRecentGraphs，避免 mount 后异步 refresh 在 act 外触发 setState
+vi.mock('../../lib/useRecentGraphs.js', () => ({
+  useRecentGraphs: () => ({
+    recent: [],
+    refresh: () => {},
+    remove: () => {},
+    loading: false,
+    error: null,
+  }),
+}));
 
 describe('LowcodeWorkspace SubgraphWorkspace 集成', () => {
   beforeEach(() => {

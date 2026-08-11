@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 import type { NodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from './node-graph-store.js';
 import { getFieldSchemas } from '../components/lowcode/nodes/drawer/fieldSchemas.js';
@@ -68,7 +68,7 @@ function validateDraft(draft: NodeData): Record<string, string> {
   return errors;
 }
 
-export const useDrawerStore = create<DrawerState>((set, get) => ({
+export const useDrawerStore = createWithEqualityFn<DrawerState>((set, get) => ({
   open: false,
   nodeId: null,
   draft: null,

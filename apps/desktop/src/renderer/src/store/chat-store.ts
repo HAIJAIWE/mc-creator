@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 
 /**
  * ChatStore：管理 AI 助手 chat 模式的对话状态。
@@ -40,7 +40,7 @@ const CLEARED_MESSAGES: ChatMessage[] = [
   { role: 'assistant', text: '对话已清空。有什么可以帮你的？' },
 ];
 
-export const useChatStore = create<ChatState>((set) => ({
+export const useChatStore = createWithEqualityFn<ChatState>((set) => ({
   messages: INITIAL_MESSAGES,
   input: '',
   sending: false,

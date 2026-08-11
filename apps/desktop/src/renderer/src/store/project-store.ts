@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 import type { ModSpec, Loader, McVersion } from '@mc-creator/shared';
 import { ipcClient } from '../lib/ipc-client.js';
 import { useModStore } from './mod-store.js';
@@ -45,7 +45,7 @@ function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+export const useProjectStore = createWithEqualityFn<ProjectState>((set, get) => ({
   projects: [],
   loading: false,
   error: null,

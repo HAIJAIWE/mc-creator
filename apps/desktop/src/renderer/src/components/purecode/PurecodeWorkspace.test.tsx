@@ -260,7 +260,9 @@ describe('PurecodeWorkspace', () => {
         defaultName: 'ModMain.java',
       });
     });
-    expect(await screen.findByText(/已保存：ModMain.java/)).toBeTruthy();
+    expect(
+      await within(screen.getByTestId('toast-stack')).findByText(/已保存：ModMain.java/),
+    ).toBeTruthy();
   });
 
   it('保存使用编辑器内最新内容（含未落盘修改），并同步回项目 store', async () => {
@@ -279,15 +281,15 @@ describe('PurecodeWorkspace', () => {
     mockSaveFile.mockResolvedValue({ ok: false, canceled: false, savedPath: null });
     const view = renderPurecode(<PurecodeWorkspace />);
     fireEvent.click(screen.getByRole('button', { name: /保存当前文件/ }));
-    expect(await screen.findByText('保存失败')).toBeTruthy();
+    expect(await within(screen.getByTestId('toast-stack')).findByText('保存失败')).toBeTruthy();
     view.unmount();
     // 取消不弹任何提示
     mockSaveFile.mockResolvedValue({ ok: false, canceled: true, savedPath: null });
     renderPurecode(<PurecodeWorkspace />);
     fireEvent.click(screen.getByRole('button', { name: /保存当前文件/ }));
     await new Promise((r) => setTimeout(r, 50));
-    expect(screen.queryByText('保存失败')).toBeNull();
-    expect(screen.queryByText(/已保存/)).toBeNull();
+    expect(within(screen.getByTestId('toast-stack')).queryByText('保存失败')).toBeNull();
+    expect(within(screen.getByTestId('toast-stack')).queryByText(/已保存/)).toBeNull();
   });
 
   it('Monaco 编辑器内容变化时更新内部状态（textarea 反映新值）', () => {
@@ -332,5 +334,84 @@ describe('PurecodeWorkspace', () => {
     expect(screen.getByRole('group', { name: 'Java 源码' })).toBeTruthy();
     expect(screen.getByRole('group', { name: '资源与配置' })).toBeTruthy();
     expect(screen.getByRole('group', { name: '构建脚本' })).toBeTruthy();
+  });
+
+  it('点击「新建文件」生成新文件并立即选中（脚手架模式，本地状态）', () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('NEW_FILE.java');
+    renderPurecode(<PurecodeWorkspace />);
+    fireEvent.click(screen.getByRole('button', { name: /新建文件/ }));
+    // 新文件出现在文件树 + Java 源码分组
+    const tree = screen.getByRole('tree', { name: /项目文件树/ });
+    expect(within(tree).getByText('NEW_FILE.java')).toBeTruthy();
+    // 自动选中：aria-selected=true + 下拉框值切换
+    const newItem = within(tree)
+      .getAllByRole('treeitem')
+      .find((t) => t.textContent?.includes('NEW_FILE.java'));
+    expect(newItem?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('新建重名文件时提示错误且不重复添加', () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('ModMain.java');
+    renderPurecode(<PurecodeWorkspace />);
+    fireEvent.click(screen.getByRole('button', { name: /新建文件/ }));
+    const tree = screen.getByRole('tree', { name: /项目文件树/ });
+    // 仍只有 11 个预置文件（ModMain.java 已存在，不新增）
+    expect(within(tree).getAllByRole('treeitem')).toHaveLength(11);
+    expect(within(screen.getByTestId('toast-stack')).getByText(/文件已存在/)).toBeTruthy();
+  });
+
+  it('新建文件后保存走 IPC（默认保存最新内容）', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('Custom.java');
+    renderPurecode(<PurecodeWorkspace />);
+    fireEvent.click(screen.getByRole('button', { name: /新建文件/ }));
+    fireEvent.click(screen.getByRole('button', { name: /保存当前文件/ }));
+    await waitFor(() => {
+      expect(mockSaveFile).toHaveBeenCalledWith(
+        expect.objectContaining({ path: 'Custom.java', defaultName: 'Custom.java' }),
+      );
+    });
+  });
+
+  it('删除文件后从文件树移除（脚手架模式，本地状态）', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const view = renderPurecode(<PurecodeWorkspace />);
+    const tree = screen.getByRole('tree', { name: /项目文件树/ });
+    expect(within(tree).getAllByRole('treeitem')).toHaveLength(11);
+    fireEvent.click(screen.getByRole('button', { name: /删除 ModMain.java/ }));
+    // 从树中消失 + treeitem 数量减一
+    expect(within(tree).queryByText('ModMain.java')).toBeNull();
+    expect(within(tree).getAllByRole('treeitem')).toHaveLength(10);
+    // 下拉框 option 同步更新
+    const select = screen.getByRole('combobox', {
+      name: /选择当前编辑的文件/,
+    }) as HTMLSelectElement;
+    expect(select.options.length).toBe(10);
+    view.unmount();
+  });
+
+  it('删除当前编辑文件后自动切换到第一个剩余文件', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPurecode(<PurecodeWorkspace />);
+    // 默认选中 ModMain.java，删除后应切到 ModItems.java（剩余第一个）
+    fireEvent.click(screen.getByRole('button', { name: /删除 ModMain.java/ }));
+    const tree = screen.getByRole('tree', { name: /项目文件树/ });
+    const mainItem = within(tree)
+      .getAllByRole('treeitem')
+      .find((t) => t.textContent?.includes('ModItems.java'));
+    expect(mainItem?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('confirm 取消时不删除文件', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderPurecode(<PurecodeWorkspace />);
+    fireEvent.click(screen.getByRole('button', { name: /删除 ModMain.java/ }));
+    const tree = screen.getByRole('tree', { name: /项目文件树/ });
+    expect(within(tree).getAllByRole('treeitem')).toHaveLength(11);
+  });
+
+  it('只读模式隐藏新建/删除按钮', () => {
+    renderPurecode(<PurecodeWorkspace readOnly />);
+    expect(screen.queryByRole('button', { name: /新建文件/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /删除 ModMain.java/ })).toBeNull();
   });
 });

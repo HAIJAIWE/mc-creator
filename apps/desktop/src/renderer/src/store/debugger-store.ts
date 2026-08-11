@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 import type { NodeGraph } from '@mc-creator/shared';
 import {
   initDebugger,
@@ -21,7 +21,7 @@ import {
  * - finished：state.finished=true（执行完成）
  *
  * 控制：
- * - start(graph)：初始化调试器，进入第一个 event 节点
+ * - start(graph)：初始化调试器，进入第一个 event 节点（多 event 时依次串行遍历全部入口）
  * - step(graph)：单步推进
  * - run(graph)：执行到下一断点或结束
  * - reset(graph)：重置回初始状态
@@ -61,7 +61,7 @@ interface DebuggerStore {
   clearBreakpoints: () => void;
 }
 
-export const useDebuggerStore = create<DebuggerStore>((set, get) => ({
+export const useDebuggerStore = createWithEqualityFn<DebuggerStore>((set, get) => ({
   state: null,
   breakpoints: new Set<string>(),
   isRunning: false,

@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 
 interface ModelConfigState {
   name: string;
@@ -11,7 +11,7 @@ interface ModelConfigState {
   setLoaded: (b: boolean) => void;
 }
 
-export const useModelConfigStore = create<ModelConfigState>((set) => ({
+export const useModelConfigStore = createWithEqualityFn<ModelConfigState>((set) => ({
   name: '',
   modelId: '',
   baseURL: '',

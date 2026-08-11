@@ -12,7 +12,9 @@ import type { NodeGraph, ModNode, ModEdge } from '@mc-creator/shared';
  * - 仅沿 kind === 'control' 的边遍历
  * - condition 节点根据 branchDecision 选择 'true' 或 'false' 出端口
  * - event/action 节点直接走任意 control 出边
- * - 终止条件：无下一节点 / 遇到断点 / 已访问所有可达节点 / 抛错 / 达到最大步数
+ * - 多入口：多个 event 节点依次作为入口串行执行，前一条链结束后自动进入下一个未访问的 event
+ * - 环路判定基于当前调用栈（跨 event 共享的下游节点允许重复进入）
+ * - 终止条件：无下一节点 / 遇到断点 / 所有 event 入口均已访问 / 抛错 / 达到最大步数
  *
  * 简化语义（不真正执行 Java/JS，仅模拟）：
  * - event：触发，无输入
@@ -110,7 +112,7 @@ function appendLog(state: DebugState, entry: DebugLogEntry, extraLogs?: string[]
  *
  * 语义：
  * - 若无 event 节点：finished=true（无可执行内容）
- * - 若有多个 event 节点：取第一个作为起点（多入口调试需后续扩展）
+ * - 若有多个 event 节点：取第一个作为起点，其余入口在链结束后由 stepForward 依次进入
  * - 单 event 节点：进入该节点，记录 enter 日志，但尚未执行（执行在 stepForward 中进行）
  */
 export function initDebugger(graph: NodeGraph): DebugState {
@@ -267,7 +269,34 @@ export function stepForward(graph: NodeGraph, state: DebugState): DebugState {
 
   // === 3. 沿出边推进 ===
   if (nextEdges.length === 0) {
-    // 无下一节点：当前节点离场，结束
+    // 无下一节点：链结束。若图中还有未访问的 event 节点（多入口），进入下一个入口；
+    // 否则当前节点离场，结束
+    const nextEntry = graph.nodes.find(
+      (n) => n.data.kind === 'event' && !n.data.disabled && !state.visitedNodeIds.includes(n.id),
+    );
+    if (nextEntry) {
+      newLogs = [
+        ...newLogs,
+        {
+          ts: Date.now(),
+          nodeId: nextEntry.id,
+          kind: 'event',
+          action: 'enter',
+          message: `进入下一事件入口 ${nextEntry.data.label || nextEntry.id}`,
+        },
+      ];
+      return {
+        ...state,
+        visitedNodeIds: [...state.visitedNodeIds, nextEntry.id],
+        currentNodeId: nextEntry.id,
+        traversedEdgeIds: state.traversedEdgeIds,
+        variables: newVariables,
+        callStack: [nextEntry.id],
+        logs: newLogs,
+        finished: false,
+      };
+    }
+
     newLogs = [
       ...newLogs,
       {
@@ -305,9 +334,9 @@ export function stepForward(graph: NodeGraph, state: DebugState): DebugState {
     };
   }
 
-  // 防止重复访问导致死循环：若下一节点已在 visited 中，标记结束
-  // （简化语义：每个节点只访问一次，环形图视为终止）
-  if (state.visitedNodeIds.includes(nextNode.id)) {
+  // 防止重复访问导致死循环：若下一节点已在当前调用栈（本条执行链）中，视为环形图终止
+  // （多入口共享下游节点：仅当同一链路上重复访问才判环，跨 event 共享的执行链不受影响）
+  if (state.callStack.includes(nextNode.id)) {
     newLogs = [
       ...newLogs,
       {
@@ -315,7 +344,7 @@ export function stepForward(graph: NodeGraph, state: DebugState): DebugState {
         nodeId: nextNode.id,
         kind: nextNode.data.kind,
         action: 'leave',
-        message: `检测到环路：节点 ${nextNode.id} 已访问过，调试结束`,
+        message: `检测到环路：节点 ${nextNode.id} 在当前执行链中，调试结束`,
       },
     ];
     return {

@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 
 export interface SpecVersion {
   id: string; // 唯一 ID（用 timestamp + random）
@@ -24,7 +24,7 @@ interface SpecHistoryState {
   removeVersion: (id: string) => void;
 }
 
-export const useSpecHistoryStore = create<SpecHistoryState>((set, get) => ({
+export const useSpecHistoryStore = createWithEqualityFn<SpecHistoryState>((set, get) => ({
   versions: [],
   currentIndex: -1,
   maxHistory: 20,
