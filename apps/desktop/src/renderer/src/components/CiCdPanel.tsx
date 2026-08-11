@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { McIcon } from '../assets/mc-ui/McIcon';
-import { Copy, CheckCircle2 } from 'lucide-react';
+import { Copy, CheckCircle2, Save, Loader2, AlertTriangle } from 'lucide-react';
+import { useModStore } from '../store/mod-store.js';
+import { ipcClient } from '../lib/ipc-client.js';
 
 type CiPlatform = 'github' | 'gitlab' | 'jenkins';
 
@@ -9,6 +11,18 @@ const PLATFORMS: { id: CiPlatform; label: string; icon: string }[] = [
   { id: 'gitlab', label: 'GitLab CI', icon: 'box' },
   { id: 'jenkins', label: 'Jenkins', icon: 'terminal' },
 ];
+
+/** 根据 MC 版本推导建议的 Java 版本（≤1.16.5→8，1.17-1.20.4→17，1.20.5+→21） */
+export function suggestJavaVersion(mcVersion: string): number {
+  const match = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(mcVersion);
+  if (!match) return 21;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  const patch = Number(match[3] ?? 0);
+  if (major < 1 || (major === 1 && minor < 17)) return 8;
+  if (major === 1 && minor >= 17 && (minor < 20 || (minor === 20 && patch <= 4))) return 17;
+  return 21;
+}
 
 /** 生成 GitHub Actions 工作流 YAML */
 function generateGithubWorkflow(opts: {
@@ -27,6 +41,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         java: [${opts.javaVersion}]
@@ -40,21 +55,29 @@ jobs:
         with:
           java-version: \${{ matrix.java }}
           distribution: temurin
+          cache: gradle
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build with Gradle
-        run: ./gradlew build
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mod-artifacts
-          path: build/libs/*.jar
+      - name: Build with Gradle
+        run: ./gradlew build compileJava --stacktrace
+        env:
+          LOADER: ${opts.loader}
+          MC_VERSION: ${opts.mcVersion}
 
       - name: Run Tests
         run: ./gradlew test
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: mod-artifacts
+          path: build/libs/*.jar
 `;
 }
 
@@ -116,11 +139,18 @@ function generateJenkinsfile(opts: { javaVersion: number }): string {
  * CI/CD 脚本生成面板：生成 GitHub Actions / GitLab CI / Jenkinsfile。
  */
 export function CiCdPanel() {
+  const storeLoader = useModStore((s) => s.loader);
+  const storeMcVersion = useModStore((s) => s.mcVersion);
   const [platform, setPlatform] = useState<CiPlatform>('github');
-  const [javaVersion, setJavaVersion] = useState(21);
-  const [loader, setLoader] = useState('fabric');
-  const [mcVersion, setMcVersion] = useState('1.21.1');
+  const [javaVersion, setJavaVersion] = useState(() => suggestJavaVersion(storeMcVersion));
+  const [loader, setLoader] = useState<string>(storeLoader);
+  const [mcVersion, setMcVersion] = useState<string>(storeMcVersion);
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const suggestedJava = suggestJavaVersion(mcVersion);
 
   const output = (() => {
     switch (platform) {
@@ -148,6 +178,21 @@ export function CiCdPanel() {
     await navigator.clipboard.writeText(output);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSavedPath(null);
+    try {
+      const res = await ipcClient.saveFile({ path: fileName, content: output });
+      if (res.ok) setSavedPath(res.savedPath ?? fileName);
+      else if (!res.canceled) setSaveError('保存失败，请重试');
+    } catch {
+      setSaveError('保存失败，请重试');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -195,6 +240,14 @@ export function CiCdPanel() {
                 </option>
               ))}
             </select>
+            {suggestedJava !== javaVersion && (
+              <button
+                onClick={() => setJavaVersion(suggestedJava)}
+                className="mt-0.5 text-[9px] text-mc-accent hover:underline"
+              >
+                采用建议 {suggestedJava}
+              </button>
+            )}
           </div>
           <div>
             <label className="mb-0.5 block text-[10px] text-mc-mute">Loader</label>
@@ -224,6 +277,14 @@ export function CiCdPanel() {
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[11px] font-mono text-mc-dim">{fileName}</span>
           <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-1 rounded-mc px-1.5 py-0.5 text-[10px] text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+            {saving ? '保存中…' : savedPath ? '已保存' : '保存文件'}
+          </button>
+          <button
             onClick={handleCopy}
             className="flex items-center gap-1 rounded-mc px-1.5 py-0.5 text-[10px] text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text"
           >
@@ -235,6 +296,13 @@ export function CiCdPanel() {
             {copied ? '已复制' : '复制'}
           </button>
         </div>
+
+        {savedPath && <div className="mb-1 text-[10px] text-green-400">已保存至 {savedPath}</div>}
+        {saveError && (
+          <div className="mb-1 flex items-center gap-1 text-[10px] text-red-400">
+            <AlertTriangle className="h-3 w-3" /> {saveError}
+          </div>
+        )}
 
         {/* 输出代码 */}
         <pre className="max-h-80 overflow-auto rounded-mc border border-mc-border bg-mc-bg p-2 font-mono text-[10px] text-mc-text">

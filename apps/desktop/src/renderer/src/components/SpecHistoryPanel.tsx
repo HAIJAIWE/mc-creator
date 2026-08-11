@@ -32,6 +32,18 @@ export function SpecHistoryPanel({ onClose, onRollback }: SpecHistoryPanelProps)
     }
   };
 
+  const handleRemove = (id: string) => {
+    if (window.confirm('确定删除该历史版本？此操作不可恢复。')) {
+      removeVersion(id);
+    }
+  };
+
+  const handleClear = () => {
+    if (window.confirm(`确定清空全部 ${versions.length} 个历史版本？此操作不可恢复。`)) {
+      clearHistory();
+    }
+  };
+
   // 倒序展示：最新在上
   const ordered = [...versions].reverse();
 
@@ -115,7 +127,7 @@ export function SpecHistoryPanel({ onClose, onRollback }: SpecHistoryPanelProps)
                         <Undo2 className="h-3 w-3" />
                       </button>
                       <button
-                        onClick={() => removeVersion(v.id)}
+                        onClick={() => handleRemove(v.id)}
                         className="rounded-mc p-1 text-mc-dim transition-colors hover:bg-mc-surface-3 hover:text-mc-redstone"
                         title="删除此版本"
                       >
@@ -137,7 +149,7 @@ export function SpecHistoryPanel({ onClose, onRollback }: SpecHistoryPanelProps)
           {versions.length > 0 && currentIndex >= 0 ? ` · 当前 #${currentIndex + 1}` : ''}
         </span>
         <button
-          onClick={clearHistory}
+          onClick={handleClear}
           disabled={versions.length === 0}
           className="mc-btn-ghost !px-2 !py-1 disabled:cursor-not-allowed disabled:opacity-40"
           title="清空所有历史"

@@ -173,6 +173,26 @@ export function PackagesPanel() {
       }
     }
 
+    // 5) 模组间直接循环依赖（A 依赖 B 且 B 依赖 A）
+    const modByName = new Map(mods.map((m) => [m.name, m]));
+    const seenCycles = new Set<string>();
+    for (const m of mods) {
+      for (const dep of m.dependencies ?? []) {
+        const target = modByName.get(dep);
+        if (!target) continue;
+        if (target.dependencies?.includes(m.name)) {
+          const key = [m.name, dep].sort().join('→');
+          if (seenCycles.has(key)) continue;
+          seenCycles.add(key);
+          issues.push({
+            level: 'warning',
+            message: `模组循环依赖: ${key}`,
+            deps: [key],
+          });
+        }
+      }
+    }
+
     return issues;
   }, [deps, mods, loader, mcVersion]);
 
@@ -191,26 +211,25 @@ export function PackagesPanel() {
       });
     }
 
-    // mod 自报依赖（如果命中顶层，则挂到顶层）
+    // mod 自报依赖：命中顶层或子树中同名节点则挂到其下（收集所有匹配，避免漏挂）
+    const collectMatches = (nodes: TreeNode[], id: string, acc: TreeNode[]): void => {
+      for (const node of nodes) {
+        if (node.id === id) acc.push(node);
+        collectMatches(node.children, id, acc);
+      }
+    };
     for (const m of mods) {
       if (m.dependencies && Array.isArray(m.dependencies)) {
         for (const dep of m.dependencies) {
-          // 在树中查找匹配的节点
-          const findAndAttach = (node: TreeNode): boolean => {
-            for (const child of node.children) {
-              if (child.id === dep) {
-                child.children.push({
-                  id: `${m.name}`,
-                  children: [],
-                  dep: { id: m.name, type: 'required' },
-                });
-                return true;
-              }
-              if (findAndAttach(child)) return true;
-            }
-            return false;
-          };
-          findAndAttach(root);
+          const matches: TreeNode[] = [];
+          collectMatches(root.children, dep, matches);
+          for (const n of matches) {
+            n.children.push({
+              id: m.name,
+              children: [],
+              dep: { id: m.name, type: 'required' },
+            });
+          }
         }
       }
     }
@@ -266,9 +285,11 @@ export function PackagesPanel() {
           <div className="flex items-center gap-2">
             <span className="text-mc-dim">游戏版本</span>
             <span className="ml-auto text-mc-text">{mcVersion}</span>
-            {MC_VERSION_PF[mcVersion] && (
+            {MC_VERSION_PF[mcVersion] ? (
               <span className="text-[9px] text-mc-mute">PF {MC_VERSION_PF[mcVersion]}</span>
-            )}
+            ) : mcVersion ? (
+              <span className="text-[9px] text-mc-mute">PF 未知</span>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-mc-dim">类型</span>
