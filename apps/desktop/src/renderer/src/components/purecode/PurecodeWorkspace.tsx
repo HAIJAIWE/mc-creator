@@ -3,6 +3,8 @@ import Editor from '@monaco-editor/react';
 import type { FileNode } from '@mc-creator/shared';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { useModStore } from '../../store/mod-store.js';
+import { ipcClient } from '../../lib/ipc-client.js';
+import { useToast } from '../useToast.js';
 import { DemoteToLowcodeButton } from './DemoteToLowcodeButton.js';
 
 // === 文件路径 → PresetFile 字段推导 ===
@@ -415,9 +417,10 @@ interface PurecodeWorkspaceProps {
  *
  * 当前为最小可用版本：
  * - 文件树预置（不支持新增/删除）
- * - 保存按钮仅 UI 占位（真实持久化由上层 IPC 完成，留待后续接入）
+ * - 保存按钮已接入真实持久化：经 IPC 弹系统保存对话框写盘，并把内容同步回项目 store
  */
 export function PurecodeWorkspace({ readOnly = false }: PurecodeWorkspaceProps) {
+  const toast = useToast();
   // 从 useModStore 读取提升后的文件（如 L2→L3 提升流程写入的文件）
   // 非空时优先使用 store 中的文件；为空时回退到 PRESET_FILES 脚手架
   const promotedFiles = useModStore((s) => s.files);
@@ -475,11 +478,23 @@ export function PurecodeWorkspace({ readOnly = false }: PurecodeWorkspaceProps) 
     [readOnly, selectedFile],
   );
 
-  // 保存：L3 最小版本仅占位提示（避免误以为已持久化）
-  const handleSave = useCallback(() => {
+  // 保存：经 IPC 弹系统保存对话框将当前文件写盘，并把编辑内容同步回项目 store
+  const handleSave = useCallback(async () => {
     if (!selectedFile) return;
-    window.alert(`已保存（占位）：${selectedFile.label}`);
-  }, [selectedFile]);
+    const content = fileContents[selectedFile.path] ?? '';
+    useModStore.getState().updateFileContent(selectedFile.path, content);
+    const res = await ipcClient.saveFile({
+      path: selectedFile.path,
+      content,
+      defaultName: selectedFile.path.split('/').pop() || 'file.txt',
+    });
+    if (res.ok) {
+      useModStore.getState().markFileClean(selectedFile.path);
+      toast.success(`已保存：${selectedFile.label}`);
+    } else if (!res.canceled) {
+      toast.error('保存失败');
+    }
+  }, [selectedFile, fileContents, toast]);
 
   // 按分组组织文件树
   const groupedFiles = useMemo(() => {
@@ -554,13 +569,13 @@ export function PurecodeWorkspace({ readOnly = false }: PurecodeWorkspaceProps) 
           {/* L3 → L2 反向降级：从 Java 代码提取节点图并切换到混合模式 */}
           <DemoteToLowcodeButton className="rounded-mc px-2 py-1 text-[11px] text-mc-mute transition-colors hover:bg-mc-surface-2 hover:text-mc-text" />
 
-          {/* 保存按钮（仅 UI 占位） */}
+          {/* 保存按钮 */}
           <button
             type="button"
             onClick={handleSave}
             disabled={readOnly}
             aria-label="保存当前文件"
-            title="保存当前文件（占位）"
+            title="保存当前文件"
             className="flex items-center gap-1 rounded-mc bg-mc-accent px-3 py-1 text-[11px] font-medium text-white transition-colors hover:bg-mc-accent/80 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <McIcon scope="pixel" name="save" size={12} className="text-white" aria-hidden="true" />

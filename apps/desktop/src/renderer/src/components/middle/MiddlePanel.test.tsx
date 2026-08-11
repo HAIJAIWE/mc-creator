@@ -2,9 +2,15 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MiddlePanel } from './MiddlePanel.js';
+import { ToastProvider } from '../ToastProvider.js';
 import { useModStore } from '../../store/mod-store.js';
 import { useSpecHistoryStore } from '../../store/spec-history-store.js';
 import { useEditorModeStore } from '../../store/editor-mode-store.js';
+
+/** 包 ToastProvider 渲染（purecode 模式渲染 PurecodeWorkspace，其保存依赖 useToast context） */
+function renderMiddlePanel(ui: React.ReactElement) {
+  return render(ui, { wrapper: ToastProvider });
+}
 
 /**
  * MiddlePanel 测试：覆盖 tab 切换、命令面板、键盘快捷键、L3 模式分支。
@@ -94,7 +100,7 @@ afterEach(() => {
 
 describe('MiddlePanel', () => {
   it('渲染冒烟：包含 5 个 tab 按钮（预览/低代码/资源/NBT/代码）', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     expect(screen.getByRole('tab', { name: /预览/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /低代码/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /资源/ })).toBeTruthy();
@@ -105,12 +111,12 @@ describe('MiddlePanel', () => {
   });
 
   it('默认选中预览 tab', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     expect(screen.getByRole('tab', { name: /预览/ }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('tablist 支持左右箭头键切换', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     // 在 tablist 上按 ArrowRight 应切换到低代码 tab（位于预览之后）
     const tablist = screen.getByRole('tablist');
     fireEvent.keyDown(tablist, { key: 'ArrowRight' });
@@ -119,7 +125,7 @@ describe('MiddlePanel', () => {
   });
 
   it('点击资源 tab 切换到资源视图', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByRole('tab', { name: /资源/ }));
     expect(screen.getByRole('tab', { name: /资源/ }).getAttribute('aria-selected')).toBe('true');
     // 资源视图渲染 ResourcePackPreview（包含拖放区域等子组件，不深入断言）
@@ -128,26 +134,26 @@ describe('MiddlePanel', () => {
   });
 
   it('点击代码 tab 切换到代码视图', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByRole('tab', { name: / 代码$/ }));
     expect(screen.getByRole('tab', { name: / 代码$/ }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('点击 NBT tab 切换到 NBT 视图', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByRole('tab', { name: /NBT/ }));
     expect(screen.getByRole('tab', { name: /NBT/ }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('默认预览 tab 渲染 EmptyState（spec=null 时 ModPreviewPanel 兜底）', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     // generatorType=mod 时 renderPreviewPanel 返回 <ModPreviewPanel />，
     // spec=null 时 ModPreviewPanel 渲染 EmptyState 标题
     expect(screen.getByText('尚未生成 Mod Spec')).toBeTruthy();
   });
 
   it('渲染命令面板入口按钮（含 F1 提示）', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     // 用 title 精确定位 MiddlePanel 顶部命令面板入口按钮
     // （EmptyState 也有「打开命令面板」按钮但无 title 属性）
     const paletteBtn = screen.getByTitle('打开命令面板（F1）');
@@ -157,32 +163,32 @@ describe('MiddlePanel', () => {
   });
 
   it('点击命令面板入口按钮打开命令面板', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByTitle('打开命令面板（F1）'));
     // 命令面板打开后渲染命令列表
     expect(screen.getByText('保存当前文件')).toBeTruthy();
   });
 
   it('F1 键打开命令面板', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.keyDown(window, { key: 'F1' });
     expect(screen.getByText('保存当前文件')).toBeTruthy();
   });
 
   it('Ctrl+Shift+P 键打开命令面板', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.keyDown(window, { key: 'P', ctrlKey: true, shiftKey: true });
     expect(screen.getByText('保存当前文件')).toBeTruthy();
   });
 
   it('Ctrl+P 键打开命令面板（Quick Open 等价）', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.keyDown(window, { key: 'P', ctrlKey: true, shiftKey: false });
     expect(screen.getByText('保存当前文件')).toBeTruthy();
   });
 
   it('命令面板包含核心命令：保存/导出/新建/清空/切换 tab', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByTitle('打开命令面板（F1）'));
     expect(screen.getByText('保存当前文件')).toBeTruthy();
     expect(screen.getByText('保存全部文件到目录')).toBeTruthy();
@@ -198,7 +204,7 @@ describe('MiddlePanel', () => {
   });
 
   it('命令面板执行「切换到资源视图」切到资源 tab', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByTitle('打开命令面板（F1）'));
     // 点击「切换到资源视图」命令
     fireEvent.click(screen.getByText('切换到资源视图'));
@@ -207,7 +213,7 @@ describe('MiddlePanel', () => {
   });
 
   it('ESC 关闭命令面板', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     // 打开命令面板
     fireEvent.click(screen.getByTitle('打开命令面板（F1）'));
     expect(screen.getByText('保存当前文件')).toBeTruthy();
@@ -219,7 +225,7 @@ describe('MiddlePanel', () => {
   });
 
   it('Ctrl+S 触发保存当前文件 IPC 调用（无选中文件时不调用）', () => {
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     // 无选中文件 → 不调用 saveFile
     fireEvent.keyDown(window, { key: 'S', ctrlKey: true });
     expect(mcApiMock.saveFile).not.toHaveBeenCalled();
@@ -230,7 +236,7 @@ describe('MiddlePanel', () => {
       selectedFile: 'test.txt',
       files: [{ path: 'test.txt', content: 'hello' }],
     });
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.keyDown(window, { key: 'S', ctrlKey: true });
     expect(mcApiMock.saveFile).toHaveBeenCalledWith({
       path: 'test.txt',
@@ -242,7 +248,7 @@ describe('MiddlePanel', () => {
   // === L3 纯代码模式分支测试 ===
   it('lowcode/hybrid 模式下「低代码」tab 渲染 LowcodeWorkspace', () => {
     useEditorModeStore.setState({ mode: 'lowcode', lastSwitchAt: Date.now() });
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByRole('tab', { name: /低代码/ }));
     // LowcodeWorkspace 顶层 role=application + aria-label "低代码工作区"
     expect(screen.getByRole('application', { name: /低代码工作区/ })).toBeTruthy();
@@ -250,7 +256,7 @@ describe('MiddlePanel', () => {
 
   it('purecode 模式下「低代码」tab 渲染 PurecodeWorkspace 而非 LowcodeWorkspace', () => {
     useEditorModeStore.setState({ mode: 'purecode', lastSwitchAt: Date.now() });
-    render(<MiddlePanel />);
+    renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByRole('tab', { name: /低代码/ }));
     // PurecodeWorkspace 顶层 role=application + aria-label "纯代码工作区"
     expect(screen.getByRole('application', { name: /纯代码工作区/ })).toBeTruthy();
