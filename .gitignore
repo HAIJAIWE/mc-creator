@@ -45,3 +45,6 @@ screenshots/
 # pnpm patch 临时目录
 node_modules/.pnpm_patches/
 
+
+# 本地安装包（不入库）
+/FeelFish-Setup-4.0.21.exe
