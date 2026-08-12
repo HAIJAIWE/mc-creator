@@ -1,4 +1,4 @@
-import type { GeneratorContext, GenerationResult } from '@mc-creator/shared';
+import type { GeneratorContext, GenerationResult, FileNode } from '@mc-creator/shared';
 import type { Loader, McVersion } from '@mc-creator/shared';
 import { MC_VERSIONS } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
@@ -37,19 +37,18 @@ export class ModGenerator implements Generator {
   };
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
+    const { files, warnings } = this.translate(ctx);
+    return { files, warnings, buildCmd: './gradlew build' };
+  }
+
+  /** 翻译并收集警告（generate 与 generateWithCache 共用单一返回路径） */
+  private translate(ctx: GeneratorContext): { files: FileNode[]; warnings: string[] } {
     const adapter = this.adapters[ctx.loader];
     if (!adapter) {
       throw new Error(`ModGenerator does not support loader: ${ctx.loader}`);
     }
     const files = adapter.translate(ctx);
-    // P2 dogfood：收集 adapter 翻译过程中的警告（当前 adapter 不产出 warnings，
-    // 但保持返回结构一致性，便于未来扩展）
-    const warnings = this.validateSpec(ctx);
-    return {
-      files,
-      warnings,
-      buildCmd: './gradlew build',
-    };
+    return { files, warnings: this.validateSpec(ctx) };
   }
 
   /** 校验：spec 中各类别是否为空（全空时提醒用户）。generate 与 generateWithCache 共用。 */
