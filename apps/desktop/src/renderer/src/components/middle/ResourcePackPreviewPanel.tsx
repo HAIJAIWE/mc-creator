@@ -15,8 +15,9 @@ import {
   findDuplicates,
   downloadBlob,
   useTabCounts,
+  useConflictDetection,
 } from './shared/index.js';
-import type { Column, TabItem } from './shared/index.js';
+import type { Column, TabItem, ConflictGroup } from './shared/index.js';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import type {
   ResourcePackSpec as ResourcePackSpecType,
@@ -40,6 +41,29 @@ const TABS: { key: Tab; label: string; icon: typeof Image }[] = [
 ];
 
 const HIDE_COUNT_TABS = new Set<Tab>(['metadata', 'export']);
+
+const RP_CONFLICT_GROUPS: ConflictGroup<ResourcePackSpecType>[] = [
+  {
+    key: 'duplicateTexturePaths',
+    label: '材质路径重复',
+    detect: (pack) => findDuplicates(pack.textureOverrides, (t) => t.path),
+  },
+  {
+    key: 'duplicateSoundIds',
+    label: '音效 ID 重复',
+    detect: (pack) => findDuplicates(pack.sounds, (s) => s.id),
+  },
+  {
+    key: 'duplicateModelPaths',
+    label: '模型路径重复',
+    detect: (pack) => findDuplicates(pack.models, (m) => m.path),
+  },
+  {
+    key: 'duplicateFontIds',
+    label: '字体 ID 重复',
+    detect: (pack) => findDuplicates(pack.fonts, (f) => f.id),
+  },
+];
 
 interface LangRow {
   key: string;
@@ -93,27 +117,10 @@ export function ResourcePackPreviewPanel() {
   }, [pack]);
 
   // ===== ID 重复检测 =====
-  const conflicts = useMemo(() => {
-    if (!pack)
-      return {
-        duplicateSoundIds: [],
-        duplicateFontIds: [],
-        duplicateTexturePaths: [],
-        duplicateModelPaths: [],
-      };
-    return {
-      duplicateSoundIds: findDuplicates(pack.sounds, (s) => s.id),
-      duplicateFontIds: findDuplicates(pack.fonts, (f) => f.id),
-      duplicateTexturePaths: findDuplicates(pack.textureOverrides, (t) => t.path),
-      duplicateModelPaths: findDuplicates(pack.models, (m) => m.path),
-    };
-  }, [pack]);
-
-  const totalConflicts =
-    conflicts.duplicateSoundIds.length +
-    conflicts.duplicateFontIds.length +
-    conflicts.duplicateTexturePaths.length +
-    conflicts.duplicateModelPaths.length;
+  const { conflicts, totalConflicts, conflictList } = useConflictDetection(
+    pack,
+    RP_CONFLICT_GROUPS,
+  );
 
   // ===== 元数据行（供 MetadataView 使用）=====
   const metadataRows = useMemo(
@@ -354,15 +361,7 @@ export function ResourcePackPreviewPanel() {
       </StatCardGrid>
 
       {/* 冲突检测告警 */}
-      <ConflictAlert
-        totalConflicts={totalConflicts}
-        conflicts={[
-          { label: '材质路径重复', count: conflicts.duplicateTexturePaths.length },
-          { label: '音效 ID 重复', count: conflicts.duplicateSoundIds.length },
-          { label: '模型路径重复', count: conflicts.duplicateModelPaths.length },
-          { label: '字体 ID 重复', count: conflicts.duplicateFontIds.length },
-        ]}
-      />
+      <ConflictAlert totalConflicts={totalConflicts} conflicts={conflictList} />
 
       {/* Tab 切换 */}
       <IconTabBar tabs={tabs} activeTab={tab} onSelect={handleTabSelect} />

@@ -17,8 +17,9 @@ import {
   downloadBlob,
   useBatchSelection,
   useTabCounts,
+  useConflictDetection,
 } from './shared/index.js';
-import type { Column, TabItem } from './shared/index.js';
+import type { Column, TabItem, ConflictGroup } from './shared/index.js';
 import type {
   ModSpec,
   ItemSpec,
@@ -97,6 +98,24 @@ const TABS: { key: ModTab; label: string; icon: typeof Boxes }[] = [
 ];
 
 const HIDE_COUNT_TABS = new Set<ModTab>(['metadata', 'export']);
+
+const MOD_CONFLICT_GROUPS: ConflictGroup<ModSpec>[] = [
+  {
+    key: 'duplicateItemIds',
+    label: '物品 ID 重复',
+    detect: (m) => findDuplicates(m.items, (i) => i.id),
+  },
+  {
+    key: 'duplicateBlockIds',
+    label: '方块 ID 重复',
+    detect: (m) => findDuplicates(m.blocks, (b) => b.id),
+  },
+  {
+    key: 'duplicateDeps',
+    label: '依赖重复',
+    detect: (m) => findDuplicates(m.dependencies, (d) => d.modId),
+  },
+];
 
 const RARITY_LABEL: Record<string, string> = {
   common: '普通',
@@ -218,19 +237,10 @@ export function ModPreviewPanel() {
   }, [mod]);
 
   // ===== 冲突检测：id 重复 =====
-  const conflicts = useMemo(() => {
-    if (!mod) return { duplicateItemIds: [], duplicateBlockIds: [], duplicateDeps: [] };
-    return {
-      duplicateItemIds: findDuplicates(mod.items, (i) => i.id),
-      duplicateBlockIds: findDuplicates(mod.blocks, (b) => b.id),
-      duplicateDeps: findDuplicates(mod.dependencies, (d) => d.modId),
-    };
-  }, [mod]);
-
-  const totalConflicts =
-    conflicts.duplicateItemIds.length +
-    conflicts.duplicateBlockIds.length +
-    conflicts.duplicateDeps.length;
+  const { conflicts, totalConflicts, conflictList } = useConflictDetection(
+    mod,
+    MOD_CONFLICT_GROUPS,
+  );
 
   // ===== 物品筛选 =====
   const filteredItems = useMemo(() => {
@@ -748,14 +758,7 @@ export function ModPreviewPanel() {
       </StatCardGrid>
 
       {/* 冲突检测告警 */}
-      <ConflictAlert
-        totalConflicts={totalConflicts}
-        conflicts={[
-          { label: '物品 ID 重复', count: conflicts.duplicateItemIds.length },
-          { label: '方块 ID 重复', count: conflicts.duplicateBlockIds.length },
-          { label: '依赖重复', count: conflicts.duplicateDeps.length },
-        ]}
-      />
+      <ConflictAlert totalConflicts={totalConflicts} conflicts={conflictList} />
 
       {/* Tab 切换 */}
       <IconTabBar tabs={tabs} activeTab={activeTab} onSelect={handleTabSelect} />

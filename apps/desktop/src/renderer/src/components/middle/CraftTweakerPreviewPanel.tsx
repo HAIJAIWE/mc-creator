@@ -17,8 +17,9 @@ import {
   downloadBlob,
   useBatchSelection,
   useTabCounts,
+  useConflictDetection,
 } from './shared/index.js';
-import type { Column, TabItem } from './shared/index.js';
+import type { Column, TabItem, ConflictGroup } from './shared/index.js';
 import type {
   CraftTweakerSpec,
   CraftTweakerRecipeSpec,
@@ -55,6 +56,29 @@ const TABS: { key: CraftTweakerTab; label: string; icon: typeof Boxes }[] = [
 ];
 
 const HIDE_COUNT_TABS = new Set<CraftTweakerTab>(['metadata', 'export']);
+
+const CT_CONFLICT_GROUPS: ConflictGroup<CraftTweakerSpec>[] = [
+  {
+    key: 'duplicateRecipeIds',
+    label: '配方 ID 重复',
+    detect: (ct) => findDuplicates(ct.recipes, (r) => r.id),
+  },
+  {
+    key: 'duplicateTagIds',
+    label: '标签 ID 重复',
+    detect: (ct) => findDuplicates(ct.tags, (t) => t.id),
+  },
+  {
+    key: 'duplicateEventIds',
+    label: '事件 ID 重复',
+    detect: (ct) => findDuplicates(ct.events, (e) => e.id),
+  },
+  {
+    key: 'duplicateTooltipIds',
+    label: '工具提示 ID 重复',
+    detect: (ct) => findDuplicates(ct.tooltips, (t) => t.itemId),
+  },
+];
 
 const RECIPE_TYPE_LABEL: Record<string, string> = {
   shaped: '有序合成',
@@ -146,27 +170,7 @@ export function CraftTweakerPreviewPanel() {
   }, [ct]);
 
   // ===== ID 重复检测 =====
-  const conflicts = useMemo(() => {
-    if (!ct)
-      return {
-        duplicateRecipeIds: [],
-        duplicateTagIds: [],
-        duplicateEventIds: [],
-        duplicateTooltipIds: [],
-      };
-    return {
-      duplicateRecipeIds: findDuplicates(ct.recipes, (r) => r.id),
-      duplicateTagIds: findDuplicates(ct.tags, (t) => t.id),
-      duplicateEventIds: findDuplicates(ct.events, (e) => e.id),
-      duplicateTooltipIds: findDuplicates(ct.tooltips, (t) => t.itemId),
-    };
-  }, [ct]);
-
-  const totalConflicts =
-    conflicts.duplicateRecipeIds.length +
-    conflicts.duplicateTagIds.length +
-    conflicts.duplicateEventIds.length +
-    conflicts.duplicateTooltipIds.length;
+  const { conflicts, totalConflicts, conflictList } = useConflictDetection(ct, CT_CONFLICT_GROUPS);
 
   // ===== 配方筛选 =====
   const filteredRecipes = useMemo(() => {
@@ -747,15 +751,7 @@ export function CraftTweakerPreviewPanel() {
       </StatCardGrid>
 
       {/* 冲突检测告警 */}
-      <ConflictAlert
-        totalConflicts={totalConflicts}
-        conflicts={[
-          { label: '配方 ID 重复', count: conflicts.duplicateRecipeIds.length },
-          { label: '标签 ID 重复', count: conflicts.duplicateTagIds.length },
-          { label: '事件 ID 重复', count: conflicts.duplicateEventIds.length },
-          { label: '工具提示 ID 重复', count: conflicts.duplicateTooltipIds.length },
-        ]}
-      />
+      <ConflictAlert totalConflicts={totalConflicts} conflicts={conflictList} />
 
       {/* Tab 切换 */}
       <IconTabBar tabs={tabs} activeTab={activeTab} onSelect={handleTabSelect} />

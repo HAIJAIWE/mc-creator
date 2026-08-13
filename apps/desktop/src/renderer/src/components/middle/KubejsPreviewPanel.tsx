@@ -17,8 +17,9 @@ import {
   downloadBlob,
   useBatchSelection,
   useTabCounts,
+  useConflictDetection,
 } from './shared/index.js';
-import type { Column, TabItem } from './shared/index.js';
+import type { Column, TabItem, ConflictGroup } from './shared/index.js';
 import type {
   KubejsSpec,
   KubejsRecipeSpec,
@@ -60,6 +61,34 @@ const TABS: { key: KubejsTab; label: string; icon: typeof Boxes }[] = [
 ];
 
 const HIDE_COUNT_TABS = new Set<KubejsTab>(['metadata', 'export']);
+
+const KJ_CONFLICT_GROUPS: ConflictGroup<KubejsSpec>[] = [
+  {
+    key: 'duplicateRecipeIds',
+    label: '配方 ID 重复',
+    detect: (kj) => findDuplicates(kj.recipes, (r) => r.id),
+  },
+  {
+    key: 'duplicateTagIds',
+    label: '标签 ID 重复',
+    detect: (kj) => findDuplicates(kj.tags, (t) => t.id),
+  },
+  {
+    key: 'duplicateEventIds',
+    label: '事件 ID 重复',
+    detect: (kj) => findDuplicates(kj.events, (e) => e.id),
+  },
+  {
+    key: 'duplicateTooltipIds',
+    label: '工具提示 ID 重复',
+    detect: (kj) => findDuplicates(kj.tooltips, (t) => t.itemId),
+  },
+  {
+    key: 'duplicateRegistryIds',
+    label: '注册表 ID 重复',
+    detect: (kj) => findDuplicates(kj.registry, (r) => r.id),
+  },
+];
 
 const RECIPE_TYPE_LABEL: Record<string, string> = {
   shaped: '有序合成',
@@ -175,30 +204,7 @@ export function KubejsPreviewPanel() {
   }, [kj]);
 
   // ===== ID 重复检测 =====
-  const conflicts = useMemo(() => {
-    if (!kj)
-      return {
-        duplicateRecipeIds: [],
-        duplicateTagIds: [],
-        duplicateEventIds: [],
-        duplicateTooltipIds: [],
-        duplicateRegistryIds: [],
-      };
-    return {
-      duplicateRecipeIds: findDuplicates(kj.recipes, (r) => r.id),
-      duplicateTagIds: findDuplicates(kj.tags, (t) => t.id),
-      duplicateEventIds: findDuplicates(kj.events, (e) => e.id),
-      duplicateTooltipIds: findDuplicates(kj.tooltips, (t) => t.itemId),
-      duplicateRegistryIds: findDuplicates(kj.registry, (r) => r.id),
-    };
-  }, [kj]);
-
-  const totalConflicts =
-    conflicts.duplicateRecipeIds.length +
-    conflicts.duplicateTagIds.length +
-    conflicts.duplicateEventIds.length +
-    conflicts.duplicateTooltipIds.length +
-    conflicts.duplicateRegistryIds.length;
+  const { conflicts, totalConflicts, conflictList } = useConflictDetection(kj, KJ_CONFLICT_GROUPS);
 
   // ===== 配方筛选 =====
   const filteredRecipes = useMemo(() => {
@@ -866,16 +872,7 @@ export function KubejsPreviewPanel() {
       </StatCardGrid>
 
       {/* 冲突检测告警 */}
-      <ConflictAlert
-        totalConflicts={totalConflicts}
-        conflicts={[
-          { label: '配方 ID 重复', count: conflicts.duplicateRecipeIds.length },
-          { label: '标签 ID 重复', count: conflicts.duplicateTagIds.length },
-          { label: '事件 ID 重复', count: conflicts.duplicateEventIds.length },
-          { label: '工具提示 ID 重复', count: conflicts.duplicateTooltipIds.length },
-          { label: '注册表 ID 重复', count: conflicts.duplicateRegistryIds.length },
-        ]}
-      />
+      <ConflictAlert totalConflicts={totalConflicts} conflicts={conflictList} />
 
       {/* Tab 切换 */}
       <IconTabBar tabs={tabs} activeTab={activeTab} onSelect={handleTabSelect} />

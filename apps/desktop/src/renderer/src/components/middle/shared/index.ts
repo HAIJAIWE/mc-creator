@@ -22,3 +22,5 @@ export type { BatchSelectToolbarProps } from './BatchSelectToolbar.js';
 export { useBatchSelection } from './useBatchSelection.js';
 export { useTabCounts, useTabStatus } from './useTabCounts.js';
 export type { BaseTab, TabStatus } from './useTabCounts.js';
+export { useConflictDetection } from './useConflictDetection.js';
+export type { ConflictGroup, ConflictDetection } from './useConflictDetection.js';

@@ -17,8 +17,9 @@ import {
   downloadBlob,
   useBatchSelection,
   useTabCounts,
+  useConflictDetection,
 } from './shared/index.js';
-import type { Column, TabItem } from './shared/index.js';
+import type { Column, TabItem, ConflictGroup } from './shared/index.js';
 import type {
   BehaviorPackSpec,
   BpEntitySpec,
@@ -51,6 +52,24 @@ const TABS: { key: BehaviorPackTab; label: string; icon: typeof Boxes }[] = [
 ];
 
 const HIDE_COUNT_TABS = new Set<BehaviorPackTab>(['metadata', 'export']);
+
+const BP_CONFLICT_GROUPS: ConflictGroup<BehaviorPackSpec>[] = [
+  {
+    key: 'duplicateEntityIds',
+    label: '实体标识符重复',
+    detect: (bp) => findDuplicates(bp.entities, (e) => e.identifier),
+  },
+  {
+    key: 'duplicateRecipeIds',
+    label: '配方标识符重复',
+    detect: (bp) => findDuplicates(bp.recipes, (r) => r.identifier),
+  },
+  {
+    key: 'duplicateLootPaths',
+    label: '战利品表路径重复',
+    detect: (bp) => findDuplicates(bp.lootTables, (l) => l.path),
+  },
+];
 
 const RECIPE_TYPE_LABEL: Record<string, string> = {
   shaped_crafting: '有序合成',
@@ -115,19 +134,7 @@ export function BehaviorPackPreviewPanel() {
   }, [bp]);
 
   // ===== UUID 重复检测 =====
-  const conflicts = useMemo(() => {
-    if (!bp) return { duplicateEntityIds: [], duplicateRecipeIds: [], duplicateLootPaths: [] };
-    return {
-      duplicateEntityIds: findDuplicates(bp.entities, (e) => e.identifier),
-      duplicateRecipeIds: findDuplicates(bp.recipes, (r) => r.identifier),
-      duplicateLootPaths: findDuplicates(bp.lootTables, (l) => l.path),
-    };
-  }, [bp]);
-
-  const totalConflicts =
-    conflicts.duplicateEntityIds.length +
-    conflicts.duplicateRecipeIds.length +
-    conflicts.duplicateLootPaths.length;
+  const { conflicts, totalConflicts, conflictList } = useConflictDetection(bp, BP_CONFLICT_GROUPS);
 
   // ===== 实体筛选 =====
   const filteredEntities = useMemo(() => {
@@ -539,14 +546,7 @@ export function BehaviorPackPreviewPanel() {
       </StatCardGrid>
 
       {/* 冲突检测告警 */}
-      <ConflictAlert
-        totalConflicts={totalConflicts}
-        conflicts={[
-          { label: '实体标识符重复', count: conflicts.duplicateEntityIds.length },
-          { label: '配方标识符重复', count: conflicts.duplicateRecipeIds.length },
-          { label: '战利品表路径重复', count: conflicts.duplicateLootPaths.length },
-        ]}
-      />
+      <ConflictAlert totalConflicts={totalConflicts} conflicts={conflictList} />
 
       {/* Tab 切换 */}
       <IconTabBar tabs={tabs} activeTab={activeTab} onSelect={handleTabSelect} />
