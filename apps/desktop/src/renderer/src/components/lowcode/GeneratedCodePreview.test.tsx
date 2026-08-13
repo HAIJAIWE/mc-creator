@@ -23,7 +23,7 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 // mock @mc-creator/core：替换 FabricAdapter
-vi.mock('@mc-creator/core', () => ({
+vi.mock('@mc-creator/core/generators/mod/fabric-adapter.js', () => ({
   FabricAdapter: class MockFabricAdapter {
     // 实例属性：new FabricAdapter().translate === hoisted.fabricAdapterTranslateMock
     translate = hoisted.fabricAdapterTranslateMock;

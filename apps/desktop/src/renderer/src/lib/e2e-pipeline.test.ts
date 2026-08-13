@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { compileNodeGraph } from './compileNodeGraph.js';
-import { FabricAdapter } from '@mc-creator/core';
+import { FabricAdapter } from '@mc-creator/core/generators/mod/fabric-adapter.js';
 import type {
   NodeGraph,
   ModNode,

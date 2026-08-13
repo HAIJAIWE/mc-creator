@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { NodeGraph, FileNode } from '@mc-creator/shared';
 import { compileNodeGraph, type CompileResult } from './compileNodeGraph.js';
-import { FabricAdapter } from '@mc-creator/core';
+import { FabricAdapter } from '@mc-creator/core/generators/mod/fabric-adapter.js';
 
 export interface DebouncedCompileResult {
   /** 编译结果（含 spec/warnings/errors） */

@@ -322,7 +322,8 @@ const applyContentTemplateTool: ToolDefinition = {
 
     try {
       const shared = await import('@mc-creator/shared');
-      const { DatapackGenerator } = await import('@mc-creator/core');
+      const { DatapackGenerator } =
+        await import('@mc-creator/core/generators/datapack/datapack-generator.js');
 
       const baseParams = { modId, materialName, materialNameZh, packFormat: 48 };
       let specObj: Record<string, unknown>;
@@ -496,7 +497,8 @@ const generateDatapackTool: ToolDefinition = {
 
     // 动态导入生成器（避免循环依赖）
     try {
-      const { DatapackGenerator } = await import('@mc-creator/core');
+      const { DatapackGenerator } =
+        await import('@mc-creator/core/generators/datapack/datapack-generator.js');
       const { DatapackSpec: DatapackSpecSchema } = await import('@mc-creator/shared');
 
       // 用 Zod 校验+填充默认值
@@ -608,7 +610,7 @@ const generateModTool: ToolDefinition = {
     }
 
     try {
-      const { ModGenerator } = await import('@mc-creator/core');
+      const { ModGenerator } = await import('@mc-creator/core/generators/mod/mod-generator.js');
       const { ModSpec: ModSpecSchema } = await import('@mc-creator/shared');
 
       // 用 Zod 校验+填充默认值
