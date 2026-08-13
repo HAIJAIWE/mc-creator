@@ -9,8 +9,11 @@ import {
   NumberField,
   SelectField,
   ToggleField,
+  IconTabBar,
+  useTabCounts,
 } from './shared/index.js';
 import type { ServerSpec, OpEntry, WhitelistEntry, ServerModEntry } from '@mc-creator/shared';
+import type { BaseTab } from './shared/index.js';
 import {
   Plus,
   Trash2,
@@ -45,6 +48,19 @@ const OP_LEVEL_LABELS: Record<number, string> = {
   4: '4 - 所有权限（满级）',
 };
 
+const SERVER_TABS: BaseTab<SubTab>[] = [
+  { key: 'basic', label: '基本', icon: FileText },
+  { key: 'world', label: '世界', icon: FileText },
+  { key: 'players', label: '玩家', icon: Users },
+  { key: 'network', label: '网络', icon: FileText },
+  { key: 'memory', label: '内存', icon: FileText },
+  { key: 'deploy', label: '部署', icon: Rocket },
+  { key: 'ops', label: 'OP', icon: Shield },
+  { key: 'whitelist', label: '白名单', icon: Users },
+  { key: 'mods', label: 'Mod', icon: Package },
+  { key: 'properties', label: 'properties', icon: FileText },
+];
+
 /**
  * Server 预览面板：以分组表单展示 ServerSpec 字段。
  * 字段修改后写回 useModStore.spec（实时同步）。
@@ -63,6 +79,14 @@ export function ServerPreviewPanel() {
 
   // server.properties 预览生成（必须在 early return 之前调用以遵守 hooks 规则）
   const propertiesText = useMemo(() => (server ? generateServerProperties(server) : ''), [server]);
+
+  // ===== Tab 配置（预计算 count）=====
+  const tabs = useTabCounts(SERVER_TABS, server, (s, key) => {
+    if (key === 'ops') return s.ops.length;
+    if (key === 'whitelist') return s.whitelistEntries.length;
+    if (key === 'mods') return s.mods.length;
+    return undefined;
+  });
 
   if (!spec || !server) {
     return (
@@ -125,20 +149,7 @@ export function ServerPreviewPanel() {
     );
   };
 
-  // ===== Tab 配置 =====
-  const TABS: { key: SubTab; label: string; icon: typeof Shield; count?: number }[] = [
-    { key: 'basic', label: '基本', icon: FileText },
-    { key: 'world', label: '世界', icon: FileText },
-    { key: 'players', label: '玩家', icon: Users },
-    { key: 'network', label: '网络', icon: FileText },
-    { key: 'memory', label: '内存', icon: FileText },
-    { key: 'deploy', label: '部署', icon: Rocket },
-    { key: 'ops', label: 'OP', icon: Shield, count: server.ops.length },
-    { key: 'whitelist', label: '白名单', icon: Users, count: server.whitelistEntries.length },
-    { key: 'mods', label: 'Mod', icon: Package, count: server.mods.length },
-    { key: 'properties', label: 'properties', icon: FileText },
-  ];
-
+  // ===== Tab 栏 =====
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-mc-surface">
       {/* Header：项目元信息 */}
@@ -165,26 +176,7 @@ export function ServerPreviewPanel() {
       </div>
 
       {/* Tab 栏 */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-1 rounded-mc px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                activeTab === t.key
-                  ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-                  : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-              }`}
-            >
-              <Icon className="h-3 w-3" />
-              {t.label}
-              {t.count !== undefined && <span className="ml-0.5 text-mc-mute">({t.count})</span>}
-            </button>
-          );
-        })}
-      </div>
+      <IconTabBar tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} />
 
       {/* Body：根据 tab 渲染 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">

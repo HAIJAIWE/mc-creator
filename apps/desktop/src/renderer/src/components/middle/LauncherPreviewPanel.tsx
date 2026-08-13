@@ -9,11 +9,21 @@ import {
   NumberField,
   SelectField,
   ToggleField,
+  IconTabBar,
 } from './shared/index.js';
 import type { LauncherSpec } from '@mc-creator/shared';
+import type { TabItem } from './shared/index.js';
 import { Copy, Terminal, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 
 type SubTab = 'basic' | 'jvm' | 'account' | 'launch' | 'command';
+
+const LAUNCHER_TABS: TabItem<SubTab>[] = [
+  { key: 'basic', label: '基本' },
+  { key: 'jvm', label: 'JVM' },
+  { key: 'account', label: '账号' },
+  { key: 'launch', label: '启动后' },
+  { key: 'command', label: '启动命令' },
+];
 
 const LAUNCHER_TYPE_LABELS: Record<LauncherSpec['launcherType'], string> = {
   official: '官方启动器',
@@ -94,27 +104,7 @@ export function LauncherPreviewPanel() {
       </div>
 
       {/* Tab 栏 */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-mc-border bg-mc-surface px-2 py-1">
-        {[
-          { key: 'basic' as SubTab, label: '基本' },
-          { key: 'jvm' as SubTab, label: 'JVM' },
-          { key: 'account' as SubTab, label: '账号' },
-          { key: 'launch' as SubTab, label: '启动后' },
-          { key: 'command' as SubTab, label: '启动命令' },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`rounded-mc px-2 py-0.5 text-[11px] font-medium transition-colors ${
-              activeTab === t.key
-                ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-                : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <IconTabBar tabs={LAUNCHER_TABS} activeTab={activeTab} onSelect={setActiveTab} />
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
