@@ -8,7 +8,7 @@ export { StatCard, StatCardGrid } from './StatCard.js';
 export type { StatCardProps, StatCardGridProps } from './StatCard.js';
 export { MetadataView } from './MetadataView.js';
 export type { MetadataRow, MetadataViewProps } from './MetadataView.js';
-export { findDuplicates, downloadBlob } from './utils.js';
+export { findDuplicates, downloadBlob, formatBytes } from './utils.js';
 export { ConflictAlert } from './ConflictAlert.js';
 export type { ConflictItem, ConflictAlertProps } from './ConflictAlert.js';
 export { ExportView } from './ExportView.js';

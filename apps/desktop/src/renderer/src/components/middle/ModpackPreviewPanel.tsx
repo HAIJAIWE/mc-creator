@@ -9,6 +9,8 @@ import {
   StatCard,
   IconTabBar,
   BatchSelectToolbar,
+  downloadBlob,
+  formatBytes,
 } from './shared/index.js';
 import type { Column, TabItem } from './shared/index.js';
 import type { ModpackSpec, ModEntry, OverrideFileSpec } from '@mc-creator/shared';
@@ -182,13 +184,7 @@ export function ModpackPreviewPanel() {
         content = lines.join('\n');
         filename = `${pack.packId}-mods.md`;
       }
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(content, filename);
     },
     [pack],
   );
@@ -547,12 +543,4 @@ function OverridesView({
       </div>
     </div>
   );
-}
-
-// ===== 工具函数 =====
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

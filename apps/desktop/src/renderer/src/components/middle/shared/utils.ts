@@ -50,3 +50,12 @@ export function downloadBlob(content: string, filename: string, mime = 'text/pla
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * 将字节数格式化为人类可读大小（B / KB / MB）。
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}

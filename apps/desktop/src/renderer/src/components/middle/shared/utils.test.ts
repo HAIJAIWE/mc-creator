@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { findDuplicates, downloadBlob } from './utils.js';
+import { findDuplicates, downloadBlob, formatBytes } from './utils.js';
 
 describe('shared/utils', () => {
   describe('findDuplicates', () => {
@@ -111,6 +111,23 @@ describe('shared/utils', () => {
 
       clickSpy.mockRestore();
       vi.unstubAllGlobals();
+    });
+  });
+
+  describe('formatBytes', () => {
+    it('小于 1KB 显示 B', () => {
+      expect(formatBytes(0)).toBe('0 B');
+      expect(formatBytes(1023)).toBe('1023 B');
+    });
+
+    it('KB 范围显示一位小数', () => {
+      expect(formatBytes(1024)).toBe('1.0 KB');
+      expect(formatBytes(1536)).toBe('1.5 KB');
+    });
+
+    it('MB 范围显示一位小数', () => {
+      expect(formatBytes(1024 * 1024)).toBe('1.0 MB');
+      expect(formatBytes(Math.round(1.5 * 1024 * 1024))).toBe('1.5 MB');
     });
   });
 });
