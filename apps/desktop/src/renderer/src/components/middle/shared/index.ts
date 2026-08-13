@@ -20,3 +20,5 @@ export type { TabItem, IconTabBarProps } from './IconTabBar.js';
 export { BatchSelectToolbar } from './BatchSelectToolbar.js';
 export type { BatchSelectToolbarProps } from './BatchSelectToolbar.js';
 export { useBatchSelection } from './useBatchSelection.js';
+export { useTabCounts, useTabStatus } from './useTabCounts.js';
+export type { BaseTab, TabStatus } from './useTabCounts.js';

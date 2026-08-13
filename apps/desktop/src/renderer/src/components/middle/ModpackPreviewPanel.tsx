@@ -12,8 +12,9 @@ import {
   downloadBlob,
   formatBytes,
   useBatchSelection,
+  useTabCounts,
 } from './shared/index.js';
-import type { Column, TabItem } from './shared/index.js';
+import type { Column, TabItem, BaseTab } from './shared/index.js';
 import type { ModpackSpec, ModEntry, OverrideFileSpec } from '@mc-creator/shared';
 import {
   Download,
@@ -30,6 +31,15 @@ import {
 type FormatFilter = 'all' | 'modrinth' | 'curseforge';
 type SortBy = 'name' | 'size' | 'source' | 'default';
 type SubView = 'mods' | 'overrides' | 'server-overrides' | 'export';
+
+const MODPACK_TABS: BaseTab<SubView>[] = [
+  { key: 'mods', label: 'Mod 列表' },
+  { key: 'overrides', label: '覆盖文件' },
+  { key: 'server-overrides', label: '服务器覆盖' },
+  { key: 'export', label: '导出' },
+];
+
+const HIDE_COUNT_TABS = new Set<SubView>(['export']);
 
 /**
  * Modpack 预览面板：mod 列表 + 搜索 + 来源筛选 + 排序 + 批量管理 + 覆盖文件预览 + 导出
@@ -176,22 +186,16 @@ export function ModpackPreviewPanel() {
   );
 
   // ===== Tab 配置（预计算 count；hooks 必须在 early return 之前）=====
-  const tabs = useMemo<TabItem<SubView>[]>(() => {
-    if (!pack) {
-      return [
-        { key: 'mods', label: 'Mod 列表', hideCount: true },
-        { key: 'overrides', label: '覆盖文件', hideCount: true },
-        { key: 'server-overrides', label: '服务器覆盖', hideCount: true },
-        { key: 'export', label: '导出', hideCount: true },
-      ];
-    }
-    return [
-      { key: 'mods', label: 'Mod 列表', count: pack.mods.length },
-      { key: 'overrides', label: '覆盖文件', count: pack.overrides.length },
-      { key: 'server-overrides', label: '服务器覆盖', count: pack.serverOverrides.length },
-      { key: 'export', label: '导出', hideCount: true },
-    ];
-  }, [pack]);
+  const tabs = useTabCounts(
+    MODPACK_TABS,
+    pack,
+    (spec, key) => {
+      if (key === 'mods') return spec.mods.length;
+      if (key === 'overrides') return spec.overrides.length;
+      return spec.serverOverrides.length;
+    },
+    HIDE_COUNT_TABS,
+  );
 
   const handleTabSelect = useCallback((view: SubView) => {
     setActiveView(view);

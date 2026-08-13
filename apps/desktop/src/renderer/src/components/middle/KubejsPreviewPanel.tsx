@@ -16,6 +16,7 @@ import {
   findDuplicates,
   downloadBlob,
   useBatchSelection,
+  useTabCounts,
 } from './shared/index.js';
 import type { Column, TabItem } from './shared/index.js';
 import type {
@@ -57,6 +58,8 @@ const TABS: { key: KubejsTab; label: string; icon: typeof Boxes }[] = [
   { key: 'metadata', label: '元数据', icon: FileText },
   { key: 'export', label: '导出', icon: Download },
 ];
+
+const HIDE_COUNT_TABS = new Set<KubejsTab>(['metadata', 'export']);
 
 const RECIPE_TYPE_LABEL: Record<string, string> = {
   shaped: '有序合成',
@@ -305,18 +308,12 @@ export function KubejsPreviewPanel() {
   );
 
   // ===== Tab 配置（预计算 count）=====
-  const tabs = useMemo<TabItem<KubejsTab>[]>(() => {
-    return TABS.map((t) => ({
-      key: t.key,
-      label: t.label,
-      icon: t.icon,
-      hideCount: t.key === 'metadata' || t.key === 'export',
-      count:
-        kj && t.key !== 'metadata' && t.key !== 'export'
-          ? countByTab(kj, t.key, stats.langEntries)
-          : undefined,
-    }));
-  }, [kj, stats.langEntries]);
+  const tabs = useTabCounts(
+    TABS,
+    kj,
+    (spec, tab) => countByTab(spec, tab, stats.langEntries),
+    HIDE_COUNT_TABS,
+  );
 
   const handleTabSelect = useCallback((tab: KubejsTab) => {
     setActiveTab(tab);

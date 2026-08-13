@@ -14,6 +14,7 @@ import {
   IconTabBar,
   findDuplicates,
   downloadBlob,
+  useTabCounts,
 } from './shared/index.js';
 import type { Column, TabItem } from './shared/index.js';
 import { McIcon } from '../../assets/mc-ui/McIcon';
@@ -28,15 +29,17 @@ import { Download, FileText, Image, Music, Box, Type, Languages } from 'lucide-r
 
 type Tab = 'textures' | 'sounds' | 'models' | 'fonts' | 'lang' | 'metadata' | 'export';
 
-const TABS: { id: Tab; label: string; icon: typeof Image }[] = [
-  { id: 'textures', label: '材质', icon: Image },
-  { id: 'sounds', label: '音效', icon: Music },
-  { id: 'models', label: '模型', icon: Box },
-  { id: 'fonts', label: '字体', icon: Type },
-  { id: 'lang', label: '语言', icon: Languages },
-  { id: 'metadata', label: '元数据', icon: FileText },
-  { id: 'export', label: '导出', icon: Download },
+const TABS: { key: Tab; label: string; icon: typeof Image }[] = [
+  { key: 'textures', label: '材质', icon: Image },
+  { key: 'sounds', label: '音效', icon: Music },
+  { key: 'models', label: '模型', icon: Box },
+  { key: 'fonts', label: '字体', icon: Type },
+  { key: 'lang', label: '语言', icon: Languages },
+  { key: 'metadata', label: '元数据', icon: FileText },
+  { key: 'export', label: '导出', icon: Download },
 ];
+
+const HIDE_COUNT_TABS = new Set<Tab>(['metadata', 'export']);
 
 interface LangRow {
   key: string;
@@ -125,18 +128,12 @@ export function ResourcePackPreviewPanel() {
   );
 
   // ===== Tab 配置（预计算 count）=====
-  const tabs = useMemo<TabItem<Tab>[]>(() => {
-    return TABS.map((t) => ({
-      key: t.id,
-      label: t.label,
-      icon: t.icon,
-      hideCount: t.id === 'metadata' || t.id === 'export',
-      count:
-        pack && t.id !== 'metadata' && t.id !== 'export'
-          ? countByTab(pack, t.id, stats)
-          : undefined,
-    }));
-  }, [pack, stats]);
+  const tabs = useTabCounts(
+    TABS,
+    pack,
+    (spec, tab) => countByTab(spec, tab, stats),
+    HIDE_COUNT_TABS,
+  );
 
   const handleTabSelect = useCallback((nextTab: Tab) => {
     setTab(nextTab);
@@ -453,7 +450,7 @@ function countByTab(
 }
 
 function tabLabel(tab: Tab): string {
-  return TABS.find((t) => t.id === tab)?.label ?? '';
+  return TABS.find((t) => t.key === tab)?.label ?? '';
 }
 
 // ===== Textures tab =====

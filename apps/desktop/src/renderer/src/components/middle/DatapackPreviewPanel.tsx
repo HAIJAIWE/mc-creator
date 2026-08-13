@@ -1,8 +1,15 @@
 import { useState, useMemo, useCallback } from 'react';
 import { shallow } from 'zustand/shallow';
 import { useModStore } from '../../store/mod-store.js';
-import { DataTable, PanelHeader, FilterBar, EmptyState, IconTabBar } from './shared/index.js';
-import type { Column, TabItem } from './shared/index.js';
+import {
+  DataTable,
+  PanelHeader,
+  FilterBar,
+  EmptyState,
+  IconTabBar,
+  useTabStatus,
+} from './shared/index.js';
+import type { Column, TabItem, BaseTab } from './shared/index.js';
 import type {
   DatapackSpec,
   FunctionSpec,
@@ -113,26 +120,25 @@ export function DatapackPreviewPanel() {
   }, [validationResult]);
 
   // ===== Tab 配置（预计算 count + error/warning；hooks 必须在 early return 之前）=====
-  const tabs = useMemo<TabItem<DatapackTab>[]>(() => {
-    if (!spec) return TABS.map((t) => ({ key: t.key, label: t.label }));
-    const dp = spec as unknown as DatapackSpec;
-    const lootCount = dp.lootTables.length + dp.predicates.length;
-    const tagCount = dp.tags.length + dp.itemTags.length + dp.blockTags.length;
-    const trimCount = dp.trimPatterns.length + dp.trimMaterials.length;
-    const issueCount = validationResult.issues.length;
-    return TABS.map((t) => {
-      const tabIssues = issuesByTab.get(t.key);
+  const tabs = useTabStatus(
+    TABS,
+    spec as unknown as DatapackSpec | null,
+    (dp, tab) =>
+      countByTab(
+        dp,
+        dp.lootTables.length + dp.predicates.length,
+        dp.tags.length + dp.itemTags.length + dp.blockTags.length,
+        dp.trimPatterns.length + dp.trimMaterials.length,
+        validationResult.issues.length,
+        tab,
+      ),
+    (dp, tab) => {
+      const tabIssues = issuesByTab.get(tab);
       const tabErrors = tabIssues?.filter((i) => i.level === 'error').length ?? 0;
       const tabWarnings = tabIssues?.filter((i) => i.level === 'warning').length ?? 0;
-      return {
-        key: t.key,
-        label: t.label,
-        count: countByTab(dp, lootCount, tagCount, trimCount, issueCount, t.key),
-        error: tabErrors > 0 ? tabErrors : undefined,
-        warning: tabWarnings > 0 && tabErrors === 0 ? tabWarnings : undefined,
-      };
-    });
-  }, [spec, issuesByTab, validationResult.issues.length]);
+      return { error: tabErrors, warning: tabWarnings };
+    },
+  );
 
   const handleTabSelect = useCallback((tab: DatapackTab) => {
     setActiveTab(tab);
