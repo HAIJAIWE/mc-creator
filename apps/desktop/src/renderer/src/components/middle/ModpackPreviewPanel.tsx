@@ -5,7 +5,7 @@ import {
   DataTable,
   PanelHeader,
   FilterBar,
-  EmptyState,
+  EmptySpecState,
   StatCard,
   IconTabBar,
   BatchSelectToolbar,
@@ -203,13 +203,7 @@ export function ModpackPreviewPanel() {
   }, []);
 
   if (!spec || !pack) {
-    return (
-      <EmptyState
-        icon="box"
-        title="尚未生成整合包 Spec"
-        hint="在右侧 AgentPanel 描述你想要的整合包，生成 Spec 后即可预览"
-      />
-    );
+    return <EmptySpecState label="整合包" describe="整合包" />;
   }
 
   const columns: Column<ModEntry>[] = [

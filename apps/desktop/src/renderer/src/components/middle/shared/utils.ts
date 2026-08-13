@@ -59,3 +59,18 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/**
+ * 统计多语言字典的翻译条目总数与语言种类数。
+ *
+ * 结构约定：`{ [langCode]: { [key]: value } }`，如 CraftTweaker / KubeJS 的 lang 字段。
+ */
+export function countLangEntries(lang: Record<string, Record<string, string>> | undefined): {
+  entries: number;
+  languages: number;
+} {
+  return {
+    entries: Object.values(lang ?? {}).reduce((sum, dict) => sum + Object.keys(dict).length, 0),
+    languages: Object.keys(lang ?? {}).length,
+  };
+}

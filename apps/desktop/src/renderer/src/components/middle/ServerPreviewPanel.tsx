@@ -3,7 +3,7 @@ import { shallow } from 'zustand/shallow';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { useModStore } from '../../store/mod-store.js';
 import {
-  EmptyState,
+  EmptySpecState,
   FieldGroup,
   TextField,
   NumberField,
@@ -89,13 +89,7 @@ export function ServerPreviewPanel() {
   });
 
   if (!spec || !server) {
-    return (
-      <EmptyState
-        icon="server"
-        title="尚未生成 Server Spec"
-        hint="在右侧 AgentPanel 描述你想要的服务器，生成 Spec 后即可预览"
-      />
-    );
+    return <EmptySpecState label="Server" describe="服务器" icon="server" />;
   }
 
   const updateField = <K extends keyof ServerSpec>(key: K, value: ServerSpec[K]) => {

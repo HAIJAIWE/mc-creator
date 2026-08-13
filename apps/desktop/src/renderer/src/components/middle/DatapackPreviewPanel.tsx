@@ -5,7 +5,7 @@ import {
   DataTable,
   PanelHeader,
   FilterBar,
-  EmptyState,
+  EmptySpecState,
   IconTabBar,
   useTabStatus,
 } from './shared/index.js';
@@ -146,13 +146,7 @@ export function DatapackPreviewPanel() {
   }, []);
 
   if (!spec) {
-    return (
-      <EmptyState
-        icon="box"
-        title="尚未生成数据包 Spec"
-        hint="在右侧 AgentPanel 描述你想要的数据包，生成 Spec 后即可预览"
-      />
-    );
+    return <EmptySpecState label="数据包" describe="数据包" />;
   }
 
   return (

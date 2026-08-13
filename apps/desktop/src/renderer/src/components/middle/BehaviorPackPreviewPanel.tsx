@@ -4,7 +4,7 @@ import { useModStore } from '../../store/mod-store.js';
 import {
   DataTable,
   PanelHeader,
-  EmptyState,
+  EmptySpecState,
   StatCard,
   StatCardGrid,
   MetadataView,
@@ -350,13 +350,7 @@ export function BehaviorPackPreviewPanel() {
   );
 
   if (!spec || !bp) {
-    return (
-      <EmptyState
-        icon="box"
-        title="尚未生成行为包 Spec"
-        hint="在右侧 AgentPanel 描述你想要的行为包，生成 Spec 后即可预览"
-      />
-    );
+    return <EmptySpecState label="行为包" describe="行为包" />;
   }
 
   // ===== 实体列定义 =====

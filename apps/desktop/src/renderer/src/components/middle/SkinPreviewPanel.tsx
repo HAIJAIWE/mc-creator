@@ -10,7 +10,7 @@ import {
 } from 'skinview3d';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { useModStore } from '../../store/mod-store.js';
-import { EmptyState, FieldGroup, TextField, SelectField } from './shared/index.js';
+import { EmptySpecState, FieldGroup, TextField, SelectField } from './shared/index.js';
 import type { SkinSpec } from '@mc-creator/shared';
 import { Download, Shuffle, Play, Pause, RotateCcw, User, Sparkles, Camera } from 'lucide-react';
 
@@ -245,13 +245,7 @@ export function SkinPreviewPanel() {
   }, [skinUrl, spec]);
 
   if (!spec) {
-    return (
-      <EmptyState
-        icon="box"
-        title="尚未生成皮肤 Spec"
-        hint="在右侧 AgentPanel 描述你想要的皮肤，生成 Spec 后即可预览"
-      />
-    );
+    return <EmptySpecState label="皮肤" describe="皮肤" />;
   }
 
   const skin = spec as unknown as SkinSpec;

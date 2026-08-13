@@ -4,7 +4,7 @@ import { useModStore } from '../../store/mod-store.js';
 import {
   DataTable,
   PanelHeader,
-  EmptyState,
+  EmptySpecState,
   StatCard,
   StatCardGrid,
   MetadataView,
@@ -15,6 +15,7 @@ import {
   BatchSelectToolbar,
   findDuplicates,
   downloadBlob,
+  countLangEntries,
   useBatchSelection,
   useTabCounts,
   useConflictDetection,
@@ -88,14 +89,6 @@ const CT_CONFLICT_GROUPS: ConflictGroup<CraftTweakerSpec>[] = [
     detect: (ct) => findDuplicates(ct.tooltips, (t) => t.itemId),
   },
 ];
-
-function ctLangStats(ct: CraftTweakerSpec) {
-  const entries = Object.values(ct.lang ?? {}).reduce(
-    (sum, dict) => sum + Object.keys(dict).length,
-    0,
-  );
-  return { langEntries: entries, langCount: Object.keys(ct.lang ?? {}).length };
-}
 
 const CT_EXPORT: ExportHandler<CraftTweakerSpec> = {
   prefix: (ct) => ct.packId,
@@ -224,7 +217,7 @@ const CT_EXPORT: ExportHandler<CraftTweakerSpec> = {
           ),
         ].join('\n'),
       toMd: (ct) => {
-        const { langEntries, langCount } = ctLangStats(ct);
+        const { entries: langEntries, languages: langCount } = countLangEntries(ct.lang);
         return toMdTable(
           `# ${ct.packName || ct.packId} - 语言条目`,
           `共 ${langEntries} 条翻译，覆盖 ${langCount} 种语言`,
@@ -300,16 +293,13 @@ export function CraftTweakerPreviewPanel() {
         customRecipes: 0,
       };
     }
-    const langEntries = Object.values(ct.lang ?? {}).reduce(
-      (sum, dict) => sum + Object.keys(dict).length,
-      0,
-    );
+    const { entries: langEntries, languages: langCount } = countLangEntries(ct.lang);
     return {
       recipes: ct.recipes.length,
       tags: ct.tags.length,
       events: ct.events.length,
       tooltips: ct.tooltips.length,
-      langCount: Object.keys(ct.lang ?? {}).length,
+      langCount,
       langEntries,
       advancedTooltips: ct.tooltips.filter((t) => t.advanced).length,
       replaceTags: ct.tags.filter((t) => t.replace).length,
@@ -464,13 +454,7 @@ export function CraftTweakerPreviewPanel() {
   );
 
   if (!spec || !ct) {
-    return (
-      <EmptyState
-        icon="box"
-        title="尚未生成 CraftTweaker Spec"
-        hint="在右侧 AgentPanel 描述你想要的 ZenScript 脚本，生成 Spec 后即可预览"
-      />
-    );
+    return <EmptySpecState label="CraftTweaker" describe="ZenScript 脚本" />;
   }
 
   // ===== 配方列定义 =====

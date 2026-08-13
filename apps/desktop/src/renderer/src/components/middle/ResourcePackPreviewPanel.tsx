@@ -7,7 +7,7 @@ import {
   ConflictAlert,
   ExportView,
   FilterBar,
-  EmptyState,
+  EmptySpecState,
   StatCard,
   StatCardGrid,
   MetadataView,
@@ -328,13 +328,7 @@ export function ResourcePackPreviewPanel() {
   );
 
   if (!spec || !pack) {
-    return (
-      <EmptyState
-        icon="box"
-        title="尚未生成资源包 Spec"
-        hint="在右侧 AgentPanel 描述你想要的资源包，生成 Spec 后即可预览"
-      />
-    );
+    return <EmptySpecState label="资源包" describe="资源包" />;
   }
 
   return (

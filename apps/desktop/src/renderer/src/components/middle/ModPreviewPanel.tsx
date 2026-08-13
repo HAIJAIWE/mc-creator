@@ -7,7 +7,7 @@ import {
   ConflictAlert,
   ExportView,
   FilterBar,
-  EmptyState,
+  EmptySpecState,
   StatCard,
   StatCardGrid,
   MetadataView,
@@ -459,10 +459,9 @@ export function ModPreviewPanel() {
 
   if (!spec || !mod) {
     return (
-      <EmptyState
-        icon="box"
-        title="尚未生成 Mod Spec"
-        hint="在右侧 AgentPanel 描述你想要的 mod，生成 Spec 后即可预览"
+      <EmptySpecState
+        label="Mod"
+        describe="mod"
         action={{
           label: '打开命令面板',
           onClick: () => window.dispatchEvent(new Event('mc:open-command-palette')),

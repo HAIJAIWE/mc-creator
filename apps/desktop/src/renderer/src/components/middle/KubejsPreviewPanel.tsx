@@ -4,7 +4,7 @@ import { useModStore } from '../../store/mod-store.js';
 import {
   DataTable,
   PanelHeader,
-  EmptyState,
+  EmptySpecState,
   StatCard,
   StatCardGrid,
   MetadataView,
@@ -15,6 +15,7 @@ import {
   BatchSelectToolbar,
   findDuplicates,
   downloadBlob,
+  countLangEntries,
   useBatchSelection,
   useTabCounts,
   useConflictDetection,
@@ -98,14 +99,6 @@ const KJ_CONFLICT_GROUPS: ConflictGroup<KubejsSpec>[] = [
     detect: (kj) => findDuplicates(kj.registry, (r) => r.id),
   },
 ];
-
-function kjLangStats(kj: KubejsSpec) {
-  const entries = Object.values(kj.lang ?? {}).reduce(
-    (sum, dict) => sum + Object.keys(dict).length,
-    0,
-  );
-  return { langEntries: entries, langCount: Object.keys(kj.lang ?? {}).length };
-}
 
 const KJ_EXPORT: ExportHandler<KubejsSpec> = {
   prefix: (kj) => kj.packId,
@@ -261,7 +254,7 @@ const KJ_EXPORT: ExportHandler<KubejsSpec> = {
           ),
         ].join('\n'),
       toMd: (kj) => {
-        const { langEntries, langCount } = kjLangStats(kj);
+        const { entries: langEntries, languages: langCount } = countLangEntries(kj.lang);
         return toMdTable(
           `# ${kj.packName || kj.packId} - 语言条目`,
           `共 ${langEntries} 条翻译，覆盖 ${langCount} 种语言`,
@@ -356,17 +349,14 @@ export function KubejsPreviewPanel() {
         totalRegistryEntries: 0,
       };
     }
-    const langEntries = Object.values(kj.lang ?? {}).reduce(
-      (sum, dict) => sum + Object.keys(dict).length,
-      0,
-    );
+    const { entries: langEntries, languages: langCount } = countLangEntries(kj.lang);
     return {
       recipes: kj.recipes.length,
       tags: kj.tags.length,
       events: kj.events.length,
       tooltips: kj.tooltips.length,
       registry: kj.registry.length,
-      langCount: Object.keys(kj.lang ?? {}).length,
+      langCount,
       langEntries,
       advancedTooltips: kj.tooltips.filter((t) => t.advanced).length,
       replaceTags: kj.tags.filter((t) => t.replace).length,
@@ -529,13 +519,7 @@ export function KubejsPreviewPanel() {
   );
 
   if (!spec || !kj) {
-    return (
-      <EmptyState
-        icon="box"
-        title="尚未生成 KubeJS Spec"
-        hint="在右侧 AgentPanel 描述你想要的 KubeJS 脚本，生成 Spec 后即可预览"
-      />
-    );
+    return <EmptySpecState label="KubeJS" describe="KubeJS 脚本" />;
   }
 
   // ===== 配方列定义 =====
