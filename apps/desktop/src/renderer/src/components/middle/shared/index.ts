@@ -19,3 +19,4 @@ export { IconTabBar } from './IconTabBar.js';
 export type { TabItem, IconTabBarProps } from './IconTabBar.js';
 export { BatchSelectToolbar } from './BatchSelectToolbar.js';
 export type { BatchSelectToolbarProps } from './BatchSelectToolbar.js';
+export { useBatchSelection } from './useBatchSelection.js';

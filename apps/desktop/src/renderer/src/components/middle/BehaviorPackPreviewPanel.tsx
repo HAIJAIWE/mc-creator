@@ -15,6 +15,7 @@ import {
   BatchSelectToolbar,
   findDuplicates,
   downloadBlob,
+  useBatchSelection,
 } from './shared/index.js';
 import type { Column, TabItem } from './shared/index.js';
 import type {
@@ -66,8 +67,8 @@ export function BehaviorPackPreviewPanel() {
   const [activeTab, setActiveTab] = useState<BehaviorPackTab>('entities');
   const [query, setQuery] = useState('');
   const [recipeTypeFilter, setRecipeTypeFilter] = useState<RecipeTypeFilter>('all');
-  const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set());
-  const [selectedRecipeIds, setSelectedRecipeIds] = useState<Set<string>>(new Set());
+  const entitySelection = useBatchSelection<string>();
+  const recipeSelection = useBatchSelection<string>();
 
   const bp = spec as unknown as BehaviorPackSpec | null;
 
@@ -179,24 +180,6 @@ export function BehaviorPackPreviewPanel() {
   }, [bp]);
 
   // ===== 批量选择操作 =====
-  const toggleEntitySelect = useCallback((id: string) => {
-    setSelectedEntityIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleRecipeSelect = useCallback((id: string) => {
-    setSelectedRecipeIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
   const removeEntities = useCallback(
     (ids: string[]) => {
       if (!bp) return;
@@ -206,7 +189,7 @@ export function BehaviorPackPreviewPanel() {
         entities: bp.entities.filter((e) => !idSet.has(e.identifier)),
       };
       setSpec(updated as unknown as typeof spec);
-      setSelectedEntityIds(new Set());
+      entitySelection.clear();
     },
     [bp, setSpec],
   );
@@ -220,7 +203,7 @@ export function BehaviorPackPreviewPanel() {
         recipes: bp.recipes.filter((r) => !idSet.has(r.identifier)),
       };
       setSpec(updated as unknown as typeof spec);
-      setSelectedRecipeIds(new Set());
+      recipeSelection.clear();
     },
     [bp, setSpec],
   );
@@ -372,11 +355,11 @@ export function BehaviorPackPreviewPanel() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            toggleEntitySelect(r.identifier);
+            entitySelection.toggle(r.identifier);
           }}
           className="text-mc-mute hover:text-mc-accent"
         >
-          {selectedEntityIds.has(r.identifier) ? (
+          {entitySelection.isSelected(r.identifier) ? (
             <CheckSquare className="h-3 w-3" />
           ) : (
             <Square className="h-3 w-3" />
@@ -450,11 +433,11 @@ export function BehaviorPackPreviewPanel() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            toggleRecipeSelect(r.identifier);
+            recipeSelection.toggle(r.identifier);
           }}
           className="text-mc-mute hover:text-mc-accent"
         >
-          {selectedRecipeIds.has(r.identifier) ? (
+          {recipeSelection.isSelected(r.identifier) ? (
             <CheckSquare className="h-3 w-3" />
           ) : (
             <Square className="h-3 w-3" />
@@ -600,18 +583,18 @@ export function BehaviorPackPreviewPanel() {
       {/* 实体批量操作栏 */}
       {activeTab === 'entities' && (
         <BatchSelectToolbar
-          selectedCount={selectedEntityIds.size}
-          onBatchRemove={() => removeEntities(Array.from(selectedEntityIds))}
-          onClearSelection={() => setSelectedEntityIds(new Set())}
+          selectedCount={entitySelection.size}
+          onBatchRemove={() => removeEntities(Array.from(entitySelection.selected))}
+          onClearSelection={entitySelection.clear}
         />
       )}
 
       {/* 配方批量操作栏 */}
       {activeTab === 'recipes' && (
         <BatchSelectToolbar
-          selectedCount={selectedRecipeIds.size}
-          onBatchRemove={() => removeRecipes(Array.from(selectedRecipeIds))}
-          onClearSelection={() => setSelectedRecipeIds(new Set())}
+          selectedCount={recipeSelection.size}
+          onBatchRemove={() => removeRecipes(Array.from(recipeSelection.selected))}
+          onClearSelection={recipeSelection.clear}
         />
       )}
 

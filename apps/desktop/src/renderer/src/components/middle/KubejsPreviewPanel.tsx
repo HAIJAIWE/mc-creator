@@ -15,6 +15,7 @@ import {
   BatchSelectToolbar,
   findDuplicates,
   downloadBlob,
+  useBatchSelection,
 } from './shared/index.js';
 import type { Column, TabItem } from './shared/index.js';
 import type {
@@ -117,7 +118,7 @@ export function KubejsPreviewPanel() {
   const [recipeTypeFilter, setRecipeTypeFilter] = useState<RecipeTypeFilter>('all');
   const [tagTypeFilter, setTagTypeFilter] = useState<TagTypeFilter>('all');
   const [registryTypeFilter, setRegistryTypeFilter] = useState<RegistryTypeFilter>('all');
-  const [selectedRecipeIds, setSelectedRecipeIds] = useState<Set<string>>(new Set());
+  const recipeSelection = useBatchSelection<string>();
 
   const kj = spec as unknown as KubejsSpec | null;
 
@@ -289,15 +290,6 @@ export function KubejsPreviewPanel() {
   }, [langRows, query]);
 
   // ===== 批量选择操作 =====
-  const toggleRecipeSelect = useCallback((id: string) => {
-    setSelectedRecipeIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
   const removeRecipes = useCallback(
     (ids: string[]) => {
       if (!kj) return;
@@ -307,7 +299,7 @@ export function KubejsPreviewPanel() {
         recipes: kj.recipes.filter((r) => !idSet.has(r.id)),
       };
       setSpec(updated as unknown as typeof spec);
-      setSelectedRecipeIds(new Set());
+      recipeSelection.clear();
     },
     [kj, setSpec],
   );
@@ -527,11 +519,11 @@ export function KubejsPreviewPanel() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            toggleRecipeSelect(r.id);
+            recipeSelection.toggle(r.id);
           }}
           className="text-mc-mute hover:text-mc-accent"
         >
-          {selectedRecipeIds.has(r.id) ? (
+          {recipeSelection.isSelected(r.id) ? (
             <CheckSquare className="h-3 w-3" />
           ) : (
             <Square className="h-3 w-3" />
@@ -945,9 +937,9 @@ export function KubejsPreviewPanel() {
       {/* 配方批量操作栏 */}
       {activeTab === 'recipes' && (
         <BatchSelectToolbar
-          selectedCount={selectedRecipeIds.size}
-          onBatchRemove={() => removeRecipes(Array.from(selectedRecipeIds))}
-          onClearSelection={() => setSelectedRecipeIds(new Set())}
+          selectedCount={recipeSelection.size}
+          onBatchRemove={() => removeRecipes(Array.from(recipeSelection.selected))}
+          onClearSelection={recipeSelection.clear}
         />
       )}
 

@@ -11,6 +11,7 @@ import {
   BatchSelectToolbar,
   downloadBlob,
   formatBytes,
+  useBatchSelection,
 } from './shared/index.js';
 import type { Column, TabItem } from './shared/index.js';
 import type { ModpackSpec, ModEntry, OverrideFileSpec } from '@mc-creator/shared';
@@ -38,7 +39,7 @@ export function ModpackPreviewPanel() {
   const [query, setQuery] = useState('');
   const [formatFilter, setFormatFilter] = useState<FormatFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('default');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selection = useBatchSelection<string>();
   const [activeView, setActiveView] = useState<SubView>('mods');
   const [expandedOverrides, setExpandedOverrides] = useState<Set<string>>(new Set());
 
@@ -102,21 +103,6 @@ export function ModpackPreviewPanel() {
   }, [pack]);
 
   // ===== 批量操作（hooks 必须在 early return 之前）=====
-  const toggleSelect = useCallback((key: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  const selectAll = useCallback(() => {
-    setSelectedIds(new Set(filtered.map((m) => `${m.projectId}:${m.versionId}`)));
-  }, [filtered]);
-
-  const deselectAll = useCallback(() => setSelectedIds(new Set()), []);
-
   const removeMods = useCallback(
     (keys: string[]) => {
       if (!pack) return;
@@ -126,7 +112,7 @@ export function ModpackPreviewPanel() {
         mods: pack.mods.filter((m) => !keySet.has(`${m.projectId}:${m.versionId}`)),
       };
       setSpec(updated as unknown as typeof spec);
-      setSelectedIds(new Set());
+      selection.clear();
     },
     [pack, setSpec],
   );
@@ -233,11 +219,11 @@ export function ModpackPreviewPanel() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              toggleSelect(key);
+              selection.toggle(key);
             }}
             className="text-mc-mute hover:text-mc-accent"
           >
-            {selectedIds.has(key) ? (
+            {selection.isSelected(key) ? (
               <CheckSquare className="h-3 w-3" />
             ) : (
               <Square className="h-3 w-3" />
@@ -344,9 +330,9 @@ export function ModpackPreviewPanel() {
 
           {/* 批量操作栏 */}
           <BatchSelectToolbar
-            selectedCount={selectedIds.size}
-            onBatchRemove={() => removeMods(Array.from(selectedIds))}
-            onClearSelection={deselectAll}
+            selectedCount={selection.size}
+            onBatchRemove={() => removeMods(Array.from(selection.selected))}
+            onClearSelection={selection.clear}
           />
 
           {/* 表格 */}
@@ -362,11 +348,16 @@ export function ModpackPreviewPanel() {
           {/* 选择操作 */}
           {filtered.length > 0 && (
             <div className="border-t border-mc-border px-3 py-1 text-[10px]">
-              <button onClick={selectAll} className="text-mc-dim hover:text-mc-text">
+              <button
+                onClick={() =>
+                  selection.setAll(filtered.map((m) => `${m.projectId}:${m.versionId}`))
+                }
+                className="text-mc-dim hover:text-mc-text"
+              >
                 全选
               </button>
               <span className="mx-2 text-mc-mute">·</span>
-              <button onClick={deselectAll} className="text-mc-dim hover:text-mc-text">
+              <button onClick={selection.clear} className="text-mc-dim hover:text-mc-text">
                 取消全选
               </button>
             </div>

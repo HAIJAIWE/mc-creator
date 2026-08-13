@@ -15,6 +15,7 @@ import {
   BatchSelectToolbar,
   findDuplicates,
   downloadBlob,
+  useBatchSelection,
 } from './shared/index.js';
 import type { Column, TabItem } from './shared/index.js';
 import type {
@@ -95,7 +96,7 @@ export function CraftTweakerPreviewPanel() {
   const [query, setQuery] = useState('');
   const [recipeTypeFilter, setRecipeTypeFilter] = useState<RecipeTypeFilter>('all');
   const [tagTypeFilter, setTagTypeFilter] = useState<TagTypeFilter>('all');
-  const [selectedRecipeIds, setSelectedRecipeIds] = useState<Set<string>>(new Set());
+  const recipeSelection = useBatchSelection<string>();
 
   const ct = spec as unknown as CraftTweakerSpec | null;
 
@@ -257,15 +258,6 @@ export function CraftTweakerPreviewPanel() {
   }, [langRows, query]);
 
   // ===== 批量选择操作 =====
-  const toggleRecipeSelect = useCallback((id: string) => {
-    setSelectedRecipeIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
   const removeRecipes = useCallback(
     (ids: string[]) => {
       if (!ct) return;
@@ -275,7 +267,7 @@ export function CraftTweakerPreviewPanel() {
         recipes: ct.recipes.filter((r) => !idSet.has(r.id)),
       };
       setSpec(updated as unknown as typeof spec);
-      setSelectedRecipeIds(new Set());
+      recipeSelection.clear();
     },
     [ct, setSpec],
   );
@@ -470,11 +462,11 @@ export function CraftTweakerPreviewPanel() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            toggleRecipeSelect(r.id);
+            recipeSelection.toggle(r.id);
           }}
           className="text-mc-mute hover:text-mc-accent"
         >
-          {selectedRecipeIds.has(r.id) ? (
+          {recipeSelection.isSelected(r.id) ? (
             <CheckSquare className="h-3 w-3" />
           ) : (
             <Square className="h-3 w-3" />
@@ -811,9 +803,9 @@ export function CraftTweakerPreviewPanel() {
       {/* 配方批量操作栏 */}
       {activeTab === 'recipes' && (
         <BatchSelectToolbar
-          selectedCount={selectedRecipeIds.size}
-          onBatchRemove={() => removeRecipes(Array.from(selectedRecipeIds))}
-          onClearSelection={() => setSelectedRecipeIds(new Set())}
+          selectedCount={recipeSelection.size}
+          onBatchRemove={() => removeRecipes(Array.from(recipeSelection.selected))}
+          onClearSelection={recipeSelection.clear}
         />
       )}
 

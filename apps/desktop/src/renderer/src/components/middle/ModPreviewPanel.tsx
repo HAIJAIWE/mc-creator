@@ -15,6 +15,7 @@ import {
   BatchSelectToolbar,
   findDuplicates,
   downloadBlob,
+  useBatchSelection,
 } from './shared/index.js';
 import type { Column, TabItem } from './shared/index.js';
 import type {
@@ -168,8 +169,8 @@ export function ModPreviewPanel() {
   const [rarityFilter, setRarityFilter] = useState<ItemRarityFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<ItemCategoryFilter>('all');
   const [materialFilter, setMaterialFilter] = useState<BlockMaterialFilter>('all');
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
-  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
+  const itemSelection = useBatchSelection<string>();
+  const blockSelection = useBatchSelection<string>();
 
   const mod = spec as unknown as ModSpec | null;
 
@@ -293,31 +294,13 @@ export function ModPreviewPanel() {
   }, [mod, query]);
 
   // ===== 批量选择操作（hooks 必须在 early return 之前）=====
-  const toggleItemSelect = useCallback((id: string) => {
-    setSelectedItemIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleBlockSelect = useCallback((id: string) => {
-    setSelectedBlockIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
   const removeItems = useCallback(
     (ids: string[]) => {
       if (!mod) return;
       const idSet = new Set(ids);
       const updated = { ...mod, items: mod.items.filter((i) => !idSet.has(i.id)) };
       setSpec(updated as unknown as typeof spec);
-      setSelectedItemIds(new Set());
+      itemSelection.clear();
     },
     [mod, setSpec],
   );
@@ -328,7 +311,7 @@ export function ModPreviewPanel() {
       const idSet = new Set(ids);
       const updated = { ...mod, blocks: mod.blocks.filter((b) => !idSet.has(b.id)) };
       setSpec(updated as unknown as typeof spec);
-      setSelectedBlockIds(new Set());
+      blockSelection.clear();
     },
     [mod, setSpec],
   );
@@ -485,11 +468,11 @@ export function ModPreviewPanel() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            toggleItemSelect(r.id);
+            itemSelection.toggle(r.id);
           }}
           className="text-mc-mute hover:text-mc-accent"
         >
-          {selectedItemIds.has(r.id) ? (
+          {itemSelection.isSelected(r.id) ? (
             <CheckSquare className="h-3 w-3" />
           ) : (
             <Square className="h-3 w-3" />
@@ -574,11 +557,11 @@ export function ModPreviewPanel() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            toggleBlockSelect(r.id);
+            blockSelection.toggle(r.id);
           }}
           className="text-mc-mute hover:text-mc-accent"
         >
-          {selectedBlockIds.has(r.id) ? (
+          {blockSelection.isSelected(r.id) ? (
             <CheckSquare className="h-3 w-3" />
           ) : (
             <Square className="h-3 w-3" />
@@ -852,18 +835,18 @@ export function ModPreviewPanel() {
       {/* 物品批量操作栏 */}
       {activeTab === 'items' && (
         <BatchSelectToolbar
-          selectedCount={selectedItemIds.size}
-          onBatchRemove={() => removeItems(Array.from(selectedItemIds))}
-          onClearSelection={() => setSelectedItemIds(new Set())}
+          selectedCount={itemSelection.size}
+          onBatchRemove={() => removeItems(Array.from(itemSelection.selected))}
+          onClearSelection={itemSelection.clear}
         />
       )}
 
       {/* 方块批量操作栏 */}
       {activeTab === 'blocks' && (
         <BatchSelectToolbar
-          selectedCount={selectedBlockIds.size}
-          onBatchRemove={() => removeBlocks(Array.from(selectedBlockIds))}
-          onClearSelection={() => setSelectedBlockIds(new Set())}
+          selectedCount={blockSelection.size}
+          onBatchRemove={() => removeBlocks(Array.from(blockSelection.selected))}
+          onClearSelection={blockSelection.clear}
         />
       )}
 
