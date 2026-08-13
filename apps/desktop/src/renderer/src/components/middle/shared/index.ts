@@ -24,3 +24,5 @@ export { useTabCounts, useTabStatus } from './useTabCounts.js';
 export type { BaseTab, TabStatus } from './useTabCounts.js';
 export { useConflictDetection } from './useConflictDetection.js';
 export type { ConflictGroup, ConflictDetection } from './useConflictDetection.js';
+export { buildExport, toMdTable, toMdOverview } from './exportData.js';
+export type { ExportScope, ExportHandler } from './exportData.js';

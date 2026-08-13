@@ -18,8 +18,17 @@ import {
   useBatchSelection,
   useTabCounts,
   useConflictDetection,
+  buildExport,
+  toMdTable,
+  toMdOverview,
 } from './shared/index.js';
-import type { Column, TabItem, ConflictGroup } from './shared/index.js';
+import type {
+  Column,
+  TabItem,
+  ConflictGroup,
+  ExportFormat,
+  ExportHandler,
+} from './shared/index.js';
 import type {
   BehaviorPackSpec,
   BpEntitySpec,
@@ -70,6 +79,108 @@ const BP_CONFLICT_GROUPS: ConflictGroup<BehaviorPackSpec>[] = [
     detect: (bp) => findDuplicates(bp.lootTables, (l) => l.path),
   },
 ];
+
+const BP_EXPORT: ExportHandler<BehaviorPackSpec> = {
+  prefix: (bp) => bp.packId,
+  scopes: {
+    all: {
+      data: (bp) => bp,
+      toMd: (bp) =>
+        toMdOverview(
+          `# ${bp.packName || bp.packId}`,
+          [
+            `- **Pack ID**: ${bp.packId}`,
+            `- **Format**: ${bp.packFormat}`,
+            `- **描述**: ${bp.description || '—'}`,
+          ],
+          [
+            {
+              heading: '实体列表',
+              lines: bp.entities.map(
+                (e) =>
+                  `- \`${e.identifier}\` — ${Object.keys(e.components).length} 组件 / ${Object.keys(e.events).length} 事件`,
+              ),
+            },
+            {
+              heading: '配方列表',
+              lines: bp.recipes.map(
+                (r) =>
+                  `- \`${r.identifier}\` — ${RECIPE_TYPE_LABEL[r.type] ?? r.type} → ${r.result} x${r.count}`,
+              ),
+            },
+            {
+              heading: '战利品表',
+              lines: bp.lootTables.map((l) => `- \`${l.path}\` — ${l.pools.length} 池`),
+            },
+          ],
+        ),
+    },
+    entities: {
+      data: (bp) => bp.entities,
+      toCsv: (bp) =>
+        [
+          'Identifier,Components,Events,DescriptionGroups',
+          ...bp.entities.map(
+            (e) =>
+              `"${e.identifier}",${Object.keys(e.components).length},${Object.keys(e.events).length},${e.description_groups.length}`,
+          ),
+        ].join('\n'),
+      toMd: (bp) =>
+        toMdTable(
+          `# ${bp.packName || bp.packId} - 实体列表`,
+          `共 ${bp.entities.length} 个实体`,
+          ['Identifier', '组件数', '事件数'],
+          bp.entities.map((e) => [
+            `\`${e.identifier}\``,
+            String(Object.keys(e.components).length),
+            String(Object.keys(e.events).length),
+          ]),
+        ),
+    },
+    recipes: {
+      data: (bp) => bp.recipes,
+      toCsv: (bp) =>
+        [
+          'Identifier,Type,Result,Count',
+          ...bp.recipes.map((r) => `"${r.identifier}","${r.type}","${r.result}",${r.count}`),
+        ].join('\n'),
+      toMd: (bp) =>
+        toMdTable(
+          `# ${bp.packName || bp.packId} - 配方列表`,
+          `共 ${bp.recipes.length} 个配方`,
+          ['Identifier', '类型', '产物', '数量'],
+          bp.recipes.map((r) => [
+            `\`${r.identifier}\``,
+            RECIPE_TYPE_LABEL[r.type] ?? r.type,
+            r.result,
+            String(r.count),
+          ]),
+        ),
+    },
+    loot: {
+      data: (bp) => bp.lootTables,
+      toCsv: (bp) =>
+        [
+          'Path,Pools,TotalEntries',
+          ...bp.lootTables.map((l) => {
+            const totalEntries = l.pools.reduce((s, p) => s + p.entries.length, 0);
+            return `"${l.path}",${l.pools.length},${totalEntries}`;
+          }),
+        ].join('\n'),
+      toMd: (bp) =>
+        toMdTable(
+          `# ${bp.packName || bp.packId} - 战利品表`,
+          `共 ${bp.lootTables.length} 个战利品表`,
+          ['Path', '池数', '总条目'],
+          bp.lootTables.map((l) => [
+            `\`${l.path}\``,
+            String(l.pools.length),
+            String(l.pools.reduce((s, p) => s + p.entries.length, 0)),
+          ]),
+        ),
+    },
+  },
+};
 
 const RECIPE_TYPE_LABEL: Record<string, string> = {
   shaped_crafting: '有序合成',
@@ -229,110 +340,11 @@ export function BehaviorPackPreviewPanel() {
 
   // ===== 导出函数 =====
   const exportData = useCallback(
-    (format: 'json' | 'csv' | 'markdown', scope: 'all' | 'entities' | 'recipes' | 'loot') => {
+    (format: ExportFormat, scope: 'all' | 'entities' | 'recipes' | 'loot') => {
       if (!bp) return;
-      let data: unknown;
-      let filename = '';
-      let content = '';
-
-      if (scope === 'all') {
-        data = bp;
-      } else if (scope === 'entities') {
-        data = bp.entities;
-      } else if (scope === 'recipes') {
-        data = bp.recipes;
-      } else {
-        data = bp.lootTables;
-      }
-
-      if (format === 'json') {
-        content = JSON.stringify(data, null, 2);
-        filename = `${bp.packId}-${scope}.json`;
-      } else if (format === 'csv') {
-        if (scope === 'entities') {
-          const rows = ['Identifier,Components,Events,DescriptionGroups'];
-          for (const e of bp.entities) {
-            rows.push(
-              `"${e.identifier}",${Object.keys(e.components).length},${Object.keys(e.events).length},${e.description_groups.length}`,
-            );
-          }
-          content = rows.join('\n');
-        } else if (scope === 'recipes') {
-          const rows = ['Identifier,Type,Result,Count'];
-          for (const r of bp.recipes) {
-            rows.push(`"${r.identifier}","${r.type}","${r.result}",${r.count}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'loot') {
-          const rows = ['Path,Pools,TotalEntries'];
-          for (const l of bp.lootTables) {
-            const totalEntries = l.pools.reduce((s, p) => s + p.entries.length, 0);
-            rows.push(`"${l.path}",${l.pools.length},${totalEntries}`);
-          }
-          content = rows.join('\n');
-        } else {
-          content = JSON.stringify(data, null, 2);
-        }
-        filename = `${bp.packId}-${scope}.csv`;
-      } else {
-        // markdown
-        const lines: string[] = [];
-        if (scope === 'all') {
-          lines.push(`# ${bp.packName || bp.packId}`, '');
-          lines.push(`- **Pack ID**: ${bp.packId}`);
-          lines.push(`- **Format**: ${bp.packFormat}`);
-          lines.push(`- **描述**: ${bp.description || '—'}`);
-          lines.push('');
-          lines.push('## 实体列表', '');
-          for (const e of bp.entities) {
-            lines.push(
-              `- \`${e.identifier}\` — ${Object.keys(e.components).length} 组件 / ${Object.keys(e.events).length} 事件`,
-            );
-          }
-          lines.push('');
-          lines.push('## 配方列表', '');
-          for (const r of bp.recipes) {
-            lines.push(
-              `- \`${r.identifier}\` — ${RECIPE_TYPE_LABEL[r.type] ?? r.type} → ${r.result} x${r.count}`,
-            );
-          }
-          lines.push('');
-          lines.push('## 战利品表', '');
-          for (const l of bp.lootTables) {
-            lines.push(`- \`${l.path}\` — ${l.pools.length} 池`);
-          }
-        } else if (scope === 'entities') {
-          lines.push(`# ${bp.packName || bp.packId} - 实体列表`, '');
-          lines.push(`共 ${bp.entities.length} 个实体`, '');
-          lines.push('| Identifier | 组件数 | 事件数 |', '|---|---|---|');
-          for (const e of bp.entities) {
-            lines.push(
-              `| \`${e.identifier}\` | ${Object.keys(e.components).length} | ${Object.keys(e.events).length} |`,
-            );
-          }
-        } else if (scope === 'recipes') {
-          lines.push(`# ${bp.packName || bp.packId} - 配方列表`, '');
-          lines.push(`共 ${bp.recipes.length} 个配方`, '');
-          lines.push('| Identifier | 类型 | 产物 | 数量 |', '|---|---|---|---|');
-          for (const r of bp.recipes) {
-            lines.push(
-              `| \`${r.identifier}\` | ${RECIPE_TYPE_LABEL[r.type] ?? r.type} | ${r.result} | ${r.count} |`,
-            );
-          }
-        } else if (scope === 'loot') {
-          lines.push(`# ${bp.packName || bp.packId} - 战利品表`, '');
-          lines.push(`共 ${bp.lootTables.length} 个战利品表`, '');
-          lines.push('| Path | 池数 | 总条目 |', '|---|---|---|');
-          for (const l of bp.lootTables) {
-            const totalEntries = l.pools.reduce((s, p) => s + p.entries.length, 0);
-            lines.push(`| \`${l.path}\` | ${l.pools.length} | ${totalEntries} |`);
-          }
-        }
-        content = lines.join('\n');
-        filename = `${bp.packId}-${scope}.md`;
-      }
-
-      downloadBlob(content, filename);
+      const out = buildExport(bp, BP_EXPORT, format, scope);
+      if (!out) return;
+      downloadBlob(out.content, out.filename);
     },
     [bp],
   );

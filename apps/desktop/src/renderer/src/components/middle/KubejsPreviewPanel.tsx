@@ -18,8 +18,17 @@ import {
   useBatchSelection,
   useTabCounts,
   useConflictDetection,
+  buildExport,
+  toMdTable,
+  toMdOverview,
 } from './shared/index.js';
-import type { Column, TabItem, ConflictGroup } from './shared/index.js';
+import type {
+  Column,
+  TabItem,
+  ConflictGroup,
+  ExportFormat,
+  ExportHandler,
+} from './shared/index.js';
 import type {
   KubejsSpec,
   KubejsRecipeSpec,
@@ -89,6 +98,182 @@ const KJ_CONFLICT_GROUPS: ConflictGroup<KubejsSpec>[] = [
     detect: (kj) => findDuplicates(kj.registry, (r) => r.id),
   },
 ];
+
+function kjLangStats(kj: KubejsSpec) {
+  const entries = Object.values(kj.lang ?? {}).reduce(
+    (sum, dict) => sum + Object.keys(dict).length,
+    0,
+  );
+  return { langEntries: entries, langCount: Object.keys(kj.lang ?? {}).length };
+}
+
+const KJ_EXPORT: ExportHandler<KubejsSpec> = {
+  prefix: (kj) => kj.packId,
+  scopes: {
+    all: {
+      data: (kj) => kj,
+      toMd: (kj) =>
+        toMdOverview(
+          `# ${kj.packName || kj.packId}`,
+          [
+            `- **Pack ID**: ${kj.packId}`,
+            `- **Format**: ${kj.packFormat}`,
+            `- **MC 版本**: ${kj.mcVersion}`,
+            `- **描述**: ${kj.description || '—'}`,
+          ],
+          [
+            {
+              heading: '配方列表',
+              lines: kj.recipes.map(
+                (r) =>
+                  `- \`${r.id}\` — ${RECIPE_TYPE_LABEL[r.type] ?? r.type} → ${r.result} x${r.count}`,
+              ),
+            },
+            {
+              heading: '标签列表',
+              lines: kj.tags.map(
+                (t) =>
+                  `- \`${t.id}\` — ${TAG_TYPE_LABEL[t.type] ?? t.type} (${t.values.length} 条目)`,
+              ),
+            },
+            {
+              heading: '事件列表',
+              lines: kj.events.map((e) => `- \`${e.id}\` — ${e.type} (${e.target || '—'})`),
+            },
+            {
+              heading: '注册表',
+              lines: kj.registry.map(
+                (r) =>
+                  `- \`${r.id}\` — ${REGISTRY_TYPE_LABEL[r.type] ?? r.type} (${r.items.length + r.blocks.length} 条目)`,
+              ),
+            },
+            {
+              heading: '工具提示',
+              lines: kj.tooltips.map(
+                (t) => `- \`${t.itemId}\` — ${t.lines.length} 行${t.advanced ? ' (高级)' : ''}`,
+              ),
+            },
+          ],
+        ),
+    },
+    recipes: {
+      data: (kj) => kj.recipes,
+      toCsv: (kj) =>
+        [
+          'ID,Type,Result,Count',
+          ...kj.recipes.map((r) => `"${r.id}","${r.type}","${r.result}",${r.count}`),
+        ].join('\n'),
+      toMd: (kj) =>
+        toMdTable(
+          `# ${kj.packName || kj.packId} - 配方列表`,
+          `共 ${kj.recipes.length} 个配方`,
+          ['ID', '类型', '产物', '数量'],
+          kj.recipes.map((r) => [
+            `\`${r.id}\``,
+            RECIPE_TYPE_LABEL[r.type] ?? r.type,
+            r.result,
+            String(r.count),
+          ]),
+        ),
+    },
+    tags: {
+      data: (kj) => kj.tags,
+      toCsv: (kj) =>
+        [
+          'ID,Type,Values,Replace',
+          ...kj.tags.map(
+            (t) => `"${t.id}","${t.type}","${t.values.join(';')}",${t.replace ? 'Yes' : 'No'}`,
+          ),
+        ].join('\n'),
+      toMd: (kj) =>
+        toMdTable(
+          `# ${kj.packName || kj.packId} - 标签列表`,
+          `共 ${kj.tags.length} 个标签`,
+          ['ID', '类型', '条目数', '替换'],
+          kj.tags.map((t) => [
+            `\`${t.id}\``,
+            TAG_TYPE_LABEL[t.type] ?? t.type,
+            String(t.values.length),
+            t.replace ? '是' : '否',
+          ]),
+        ),
+    },
+    events: {
+      data: (kj) => kj.events,
+      toCsv: (kj) =>
+        ['ID,Type,Target', ...kj.events.map((e) => `"${e.id}","${e.type}","${e.target}"`)].join(
+          '\n',
+        ),
+      toMd: (kj) =>
+        toMdTable(
+          `# ${kj.packName || kj.packId} - 事件列表`,
+          `共 ${kj.events.length} 个事件`,
+          ['ID', '类型', '目标'],
+          kj.events.map((e) => [`\`${e.id}\``, e.type, e.target || '—']),
+        ),
+    },
+    tooltips: {
+      data: (kj) => kj.tooltips,
+      toCsv: (kj) =>
+        [
+          'ItemID,Lines,Advanced',
+          ...kj.tooltips.map((t) => `"${t.itemId}",${t.lines.length},${t.advanced ? 'Yes' : 'No'}`),
+        ].join('\n'),
+      toMd: (kj) =>
+        toMdTable(
+          `# ${kj.packName || kj.packId} - 工具提示`,
+          `共 ${kj.tooltips.length} 个工具提示`,
+          ['物品 ID', '行数', '高级'],
+          kj.tooltips.map((t) => [
+            `\`${t.itemId}\``,
+            String(t.lines.length),
+            t.advanced ? '是' : '否',
+          ]),
+        ),
+    },
+    registry: {
+      data: (kj) => kj.registry,
+      toCsv: (kj) =>
+        [
+          'ID,Type,Items,Blocks',
+          ...kj.registry.map((r) => `"${r.id}","${r.type}",${r.items.length},${r.blocks.length}`),
+        ].join('\n'),
+      toMd: (kj) =>
+        toMdTable(
+          `# ${kj.packName || kj.packId} - 注册表`,
+          `共 ${kj.registry.length} 个注册表条目`,
+          ['ID', '类型', '物品数', '方块数'],
+          kj.registry.map((r) => [
+            `\`${r.id}\``,
+            REGISTRY_TYPE_LABEL[r.type] ?? r.type,
+            String(r.items.length),
+            String(r.blocks.length),
+          ]),
+        ),
+    },
+    lang: {
+      data: (kj) => kj.lang,
+      toCsv: (kj) =>
+        [
+          'Lang,Key,Value',
+          ...Object.entries(kj.lang ?? {}).flatMap(([langCode, dict]) =>
+            Object.entries(dict).map(([k, v]) => `"${langCode}","${k}","${v.replace(/"/g, '""')}"`),
+          ),
+        ].join('\n'),
+      toMd: (kj) => {
+        const { langEntries, langCount } = kjLangStats(kj);
+        return toMdTable(
+          `# ${kj.packName || kj.packId} - 语言条目`,
+          `共 ${langEntries} 条翻译，覆盖 ${langCount} 种语言`,
+          ['语言', '键', '值'],
+          Object.entries(kj.lang ?? {}).flatMap(([langCode, dict]) =>
+            Object.entries(dict).map(([k, v]) => [langCode, `\`${k}\``, v]),
+          ),
+        );
+      },
+    },
+  },
+};
 
 const RECIPE_TYPE_LABEL: Record<string, string> = {
   shaped: '有序合成',
@@ -332,174 +517,15 @@ export function KubejsPreviewPanel() {
   // ===== 导出函数 =====
   const exportData = useCallback(
     (
-      format: 'json' | 'csv' | 'markdown',
+      format: ExportFormat,
       scope: 'all' | 'recipes' | 'tags' | 'events' | 'tooltips' | 'registry' | 'lang',
     ) => {
       if (!kj) return;
-      let data: unknown;
-      let filename = '';
-      let content = '';
-
-      if (scope === 'all') {
-        data = kj;
-      } else if (scope === 'recipes') {
-        data = kj.recipes;
-      } else if (scope === 'tags') {
-        data = kj.tags;
-      } else if (scope === 'events') {
-        data = kj.events;
-      } else if (scope === 'tooltips') {
-        data = kj.tooltips;
-      } else if (scope === 'registry') {
-        data = kj.registry;
-      } else {
-        data = kj.lang;
-      }
-
-      if (format === 'json') {
-        content = JSON.stringify(data, null, 2);
-        filename = `${kj.packId}-${scope}.json`;
-      } else if (format === 'csv') {
-        if (scope === 'recipes') {
-          const rows = ['ID,Type,Result,Count'];
-          for (const r of kj.recipes) {
-            rows.push(`"${r.id}","${r.type}","${r.result}",${r.count}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'tags') {
-          const rows = ['ID,Type,Values,Replace'];
-          for (const t of kj.tags) {
-            rows.push(`"${t.id}","${t.type}","${t.values.join(';')}",${t.replace ? 'Yes' : 'No'}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'events') {
-          const rows = ['ID,Type,Target'];
-          for (const e of kj.events) {
-            rows.push(`"${e.id}","${e.type}","${e.target}"`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'tooltips') {
-          const rows = ['ItemID,Lines,Advanced'];
-          for (const t of kj.tooltips) {
-            rows.push(`"${t.itemId}",${t.lines.length},${t.advanced ? 'Yes' : 'No'}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'registry') {
-          const rows = ['ID,Type,Items,Blocks'];
-          for (const r of kj.registry) {
-            rows.push(`"${r.id}","${r.type}",${r.items.length},${r.blocks.length}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'lang') {
-          const rows = ['Lang,Key,Value'];
-          for (const [langCode, dict] of Object.entries(kj.lang ?? {})) {
-            for (const [k, v] of Object.entries(dict)) {
-              rows.push(`"${langCode}","${k}","${v.replace(/"/g, '""')}"`);
-            }
-          }
-          content = rows.join('\n');
-        } else {
-          content = JSON.stringify(data, null, 2);
-        }
-        filename = `${kj.packId}-${scope}.csv`;
-      } else {
-        // markdown
-        const lines: string[] = [];
-        if (scope === 'all') {
-          lines.push(`# ${kj.packName || kj.packId}`, '');
-          lines.push(`- **Pack ID**: ${kj.packId}`);
-          lines.push(`- **Format**: ${kj.packFormat}`);
-          lines.push(`- **MC 版本**: ${kj.mcVersion}`);
-          lines.push(`- **描述**: ${kj.description || '—'}`);
-          lines.push('');
-          lines.push('## 配方列表', '');
-          for (const r of kj.recipes) {
-            lines.push(
-              `- \`${r.id}\` — ${RECIPE_TYPE_LABEL[r.type] ?? r.type} → ${r.result} x${r.count}`,
-            );
-          }
-          lines.push('');
-          lines.push('## 标签列表', '');
-          for (const t of kj.tags) {
-            lines.push(
-              `- \`${t.id}\` — ${TAG_TYPE_LABEL[t.type] ?? t.type} (${t.values.length} 条目)`,
-            );
-          }
-          lines.push('');
-          lines.push('## 事件列表', '');
-          for (const e of kj.events) {
-            lines.push(`- \`${e.id}\` — ${e.type} (${e.target || '—'})`);
-          }
-          lines.push('');
-          lines.push('## 注册表', '');
-          for (const r of kj.registry) {
-            lines.push(
-              `- \`${r.id}\` — ${REGISTRY_TYPE_LABEL[r.type] ?? r.type} (${r.items.length + r.blocks.length} 条目)`,
-            );
-          }
-          lines.push('');
-          lines.push('## 工具提示', '');
-          for (const t of kj.tooltips) {
-            lines.push(`- \`${t.itemId}\` — ${t.lines.length} 行${t.advanced ? ' (高级)' : ''}`);
-          }
-        } else if (scope === 'recipes') {
-          lines.push(`# ${kj.packName || kj.packId} - 配方列表`, '');
-          lines.push(`共 ${kj.recipes.length} 个配方`, '');
-          lines.push('| ID | 类型 | 产物 | 数量 |', '|---|---|---|---|');
-          for (const r of kj.recipes) {
-            lines.push(
-              `| \`${r.id}\` | ${RECIPE_TYPE_LABEL[r.type] ?? r.type} | ${r.result} | ${r.count} |`,
-            );
-          }
-        } else if (scope === 'tags') {
-          lines.push(`# ${kj.packName || kj.packId} - 标签列表`, '');
-          lines.push(`共 ${kj.tags.length} 个标签`, '');
-          lines.push('| ID | 类型 | 条目数 | 替换 |', '|---|---|---|---|');
-          for (const t of kj.tags) {
-            lines.push(
-              `| \`${t.id}\` | ${TAG_TYPE_LABEL[t.type] ?? t.type} | ${t.values.length} | ${t.replace ? '是' : '否'} |`,
-            );
-          }
-        } else if (scope === 'events') {
-          lines.push(`# ${kj.packName || kj.packId} - 事件列表`, '');
-          lines.push(`共 ${kj.events.length} 个事件`, '');
-          lines.push('| ID | 类型 | 目标 |', '|---|---|---|');
-          for (const e of kj.events) {
-            lines.push(`| \`${e.id}\` | ${e.type} | ${e.target || '—'} |`);
-          }
-        } else if (scope === 'tooltips') {
-          lines.push(`# ${kj.packName || kj.packId} - 工具提示`, '');
-          lines.push(`共 ${kj.tooltips.length} 个工具提示`, '');
-          lines.push('| 物品 ID | 行数 | 高级 |', '|---|---|---|');
-          for (const t of kj.tooltips) {
-            lines.push(`| \`${t.itemId}\` | ${t.lines.length} | ${t.advanced ? '是' : '否'} |`);
-          }
-        } else if (scope === 'registry') {
-          lines.push(`# ${kj.packName || kj.packId} - 注册表`, '');
-          lines.push(`共 ${kj.registry.length} 个注册表条目`, '');
-          lines.push('| ID | 类型 | 物品数 | 方块数 |', '|---|---|---|---|');
-          for (const r of kj.registry) {
-            lines.push(
-              `| \`${r.id}\` | ${REGISTRY_TYPE_LABEL[r.type] ?? r.type} | ${r.items.length} | ${r.blocks.length} |`,
-            );
-          }
-        } else if (scope === 'lang') {
-          lines.push(`# ${kj.packName || kj.packId} - 语言条目`, '');
-          lines.push(`共 ${stats.langEntries} 条翻译，覆盖 ${stats.langCount} 种语言`, '');
-          lines.push('| 语言 | 键 | 值 |', '|---|---|---|');
-          for (const [langCode, dict] of Object.entries(kj.lang ?? {})) {
-            for (const [k, v] of Object.entries(dict)) {
-              lines.push(`| ${langCode} | \`${k}\` | ${v} |`);
-            }
-          }
-        }
-        content = lines.join('\n');
-        filename = `${kj.packId}-${scope}.md`;
-      }
-
-      downloadBlob(content, filename, 'text/plain');
+      const out = buildExport(kj, KJ_EXPORT, format, scope);
+      if (!out) return;
+      downloadBlob(out.content, out.filename, 'text/plain');
     },
-    [kj, stats.langEntries, stats.langCount],
+    [kj],
   );
 
   if (!spec || !kj) {

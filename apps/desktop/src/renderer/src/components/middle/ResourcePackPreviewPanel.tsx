@@ -16,8 +16,17 @@ import {
   downloadBlob,
   useTabCounts,
   useConflictDetection,
+  buildExport,
+  toMdTable,
+  toMdOverview,
 } from './shared/index.js';
-import type { Column, TabItem, ConflictGroup } from './shared/index.js';
+import type {
+  Column,
+  TabItem,
+  ConflictGroup,
+  ExportFormat,
+  ExportHandler,
+} from './shared/index.js';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import type {
   ResourcePackSpec as ResourcePackSpecType,
@@ -64,6 +73,166 @@ const RP_CONFLICT_GROUPS: ConflictGroup<ResourcePackSpecType>[] = [
     detect: (pack) => findDuplicates(pack.fonts, (f) => f.id),
   },
 ];
+
+function rpLangStats(pack: ResourcePackSpecType) {
+  return {
+    langEnUs: Object.keys(pack.langEnUs).length,
+    langZhCn: Object.keys(pack.langZhCn).length,
+  };
+}
+
+const RP_EXPORT: ExportHandler<ResourcePackSpecType> = {
+  prefix: (pack) => pack.namespace,
+  scopes: {
+    all: {
+      data: (pack) => pack,
+      toMd: (pack) =>
+        toMdOverview(
+          `# ${pack.packName}`,
+          [
+            `- **Namespace**: ${pack.namespace}`,
+            `- **Format**: ${pack.packFormat}`,
+            `- **描述**: ${pack.packDescription || '—'}`,
+          ],
+          [
+            {
+              heading: '材质覆盖',
+              lines: pack.textureOverrides.map(
+                (t) => `- \`${t.path}\` — ${t.width}×${t.height} (${t.color})`,
+              ),
+            },
+            {
+              heading: '音效',
+              lines: pack.sounds.map(
+                (s) =>
+                  `- \`${s.id}\` — 音量 ${s.volume} · 音调 ${s.pitch}${s.stream ? ' · 流式' : ''}`,
+              ),
+            },
+            {
+              heading: '模型',
+              lines: pack.models.map(
+                (m) => `- \`${m.path}\` — ${m.autoCubeAll ? '自动 cube_all' : '自定义 JSON'}`,
+              ),
+            },
+            {
+              heading: '字体',
+              lines: pack.fonts.map((f) => `- \`${f.id}\` — 字符 "${f.char}" → ${f.texture}`),
+            },
+            {
+              heading: '语言 (en_us)',
+              lines: Object.entries(pack.langEnUs).map(([k, v]) => `- \`${k}\` = ${v}`),
+            },
+          ],
+        ),
+    },
+    textures: {
+      data: (pack) => pack.textureOverrides,
+      toCsv: (pack) =>
+        [
+          'Path,Color,Width,Height,Gradient,Checkerboard',
+          ...pack.textureOverrides.map(
+            (t) =>
+              `"${t.path}","${t.color}",${t.width},${t.height},${t.gradientTo ? 'Yes' : 'No'},${t.checkerboard ? 'Yes' : 'No'}`,
+          ),
+        ].join('\n'),
+      toMd: (pack) =>
+        toMdTable(
+          `# ${pack.packName} - 材质覆盖`,
+          `共 ${pack.textureOverrides.length} 个材质`,
+          ['路径', '颜色', '尺寸'],
+          pack.textureOverrides.map((t) => [`\`${t.path}\``, t.color, `${t.width}×${t.height}`]),
+        ),
+    },
+    sounds: {
+      data: (pack) => pack.sounds,
+      toCsv: (pack) =>
+        [
+          'ID,Event,Volume,Pitch,Stream',
+          ...pack.sounds.map(
+            (s) => `"${s.id}","${s.event}",${s.volume},${s.pitch},${s.stream ? 'Yes' : 'No'}`,
+          ),
+        ].join('\n'),
+      toMd: (pack) =>
+        toMdTable(
+          `# ${pack.packName} - 音效`,
+          `共 ${pack.sounds.length} 个音效`,
+          ['ID', '事件', '音量', '音调'],
+          pack.sounds.map((s) => [
+            `\`${s.id}\``,
+            s.event || '—',
+            String(s.volume),
+            String(s.pitch),
+          ]),
+        ),
+    },
+    models: {
+      data: (pack) => pack.models,
+      toCsv: (pack) =>
+        [
+          'Path,TextureName,AutoCubeAll',
+          ...pack.models.map(
+            (m) => `"${m.path}","${m.textureName}",${m.autoCubeAll ? 'Yes' : 'No'}`,
+          ),
+        ].join('\n'),
+      toMd: (pack) =>
+        toMdTable(
+          `# ${pack.packName} - 模型`,
+          `共 ${pack.models.length} 个模型`,
+          ['路径', '贴图名', '类型'],
+          pack.models.map((m) => [
+            `\`${m.path}\``,
+            m.textureName || '—',
+            m.autoCubeAll ? 'cube_all' : '自定义',
+          ]),
+        ),
+    },
+    fonts: {
+      data: (pack) => pack.fonts,
+      toCsv: (pack) =>
+        [
+          'ID,Char,Texture,Width,Height,Advance,Ascent',
+          ...pack.fonts.map(
+            (f) =>
+              `"${f.id}","${f.char}","${f.texture}",${f.width},${f.height},${f.advance},${f.ascent}`,
+          ),
+        ].join('\n'),
+      toMd: (pack) =>
+        toMdTable(
+          `# ${pack.packName} - 字体`,
+          `共 ${pack.fonts.length} 个字体条目`,
+          ['ID', '字符', '贴图', '尺寸'],
+          pack.fonts.map((f) => [
+            `\`${f.id}\``,
+            `"${f.char}"`,
+            f.texture || '—',
+            `${f.width}×${f.height}`,
+          ]),
+        ),
+    },
+    lang: {
+      data: (pack) => ({ en_us: pack.langEnUs, zh_cn: pack.langZhCn }),
+      toCsv: (pack) => {
+        const allKeys = new Set([...Object.keys(pack.langEnUs), ...Object.keys(pack.langZhCn)]);
+        return [
+          'Key,en_us,zh_cn',
+          ...[...allKeys].map(
+            (k) => `"${k}","${pack.langEnUs[k] ?? ''}","${pack.langZhCn[k] ?? ''}"`,
+          ),
+        ].join('\n');
+      },
+      toMd: (pack) => {
+        const { langEnUs, langZhCn } = rpLangStats(pack);
+        const allKeys = new Set([...Object.keys(pack.langEnUs), ...Object.keys(pack.langZhCn)]);
+        return toMdTable(
+          `# ${pack.packName} - 语言条目`,
+          `en_us: ${langEnUs} 条 · zh_cn: ${langZhCn} 条`,
+          ['键', 'en_us', 'zh_cn'],
+          [...allKeys].map((k) => [`\`${k}\``, pack.langEnUs[k] ?? '—', pack.langZhCn[k] ?? '—']),
+        );
+      },
+    },
+  },
+};
 
 interface LangRow {
   key: string;
@@ -149,155 +318,13 @@ export function ResourcePackPreviewPanel() {
 
   // ===== 导出函数 =====
   const exportData = useCallback(
-    (
-      format: 'json' | 'csv' | 'markdown',
-      scope: 'all' | 'textures' | 'sounds' | 'models' | 'fonts' | 'lang',
-    ) => {
+    (format: ExportFormat, scope: 'all' | 'textures' | 'sounds' | 'models' | 'fonts' | 'lang') => {
       if (!pack) return;
-      let data: unknown;
-      let filename = '';
-      let content = '';
-
-      if (scope === 'all') {
-        data = pack;
-      } else if (scope === 'textures') {
-        data = pack.textureOverrides;
-      } else if (scope === 'sounds') {
-        data = pack.sounds;
-      } else if (scope === 'models') {
-        data = pack.models;
-      } else if (scope === 'fonts') {
-        data = pack.fonts;
-      } else {
-        data = { en_us: pack.langEnUs, zh_cn: pack.langZhCn };
-      }
-
-      if (format === 'json') {
-        content = JSON.stringify(data, null, 2);
-        filename = `${pack.namespace}-${scope}.json`;
-      } else if (format === 'csv') {
-        if (scope === 'textures') {
-          const rows = ['Path,Color,Width,Height,Gradient,Checkerboard'];
-          for (const t of pack.textureOverrides) {
-            rows.push(
-              `"${t.path}","${t.color}",${t.width},${t.height},${t.gradientTo ? 'Yes' : 'No'},${t.checkerboard ? 'Yes' : 'No'}`,
-            );
-          }
-          content = rows.join('\n');
-        } else if (scope === 'sounds') {
-          const rows = ['ID,Event,Volume,Pitch,Stream'];
-          for (const s of pack.sounds) {
-            rows.push(`"${s.id}","${s.event}",${s.volume},${s.pitch},${s.stream ? 'Yes' : 'No'}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'models') {
-          const rows = ['Path,TextureName,AutoCubeAll'];
-          for (const m of pack.models) {
-            rows.push(`"${m.path}","${m.textureName}",${m.autoCubeAll ? 'Yes' : 'No'}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'fonts') {
-          const rows = ['ID,Char,Texture,Width,Height,Advance,Ascent'];
-          for (const f of pack.fonts) {
-            rows.push(
-              `"${f.id}","${f.char}","${f.texture}",${f.width},${f.height},${f.advance},${f.ascent}`,
-            );
-          }
-          content = rows.join('\n');
-        } else if (scope === 'lang') {
-          const rows = ['Key,en_us,zh_cn'];
-          const allKeys = new Set([...Object.keys(pack.langEnUs), ...Object.keys(pack.langZhCn)]);
-          for (const k of allKeys) {
-            rows.push(`"${k}","${pack.langEnUs[k] ?? ''}","${pack.langZhCn[k] ?? ''}"`);
-          }
-          content = rows.join('\n');
-        } else {
-          content = JSON.stringify(data, null, 2);
-        }
-        filename = `${pack.namespace}-${scope}.csv`;
-      } else {
-        // markdown
-        const lines: string[] = [];
-        if (scope === 'all') {
-          lines.push(`# ${pack.packName}`, '');
-          lines.push(`- **Namespace**: ${pack.namespace}`);
-          lines.push(`- **Format**: ${pack.packFormat}`);
-          lines.push(`- **描述**: ${pack.packDescription || '—'}`);
-          lines.push('');
-          lines.push('## 材质覆盖', '');
-          for (const t of pack.textureOverrides) {
-            lines.push(`- \`${t.path}\` — ${t.width}×${t.height} (${t.color})`);
-          }
-          lines.push('');
-          lines.push('## 音效', '');
-          for (const s of pack.sounds) {
-            lines.push(
-              `- \`${s.id}\` — 音量 ${s.volume} · 音调 ${s.pitch}${s.stream ? ' · 流式' : ''}`,
-            );
-          }
-          lines.push('');
-          lines.push('## 模型', '');
-          for (const m of pack.models) {
-            lines.push(`- \`${m.path}\` — ${m.autoCubeAll ? '自动 cube_all' : '自定义 JSON'}`);
-          }
-          lines.push('');
-          lines.push('## 字体', '');
-          for (const f of pack.fonts) {
-            lines.push(`- \`${f.id}\` — 字符 "${f.char}" → ${f.texture}`);
-          }
-          lines.push('');
-          lines.push('## 语言 (en_us)', '');
-          for (const [k, v] of Object.entries(pack.langEnUs)) {
-            lines.push(`- \`${k}\` = ${v}`);
-          }
-        } else if (scope === 'textures') {
-          lines.push(`# ${pack.packName} - 材质覆盖`, '');
-          lines.push(`共 ${pack.textureOverrides.length} 个材质`, '');
-          lines.push('| 路径 | 颜色 | 尺寸 |', '|---|---|---|');
-          for (const t of pack.textureOverrides) {
-            lines.push(`| \`${t.path}\` | ${t.color} | ${t.width}×${t.height} |`);
-          }
-        } else if (scope === 'sounds') {
-          lines.push(`# ${pack.packName} - 音效`, '');
-          lines.push(`共 ${pack.sounds.length} 个音效`, '');
-          lines.push('| ID | 事件 | 音量 | 音调 |', '|---|---|---|---|');
-          for (const s of pack.sounds) {
-            lines.push(`| \`${s.id}\` | ${s.event || '—'} | ${s.volume} | ${s.pitch} |`);
-          }
-        } else if (scope === 'models') {
-          lines.push(`# ${pack.packName} - 模型`, '');
-          lines.push(`共 ${pack.models.length} 个模型`, '');
-          lines.push('| 路径 | 贴图名 | 类型 |', '|---|---|---|');
-          for (const m of pack.models) {
-            lines.push(
-              `| \`${m.path}\` | ${m.textureName || '—'} | ${m.autoCubeAll ? 'cube_all' : '自定义'} |`,
-            );
-          }
-        } else if (scope === 'fonts') {
-          lines.push(`# ${pack.packName} - 字体`, '');
-          lines.push(`共 ${pack.fonts.length} 个字体条目`, '');
-          lines.push('| ID | 字符 | 贴图 | 尺寸 |', '|---|---|---|---|');
-          for (const f of pack.fonts) {
-            lines.push(
-              `| \`${f.id}\` | "${f.char}" | ${f.texture || '—'} | ${f.width}×${f.height} |`,
-            );
-          }
-        } else if (scope === 'lang') {
-          lines.push(`# ${pack.packName} - 语言条目`, '');
-          lines.push(`en_us: ${stats.langEnUs} 条 · zh_cn: ${stats.langZhCn} 条`, '');
-          lines.push('| 键 | en_us | zh_cn |', '|---|---|---|');
-          const allKeys = new Set([...Object.keys(pack.langEnUs), ...Object.keys(pack.langZhCn)]);
-          for (const k of allKeys) {
-            lines.push(`| \`${k}\` | ${pack.langEnUs[k] ?? '—'} | ${pack.langZhCn[k] ?? '—'} |`);
-          }
-        }
-        content = lines.join('\n');
-        filename = `${pack.namespace}-${scope}.md`;
-      }
-
-      downloadBlob(content, filename);
+      const out = buildExport(pack, RP_EXPORT, format, scope);
+      if (!out) return;
+      downloadBlob(out.content, out.filename);
     },
-    [pack, stats.langEnUs, stats.langZhCn],
+    [pack],
   );
 
   if (!spec || !pack) {

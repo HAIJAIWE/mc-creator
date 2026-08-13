@@ -18,8 +18,17 @@ import {
   useBatchSelection,
   useTabCounts,
   useConflictDetection,
+  buildExport,
+  toMdTable,
+  toMdOverview,
 } from './shared/index.js';
-import type { Column, TabItem, ConflictGroup } from './shared/index.js';
+import type {
+  Column,
+  TabItem,
+  ConflictGroup,
+  ExportFormat,
+  ExportHandler,
+} from './shared/index.js';
 import type {
   CraftTweakerSpec,
   CraftTweakerRecipeSpec,
@@ -79,6 +88,155 @@ const CT_CONFLICT_GROUPS: ConflictGroup<CraftTweakerSpec>[] = [
     detect: (ct) => findDuplicates(ct.tooltips, (t) => t.itemId),
   },
 ];
+
+function ctLangStats(ct: CraftTweakerSpec) {
+  const entries = Object.values(ct.lang ?? {}).reduce(
+    (sum, dict) => sum + Object.keys(dict).length,
+    0,
+  );
+  return { langEntries: entries, langCount: Object.keys(ct.lang ?? {}).length };
+}
+
+const CT_EXPORT: ExportHandler<CraftTweakerSpec> = {
+  prefix: (ct) => ct.packId,
+  scopes: {
+    all: {
+      data: (ct) => ct,
+      toMd: (ct) =>
+        toMdOverview(
+          `# ${ct.packName || ct.packId}`,
+          [
+            `- **Pack ID**: ${ct.packId}`,
+            `- **Format**: ${ct.packFormat}`,
+            `- **MC 版本**: ${ct.mcVersion}`,
+            `- **描述**: ${ct.description || '—'}`,
+          ],
+          [
+            {
+              heading: '配方列表',
+              lines: ct.recipes.map(
+                (r) =>
+                  `- \`${r.id}\` — ${RECIPE_TYPE_LABEL[r.type] ?? r.type} → ${r.result} x${r.count}`,
+              ),
+            },
+            {
+              heading: '标签列表',
+              lines: ct.tags.map(
+                (t) =>
+                  `- \`${t.id}\` — ${TAG_TYPE_LABEL[t.type] ?? t.type} (${t.values.length} 条目)`,
+              ),
+            },
+            {
+              heading: '事件列表',
+              lines: ct.events.map((e) => `- \`${e.id}\` — ${e.type} (${e.target || '—'})`),
+            },
+            {
+              heading: '工具提示',
+              lines: ct.tooltips.map(
+                (t) => `- \`${t.itemId}\` — ${t.lines.length} 行${t.advanced ? ' (高级)' : ''}`,
+              ),
+            },
+          ],
+        ),
+    },
+    recipes: {
+      data: (ct) => ct.recipes,
+      toCsv: (ct) =>
+        [
+          'ID,Type,Result,Count',
+          ...ct.recipes.map((r) => `"${r.id}","${r.type}","${r.result}",${r.count}`),
+        ].join('\n'),
+      toMd: (ct) =>
+        toMdTable(
+          `# ${ct.packName || ct.packId} - 配方列表`,
+          `共 ${ct.recipes.length} 个配方`,
+          ['ID', '类型', '产物', '数量'],
+          ct.recipes.map((r) => [
+            `\`${r.id}\``,
+            RECIPE_TYPE_LABEL[r.type] ?? r.type,
+            r.result,
+            String(r.count),
+          ]),
+        ),
+    },
+    tags: {
+      data: (ct) => ct.tags,
+      toCsv: (ct) =>
+        [
+          'ID,Type,Values,Replace',
+          ...ct.tags.map(
+            (t) => `"${t.id}","${t.type}","${t.values.join(';')}",${t.replace ? 'Yes' : 'No'}`,
+          ),
+        ].join('\n'),
+      toMd: (ct) =>
+        toMdTable(
+          `# ${ct.packName || ct.packId} - 标签列表`,
+          `共 ${ct.tags.length} 个标签`,
+          ['ID', '类型', '条目数', '替换'],
+          ct.tags.map((t) => [
+            `\`${t.id}\``,
+            TAG_TYPE_LABEL[t.type] ?? t.type,
+            String(t.values.length),
+            t.replace ? '是' : '否',
+          ]),
+        ),
+    },
+    events: {
+      data: (ct) => ct.events,
+      toCsv: (ct) =>
+        ['ID,Type,Target', ...ct.events.map((e) => `"${e.id}","${e.type}","${e.target}"`)].join(
+          '\n',
+        ),
+      toMd: (ct) =>
+        toMdTable(
+          `# ${ct.packName || ct.packId} - 事件列表`,
+          `共 ${ct.events.length} 个事件`,
+          ['ID', '类型', '目标'],
+          ct.events.map((e) => [`\`${e.id}\``, e.type, e.target || '—']),
+        ),
+    },
+    tooltips: {
+      data: (ct) => ct.tooltips,
+      toCsv: (ct) =>
+        [
+          'ItemID,Lines,Advanced',
+          ...ct.tooltips.map((t) => `"${t.itemId}",${t.lines.length},${t.advanced ? 'Yes' : 'No'}`),
+        ].join('\n'),
+      toMd: (ct) =>
+        toMdTable(
+          `# ${ct.packName || ct.packId} - 工具提示`,
+          `共 ${ct.tooltips.length} 个工具提示`,
+          ['物品 ID', '行数', '高级'],
+          ct.tooltips.map((t) => [
+            `\`${t.itemId}\``,
+            String(t.lines.length),
+            t.advanced ? '是' : '否',
+          ]),
+        ),
+    },
+    lang: {
+      data: (ct) => ct.lang,
+      toCsv: (ct) =>
+        [
+          'Lang,Key,Value',
+          ...Object.entries(ct.lang ?? {}).flatMap(([langCode, dict]) =>
+            Object.entries(dict).map(([k, v]) => `"${langCode}","${k}","${v.replace(/"/g, '""')}"`),
+          ),
+        ].join('\n'),
+      toMd: (ct) => {
+        const { langEntries, langCount } = ctLangStats(ct);
+        return toMdTable(
+          `# ${ct.packName || ct.packId} - 语言条目`,
+          `共 ${langEntries} 条翻译，覆盖 ${langCount} 种语言`,
+          ['语言', '键', '值'],
+          Object.entries(ct.lang ?? {}).flatMap(([langCode, dict]) =>
+            Object.entries(dict).map(([k, v]) => [langCode, `\`${k}\``, v]),
+          ),
+        );
+      },
+    },
+  },
+};
 
 const RECIPE_TYPE_LABEL: Record<string, string> = {
   shaped: '有序合成',
@@ -296,151 +454,13 @@ export function CraftTweakerPreviewPanel() {
 
   // ===== 导出函数 =====
   const exportData = useCallback(
-    (
-      format: 'json' | 'csv' | 'markdown',
-      scope: 'all' | 'recipes' | 'tags' | 'events' | 'tooltips' | 'lang',
-    ) => {
+    (format: ExportFormat, scope: 'all' | 'recipes' | 'tags' | 'events' | 'tooltips' | 'lang') => {
       if (!ct) return;
-      let data: unknown;
-      let filename = '';
-      let content = '';
-
-      if (scope === 'all') {
-        data = ct;
-      } else if (scope === 'recipes') {
-        data = ct.recipes;
-      } else if (scope === 'tags') {
-        data = ct.tags;
-      } else if (scope === 'events') {
-        data = ct.events;
-      } else if (scope === 'tooltips') {
-        data = ct.tooltips;
-      } else {
-        data = ct.lang;
-      }
-
-      if (format === 'json') {
-        content = JSON.stringify(data, null, 2);
-        filename = `${ct.packId}-${scope}.json`;
-      } else if (format === 'csv') {
-        if (scope === 'recipes') {
-          const rows = ['ID,Type,Result,Count'];
-          for (const r of ct.recipes) {
-            rows.push(`"${r.id}","${r.type}","${r.result}",${r.count}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'tags') {
-          const rows = ['ID,Type,Values,Replace'];
-          for (const t of ct.tags) {
-            rows.push(`"${t.id}","${t.type}","${t.values.join(';')}",${t.replace ? 'Yes' : 'No'}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'events') {
-          const rows = ['ID,Type,Target'];
-          for (const e of ct.events) {
-            rows.push(`"${e.id}","${e.type}","${e.target}"`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'tooltips') {
-          const rows = ['ItemID,Lines,Advanced'];
-          for (const t of ct.tooltips) {
-            rows.push(`"${t.itemId}",${t.lines.length},${t.advanced ? 'Yes' : 'No'}`);
-          }
-          content = rows.join('\n');
-        } else if (scope === 'lang') {
-          const rows = ['Lang,Key,Value'];
-          for (const [langCode, dict] of Object.entries(ct.lang ?? {})) {
-            for (const [k, v] of Object.entries(dict)) {
-              rows.push(`"${langCode}","${k}","${v.replace(/"/g, '""')}"`);
-            }
-          }
-          content = rows.join('\n');
-        } else {
-          content = JSON.stringify(data, null, 2);
-        }
-        filename = `${ct.packId}-${scope}.csv`;
-      } else {
-        // markdown
-        const lines: string[] = [];
-        if (scope === 'all') {
-          lines.push(`# ${ct.packName || ct.packId}`, '');
-          lines.push(`- **Pack ID**: ${ct.packId}`);
-          lines.push(`- **Format**: ${ct.packFormat}`);
-          lines.push(`- **MC 版本**: ${ct.mcVersion}`);
-          lines.push(`- **描述**: ${ct.description || '—'}`);
-          lines.push('');
-          lines.push('## 配方列表', '');
-          for (const r of ct.recipes) {
-            lines.push(
-              `- \`${r.id}\` — ${RECIPE_TYPE_LABEL[r.type] ?? r.type} → ${r.result} x${r.count}`,
-            );
-          }
-          lines.push('');
-          lines.push('## 标签列表', '');
-          for (const t of ct.tags) {
-            lines.push(
-              `- \`${t.id}\` — ${TAG_TYPE_LABEL[t.type] ?? t.type} (${t.values.length} 条目)`,
-            );
-          }
-          lines.push('');
-          lines.push('## 事件列表', '');
-          for (const e of ct.events) {
-            lines.push(`- \`${e.id}\` — ${e.type} (${e.target || '—'})`);
-          }
-          lines.push('');
-          lines.push('## 工具提示', '');
-          for (const t of ct.tooltips) {
-            lines.push(`- \`${t.itemId}\` — ${t.lines.length} 行${t.advanced ? ' (高级)' : ''}`);
-          }
-        } else if (scope === 'recipes') {
-          lines.push(`# ${ct.packName || ct.packId} - 配方列表`, '');
-          lines.push(`共 ${ct.recipes.length} 个配方`, '');
-          lines.push('| ID | 类型 | 产物 | 数量 |', '|---|---|---|---|');
-          for (const r of ct.recipes) {
-            lines.push(
-              `| \`${r.id}\` | ${RECIPE_TYPE_LABEL[r.type] ?? r.type} | ${r.result} | ${r.count} |`,
-            );
-          }
-        } else if (scope === 'tags') {
-          lines.push(`# ${ct.packName || ct.packId} - 标签列表`, '');
-          lines.push(`共 ${ct.tags.length} 个标签`, '');
-          lines.push('| ID | 类型 | 条目数 | 替换 |', '|---|---|---|---|');
-          for (const t of ct.tags) {
-            lines.push(
-              `| \`${t.id}\` | ${TAG_TYPE_LABEL[t.type] ?? t.type} | ${t.values.length} | ${t.replace ? '是' : '否'} |`,
-            );
-          }
-        } else if (scope === 'events') {
-          lines.push(`# ${ct.packName || ct.packId} - 事件列表`, '');
-          lines.push(`共 ${ct.events.length} 个事件`, '');
-          lines.push('| ID | 类型 | 目标 |', '|---|---|---|');
-          for (const e of ct.events) {
-            lines.push(`| \`${e.id}\` | ${e.type} | ${e.target || '—'} |`);
-          }
-        } else if (scope === 'tooltips') {
-          lines.push(`# ${ct.packName || ct.packId} - 工具提示`, '');
-          lines.push(`共 ${ct.tooltips.length} 个工具提示`, '');
-          lines.push('| 物品 ID | 行数 | 高级 |', '|---|---|---|');
-          for (const t of ct.tooltips) {
-            lines.push(`| \`${t.itemId}\` | ${t.lines.length} | ${t.advanced ? '是' : '否'} |`);
-          }
-        } else if (scope === 'lang') {
-          lines.push(`# ${ct.packName || ct.packId} - 语言条目`, '');
-          lines.push(`共 ${stats.langEntries} 条翻译，覆盖 ${stats.langCount} 种语言`, '');
-          lines.push('| 语言 | 键 | 值 |', '|---|---|---|');
-          for (const [langCode, dict] of Object.entries(ct.lang ?? {})) {
-            for (const [k, v] of Object.entries(dict)) {
-              lines.push(`| ${langCode} | \`${k}\` | ${v} |`);
-            }
-          }
-        }
-        content = lines.join('\n');
-        filename = `${ct.packId}-${scope}.md`;
-      }
-
-      downloadBlob(content, filename, 'text/plain');
+      const out = buildExport(ct, CT_EXPORT, format, scope);
+      if (!out) return;
+      downloadBlob(out.content, out.filename, 'text/plain');
     },
-    [ct, stats.langEntries, stats.langCount],
+    [ct],
   );
 
   if (!spec || !ct) {

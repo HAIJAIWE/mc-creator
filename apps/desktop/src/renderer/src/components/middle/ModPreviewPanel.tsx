@@ -18,8 +18,17 @@ import {
   useBatchSelection,
   useTabCounts,
   useConflictDetection,
+  buildExport,
+  toMdTable,
+  toMdOverview,
 } from './shared/index.js';
-import type { Column, TabItem, ConflictGroup } from './shared/index.js';
+import type {
+  Column,
+  TabItem,
+  ConflictGroup,
+  ExportFormat,
+  ExportHandler,
+} from './shared/index.js';
 import type {
   ModSpec,
   ItemSpec,
@@ -116,6 +125,103 @@ const MOD_CONFLICT_GROUPS: ConflictGroup<ModSpec>[] = [
     detect: (m) => findDuplicates(m.dependencies, (d) => d.modId),
   },
 ];
+
+const MOD_EXPORT: ExportHandler<ModSpec> = {
+  prefix: (m) => m.modId,
+  scopes: {
+    all: {
+      data: (m) => m,
+      toMd: (m) =>
+        toMdOverview(
+          `# ${m.name || m.modId}`,
+          [
+            `- **Mod ID**: ${m.modId}`,
+            `- **版本**: ${m.version}`,
+            `- **License**: ${m.license}`,
+            `- **作者**: ${m.authors.join(', ') || '—'}`,
+            `- **描述**: ${m.description || '—'}`,
+          ],
+          [
+            {
+              heading: '物品列表',
+              lines: m.items.map(
+                (i) =>
+                  `- **${i.name}** (\`${i.id}\`) — 稀有度 ${RARITY_LABEL[i.rarity]} · 堆叠 ${i.maxStackSize}`,
+              ),
+            },
+            {
+              heading: '方块列表',
+              lines: m.blocks.map(
+                (b) => `- **${b.name}** (\`${b.id}\`) — 材质 ${b.material} · 硬度 ${b.hardness}`,
+              ),
+            },
+            {
+              heading: '依赖',
+              lines: m.dependencies.map(
+                (d) => `- \`${d.modId}\` ${d.version} ${d.mandatory ? '(必需)' : '(可选)'}`,
+              ),
+            },
+          ],
+        ),
+    },
+    items: {
+      data: (m) => m.items,
+      toCsv: (m) =>
+        [
+          'ID,Name,Rarity,MaxStackSize,MaxDamage,FuelTick,Category,CreativeTab,Food',
+          ...m.items.map(
+            (i) =>
+              `"${i.id}","${i.name}","${i.rarity}",${i.maxStackSize},${i.maxDamage},${i.fuelTick},"${i.itemCategory}","${i.creativeTab}",${i.food ? 'Yes' : 'No'}`,
+          ),
+        ].join('\n'),
+      toMd: (m) =>
+        toMdTable(
+          `# ${m.name || m.modId} - 物品列表`,
+          `共 ${m.items.length} 个物品`,
+          ['ID', '名称', '稀有度', '堆叠'],
+          m.items.map((i) => [
+            `\`${i.id}\``,
+            i.name,
+            RARITY_LABEL[i.rarity],
+            String(i.maxStackSize),
+          ]),
+        ),
+    },
+    blocks: {
+      data: (m) => m.blocks,
+      toCsv: (m) =>
+        [
+          'ID,Name,Material,Hardness,Resistance,LightLevel,BlockType,Transparent',
+          ...m.blocks.map(
+            (b) =>
+              `"${b.id}","${b.name}","${b.material}",${b.hardness},${b.resistance},${b.lightLevel},"${b.blockType}",${b.transparent ? 'Yes' : 'No'}`,
+          ),
+        ].join('\n'),
+      toMd: (m) =>
+        toMdTable(
+          `# ${m.name || m.modId} - 方块列表`,
+          `共 ${m.blocks.length} 个方块`,
+          ['ID', '名称', '材质', '硬度'],
+          m.blocks.map((b) => [`\`${b.id}\``, b.name, b.material, String(b.hardness)]),
+        ),
+    },
+    deps: {
+      data: (m) => m.dependencies,
+      toCsv: (m) =>
+        [
+          'ModID,Version,Mandatory',
+          ...m.dependencies.map((d) => `"${d.modId}","${d.version}",${d.mandatory ? 'Yes' : 'No'}`),
+        ].join('\n'),
+      toMd: (m) =>
+        toMdTable(
+          `# ${m.name || m.modId} - 依赖列表`,
+          `共 ${m.dependencies.length} 个依赖`,
+          ['Mod ID', '版本', '必需'],
+          m.dependencies.map((d) => [`\`${d.modId}\``, d.version, d.mandatory ? '是' : '否']),
+        ),
+    },
+  },
+};
 
 const RARITY_LABEL: Record<string, string> = {
   common: '普通',
@@ -342,109 +448,11 @@ export function ModPreviewPanel() {
 
   // ===== 导出函数 =====
   const exportData = useCallback(
-    (format: 'json' | 'csv' | 'markdown', scope: 'all' | 'items' | 'blocks' | 'deps') => {
+    (format: ExportFormat, scope: 'all' | 'items' | 'blocks' | 'deps') => {
       if (!mod) return;
-      let data: unknown;
-      let filename = '';
-      let content = '';
-
-      if (scope === 'all') {
-        data = mod;
-      } else if (scope === 'items') {
-        data = mod.items;
-      } else if (scope === 'blocks') {
-        data = mod.blocks;
-      } else {
-        data = mod.dependencies;
-      }
-
-      if (format === 'json') {
-        content = JSON.stringify(data, null, 2);
-        filename = `${mod.modId}-${scope}.json`;
-      } else if (format === 'csv') {
-        if (scope === 'items') {
-          const rows = ['ID,Name,Rarity,MaxStackSize,MaxDamage,FuelTick,Category,CreativeTab,Food'];
-          for (const i of mod.items) {
-            rows.push(
-              `"${i.id}","${i.name}","${i.rarity}",${i.maxStackSize},${i.maxDamage},${i.fuelTick},"${i.itemCategory}","${i.creativeTab}",${i.food ? 'Yes' : 'No'}`,
-            );
-          }
-          content = rows.join('\n');
-        } else if (scope === 'blocks') {
-          const rows = ['ID,Name,Material,Hardness,Resistance,LightLevel,BlockType,Transparent'];
-          for (const b of mod.blocks) {
-            rows.push(
-              `"${b.id}","${b.name}","${b.material}",${b.hardness},${b.resistance},${b.lightLevel},"${b.blockType}",${b.transparent ? 'Yes' : 'No'}`,
-            );
-          }
-          content = rows.join('\n');
-        } else if (scope === 'deps') {
-          const rows = ['ModID,Version,Mandatory'];
-          for (const d of mod.dependencies) {
-            rows.push(`"${d.modId}","${d.version}",${d.mandatory ? 'Yes' : 'No'}`);
-          }
-          content = rows.join('\n');
-        } else {
-          // all - 不适合 CSV，fallback 到 JSON
-          content = JSON.stringify(data, null, 2);
-        }
-        filename = `${mod.modId}-${scope}.csv`;
-      } else {
-        // markdown
-        const lines: string[] = [];
-        if (scope === 'all') {
-          lines.push(`# ${mod.name || mod.modId}`, '');
-          lines.push(`- **Mod ID**: ${mod.modId}`);
-          lines.push(`- **版本**: ${mod.version}`);
-          lines.push(`- **License**: ${mod.license}`);
-          lines.push(`- **作者**: ${mod.authors.join(', ') || '—'}`);
-          lines.push(`- **描述**: ${mod.description || '—'}`);
-          lines.push('');
-          lines.push('## 物品列表', '');
-          for (const i of mod.items) {
-            lines.push(
-              `- **${i.name}** (\`${i.id}\`) — 稀有度 ${RARITY_LABEL[i.rarity]} · 堆叠 ${i.maxStackSize}`,
-            );
-          }
-          lines.push('');
-          lines.push('## 方块列表', '');
-          for (const b of mod.blocks) {
-            lines.push(`- **${b.name}** (\`${b.id}\`) — 材质 ${b.material} · 硬度 ${b.hardness}`);
-          }
-          lines.push('');
-          lines.push('## 依赖', '');
-          for (const d of mod.dependencies) {
-            lines.push(`- \`${d.modId}\` ${d.version} ${d.mandatory ? '(必需)' : '(可选)'}`);
-          }
-        } else if (scope === 'items') {
-          lines.push(`# ${mod.name || mod.modId} - 物品列表`, '');
-          lines.push(`共 ${mod.items.length} 个物品`, '');
-          lines.push('| ID | 名称 | 稀有度 | 堆叠 |', '|---|---|---|---|');
-          for (const i of mod.items) {
-            lines.push(
-              `| \`${i.id}\` | ${i.name} | ${RARITY_LABEL[i.rarity]} | ${i.maxStackSize} |`,
-            );
-          }
-        } else if (scope === 'blocks') {
-          lines.push(`# ${mod.name || mod.modId} - 方块列表`, '');
-          lines.push(`共 ${mod.blocks.length} 个方块`, '');
-          lines.push('| ID | 名称 | 材质 | 硬度 |', '|---|---|---|---|');
-          for (const b of mod.blocks) {
-            lines.push(`| \`${b.id}\` | ${b.name} | ${b.material} | ${b.hardness} |`);
-          }
-        } else if (scope === 'deps') {
-          lines.push(`# ${mod.name || mod.modId} - 依赖列表`, '');
-          lines.push(`共 ${mod.dependencies.length} 个依赖`, '');
-          lines.push('| Mod ID | 版本 | 必需 |', '|---|---|---|');
-          for (const d of mod.dependencies) {
-            lines.push(`| \`${d.modId}\` | ${d.version} | ${d.mandatory ? '是' : '否'} |`);
-          }
-        }
-        content = lines.join('\n');
-        filename = `${mod.modId}-${scope}.md`;
-      }
-
-      downloadBlob(content, filename);
+      const out = buildExport(mod, MOD_EXPORT, format, scope);
+      if (!out) return;
+      downloadBlob(out.content, out.filename);
     },
     [mod],
   );
