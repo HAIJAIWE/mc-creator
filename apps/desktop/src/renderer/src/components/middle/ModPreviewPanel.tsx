@@ -9,6 +9,7 @@ import {
   FilterBar,
   EmptyState,
   StatCard,
+  StatCardGrid,
   MetadataView,
   IconTabBar,
   BatchSelectToolbar,
@@ -749,7 +750,7 @@ export function ModPreviewPanel() {
       />
 
       {/* 顶部统计卡片行 */}
-      <div className="grid grid-cols-3 gap-2 border-b border-mc-border bg-mc-surface-2/30 p-2 sm:grid-cols-4 md:grid-cols-7">
+      <StatCardGrid>
         <StatCard label="物品" value={stats.items} icon={<Boxes className="h-3 w-3" />} />
         <StatCard label="方块" value={stats.blocks} icon={<Layers className="h-3 w-3" />} />
         <StatCard
@@ -766,7 +767,7 @@ export function ModPreviewPanel() {
           value={stats.functions}
           icon={<FunctionSquare className="h-3 w-3" />}
         />
-      </div>
+      </StatCardGrid>
 
       {/* 冲突检测告警 */}
       <ConflictAlert

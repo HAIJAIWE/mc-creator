@@ -6,6 +6,7 @@ import {
   PanelHeader,
   EmptyState,
   StatCard,
+  StatCardGrid,
   MetadataView,
   ConflictAlert,
   ExportView,
@@ -842,7 +843,7 @@ export function KubejsPreviewPanel() {
       />
 
       {/* 统计卡片行 */}
-      <div className="grid grid-cols-3 gap-2 border-b border-mc-border bg-mc-surface-2/30 p-2 sm:grid-cols-4 md:grid-cols-7">
+      <StatCardGrid>
         <StatCard label="配方" value={stats.recipes} icon={<Boxes className="h-3 w-3" />} />
         <StatCard
           label="标签"
@@ -873,7 +874,7 @@ export function KubejsPreviewPanel() {
           value={stats.langEntries}
           icon={<FileText className="h-3 w-3" />}
         />
-      </div>
+      </StatCardGrid>
 
       {/* 冲突检测告警 */}
       <ConflictAlert

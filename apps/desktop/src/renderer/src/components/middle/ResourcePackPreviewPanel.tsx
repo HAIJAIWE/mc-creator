@@ -9,6 +9,7 @@ import {
   FilterBar,
   EmptyState,
   StatCard,
+  StatCardGrid,
   MetadataView,
   IconTabBar,
   findDuplicates,
@@ -319,7 +320,7 @@ export function ResourcePackPreviewPanel() {
       />
 
       {/* 统计卡片行 */}
-      <div className="grid grid-cols-3 gap-2 border-b border-mc-border bg-mc-surface-2/30 p-2 sm:grid-cols-4 md:grid-cols-7">
+      <StatCardGrid>
         <StatCard
           label="材质"
           value={stats.textures}
@@ -353,7 +354,7 @@ export function ResourcePackPreviewPanel() {
           }
           icon={<FileText className="h-3 w-3" />}
         />
-      </div>
+      </StatCardGrid>
 
       {/* 冲突检测告警 */}
       <ConflictAlert
