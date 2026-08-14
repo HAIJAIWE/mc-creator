@@ -21,7 +21,7 @@ const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
   behavior_pack: { scope: 'pixel', name: 'box' },
   enchantment: { scope: 'pixel', name: 'star' },
   behavior_item: { scope: 'pixel', name: 'tool-case' },
-  behavior_entity: { scope: 'pixel', name: 'ghost' },
+  behavior_entity: { scope: 'pixel', name: 'bug' },
 };
 
 const TYPE_LABEL: Record<GeneratorType, string> = {

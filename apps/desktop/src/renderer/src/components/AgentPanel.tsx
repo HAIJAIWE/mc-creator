@@ -18,6 +18,7 @@ import { useModelConfigStore } from '../store/model-config-store.js';
 import { useSpecHistoryStore } from '../store/spec-history-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
+import { WarningBanner } from './WarningBanner.js';
 import { TemplatePicker } from './TemplatePicker.js';
 import { ModrinthSearchPanel } from './ModrinthSearchPanel.js';
 import { CurseForgeSearchPanel } from './CurseForgeSearchPanel.js';
@@ -71,6 +72,7 @@ export function AgentPanel() {
   const [editorText, setEditorText] = useState('');
   const [originalSpec, setOriginalSpec] = useState('');
   const [specError, setSpecError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const [showTemplates, setShowTemplates] = useState(false);
   const [showModrinthSearch, setShowModrinthSearch] = useState(false);
@@ -115,6 +117,7 @@ export function AgentPanel() {
       setEditorText(text);
       setOriginalSpec(text);
       setSpecError(null);
+      setWarnings([]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -142,6 +145,7 @@ export function AgentPanel() {
         generatorType,
       });
       setFiles(res.files);
+      setWarnings(res.warnings ?? []);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -402,6 +406,9 @@ export function AgentPanel() {
                 />
               )}
               {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
+              {warnings.length > 0 && (
+                <WarningBanner warnings={warnings} onClose={() => setWarnings([])} />
+              )}
             </div>
           )}
         </div>

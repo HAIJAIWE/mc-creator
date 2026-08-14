@@ -20,6 +20,8 @@ import {
   CurseForgeApiClient,
   createDefaultRegistry,
   ModGenerator,
+  SPEC_CONFIGS,
+  formatSpecIssues,
   type BuildCacheSnapshot,
   type SpecType,
 } from '@mc-creator/core';
@@ -201,6 +203,14 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const gen = generatorRegistry.get(req.generatorType);
     if (!gen) {
       return { files: [], warnings: [`不支持的生成器类型：${req.generatorType}`] };
+    }
+    // 前置校验：spec 不合法时给出中文字段级错误，避免生成器内部抛英文 zod 原始消息
+    const schema = SPEC_CONFIGS[req.generatorType]?.schema;
+    if (schema) {
+      const check = schema.safeParse(req.spec);
+      if (!check.success) {
+        throw new Error(`${req.generatorType} Spec 校验失败：${formatSpecIssues(check.error)}`);
+      }
     }
     // modId 可能从 spec 顶层或单独字段取
     const modId = req.modId || (req.spec as { modId?: string }).modId || 'mc_creator';

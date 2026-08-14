@@ -9,10 +9,13 @@ import {
   KubejsSpec,
   CraftTweakerSpec,
   BehaviorPackSpec,
+  DataEnchantmentSpec,
+  BehaviorItemSpec,
+  BehaviorEntitySpec,
   type ModSpec as ModSpecType,
 } from '@mc-creator/shared';
 import type { ModelProvider } from '../model-provider/types.js';
-import type { ZodTypeAny } from 'zod';
+import type { ZodError, ZodTypeAny } from 'zod';
 
 const MAX_RETRIES = 3;
 
@@ -27,11 +30,24 @@ export type SpecType =
   | 'launcher'
   | 'kubejs'
   | 'crafttweaker'
-  | 'behavior_pack';
+  | 'behavior_pack'
+  | 'enchantment'
+  | 'behavior_item'
+  | 'behavior_entity';
 
 interface SpecConfig {
   schema: ZodTypeAny;
   prompt: string;
+}
+
+/** 将 zod 校验失败转为可读的中文摘要（最多列 3 条字段问题） */
+export function formatSpecIssues(error: ZodError): string {
+  const issues = error.issues.slice(0, 3).map((i) => {
+    const path = i.path.join('.') || '(根)';
+    return `${path}: ${i.message}`;
+  });
+  const more = error.issues.length > 3 ? ` 等 ${error.issues.length} 处` : '';
+  return issues.join('；') + more;
 }
 
 const SPEC_CONFIGS: Record<SpecType, SpecConfig> = {
@@ -211,6 +227,45 @@ Schema 字段：
 identifier 使用 namespace:id 格式。components 使用基岩版组件名如 minecraft:health、minecraft:attack_damage 等。
 只输出 JSON，不要解释。`,
   },
+  enchantment: {
+    schema: DataEnchantmentSpec,
+    prompt: `你是 Minecraft 1.21+ 数据驱动附魔规格生成器。根据描述生成 DataEnchantmentSpec JSON。
+Schema 字段：
+- packId: 小写下划线 ^[a-z0-9_]+$
+- packName: 数据包名
+- description: 描述
+- packFormat: 数字（1.21.1 用 61，生成时按 MC 版本自动校正）
+- enchantments[]: 附魔列表（id 小写下划线, name 显示名, description, maxLevel 1-10, slots[] mainhand/offhand/armor/any, weight 1-1023, effects[]{type: damage_bonus/mob_experience/loot_bonus/knockback/burning_time/healing/attribute, amount 每级数值, target all/undead/arthropods/illagers, extra{}}）
+- customEffects[]: 原始效果（group 如 minecraft:damage, effect{}）
+- lang: 语言覆盖（zh_CN/en_US 键值对）
+效果 type 与数值必须严格按用户描述生成，不要编造。只输出 JSON，不要解释。`,
+  },
+  behavior_item: {
+    schema: BehaviorItemSpec,
+    prompt: `你是 Minecraft 基岩版自定义物品规格生成器。根据描述生成 BehaviorItemSpec JSON（生成 items/<id>.json + 16x16 纹理）。
+Schema 字段：
+- packId: 小写下划线 ^[a-z0-9_]+$
+- packName: 行为包名
+- description: 描述
+- packFormat: 数字（默认 2）
+- mcVersion: 版本数组 [1,21,0]
+- items[]: 物品列表（id 小写下划线, name 显示名, category equipment/tools/weapons/items, maxStackSize 1-64, durability 0=不可损坏, attackDamage, attackSpeed, armor{protection, slot head/chest/legs/feet}, tool{level 1-5, efficiency, tags[]}, enchantable 0-15, foils 布尔, primaryColor #RRGGBB 6位十六进制色, secondaryColor #RRGGBB）
+- lang: 语言覆盖（zh_CN/en_US 键值对）
+颜色必须是 #RRGGBB 格式的 6 位十六进制。只输出 JSON，不要解释。`,
+  },
+  behavior_entity: {
+    schema: BehaviorEntitySpec,
+    prompt: `你是 Minecraft 基岩版自定义实体（怪物 AI）规格生成器。根据描述生成 BehaviorEntitySpec JSON（生成 entities/<id>.behavior.json 行为 + RP client_entity + 纹理）。
+Schema 字段：
+- packId: 小写下划线 ^[a-z0-9_]+$
+- packName: 行为包名
+- description: 描述
+- packFormat: 数字（默认 2）
+- mcVersion: 版本数组 [1,21,0]
+- entities[]: 实体列表（id 小写下划线, name 显示名, health, attackDamage 0=不攻击, movementSpeed, knockbackResistance 0-1, fireImmune 布尔, scale 体型缩放, xp 击杀经验, despawn 布尔, hostile 布尔, geometry creeper/zombie/skeleton/spider/blaze/slime 内置模型, mainColor #RRGGBB, accentColor #RRGGBB, goals[]{type melee/ranged/idle_wander/look_at_player/flee_sun/swim/follow_owner/panic, priority 0-10, speedMultiplier, attackRange 仅远程, attackInterval 仅远程}, targetTypes[] 如 player/villager, drops[]{item 物品ID 如 minecraft:bone, count, chance 0-1}）
+- lang: 语言覆盖（zh_CN/en_US 键值对）
+颜色必须是 #RRGGBB 格式的 6 位十六进制。实体名（如哥布林）放 name 字段。只输出 JSON，不要解释。`,
+  },
 };
 
 /**
@@ -229,7 +284,7 @@ export class Orchestrator {
       if (parsed.ok) {
         const result = ModSpec.safeParse(parsed.value);
         if (result.success) return result.data;
-        lastError = result.error.message;
+        lastError = formatSpecIssues(result.error);
       } else {
         lastError = parsed.error;
       }
@@ -249,7 +304,7 @@ export class Orchestrator {
       if (parsed.ok) {
         const result = config.schema.safeParse(parsed.value);
         if (result.success) return result.data;
-        lastError = result.error.message;
+        lastError = formatSpecIssues(result.error);
       } else {
         lastError = parsed.error;
       }

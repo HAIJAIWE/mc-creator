@@ -455,7 +455,7 @@ export function BehaviorEntityPreviewPanel() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-mc-surface">
       <PanelHeader
-        icon="ghost"
+        icon="bug"
         title={be.packName || be.packId}
         meta={[
           { label: 'packFormat', value: String(be.packFormat) },

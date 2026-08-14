@@ -203,6 +203,47 @@ describe('AgentPanel', () => {
     expect(mockMcApi.generateSpec).toHaveBeenCalledWith('一个测试 mod', 'mod');
   });
 
+  it('生成代码后显示生成警告（warnings）', async () => {
+    // 先 mock 生成 Spec（写入 editorText），再 mock 生成代码返回 warnings
+    mockMcApi.generateSpec.mockResolvedValue({ spec: { packId: 'bp', packName: 'BP' } });
+    mockMcApi.generateFiles.mockResolvedValue({
+      files: [{ path: 'manifest.json', content: '{}' }],
+      warnings: ['需将包分别放入 behavior_packs 与 resource_packs', '实体 1 个未定义'],
+    });
+    useModStore.setState({ description: '行为包' });
+    render(<AgentPanel />);
+    fireEvent.change(screen.getByPlaceholderText('描述你想要的 mod…'), {
+      target: { value: '行为包' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /生成 Spec/ }));
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: /生成代码/ }));
+    await act(async () => {});
+    expect(screen.getByText('生成提示（2）')).toBeTruthy();
+    expect(screen.getByText('需将包分别放入 behavior_packs 与 resource_packs')).toBeTruthy();
+    // 可关闭
+    fireEvent.click(screen.getByTitle('关闭警告'));
+    expect(screen.queryByText('生成提示（2）')).toBeNull();
+  });
+
+  it('无 warnings 时不渲染警告条', async () => {
+    mockMcApi.generateSpec.mockResolvedValue({ spec: { packId: 'bp', packName: 'BP' } });
+    mockMcApi.generateFiles.mockResolvedValue({
+      files: [{ path: 'a.txt', content: 'x' }],
+      warnings: [],
+    });
+    useModStore.setState({ description: 'x' });
+    render(<AgentPanel />);
+    fireEvent.change(screen.getByPlaceholderText('描述你想要的 mod…'), {
+      target: { value: 'x' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /生成 Spec/ }));
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: /生成代码/ }));
+    await act(async () => {});
+    expect(screen.queryByText('生成提示')).toBeNull();
+  });
+
   it('渲染「AI 智能体」标题（默认 agent 模式）', () => {
     render(<AgentPanel />);
     // agentMode=agent 时标题为「AI 智能体」（AgentSessionPanel 内部也可能含此文本，用 getAllByText）
