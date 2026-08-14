@@ -17,6 +17,7 @@ import { CRAFTTWEAKER_TEMPLATES } from './crafttweaker-templates.js';
 import { BEHAVIOR_PACK_TEMPLATES } from './behavior-pack-templates.js';
 import { ENCHANTMENT_TEMPLATES } from './enchantment-templates.js';
 import { BEHAVIOR_ITEM_TEMPLATES } from './behavior-item-templates.js';
+import { BEHAVIOR_ENTITY_TEMPLATES } from './behavior-entity-templates.js';
 
 export type { SpecTemplate, GeneratorType } from './types.js';
 export * from './mod-templates.js';
@@ -31,6 +32,7 @@ export * from './crafttweaker-templates.js';
 export * from './behavior-pack-templates.js';
 export * from './enchantment-templates.js';
 export * from './behavior-item-templates.js';
+export * from './behavior-entity-templates.js';
 
 /**
  * 按生成器类型分组的模板映射。
@@ -53,4 +55,5 @@ export const TEMPLATES_BY_TYPE: Record<GeneratorType, SpecTemplate[]> = {
   behavior_pack: BEHAVIOR_PACK_TEMPLATES,
   enchantment: ENCHANTMENT_TEMPLATES,
   behavior_item: BEHAVIOR_ITEM_TEMPLATES,
+  behavior_entity: BEHAVIOR_ENTITY_TEMPLATES,
 };

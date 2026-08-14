@@ -47,14 +47,17 @@ describe('createDefaultRegistry 端到端', () => {
     'kubejs',
     'crafttweaker',
     'behavior_pack',
+    'enchantment',
+    'behavior_item',
+    'behavior_entity',
   ] as const;
 
-  it('注册了全部 10 种 generator', () => {
+  it('注册了全部 13 种 generator', () => {
     const registry = createDefaultRegistry();
     for (const type of EXPECTED_TYPES) {
       expect(registry.get(type), `generator "${type}" should be registered`).toBeDefined();
     }
-    expect(registry.list()).toHaveLength(10);
+    expect(registry.list()).toHaveLength(13);
   });
 
   it('launcher generator 端到端生成 8 个文件', async () => {

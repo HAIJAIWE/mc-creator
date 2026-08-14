@@ -11,6 +11,7 @@ export * from './launcher-spec.js';
 export * from './behavior-pack-spec.js';
 export * from './enchantment-spec.js';
 export * from './behavior-item-spec.js';
+export * from './behavior-entity-spec.js';
 export * from './node-graph-spec.js';
 export * from './nodeDataMigrator.js';
 export * from './custom-node-schema.js';

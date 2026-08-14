@@ -38,4 +38,5 @@ export type GeneratorType =
   | 'crafttweaker'
   | 'behavior_pack'
   | 'enchantment'
-  | 'behavior_item';
+  | 'behavior_item'
+  | 'behavior_entity';

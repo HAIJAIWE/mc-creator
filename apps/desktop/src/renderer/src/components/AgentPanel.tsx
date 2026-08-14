@@ -271,6 +271,7 @@ export function AgentPanel() {
     behavior_pack: '描述你想要的行为包…',
     enchantment: '描述你想要的附魔…',
     behavior_item: '描述你想要的自定义物品…',
+    behavior_entity: '描述你想要的自定义怪物…',
   };
   const placeholder = PLACEHOLDERS[generatorType] ?? '描述你想要的内容…';
 

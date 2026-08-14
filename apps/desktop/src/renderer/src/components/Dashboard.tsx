@@ -21,6 +21,7 @@ const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
   behavior_pack: { scope: 'pixel', name: 'box' },
   enchantment: { scope: 'pixel', name: 'star' },
   behavior_item: { scope: 'pixel', name: 'tool-case' },
+  behavior_entity: { scope: 'pixel', name: 'ghost' },
 };
 
 const TYPE_LABEL: Record<GeneratorType, string> = {
@@ -36,6 +37,7 @@ const TYPE_LABEL: Record<GeneratorType, string> = {
   behavior_pack: '行为包',
   enchantment: '附魔',
   behavior_item: '行为包物品',
+  behavior_entity: '行为包实体',
 };
 
 const TYPE_DESC: Record<GeneratorType, string> = {
@@ -51,6 +53,7 @@ const TYPE_DESC: Record<GeneratorType, string> = {
   behavior_pack: '创建基岩版行为包',
   enchantment: '创建数据驱动附魔（1.21+）',
   behavior_item: '创建基岩版自定义物品',
+  behavior_entity: '创建基岩版自定义实体',
 };
 
 const LOADER_LABEL: Record<string, string> = {

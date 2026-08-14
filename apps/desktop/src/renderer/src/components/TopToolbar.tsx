@@ -27,6 +27,7 @@ const TYPE_LABELS: Record<GeneratorType, string> = {
   behavior_pack: '行为包',
   enchantment: '附魔',
   behavior_item: '行为包物品',
+  behavior_entity: '行为包实体',
 };
 
 export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
