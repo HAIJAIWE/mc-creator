@@ -20,6 +20,7 @@ const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
   crafttweaker: { scope: 'pixel', name: 'code' },
   behavior_pack: { scope: 'pixel', name: 'box' },
   enchantment: { scope: 'pixel', name: 'star' },
+  behavior_item: { scope: 'pixel', name: 'tool-case' },
 };
 
 const TYPE_LABEL: Record<GeneratorType, string> = {
@@ -34,6 +35,7 @@ const TYPE_LABEL: Record<GeneratorType, string> = {
   crafttweaker: 'CraftTweaker',
   behavior_pack: '行为包',
   enchantment: '附魔',
+  behavior_item: '行为包物品',
 };
 
 const TYPE_DESC: Record<GeneratorType, string> = {
@@ -48,6 +50,7 @@ const TYPE_DESC: Record<GeneratorType, string> = {
   crafttweaker: '创建 ZenScript 脚本',
   behavior_pack: '创建基岩版行为包',
   enchantment: '创建数据驱动附魔（1.21+）',
+  behavior_item: '创建基岩版自定义物品',
 };
 
 const LOADER_LABEL: Record<string, string> = {

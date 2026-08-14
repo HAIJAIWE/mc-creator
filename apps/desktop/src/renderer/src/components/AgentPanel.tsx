@@ -270,6 +270,7 @@ export function AgentPanel() {
     crafttweaker: '描述你想要的 CraftTweaker 脚本…',
     behavior_pack: '描述你想要的行为包…',
     enchantment: '描述你想要的附魔…',
+    behavior_item: '描述你想要的自定义物品…',
   };
   const placeholder = PLACEHOLDERS[generatorType] ?? '描述你想要的内容…';
 

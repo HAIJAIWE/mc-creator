@@ -37,4 +37,5 @@ export type GeneratorType =
   | 'kubejs'
   | 'crafttweaker'
   | 'behavior_pack'
-  | 'enchantment';
+  | 'enchantment'
+  | 'behavior_item';

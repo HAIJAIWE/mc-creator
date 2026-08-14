@@ -14,6 +14,7 @@ export const GENERATOR_TYPES = [
   'crafttweaker',
   'behavior_pack',
   'enchantment',
+  'behavior_item',
 ] as const;
 export type GeneratorType = (typeof GENERATOR_TYPES)[number];
 

@@ -11,6 +11,7 @@ export * from './kubejs/index.js';
 export * from './crafttweaker/index.js';
 export * from './behavior-pack/index.js';
 export * from './enchantment/index.js';
+export * from './behavior-item/index.js';
 import { GeneratorRegistry } from './registry.js';
 import { ModGenerator } from './mod/index.js';
 import { DatapackGenerator } from './datapack/index.js';
@@ -23,6 +24,7 @@ import { KubejsGenerator } from './kubejs/index.js';
 import { CraftTweakerGenerator } from './crafttweaker/index.js';
 import { BehaviorPackGenerator } from './behavior-pack/index.js';
 import { EnchantmentGenerator } from './enchantment/index.js';
+import { BehaviorItemGenerator } from './behavior-item/index.js';
 
 /**
  * 创建已注册所有内置生成器的默认注册表。
@@ -41,5 +43,6 @@ export function createDefaultRegistry(): GeneratorRegistry {
   registry.register(new CraftTweakerGenerator());
   registry.register(new BehaviorPackGenerator());
   registry.register(new EnchantmentGenerator());
+  registry.register(new BehaviorItemGenerator());
   return registry;
 }
