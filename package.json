@@ -1,7 +1,7 @@
 {
   "name": "mc-creator",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "AI 驱动的 Minecraft 内容创作桌面客户端 — 生成 Mod / 数据包 / 整合包 / 服务器配置 / 材质包 / 皮肤 / 资源包",
   "license": "MIT",
   "packageManager": "pnpm@9.15.0",
