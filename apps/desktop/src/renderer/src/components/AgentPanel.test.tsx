@@ -122,6 +122,12 @@ describe('AgentPanel', () => {
     expect(screen.getByPlaceholderText('描述你想要的行为包…')).toBeTruthy();
   });
 
+  it('generatorType=enchantment 时 placeholder 为「描述你想要的附魔…」', () => {
+    useModStore.setState({ generatorType: 'enchantment' });
+    render(<AgentPanel />);
+    expect(screen.getByPlaceholderText('描述你想要的附魔…')).toBeTruthy();
+  });
+
   it('描述为空时「生成 Spec」按钮被禁用', () => {
     render(<AgentPanel />);
     const generateBtn = screen.getByRole('button', { name: /生成 Spec/ }) as HTMLButtonElement;

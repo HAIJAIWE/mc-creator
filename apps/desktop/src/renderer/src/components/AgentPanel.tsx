@@ -269,6 +269,7 @@ export function AgentPanel() {
     kubejs: '描述你想要的 KubeJS 脚本…',
     crafttweaker: '描述你想要的 CraftTweaker 脚本…',
     behavior_pack: '描述你想要的行为包…',
+    enchantment: '描述你想要的附魔…',
   };
   const placeholder = PLACEHOLDERS[generatorType] ?? '描述你想要的内容…';
 

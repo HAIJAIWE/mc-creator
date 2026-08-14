@@ -15,6 +15,7 @@ import { RESOURCE_PACK_TEMPLATES } from './resource-pack-templates.js';
 import { KUBEJS_TEMPLATES } from './kubejs-templates.js';
 import { CRAFTTWEAKER_TEMPLATES } from './crafttweaker-templates.js';
 import { BEHAVIOR_PACK_TEMPLATES } from './behavior-pack-templates.js';
+import { ENCHANTMENT_TEMPLATES } from './enchantment-templates.js';
 
 export type { SpecTemplate, GeneratorType } from './types.js';
 export * from './mod-templates.js';
@@ -27,6 +28,7 @@ export * from './resource-pack-templates.js';
 export * from './kubejs-templates.js';
 export * from './crafttweaker-templates.js';
 export * from './behavior-pack-templates.js';
+export * from './enchantment-templates.js';
 
 /**
  * 按生成器类型分组的模板映射。
@@ -47,4 +49,5 @@ export const TEMPLATES_BY_TYPE: Record<GeneratorType, SpecTemplate[]> = {
   kubejs: KUBEJS_TEMPLATES,
   crafttweaker: CRAFTTWEAKER_TEMPLATES,
   behavior_pack: BEHAVIOR_PACK_TEMPLATES,
+  enchantment: ENCHANTMENT_TEMPLATES,
 };

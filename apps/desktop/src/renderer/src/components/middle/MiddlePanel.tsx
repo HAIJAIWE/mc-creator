@@ -15,6 +15,7 @@ import { SkinPreviewPanel } from './SkinPreviewPanel.js';
 import { KubejsPreviewPanel } from './KubejsPreviewPanel.js';
 import { CraftTweakerPreviewPanel } from './CraftTweakerPreviewPanel.js';
 import { BehaviorPackPreviewPanel } from './BehaviorPackPreviewPanel.js';
+import { EnchantmentPreviewPanel } from './EnchantmentPreviewPanel.js';
 import { ResourcePackPreview } from '../ResourcePackPreview.js';
 import { NbtEditor } from '../NbtEditor.js';
 import { CommandPalette, type Command } from '../CommandPalette.js';
@@ -101,6 +102,8 @@ export function MiddlePanel() {
         return <CraftTweakerPreviewPanel />;
       case 'behavior_pack':
         return <BehaviorPackPreviewPanel />;
+      case 'enchantment':
+        return <EnchantmentPreviewPanel />;
       default:
         return <PlaceholderPanel type={generatorType} />;
     }

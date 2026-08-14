@@ -13,6 +13,7 @@ export const GENERATOR_TYPES = [
   'kubejs',
   'crafttweaker',
   'behavior_pack',
+  'enchantment',
 ] as const;
 export type GeneratorType = (typeof GENERATOR_TYPES)[number];
 

@@ -19,6 +19,7 @@ const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
   kubejs: { scope: 'pixel', name: 'zap' },
   crafttweaker: { scope: 'pixel', name: 'code' },
   behavior_pack: { scope: 'pixel', name: 'box' },
+  enchantment: { scope: 'pixel', name: 'star' },
 };
 
 const TYPE_LABEL: Record<GeneratorType, string> = {
@@ -32,6 +33,7 @@ const TYPE_LABEL: Record<GeneratorType, string> = {
   kubejs: 'KubeJS',
   crafttweaker: 'CraftTweaker',
   behavior_pack: '行为包',
+  enchantment: '附魔',
 };
 
 const TYPE_DESC: Record<GeneratorType, string> = {
@@ -45,6 +47,7 @@ const TYPE_DESC: Record<GeneratorType, string> = {
   kubejs: '创建 KubeJS 脚本',
   crafttweaker: '创建 ZenScript 脚本',
   behavior_pack: '创建基岩版行为包',
+  enchantment: '创建数据驱动附魔（1.21+）',
 };
 
 const LOADER_LABEL: Record<string, string> = {

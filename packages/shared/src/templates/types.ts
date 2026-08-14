@@ -36,4 +36,5 @@ export type GeneratorType =
   | 'launcher'
   | 'kubejs'
   | 'crafttweaker'
-  | 'behavior_pack';
+  | 'behavior_pack'
+  | 'enchantment';

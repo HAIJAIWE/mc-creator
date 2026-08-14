@@ -25,6 +25,7 @@ const TYPE_LABELS: Record<GeneratorType, string> = {
   kubejs: 'KubeJS',
   crafttweaker: 'CraftTweaker',
   behavior_pack: '行为包',
+  enchantment: '附魔',
 };
 
 export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
