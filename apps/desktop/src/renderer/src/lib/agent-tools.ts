@@ -674,6 +674,116 @@ const generateModTool: ToolDefinition = {
 };
 
 /**
+ * 通用生成工具：按生成器类型 + spec JSON 生成全部文件。
+ * 覆盖除 mod/datapack（有专用工具）外的其余 11 种生成器，也支持全部 13 种。
+ */
+const generateFilesTool: ToolDefinition = {
+  name: 'generate_files',
+  description:
+    '按生成器类型生成内容文件：传入 generator_type 和 spec_json（该类型 spec 的 JSON），自动运行对应生成器产出全部文件到项目文件列表。生成器类型: mod(Java 模组,也可用 generate_mod) | datapack(数据包,也可用 generate_datapack) | modpack(整合包) | server(服务器) | resource_pack(资源包) | skin(皮肤) | launcher(启动器) | kubejs(KubeJS) | crafttweaker(CraftTweaker) | behavior_pack(基岩行为包) | behavior_item(基岩自定义物品) | behavior_entity(基岩自定义实体) | enchantment(数据包附魔)。',
+  parameters: [
+    {
+      name: 'generator_type',
+      type: 'string',
+      description:
+        '生成器类型：mod | datapack | modpack | server | resource_pack | skin | launcher | kubejs | crafttweaker | behavior_pack | behavior_item | behavior_entity | enchantment',
+      required: true,
+    },
+    {
+      name: 'spec_json',
+      type: 'string',
+      description:
+        '该生成器类型的 spec JSON 字符串（packId/packName 或 modId/name 或 serverName 等）',
+      required: true,
+    },
+    {
+      name: 'loader',
+      type: 'string',
+      description: '加载器：fabric | neoforge（可选，默认取当前项目选择）',
+      required: false,
+    },
+    {
+      name: 'mc_version',
+      type: 'string',
+      description: 'MC 版本号（可选，默认取当前项目选择）',
+      required: false,
+    },
+  ],
+  category: 'write',
+  requiresApproval: true,
+  execute: async (args) => {
+    const type = String(args.generator_type);
+    let specObj: Record<string, unknown>;
+    try {
+      specObj = JSON.parse(String(args.spec_json));
+    } catch (e) {
+      return `错误：spec_json 不是有效的 JSON: ${(e as Error).message}`;
+    }
+
+    try {
+      const { createDefaultRegistry, SPEC_CONFIGS } = await import('@mc-creator/core');
+      const schema = SPEC_CONFIGS[type as keyof typeof SPEC_CONFIGS]?.schema;
+      if (!schema) {
+        return `错误：未知生成器类型 "${type}"。可用类型：${Object.keys(SPEC_CONFIGS).join(', ')}`;
+      }
+
+      // 与 ipc GENERATE_FILES 一致：校验通过后使用 parse 后的完整 spec（default 字段已填充）
+      const parsed = schema.safeParse(specObj);
+      if (!parsed.success) {
+        const issues = parsed.error.issues
+          .slice(0, 5)
+          .map((i) => `  ${i.path.join('.') || '(根)'}: ${i.message}`)
+          .join('\n');
+        const more =
+          parsed.error.issues.length > 5 ? `\n  ...等 ${parsed.error.issues.length} 处` : '';
+        return `错误：${type} Spec 校验失败:\n${issues}${more}`;
+      }
+
+      const gen = createDefaultRegistry().get(type as never);
+      if (!gen) return `错误：生成器 "${type}" 未注册`;
+
+      const store = useModStore.getState();
+      const result = await gen.generate({
+        loader: (args.loader as string | undefined) ?? store.loader,
+        mcVersion: (args.mc_version as string | undefined) ?? store.mcVersion,
+        modId:
+          (parsed.data as { modId?: string }).modId ||
+          (parsed.data as { packId?: string }).packId ||
+          'mc_creator',
+        spec: parsed.data as never,
+        projectPath: '',
+      } as never);
+
+      // 合并文件到 store（已有则更新，新增则创建）
+      const storeState = useModStore.getState();
+      const existingPaths = new Set(storeState.files.map((f) => f.path));
+      for (const f of result.files) {
+        if (existingPaths.has(f.path)) {
+          storeState.updateFileContent(f.path, f.content);
+        } else {
+          storeState.createFile(f.path, f.content);
+        }
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      storeState.setSpec(parsed.data as any);
+
+      const summary = [`✅ ${type} 生成成功！`, `生成文件: ${result.files.length} 个`];
+      const spec = parsed.data as Record<string, unknown>;
+      const counts = Object.entries(spec)
+        .filter(([, v]) => Array.isArray(v) && v.length > 0)
+        .map(([k, v]) => `  ${k}: ${(v as unknown[]).length}`);
+      if (counts.length > 0) summary.push(...counts);
+      if (result.warnings.length > 0) {
+        summary.push(`警告: ${result.warnings.join(', ')}`);
+      }
+      return summary.join('\n');
+    } catch (e) {
+      return `错误：生成 ${type} 失败: ${(e as Error).message}`;
+    }
+  },
+};
+
+/**
  * 获取项目上下文（spec + 文件结构概览）
  */
 const getProjectContextTool: ToolDefinition = {
@@ -769,6 +879,7 @@ export const agentTools: ToolDefinition[] = [
   applyContentTemplateTool,
   generateDatapackTool,
   generateModTool,
+  generateFilesTool,
   getProjectContextTool,
 ];
 

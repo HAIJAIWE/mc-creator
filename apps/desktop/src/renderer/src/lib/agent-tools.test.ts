@@ -50,8 +50,8 @@ function resetStore() {
 }
 
 describe('agent-tools 注册表', () => {
-  it('注册 11 个工具', () => {
-    expect(agentTools).toHaveLength(11);
+  it('注册 12 个工具', () => {
+    expect(agentTools).toHaveLength(12);
   });
 
   it('findTool 按名查找', () => {
@@ -62,7 +62,7 @@ describe('agent-tools 注册表', () => {
 
   it('toolsToFunctionDefinitions 生成 OpenAI 兼容定义', () => {
     const defs = toolsToFunctionDefinitions();
-    expect(defs.length).toBe(11);
+    expect(defs.length).toBe(12);
     const readFile = defs.find((d) => d.function.name === 'read_file')!;
     expect(readFile.type).toBe('function');
     expect(readFile.function.parameters.type).toBe('object');
@@ -354,5 +354,70 @@ describe('generate_mod', () => {
       spec_json: JSON.stringify({ modId: 'bad id!', version: '1.0.0', name: '', description: '' }),
     });
     expect(result).toContain('ModSpec 校验失败');
+  });
+});
+
+describe('generate_files（通用生成器工具）', () => {
+  beforeEach(resetStore);
+
+  it('生成 behavior_entity 全套文件并写回 store', async () => {
+    const tool = findTool('generate_files')!;
+    const result = await tool.execute({
+      generator_type: 'behavior_entity',
+      spec_json: JSON.stringify({
+        packId: 'test_pack',
+        packName: 'Test Pack',
+        entities: [{ id: 'tiger', name: 'Tiger', hostile: false, geometry: 'creeper' }],
+      }),
+    });
+    expect(result).toContain('behavior_entity 生成成功');
+    expect(result).toContain('entities: 1');
+
+    const s = useModStore.getState();
+    const paths = s.files.map((f) => f.path);
+    expect(paths).toContain('manifest.json');
+    expect(paths).toContain('entities/tiger.behavior.json');
+    expect(paths).toContain('entity/tiger.client_entity.json');
+    expect(paths).toContain('textures/entity/tiger.png');
+    expect(paths).toContain('texts/zh_CN.lang');
+    expect((s.spec as unknown as { packId: string }).packId).toBe('test_pack');
+  });
+
+  it('未知生成器类型返回可用类型列表', async () => {
+    const tool = findTool('generate_files')!;
+    const result = await tool.execute({
+      generator_type: 'not_a_type',
+      spec_json: '{}',
+    });
+    expect(result).toContain('未知生成器类型');
+    expect(result).toContain('behavior_entity');
+  });
+
+  it('非法 spec 返回中文字段级校验错误', async () => {
+    const tool = findTool('generate_files')!;
+    const result = await tool.execute({
+      generator_type: 'behavior_item',
+      spec_json: JSON.stringify({ packId: 'bad id!', packName: 'X' }),
+    });
+    expect(result).toContain('behavior_item Spec 校验失败');
+    expect(result).toContain('packId');
+  });
+
+  it('无效 JSON 返回错误', async () => {
+    const tool = findTool('generate_files')!;
+    const result = await tool.execute({ generator_type: 'server', spec_json: 'not json' });
+    expect(result).toContain('不是有效的 JSON');
+  });
+
+  it('server 类型使用项目默认版本生成 server.properties', async () => {
+    const tool = findTool('generate_files')!;
+    const result = await tool.execute({
+      generator_type: 'server',
+      spec_json: JSON.stringify({ serverName: 'MyServer' }),
+    });
+    expect(result).toContain('server 生成成功');
+    const paths = useModStore.getState().files.map((f) => f.path);
+    expect(paths).toContain('server.properties');
+    expect(paths).toContain('eula.txt');
   });
 });
