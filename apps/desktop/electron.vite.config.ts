@@ -26,7 +26,21 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
-    build: { rollupOptions: { input: { index: resolve(__dirname, 'src/renderer/index.html') } } },
+    build: {
+      rollupOptions: {
+        input: { index: resolve(__dirname, 'src/renderer/index.html') },
+        output: {
+          // 把重型第三方库拆成独立 vendor chunk，避免单包过大、利于缓存
+          manualChunks: {
+            'vendor-monaco': ['@monaco-editor/react'],
+            'vendor-reactflow': ['reactflow'],
+            'vendor-skinview3d': ['skinview3d'],
+            'vendor-xterm': ['@xterm/xterm', '@xterm/addon-fit'],
+            'vendor-react': ['react', 'react-dom', 'zustand'],
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@renderer': resolve(__dirname, 'src/renderer/src'),

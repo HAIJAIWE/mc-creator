@@ -56,8 +56,9 @@ export const ipcClient = {
   }): Promise<GenerateFilesRes> => {
     if (isWebPreview()) {
       // 预览模式：渲染进程内直接跑 core 生成器（与主进程 GENERATE_FILES 逻辑一致）
+      // 通过浏览器安全入口导入，避免把 Node-only 的 builder 模块拖进浏览器 bundle
       const { createDefaultRegistry, SPEC_CONFIGS, formatSpecIssues } =
-        await import('@mc-creator/core');
+        await import('@mc-creator/core/browser.js');
       const gen = createDefaultRegistry().get(req.generatorType);
       if (!gen) {
         return { files: [], warnings: [`不支持的生成器类型：${req.generatorType}`] };

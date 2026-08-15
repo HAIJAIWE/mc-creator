@@ -92,13 +92,13 @@ mc-creator/
 │       ├── src/
 │       │   ├── main/             # 主进程（IPC handler / 模型配置 / 构建调用）
 │       │   ├── preload/          # contextBridge 桥接
-│       │   │   ├── renderer/         # 渲染进程（React UI）
-│       │   │   │   └── src/
-│       │   │   │       ├── components/   # AgentPanel / TemplatePicker / SpecFormEditor / PreviewPanel 系列 / BuildPanel / SettingsPanel
-│       │   │   │       │   ├── lowcode/  # 低代码节点图编辑器（15 节点 + 子图 + 自定义节点 + 编译器）
-│       │   │   │       │   └── middle/   # 各生成器类型预览面板（Mod / Datapack / Modpack / Server / Launcher / ResourcePack / Skin）
-│       │   │   │       ├── store/        # Zustand stores（mod-store / node-graph-store / drawer-store / debugger-store）
-│       │   │   │       └── lib/          # compileNodeGraph + 4 编译器 + ipc-client + monaco-theme
+│       │   ├── renderer/         # 渲染进程（React UI）
+│       │   │   └── src/
+│       │   │       ├── components/   # AgentPanel / TemplatePicker / SpecFormEditor / PreviewPanel 系列 / BuildPanel / SettingsPanel
+│       │   │       │   ├── lowcode/  # 低代码节点图编辑器（15 节点 + 子图 + 自定义节点 + 编译器）
+│       │   │       │   └── middle/   # 各生成器类型预览面板（Mod / Datapack / Modpack / Server / Launcher / ResourcePack / Skin）
+│       │   │       ├── store/        # Zustand stores（mod-store / node-graph-store / drawer-store / debugger-store）
+│       │   │       └── lib/          # compileNodeGraph + 4 编译器 + ipc-client + monaco-theme
 │       │   └── shared/           # IPC 通道常量 + zod schema（main/preload/renderer 共享）
 │       └── electron.vite.config.ts
 ├── packages/
@@ -127,7 +127,8 @@ mc-creator/
 │           ├── model-provider/   # ModelProvider 抽象 + VercelAiProvider + MockProvider
 │           ├── orchestrator/     # AI 编排器（描述 → Spec，10 种类型独立 prompt）
 │           ├── filesystem/       # 文件系统抽象（用于测试）
-│           └── utils/            # PNG 编码器（基于 zlib，无原生依赖）
+│           ├── browser.ts        # 浏览器安全入口（只导出 generators + orchestrator）
+│           └── utils/            # PNG 编码器（pako，Uint8Array 同构）
 ├── docs/
 │   ├── superpowers/
 │   │   ├── specs/                # 设计规格
@@ -269,6 +270,15 @@ pnpm --filter @mc-creator/desktop build
 └─────────────────────────────────────────┘
 ```
 
+### 浏览器安全入口
+
+`@mc-creator/core` 顶层 barrel `.` 会导出依赖 `node:` 内置模块的 builder / 构建链路，不能直接被浏览器 bundle 导入。为此提供浏览器安全入口 `@mc-creator/core/browser.js`（只导出 `generators` + `orchestrator`），渲染进程的 web-preview 模式通过它调用生成器，避免把 Node-only 模块拖进浏览器包。
+
+### 打包体积优化
+
+- **manualChunks**：Monaco / reactflow / skinview3d / xterm / react 拆成独立 vendor chunk。
+- **React.lazy 按需加载**：15 个重型面板（编辑器 / 节点图 / 皮肤预览 / 终端 / Dashboard 等）按需加载，外壳保持 eager，显著降低首屏初始化体积。
+
 ### Spec-first 数据流
 
 ```
@@ -314,11 +324,12 @@ ModGenerator 内部通过 Loader Adapter 抽象，同一 ModSpec 按 loader 产�
 
 ### PNG 编码器
 
-材质 / 皮肤生成器使用自研的 PNG 编码器（`packages/core/src/utils/png-encoder.ts`），基于 Node.js 内置 `zlib`，无原生依赖：
+材质 / 皮肤生成器使用自研的 PNG 编码器（`packages/core/src/utils/png-encoder.ts`），基于纯 JS 的 `pako` deflate，输出 `Uint8Array`，**浏览器与 Node 同构**（无原生依赖）：
 
 - 支持 RGBA 8-bit
 - 提供 `fillSolid` / `fillGradient` / `fillCheckerboard` 填充工具
 - 输出标准 PNG（signature + IHDR + IDAT + IEND + CRC32）
+- 附 `toBase64`：浏览器用 `btoa`、Node 用 `Buffer`，统一把 PNG 编码进 `FileNode.content`
 
 PNG 二进制在 IPC 传输时以 base64 字符串存入 `FileNode.content`，导出 zip 时由主进程解码为二进制。
 
@@ -371,13 +382,13 @@ runGradleBuild
 
 ## 测试覆盖
 
-当前共 **1699+ 个测试**通过（本地实测 `pnpm -r test`）：
+当前共 **2115 个测试通过**（本地实测 `pnpm -r test`，另有 17 个跳过）：
 
-| 包                    | 测试文件 | 测试用例 |
-| --------------------- | -------- | -------- |
-| `@mc-creator/shared`  | 9        | 82       |
-| `@mc-creator/core`    | 30       | 381      |
-| `@mc-creator/desktop` | 99       | 1236     |
+| 包                    | 测试文件 | 测试用例        |
+| --------------------- | -------- | --------------- |
+| `@mc-creator/shared`  | 9        | 82              |
+| `@mc-creator/core`    | 36       | 581（+17 跳过） |
+| `@mc-creator/desktop` | 122      | 1452            |
 
 低代码模块测试覆盖：432 个测试（55 个文件），覆盖全部 15 种节点组件、4 个编译器、子图系统、自定义节点系统、过程节点 / PureCode 模式。
 
