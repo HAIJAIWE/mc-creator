@@ -50,7 +50,7 @@ export function formatSpecIssues(error: ZodError): string {
   return issues.join('；') + more;
 }
 
-const SPEC_CONFIGS: Record<SpecType, SpecConfig> = {
+export const SPEC_CONFIGS: Record<SpecType, SpecConfig> = {
   mod: {
     schema: ModSpec,
     prompt: `你是 Minecraft Mod 规格生成器。根据描述生成 loader 无关的 ModSpec JSON。

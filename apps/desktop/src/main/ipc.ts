@@ -199,7 +199,7 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
   });
 
   ipcMain.handle(IPC.GENERATE_FILES, async (_e, raw: unknown): Promise<GenerateFilesRes> => {
-    const req = GenerateFilesRequest.parse(raw);
+    let req = GenerateFilesRequest.parse(raw);
     const gen = generatorRegistry.get(req.generatorType);
     if (!gen) {
       return { files: [], warnings: [`不支持的生成器类型：${req.generatorType}`] };
@@ -211,6 +211,8 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
       if (!check.success) {
         throw new Error(`${req.generatorType} Spec 校验失败：${formatSpecIssues(check.error)}`);
       }
+      // 校验通过后用 parse 后的完整 spec（default 字段已填充），避免生成器拿到缺省字段
+      req = { ...req, spec: check.data as z.infer<typeof GenerateFilesRequest>['spec'] };
     }
     // modId 可能从 spec 顶层或单独字段取
     const modId = req.modId || (req.spec as { modId?: string }).modId || 'mc_creator';
