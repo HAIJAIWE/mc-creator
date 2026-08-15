@@ -12,7 +12,8 @@ const mcApiStub = {
       {
         tag: 'script',
         attrs: { type: 'module' },
-        children: `window.mcApi = new Proxy({}, {
+        children: `window.__MC_PREVIEW__ = true;
+window.mcApi = new Proxy({}, {
           get: (_, prop) => {
             const name = String(prop);
             // 列表类：返回空数组
@@ -81,6 +82,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@renderer': resolve(__dirname, 'src/renderer/src'),
+      '@mc-creator/core': resolve(__dirname, '../../packages/core/src'),
       '@mc-creator/shared': resolve(__dirname, '../../packages/shared/src'),
     },
   },

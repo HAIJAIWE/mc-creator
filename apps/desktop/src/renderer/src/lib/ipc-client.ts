@@ -33,16 +33,57 @@ import type {
   ImportResourceFilesRes,
 } from '../../../shared/ipc-channels.js';
 
+/**
+ * 网页预览模式（vite.renderer-preview）：无 Electron 主进程。
+ * ipcClient 在预览下直接调用 core 生成器（纯 JS），让生成流程在浏览器可用。
+ */
+function isWebPreview(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    (window as unknown as { __MC_PREVIEW__?: boolean }).__MC_PREVIEW__ === true
+  );
+}
+
 /** 封装 window.mcApi，提供类型安全调用 */
 export const ipcClient = {
   generateSpec: (description: string, generatorType: GeneratorType): Promise<GenerateSpecRes> =>
     window.mcApi.generateSpec(description, generatorType),
-  generateFiles: (req: {
+  generateFiles: async (req: {
     loader: string;
     mcVersion: string;
     spec: unknown;
     generatorType: GeneratorType;
-  }): Promise<GenerateFilesRes> => window.mcApi.generateFiles(req),
+  }): Promise<GenerateFilesRes> => {
+    if (isWebPreview()) {
+      // 预览模式：渲染进程内直接跑 core 生成器（与主进程 GENERATE_FILES 逻辑一致）
+      const { createDefaultRegistry, SPEC_CONFIGS, formatSpecIssues } =
+        await import('@mc-creator/core');
+      const gen = createDefaultRegistry().get(req.generatorType);
+      if (!gen) {
+        return { files: [], warnings: [`不支持的生成器类型：${req.generatorType}`] };
+      }
+      const schema = SPEC_CONFIGS[req.generatorType]?.schema;
+      if (schema) {
+        const check = schema.safeParse(req.spec);
+        if (!check.success) {
+          throw new Error(`${req.generatorType} Spec 校验失败：${formatSpecIssues(check.error)}`);
+        }
+        req = { ...req, spec: check.data };
+      }
+      const result = await gen.generate({
+        loader: req.loader,
+        mcVersion: req.mcVersion,
+        modId:
+          (req.spec as { modId?: string }).modId ||
+          (req.spec as { packId?: string }).packId ||
+          'mc_creator',
+        spec: req.spec as never,
+        projectPath: '',
+      } as never);
+      return { files: result.files, warnings: result.warnings };
+    }
+    return window.mcApi.generateFiles(req);
+  },
   build: (projectPath: string): Promise<BuildRes> => window.mcApi.build(projectPath),
   loadModelConfig: () => window.mcApi.loadModelConfig(),
   saveModelConfig: (config: { name: string; modelId: string; baseURL: string; apiKey: string }) =>
