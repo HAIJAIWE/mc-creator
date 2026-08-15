@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - run: pnpm install --frozen-lockfile
       - name: Generate mod projects for all MC versions
         run: pnpm --filter @mc-creator/core test src/ci/export-projects
@@ -84,7 +84,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - run: pnpm install --frozen-lockfile
       - name: Check LOADER_VERSIONS against upstream
         run: pnpm --filter @mc-creator/core test src/ci/verify-loader-versions
