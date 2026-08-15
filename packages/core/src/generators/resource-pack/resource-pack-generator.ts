@@ -21,6 +21,7 @@ import type {
 import {
   createBuffer,
   encodePng,
+  toBase64,
   fillSolid,
   fillGradient,
   fillCheckerboard,
@@ -149,7 +150,7 @@ export class ResourcePackGenerator implements Generator {
     const png = encodePng(buf);
     return {
       path: `assets/minecraft/textures/${sanitizePathSegment(entry.path)}.png`,
-      content: png.toString('base64'),
+      content: toBase64(png),
     };
   }
 
@@ -205,7 +206,7 @@ export class ResourcePackGenerator implements Generator {
     const png = encodePng(buf);
     return {
       path: `assets/${namespace}/textures/font/${sanitizePathSegment(entry.id)}.png`,
-      content: png.toString('base64'),
+      content: toBase64(png),
     };
   }
 
