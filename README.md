@@ -1,9 +1,9 @@
 # MC Creator
 
-[![CI](https://github.com/USER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/USER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/HAIJAIWE/mc-creator/actions/workflows/ci.yml/badge.svg)](https://github.com/HAIJAIWE/mc-creator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<!-- 推送到 GitHub 后，把上面的 USER/REPO 替换为你的仓库地址（owner/repo），CI 徽章会自动显示构建状态。 -->
+<!-- 仓库地址：https://github.com/HAIJAIWE/mc-creator，CI 徽章会自动显示构建状态。 -->
 
 AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代码、数据包、整合包、服务器配置、材质包、皮肤和资源包，并通过内置构建链编译成 `.jar`，支持项目管理与一键部署。
 
