@@ -5,7 +5,21 @@
  */
 
 import { ipcClient } from './ipc-client.js';
+import { generateFilesForType } from './generate-files.js';
 import { useModStore } from '../store/mod-store.js';
+
+/**
+ * 把生成器结果文件合并写入 store：已有路径则更新内容，新路径则创建。
+ * 供各生成工具共用，消除重复的文件合并逻辑。
+ */
+function mergeFilesIntoStore(files: { path: string; content: string }[]): void {
+  const storeState = useModStore.getState();
+  const existingPaths = new Set(storeState.files.map((f) => f.path));
+  for (const file of files) {
+    if (existingPaths.has(file.path)) storeState.updateFileContent(file.path, file.content);
+    else storeState.createFile(file.path, file.content);
+  }
+}
 
 export interface ToolParameter {
   name: string;
@@ -421,15 +435,8 @@ const applyContentTemplateTool: ToolDefinition = {
       const result = await gen.generate(ctx);
 
       // 写入文件
+      mergeFilesIntoStore(result.files);
       const storeState = useModStore.getState();
-      const existingPaths = new Set(storeState.files.map((f) => f.path));
-      for (const file of result.files) {
-        if (existingPaths.has(file.path)) {
-          storeState.updateFileContent(file.path, file.content);
-        } else {
-          storeState.createFile(file.path, file.content);
-        }
-      }
 
       // 生成语言文件
       const langEnPath = `assets/${modId}/lang/en_us.json`;
@@ -521,25 +528,11 @@ const generateDatapackTool: ToolDefinition = {
       const result = await gen.generate(ctx);
 
       // 将生成的文件写入 store
-      const storeState = useModStore.getState();
-      const newFiles = result.files.map((file) => ({
-        path: file.path,
-        content: file.content,
-      }));
-
-      // 合并文件（已有则更新，新增则添加）
-      const existingPaths = new Set(storeState.files.map((f) => f.path));
-      for (const nf of newFiles) {
-        if (existingPaths.has(nf.path)) {
-          storeState.updateFileContent(nf.path, nf.content);
-        } else {
-          storeState.createFile(nf.path, nf.content);
-        }
-      }
+      mergeFilesIntoStore(result.files);
 
       // 更新 spec（DatapackSpec 与 ModSpec 结构不同，需桥接）
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      storeState.setSpec(parsed.data as any);
+      useModStore.getState().setSpec(parsed.data as any);
 
       const summary = [
         `✅ 数据包生成成功！`,
@@ -632,18 +625,10 @@ const generateModTool: ToolDefinition = {
       const result = await gen.generate(ctx);
 
       // 将生成的文件写入 store
-      const storeState = useModStore.getState();
-      const existingPaths = new Set(storeState.files.map((f) => f.path));
-      for (const file of result.files) {
-        if (existingPaths.has(file.path)) {
-          storeState.updateFileContent(file.path, file.content);
-        } else {
-          storeState.createFile(file.path, file.content);
-        }
-      }
+      mergeFilesIntoStore(result.files);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      storeState.setSpec(parsed.data as any);
+      useModStore.getState().setSpec(parsed.data as any);
 
       const summary = [
         `✅ Mod 生成成功！`,
@@ -721,54 +706,19 @@ const generateFilesTool: ToolDefinition = {
     }
 
     try {
-      const { createDefaultRegistry, SPEC_CONFIGS } = await import('@mc-creator/core');
-      const schema = SPEC_CONFIGS[type as keyof typeof SPEC_CONFIGS]?.schema;
-      if (!schema) {
-        return `错误：未知生成器类型 "${type}"。可用类型：${Object.keys(SPEC_CONFIGS).join(', ')}`;
-      }
-
-      // 与 ipc GENERATE_FILES 一致：校验通过后使用 parse 后的完整 spec（default 字段已填充）
-      const parsed = schema.safeParse(specObj);
-      if (!parsed.success) {
-        const issues = parsed.error.issues
-          .slice(0, 5)
-          .map((i) => `  ${i.path.join('.') || '(根)'}: ${i.message}`)
-          .join('\n');
-        const more =
-          parsed.error.issues.length > 5 ? `\n  ...等 ${parsed.error.issues.length} 处` : '';
-        return `错误：${type} Spec 校验失败:\n${issues}${more}`;
-      }
-
-      const gen = createDefaultRegistry().get(type as never);
-      if (!gen) return `错误：生成器 "${type}" 未注册`;
-
       const store = useModStore.getState();
-      const result = await gen.generate({
+      const result = await generateFilesForType(type, specObj, {
         loader: (args.loader as string | undefined) ?? store.loader,
         mcVersion: (args.mc_version as string | undefined) ?? store.mcVersion,
-        modId:
-          (parsed.data as { modId?: string }).modId ||
-          (parsed.data as { packId?: string }).packId ||
-          'mc_creator',
-        spec: parsed.data as never,
-        projectPath: '',
-      } as never);
+      });
 
       // 合并文件到 store（已有则更新，新增则创建）
-      const storeState = useModStore.getState();
-      const existingPaths = new Set(storeState.files.map((f) => f.path));
-      for (const f of result.files) {
-        if (existingPaths.has(f.path)) {
-          storeState.updateFileContent(f.path, f.content);
-        } else {
-          storeState.createFile(f.path, f.content);
-        }
-      }
+      mergeFilesIntoStore(result.files);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      storeState.setSpec(parsed.data as any);
+      useModStore.getState().setSpec(result.spec as any);
 
       const summary = [`✅ ${type} 生成成功！`, `生成文件: ${result.files.length} 个`];
-      const spec = parsed.data as Record<string, unknown>;
+      const spec = result.spec as Record<string, unknown>;
       const counts = Object.entries(spec)
         .filter(([, v]) => Array.isArray(v) && v.length > 0)
         .map(([k, v]) => `  ${k}: ${(v as unknown[]).length}`);
@@ -778,7 +728,7 @@ const generateFilesTool: ToolDefinition = {
       }
       return summary.join('\n');
     } catch (e) {
-      return `错误：生成 ${type} 失败: ${(e as Error).message}`;
+      return `错误：${(e as Error).message}`;
     }
   },
 };

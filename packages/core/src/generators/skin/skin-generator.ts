@@ -11,6 +11,7 @@ import type { SkinSpec as SkinSpecType } from '@mc-creator/shared';
 import {
   createBuffer,
   encodePng,
+  toBase64,
   setPixel,
   hexToRgb,
   fillSolid,
@@ -35,14 +36,14 @@ export class SkinGenerator implements Generator {
     const skinPng = this.generateSkinPng(spec);
     files.push({
       path: `${spec.playerName}.png`,
-      content: skinPng.toString('base64'),
+      content: toBase64(skinPng),
     });
 
     if (spec.generatePreview) {
       const previewPng = this.generatePreviewPng(spec);
       files.push({
         path: 'preview.png',
-        content: previewPng.toString('base64'),
+        content: toBase64(previewPng),
       });
     }
 
@@ -54,7 +55,7 @@ export class SkinGenerator implements Generator {
   }
 
   /** 生成 64x64 皮肤 PNG */
-  private generateSkinPng(spec: SkinSpecType): Buffer {
+  private generateSkinPng(spec: SkinSpecType): Uint8Array {
     const buf = createBuffer(64, 64);
     const [sr, sg, sb] = hexToRgb(spec.skinColor);
     const [hr, hg, hb] = hexToRgb(spec.hairColor);
@@ -93,7 +94,7 @@ export class SkinGenerator implements Generator {
   }
 
   /** 生成预览图（64x64，用纯色简化展示各部位） */
-  private generatePreviewPng(spec: SkinSpecType): Buffer {
+  private generatePreviewPng(spec: SkinSpecType): Uint8Array {
     const buf = createBuffer(64, 64);
     const [shr, shg, shb] = hexToRgb(spec.shirtColor);
     fillSolid(buf, shr, shg, shb);

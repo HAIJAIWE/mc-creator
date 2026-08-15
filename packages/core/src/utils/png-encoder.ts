@@ -1,10 +1,10 @@
-import { deflateSync } from 'node:zlib';
+import { deflate } from 'pako';
 
-/** 像素数据（RGBA） */
+/** 像素数据（RGBA）。用 Uint8Array 以便浏览器与 Node 同构运行。 */
 export interface PixelBuffer {
   width: number;
   height: number;
-  data: Buffer; // width * height * 4 字节
+  data: Uint8Array; // width * height * 4 字节
 }
 
 /** 设置像素颜色 */
@@ -82,7 +82,7 @@ export function fillCheckerboard(
 
 /** 创建像素缓冲 */
 export function createBuffer(width: number, height: number): PixelBuffer {
-  return { width, height, data: Buffer.alloc(width * height * 4, 0) };
+  return { width, height, data: new Uint8Array(width * height * 4) };
 }
 
 /** hex #RRGGBB -> [r,g,b] */
@@ -92,12 +92,12 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
 }
 
-/** 将 PixelBuffer 编码为 PNG Buffer */
-export function encodePng(buf: PixelBuffer): Buffer {
-  const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(buf.width, 0);
-  ihdr.writeUInt32BE(buf.height, 4);
+/** 将 PixelBuffer 编码为 PNG 字节（Uint8Array，浏览器与 Node 通用） */
+export function encodePng(buf: PixelBuffer): Uint8Array {
+  const sig = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const ihdr = new Uint8Array(13);
+  writeUInt32BE(ihdr, 0, buf.width);
+  writeUInt32BE(ihdr, 4, buf.height);
   ihdr[8] = 8; // bit depth
   ihdr[9] = 6; // color type RGBA
   ihdr[10] = 0; // compression
@@ -105,30 +105,59 @@ export function encodePng(buf: PixelBuffer): Buffer {
   ihdr[12] = 0; // interlace
   // IDAT raw: 每行 1 字节 filter(0) + width*4 字节 RGBA
   const rowSize = buf.width * 4 + 1;
-  const raw = Buffer.alloc(rowSize * buf.height);
+  const raw = new Uint8Array(rowSize * buf.height);
   for (let y = 0; y < buf.height; y++) {
     raw[y * rowSize] = 0; // filter none
-    buf.data.copy(raw, y * rowSize + 1, y * buf.width * 4, (y + 1) * buf.width * 4);
+    raw.set(buf.data.subarray(y * buf.width * 4, (y + 1) * buf.width * 4), y * rowSize + 1);
   }
-  const idat = deflateSync(raw);
-  return Buffer.concat([
+  const idat = deflate(raw);
+  return concatBytes([
     sig,
     makeChunk('IHDR', ihdr),
     makeChunk('IDAT', idat),
-    makeChunk('IEND', Buffer.alloc(0)),
+    makeChunk('IEND', new Uint8Array(0)),
   ]);
 }
 
-function makeChunk(type: string, data: Buffer): Buffer {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length, 0);
-  const typeBuf = Buffer.from(type, 'ascii');
-  const crcBuf = Buffer.alloc(4);
-  crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
-  return Buffer.concat([len, typeBuf, data, crcBuf]);
+/** 字节数组 base64 编码（浏览器用 btoa，Node 用 Buffer），用于 PNG 存入 FileNode.content */
+export function toBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64');
+  }
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
 }
 
-function crc32(buf: Buffer): number {
+function makeChunk(type: string, data: Uint8Array): Uint8Array {
+  const len = new Uint8Array(4);
+  writeUInt32BE(len, 0, data.length);
+  const typeBuf = Uint8Array.from(type, (c) => c.charCodeAt(0));
+  const crcBuf = new Uint8Array(4);
+  writeUInt32BE(crcBuf, 0, crc32(concatBytes([typeBuf, data])));
+  return concatBytes([len, typeBuf, data, crcBuf]);
+}
+
+function writeUInt32BE(target: Uint8Array, offset: number, value: number): void {
+  target[offset] = (value >>> 24) & 0xff;
+  target[offset + 1] = (value >>> 16) & 0xff;
+  target[offset + 2] = (value >>> 8) & 0xff;
+  target[offset + 3] = value & 0xff;
+}
+
+function concatBytes(chunks: Uint8Array[]): Uint8Array {
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.length;
+  }
+  return out;
+}
+
+function crc32(buf: Uint8Array): number {
   const table = new Uint32Array(256);
   for (let i = 0; i < 256; i++) {
     let c = i;

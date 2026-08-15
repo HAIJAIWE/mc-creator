@@ -17,10 +17,12 @@
     "@mc-creator/shared": "workspace:*",
     "ai": "^4.0.0",
     "execa": "^9.0.0",
+    "pako": "^2.1.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "@types/pako": "^2.0.3",
     "memfs": "^4.9.0",
     "vitest": "^2.0.0"
   }

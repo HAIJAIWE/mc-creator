@@ -12,6 +12,7 @@ import type { Generator } from '../types.js';
 import {
   createBuffer,
   encodePng,
+  toBase64,
   fillGradient,
   setPixel,
   hexToRgb,
@@ -20,11 +21,11 @@ import {
 
 /** 生成简单 UUID v4（基岩版 manifest 需要） */
 function generateUUID(): string {
-  const b = Buffer.alloc(16);
+  const b = new Uint8Array(16);
   for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
   b[6] = (b[6] & 0x0f) | 0x40;
   b[8] = (b[8] & 0x3f) | 0x80;
-  const h = b.toString('hex');
+  const h = Array.from(b, (v) => v.toString(16).padStart(2, '0')).join('');
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
@@ -84,7 +85,7 @@ export class BehaviorItemGenerator implements Generator {
       });
       files.push({
         path: `textures/items/${item.id}.png`,
-        content: this.generateItemTexture(item).toString('base64'),
+        content: toBase64(this.generateItemTexture(item)),
       });
     }
 
@@ -203,7 +204,7 @@ export class BehaviorItemGenerator implements Generator {
   }
 
   /** 生成 16x16 物品贴图：基色渐变 + 亮色描边 + 顶部高光 */
-  private generateItemTexture(item: BpItemEntrySpec): Buffer {
+  private generateItemTexture(item: BpItemEntrySpec): Uint8Array {
     const buf = createBuffer(16, 16);
     const [r1, g1, b1] = hexToRgb(item.primaryColor);
     const [r2, g2, b2] = hexToRgb(item.secondaryColor || this.darken(item.primaryColor));

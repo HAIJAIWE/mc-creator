@@ -8,7 +8,23 @@ import {
   hexToRgb,
 } from './png-encoder.js';
 
-const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const PNG_SIG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/** Uint8Array 大端读 UInt32 */
+function readUInt32BE(bytes: Uint8Array, offset: number): number {
+  return (
+    ((bytes[offset] << 24) |
+      (bytes[offset + 1] << 16) |
+      (bytes[offset + 2] << 8) |
+      bytes[offset + 3]) >>>
+    0
+  );
+}
+
+/** Uint8Array 转 ascii */
+function ascii(bytes: Uint8Array): string {
+  return String.fromCharCode(...bytes);
+}
 
 describe('png-encoder', () => {
   it('encodePng 输出以 PNG signature 开头', () => {
@@ -24,9 +40,9 @@ describe('png-encoder', () => {
     const png = encodePng(buf);
     // IEND chunk: length(4)=0 + type(4)='IEND' + crc(4)
     const tail = png.subarray(png.length - 12, png.length);
-    const len = tail.readUInt32BE(0);
+    const len = readUInt32BE(tail, 0);
     expect(len).toBe(0);
-    expect(tail.subarray(4, 8).toString('ascii')).toBe('IEND');
+    expect(ascii(tail.subarray(4, 8))).toBe('IEND');
   });
 
   it('hexToRgb 正确解析 #FF0000 → [255, 0, 0]', () => {
@@ -72,8 +88,8 @@ describe('png-encoder', () => {
     const png = encodePng(buf);
     expect(png.subarray(0, 8)).toEqual(PNG_SIG);
     // IHDR width/height 应为 1
-    const width = png.readUInt32BE(8 + 4 + 4); // sig(8) + len(4) + type(4)
-    const height = png.readUInt32BE(8 + 4 + 4 + 4);
+    const width = readUInt32BE(png, 8 + 4 + 4); // sig(8) + len(4) + type(4)
+    const height = readUInt32BE(png, 8 + 4 + 4 + 4);
     expect(width).toBe(1);
     expect(height).toBe(1);
   });

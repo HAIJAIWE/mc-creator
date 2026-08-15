@@ -20,6 +20,10 @@ export function decryptSecret(stored: string): string {
     try {
       return safeStorage.decryptString(Buffer.from(stored.slice(4), 'base64'));
     } catch {
+      // 解密失败（如跨机器迁移 / 系统密钥变更）：回退为空串避免崩溃，并给出提示
+      console.warn(
+        '[mc-creator] 解密 API Key 失败，已回退为空（可能是跨机器迁移或系统密钥变更导致）',
+      );
       return '';
     }
   }

@@ -1,5 +1,7 @@
 appId: com.mc-creator.app
 productName: MC Creator
+# 本地构建不自动发布：避免 electron-builder 因未配置真实仓库地址而报 "Cannot detect repository"
+publish: null
 directories:
   output: dist
   buildResources: build

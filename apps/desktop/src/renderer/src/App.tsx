@@ -1,27 +1,61 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, lazy, Suspense, type ReactNode } from 'react';
 import { ActivityBar } from './components/ActivityBar.js';
-import { FileTree } from './components/FileTree.js';
-import { MiddlePanel } from './components/middle/MiddlePanel.js';
-import { AgentPanel } from './components/AgentPanel.js';
 import { TopToolbar } from './components/TopToolbar.js';
-import { SettingsPanel } from './components/SettingsPanel.js';
+import { Splitter } from './components/Splitter.js';
 import { ProjectSaveDialog } from './components/ProjectSaveDialog.js';
 import { TaskCompleteDialog } from './components/TaskCompleteDialog.js';
-import { Splitter } from './components/Splitter.js';
-import { ItemRecipeEditor } from './components/ItemRecipeEditor.js';
-import { SearchPanel } from './components/SearchPanel.js';
-import { PackagesPanel } from './components/PackagesPanel.js';
-import { GitPanel } from './components/GitPanel.js';
-import { BlockEditor } from './components/BlockEditor.js';
-import { EntityAiEditor } from './components/EntityAiEditor.js';
-import { AudioPanel } from './components/AudioPanel.js';
-import { CiCdPanel } from './components/CiCdPanel.js';
-import { GameLauncherPanel } from './components/GameLauncherPanel.js';
-import { BuildPanel } from './components/BuildPanel.js';
-import { TerminalPanel } from './components/TerminalPanel.js';
-import { Dashboard } from './components/Dashboard.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { useProjectStore } from './store/project-store.js';
+
+// 重型面板按需加载（Monaco / reactflow / xterm / skinview3d 拆进独立 chunk，首次不进主包）
+const MiddlePanel = lazy(() =>
+  import('./components/middle/MiddlePanel.js').then((m) => ({ default: m.MiddlePanel })),
+);
+const AgentPanel = lazy(() =>
+  import('./components/AgentPanel.js').then((m) => ({ default: m.AgentPanel })),
+);
+const BuildPanel = lazy(() =>
+  import('./components/BuildPanel.js').then((m) => ({ default: m.BuildPanel })),
+);
+const TerminalPanel = lazy(() =>
+  import('./components/TerminalPanel.js').then((m) => ({ default: m.TerminalPanel })),
+);
+const Dashboard = lazy(() =>
+  import('./components/Dashboard.js').then((m) => ({ default: m.Dashboard })),
+);
+const FileTree = lazy(() =>
+  import('./components/FileTree.js').then((m) => ({ default: m.FileTree })),
+);
+const SearchPanel = lazy(() =>
+  import('./components/SearchPanel.js').then((m) => ({ default: m.SearchPanel })),
+);
+const GitPanel = lazy(() =>
+  import('./components/GitPanel.js').then((m) => ({ default: m.GitPanel })),
+);
+const PackagesPanel = lazy(() =>
+  import('./components/PackagesPanel.js').then((m) => ({ default: m.PackagesPanel })),
+);
+const ItemRecipeEditor = lazy(() =>
+  import('./components/ItemRecipeEditor.js').then((m) => ({ default: m.ItemRecipeEditor })),
+);
+const BlockEditor = lazy(() =>
+  import('./components/BlockEditor.js').then((m) => ({ default: m.BlockEditor })),
+);
+const EntityAiEditor = lazy(() =>
+  import('./components/EntityAiEditor.js').then((m) => ({ default: m.EntityAiEditor })),
+);
+const AudioPanel = lazy(() =>
+  import('./components/AudioPanel.js').then((m) => ({ default: m.AudioPanel })),
+);
+const CiCdPanel = lazy(() =>
+  import('./components/CiCdPanel.js').then((m) => ({ default: m.CiCdPanel })),
+);
+const GameLauncherPanel = lazy(() =>
+  import('./components/GameLauncherPanel.js').then((m) => ({ default: m.GameLauncherPanel })),
+);
+const SettingsPanel = lazy(() =>
+  import('./components/SettingsPanel.js').then((m) => ({ default: m.SettingsPanel })),
+);
 
 type Activity =
   | 'explorer'
@@ -35,6 +69,15 @@ type Activity =
   | 'audio'
   | 'cicd'
   | 'game';
+
+/** 按需加载面板的 Suspense 边界 */
+function LazyPanel({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<div className="p-3 text-sm text-mc-dim">加载中…</div>}>
+      {children}
+    </Suspense>
+  );
+}
 
 /** 工作台视图（三栏布局） */
 function Workbench() {
@@ -109,17 +152,25 @@ function Workbench() {
           style={{ width: leftWidth }}
           className="flex-shrink-0 overflow-hidden border-r border-mc-border bg-mc-surface"
         >
-          <ErrorBoundary name="侧面板">{renderActivityPanel()}</ErrorBoundary>
+          <ErrorBoundary name="侧面板">
+            <LazyPanel>{renderActivityPanel()}</LazyPanel>
+          </ErrorBoundary>
         </aside>
 
         <Splitter onResize={handleLeftResize} />
 
         <main className="flex flex-1 flex-col overflow-hidden">
           <ErrorBoundary name="编辑区">
-            <MiddlePanel />
+            <LazyPanel>
+              <MiddlePanel />
+            </LazyPanel>
           </ErrorBoundary>
-          <BuildPanel />
-          <TerminalPanel />
+          <LazyPanel>
+            <BuildPanel />
+          </LazyPanel>
+          <LazyPanel>
+            <TerminalPanel />
+          </LazyPanel>
         </main>
 
         <Splitter onResize={handleRightResize} />
@@ -129,7 +180,9 @@ function Workbench() {
           className="flex-shrink-0 overflow-hidden border-l border-mc-border bg-mc-surface"
         >
           <ErrorBoundary name="智能体面板">
-            <AgentPanel />
+            <LazyPanel>
+              <AgentPanel />
+            </LazyPanel>
           </ErrorBoundary>
         </aside>
       </div>
@@ -151,7 +204,9 @@ export default function App() {
   if (view === 'dashboard')
     return (
       <ErrorBoundary name="仪表盘">
-        <Dashboard />
+        <LazyPanel>
+          <Dashboard />
+        </LazyPanel>
       </ErrorBoundary>
     );
   return <Workbench />;
