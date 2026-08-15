@@ -1,4 +1,6 @@
 import { createWithEqualityFn } from 'zustand/traditional';
+import { persist } from 'zustand/middleware';
+import { resolveUiStorage } from './persist-storage.js';
 
 /**
  * ChatStore：管理 AI 助手 chat 模式的对话状态。
@@ -6,6 +8,7 @@ import { createWithEqualityFn } from 'zustand/traditional';
  * 设计目的：让 chat 模式切换到 agent 模式再切回时，对话历史不丢失。
  * 原本 ChatPanel 内部 useState 在组件卸载（切到 agent 模式）时会清空，
  * 提升到 store 后状态独立于组件生命周期。
+ * 对话历史持久化到 localStorage，重启后保留。
  */
 
 export interface ChatMessage {
@@ -40,31 +43,41 @@ const CLEARED_MESSAGES: ChatMessage[] = [
   { role: 'assistant', text: '对话已清空。有什么可以帮你的？' },
 ];
 
-export const useChatStore = createWithEqualityFn<ChatState>((set) => ({
-  messages: INITIAL_MESSAGES,
-  input: '',
-  sending: false,
+export const useChatStore = createWithEqualityFn<ChatState>()(
+  persist(
+    (set) => ({
+      messages: INITIAL_MESSAGES,
+      input: '',
+      sending: false,
 
-  setMessages: (updater) =>
-    set((state) => ({
-      messages: typeof updater === 'function' ? updater(state.messages) : updater,
-    })),
+      setMessages: (updater) =>
+        set((state) => ({
+          messages: typeof updater === 'function' ? updater(state.messages) : updater,
+        })),
 
-  setInput: (input) => set({ input }),
+      setInput: (input) => set({ input }),
 
-  setSending: (sending) => set({ sending }),
+      setSending: (sending) => set({ sending }),
 
-  appendMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
+      appendMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
 
-  updateLastAssistant: (updater) =>
-    set((state) => {
-      const next = [...state.messages];
-      const last = next[next.length - 1];
-      if (last && last.role === 'assistant') {
-        next[next.length - 1] = updater(last);
-      }
-      return { messages: next };
+      updateLastAssistant: (updater) =>
+        set((state) => {
+          const next = [...state.messages];
+          const last = next[next.length - 1];
+          if (last && last.role === 'assistant') {
+            next[next.length - 1] = updater(last);
+          }
+          return { messages: next };
+        }),
+
+      clearHistory: () => set({ messages: CLEARED_MESSAGES, input: '', sending: false }),
     }),
-
-  clearHistory: () => set({ messages: CLEARED_MESSAGES, input: '', sending: false }),
-}));
+    {
+      name: 'mc-creator-chat-state',
+      version: 1,
+      storage: resolveUiStorage(),
+      partialize: (state) => ({ messages: state.messages }),
+    },
+  ),
+);

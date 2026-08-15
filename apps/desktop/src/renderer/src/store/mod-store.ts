@@ -1,10 +1,5 @@
 import { createWithEqualityFn } from 'zustand/traditional';
-import {
-  createJSONStorage,
-  persist,
-  type PersistStorage,
-  type StorageValue,
-} from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import {
   ModSpec,
   type Loader,
@@ -14,28 +9,7 @@ import {
 } from '@mc-creator/shared';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
 import { useSpecHistoryStore } from './spec-history-store.js';
-
-/**
- * 持久化存储：浏览器用 localStorage；无 localStorage 的环境（node 测试、
- * SSR 等）回退到进程内内存存储，避免 createJSONStorage 在模块加载时抛错。
- */
-function resolveUiStorage(): PersistStorage<unknown> {
-  try {
-    const storage = (globalThis as { localStorage?: Storage }).localStorage;
-    if (storage) {
-      const json = createJSONStorage(() => storage);
-      if (json) return json;
-    }
-  } catch {
-    // fallthrough
-  }
-  const mem = new Map<string, StorageValue<unknown>>();
-  return {
-    getItem: (name) => mem.get(name) ?? null,
-    setItem: (name, value) => void mem.set(name, value),
-    removeItem: (name) => void mem.delete(name),
-  } satisfies PersistStorage<unknown>;
-}
+import { resolveUiStorage } from './persist-storage.js';
 
 interface ModState {
   // 输入
