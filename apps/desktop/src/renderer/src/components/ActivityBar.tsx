@@ -92,7 +92,7 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
             className={`relative flex h-10 w-10 items-center justify-center rounded-mc transition-colors ${
               active === id
                 ? 'bg-mc-surface-2 text-mc-text'
-                : 'text-mc-mute hover:bg-mc-surface hover:text-mc-dim'
+                : 'text-mc-dim hover:bg-mc-surface hover:text-mc-text'
             }`}
             title={label}
           >
@@ -125,7 +125,7 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
           className={`relative flex h-10 w-10 items-center justify-center rounded-mc transition-colors ${
             active === 'settings'
               ? 'bg-mc-surface-2 text-mc-text'
-              : 'text-mc-mute hover:bg-mc-surface hover:text-mc-dim'
+              : 'text-mc-dim hover:bg-mc-surface hover:text-mc-text'
           }`}
           title="设置"
         >

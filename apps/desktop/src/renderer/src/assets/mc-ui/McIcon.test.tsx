@@ -4,12 +4,15 @@ import { render, screen } from '@testing-library/react';
 import { McIcon } from './McIcon.js';
 
 describe('McIcon', () => {
-  it('渲染指定 scope/name 的图标 img', () => {
+  it('渲染指定 scope/name 的图标（SVG 内联，继承颜色）', () => {
     render(<McIcon scope="pixel" name="plus" size={16} />);
-    const img = screen.getByAltText('plus');
-    expect(img).toBeTruthy();
-    expect(img.getAttribute('width')).toBe('16');
-    expect(img.getAttribute('style')).toContain('pixelated');
+    const el = screen.getByRole('img', { name: 'plus' });
+    expect(el).toBeTruthy();
+    expect(el.getAttribute('style')).toContain('width: 16px');
+    expect(el.getAttribute('style')).toContain('height: 16px');
+    // 内联 SVG 注入内容应存在，且带 mc-icon-svg 类
+    expect(el.className).toContain('mc-icon-svg');
+    expect(el.querySelector('svg')).toBeTruthy();
   });
 
   it('未知资源返回 null（不渲染）', () => {
@@ -19,6 +22,6 @@ describe('McIcon', () => {
 
   it('className 透传', () => {
     render(<McIcon scope="pixel" name="plus" className="mc-icon-custom" />);
-    expect(screen.getByAltText('plus').getAttribute('class')).toContain('mc-icon-custom');
+    expect(screen.getByRole('img', { name: 'plus' }).className).toContain('mc-icon-custom');
   });
 });
