@@ -9,7 +9,7 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 
 ## 功能特性
 
-支持 **10 种生成器类型**，覆盖 Minecraft 内容创作的主要场景：
+支持 **13 种生成器类型**，覆盖 Minecraft 内容创作的主要场景：
 
 | 类型             | 说明                                                                   | 产物                                                                                                                           |
 | ---------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -23,6 +23,9 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 | **KubeJS 脚本**  | KubeJS mod 脚本包（配方 / 标签 / 事件 / 工具提示 / 注册）              | `pack.mcmeta` + `kubejs/server_scripts/` + `startup_scripts/` + `client_scripts/` + `lang/`                                    |
 | **CraftTweaker** | ZenScript 脚本包（配方 / 标签 / 事件 / 工具提示）                      | `pack.mcmeta` + `scripts/*.zs` + `lang/`                                                                                       |
 | **行为包**       | 基岩版 Behavior Pack（实体 / 配方 / 战利品表）                         | `manifest.json` + `entities/` + `recipes/` + `loot_tables/`                                                                    |
+| **附魔**         | 1.21+ 数据驱动附魔（武器 / 工具 / 盔甲等 12 个预置模板）               | `data/<ns>/enchantment/<id>.json` + `tags/` + `lang/`                                                                          |
+| **行为物品**     | 基岩版自定义物品（物品定义 + 自动纹理）                                | `items/<id>.json`（minecraft:item）+ 纹理资源 + `lang/`                                                                        |
+| **行为实体**     | 基岩版自定义实体（怪物 AI 目标 / 内置几何 / 自动纹理 / 生成蛋）        | BP `entities/<id>.behavior.json` + RP `client_entity/` + `spawn_egg` + 纹理                                                     |
 
 ### 低代码节点编辑器
 
@@ -51,7 +54,7 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 - **Spec-first 工作流**：自然语言描述 → AI 生成结构化 Spec → 用户审阅 → 生成代码 → 编译
 - **低代码节点图**：可视化拖拽编辑 → 编译为 ModSpec → 生成 Java 代码（支持 15 种节点 + 子图内联 + 自定义节点模板 + 过程封装/PureCode 模式）
 - **Spec 编辑器**：生成 Spec 后可直接在 Monaco 编辑器中修改 JSON 再生成代码
-- **Spec 模板库**：10 种生成器类型共 36 个预置模板（TemplatePicker UI），点击即预填描述
+- **Spec 模板库**：13 种生成器类型共 56 个预置模板（TemplatePicker UI），点击即预填描述
 - **Loader Adapter 抽象**：同一 ModSpec 按 Fabric / NeoForge / Quilt / Legacy Fabric 产出不同源码
 - **AI prompt 按类型优化**：每种生成器有独立的 schema 约束提示，提升 Spec 质量
 - **AI 模型接入**：基于 Vercel AI SDK，兼容 OpenAI 接口（云端 / 本地模型均可）
@@ -96,7 +99,7 @@ mc-creator/
 │       │   │   └── src/
 │       │   │       ├── components/   # AgentPanel / TemplatePicker / SpecFormEditor / PreviewPanel 系列 / BuildPanel / SettingsPanel
 │       │   │       │   ├── lowcode/  # 低代码节点图编辑器（15 节点 + 子图 + 自定义节点 + 编译器）
-│       │   │       │   └── middle/   # 各生成器类型预览面板（Mod / Datapack / Modpack / Server / Launcher / ResourcePack / Skin）
+│       │   │       │   └── middle/   # 各生成器类型预览面板（13 种类型全齐）
 │       │   │       ├── store/        # Zustand stores（mod-store / node-graph-store / drawer-store / debugger-store）
 │       │   │       └── lib/          # compileNodeGraph + 4 编译器 + ipc-client + monaco-theme
 │       │   └── shared/           # IPC 通道常量 + zod schema（main/preload/renderer 共享）
@@ -104,8 +107,8 @@ mc-creator/
 ├── packages/
 │   ├── shared/                   # 共享 schema 与类型
 │   │   └── src/
-│   │       ├── schemas/          # mod-spec / datapack-spec / modpack-spec / server-spec / resource-pack-spec / skin-spec / launcher-spec / kubejs-spec / crafttweaker-spec / behavior-pack-spec / node-graph-spec
-│   │       ├── templates/        # 10 种生成器类型的 Spec 模板库（36 个模板，TEMPLATES_BY_TYPE）
+│   │       ├── schemas/          # mod-spec / datapack-spec / modpack-spec / server-spec / resource-pack-spec / skin-spec / launcher-spec / kubejs-spec / crafttweaker-spec / behavior-pack-spec / enchantment-spec / behavior-item-spec / behavior-entity-spec / node-graph-spec
+│   │       ├── templates/        # 13 种生成器类型的 Spec 模板库（56 个模板，TEMPLATES_BY_TYPE）
 │   │       ├── presets/          # 数据包内容模板（矿石 / 食物 / 维度 / 附魔 / 效果 / 结构 / 生物群系）
 │   │       └── types/            # Loader / McVersion
 │   └── core/                     # 核心引擎（独立 TS 库）
@@ -121,11 +124,14 @@ mc-creator/
 │           │   ├── kubejs/       # KubejsGenerator
 │           │   ├── crafttweaker/ # CraftTweakerGenerator（ZenScript）
 │           │   ├── behavior-pack/ # BehaviorPackGenerator（基岩版）
+│           │   ├── enchantment/   # EnchantmentGenerator（1.21+ 数据驱动附魔）
+│           │   ├── behavior-item/ # BehaviorItemGenerator（基岩版自定义物品 + 自动纹理）
+│           │   ├── behavior-entity/ # BehaviorEntityGenerator（基岩版自定义实体 + 怪物 AI）
 │           │   ├── registry.ts   # 生成器注册表（按 type 路由）
 │           │   └── types.ts      # Generator 接口
 │           ├── builder/          # Gradle 构建 + BuildFixer 修复循环 + BuildCache + log-parser
 │           ├── model-provider/   # ModelProvider 抽象 + VercelAiProvider + MockProvider
-│           ├── orchestrator/     # AI 编排器（描述 → Spec，10 种类型独立 prompt）
+│           ├── orchestrator/     # AI 编排器（描述 → Spec，13 种类型独立 prompt）
 │           ├── filesystem/       # 文件系统抽象（用于测试）
 │           ├── browser.ts        # 浏览器安全入口（只导出 generators + orchestrator）
 │           └── utils/            # PNG 编码器（pako，Uint8Array 同构）
@@ -208,7 +214,7 @@ pnpm --filter @mc-creator/desktop build
 
 ### 2. 选择生成器类型
 
-顶部工具栏「类型」下拉框选择（共 10 种）：
+顶部工具栏「类型」下拉框选择（共 13 种）：
 
 - Mod（默认）
 - 数据包
@@ -220,6 +226,9 @@ pnpm --filter @mc-creator/desktop build
 - KubeJS 脚本
 - CraftTweaker 脚本
 - 行为包
+- 附魔
+- 行为物品
+- 行为实体
 
 ### 3. 选择 Loader 和 MC 版本
 
