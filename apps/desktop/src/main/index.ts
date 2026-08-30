@@ -3,7 +3,9 @@ import { join } from 'path';
 import { registerIpcHandlers, createDefaultOrchestrator } from './ipc.js';
 
 // 受限环境（无 GPU / 沙箱代理）下禁用 GPU，避免 Chromium GPU 进程崩溃。
-// 正常桌面运行不设置此变量，保持 GPU + sandbox。
+// 代价：WebGL 不可用，skinview3d 等 3D 预览会加载失败（实测 SwiftShader
+// 软件渲染在本环境更糟——直接白屏，故不用）。正常桌面运行不设此变量，
+// 保持硬件 GPU + WebGL。
 if (process.env.MC_CREATOR_NO_GPU) {
   app.commandLine.appendSwitch('no-sandbox');
   app.commandLine.appendSwitch('disable-gpu');
