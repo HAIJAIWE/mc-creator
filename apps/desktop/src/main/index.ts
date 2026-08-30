@@ -2,6 +2,15 @@ import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'path';
 import { registerIpcHandlers, createDefaultOrchestrator } from './ipc.js';
 
+// 受限环境（无 GPU / 沙箱代理）下禁用 GPU，避免 Chromium GPU 进程崩溃。
+// 正常桌面运行不设置此变量，保持 GPU + sandbox。
+if (process.env.MC_CREATOR_NO_GPU) {
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+  app.commandLine.appendSwitch('disable-dev-shm-usage');
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1400,
