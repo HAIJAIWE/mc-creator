@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, Menu, shell } from 'electron';
 import { join } from 'path';
 import { registerIpcHandlers, createDefaultOrchestrator } from './ipc.js';
 
@@ -17,6 +17,8 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
+    // 隐藏默认英文菜单栏；按 Alt 可唤出中文菜单。应用内已有 TopToolbar 负责日常操作。
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -54,8 +56,64 @@ app.on('web-contents-created', (_e, contents) => {
   });
 });
 
+/** 中文应用菜单（按 Alt 唤出），替换 Electron 默认英文菜单 */
+function createChineseMenu(): Menu {
+  return Menu.buildFromTemplate([
+    {
+      label: 'MC 创作器',
+      submenu: [
+        { label: '关于 MC 创作器', role: 'about' },
+        { type: 'separator' },
+        { label: '退出', role: 'quit' },
+      ],
+    },
+    {
+      label: '文件',
+      submenu: [
+        { label: '关闭窗口', role: 'close' },
+      ],
+    },
+    {
+      label: '编辑',
+      submenu: [
+        { label: '撤销', role: 'undo' },
+        { label: '重做', role: 'redo' },
+        { type: 'separator' },
+        { label: '剪切', role: 'cut' },
+        { label: '复制', role: 'copy' },
+        { label: '粘贴', role: 'paste' },
+        { label: '全选', role: 'selectAll' },
+      ],
+    },
+    {
+      label: '视图',
+      submenu: [
+        { label: '重新加载', role: 'reload' },
+        { label: '强制重新加载', role: 'forceReload' },
+        { label: '开发者工具', role: 'toggleDevTools' },
+        { type: 'separator' },
+        { label: '全屏', role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: '窗口',
+      submenu: [
+        { label: '最小化', role: 'minimize' },
+        { label: '关闭', role: 'close' },
+      ],
+    },
+    {
+      label: '帮助',
+      submenu: [
+        { label: '开发者工具', role: 'toggleDevTools' },
+      ],
+    },
+  ]);
+}
+
 app.whenReady().then(() => {
   registerIpcHandlers(createDefaultOrchestrator);
+  Menu.setApplicationMenu(createChineseMenu());
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

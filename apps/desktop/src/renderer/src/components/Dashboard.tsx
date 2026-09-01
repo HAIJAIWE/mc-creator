@@ -15,7 +15,7 @@ const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
   server: { scope: 'pixel', name: 'server' },
   resource_pack: { scope: 'pixel', name: 'folder' },
   skin: { scope: 'pixel', name: 'user' },
-  launcher: { scope: 'pixel', name: 'rocket' },
+  launcher: { scope: 'pixel', name: 'play' },
   kubejs: { scope: 'pixel', name: 'zap' },
   crafttweaker: { scope: 'pixel', name: 'code' },
   behavior_pack: { scope: 'pixel', name: 'box' },
@@ -151,7 +151,12 @@ export function Dashboard() {
             <McMark className="h-6 w-6 text-mc-accent" />
           </div>
           <div>
-            <h1 className="font-display text-xl font-bold tracking-tight">MC Creator</h1>
+            <h1 className="font-display text-xl font-bold tracking-tight">
+              MC 创作器
+              <span className="ml-2 align-middle text-xs font-normal text-mc-mute">
+                MC Creator
+              </span>
+            </h1>
             <div className="text-xs text-mc-mute">AI 驱动的 Minecraft 内容创作工具</div>
           </div>
         </div>

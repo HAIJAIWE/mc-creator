@@ -30,6 +30,7 @@
     "url": "https://github.com/HAIJAIWE/mc-creator/issues"
   },
   "scripts": {
+    "dev": "pnpm --filter @mc-creator/desktop dev",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
