@@ -9,19 +9,19 @@ import { McMark } from './McMark.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
 
 const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
-  mod: { scope: 'pixel', name: 'package' },
-  datapack: { scope: 'pixel', name: 'database' },
-  modpack: { scope: 'pixel', name: 'box' },
-  server: { scope: 'pixel', name: 'server' },
-  resource_pack: { scope: 'pixel', name: 'folder' },
-  skin: { scope: 'pixel', name: 'user' },
-  launcher: { scope: 'pixel', name: 'play' },
-  kubejs: { scope: 'pixel', name: 'zap' },
-  crafttweaker: { scope: 'pixel', name: 'code' },
-  behavior_pack: { scope: 'pixel', name: 'box' },
-  enchantment: { scope: 'pixel', name: 'star' },
-  behavior_item: { scope: 'pixel', name: 'tool-case' },
-  behavior_entity: { scope: 'pixel', name: 'bug' },
+  mod: { scope: 'pixel', name: 'gen-mod' },
+  datapack: { scope: 'pixel', name: 'gen-datapack' },
+  modpack: { scope: 'pixel', name: 'gen-modpack' },
+  server: { scope: 'pixel', name: 'gen-server' },
+  resource_pack: { scope: 'pixel', name: 'gen-resource' },
+  skin: { scope: 'pixel', name: 'gen-skin' },
+  launcher: { scope: 'pixel', name: 'gen-launcher' },
+  kubejs: { scope: 'pixel', name: 'gen-kubejs' },
+  crafttweaker: { scope: 'pixel', name: 'gen-crafttweaker' },
+  behavior_pack: { scope: 'pixel', name: 'gen-behaviorpack' },
+  enchantment: { scope: 'pixel', name: 'gen-enchantment' },
+  behavior_item: { scope: 'pixel', name: 'gen-behavioritem' },
+  behavior_entity: { scope: 'pixel', name: 'gen-behaviorentity' },
 };
 
 const TYPE_LABEL: Record<GeneratorType, string> = {

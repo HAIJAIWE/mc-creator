@@ -49,3 +49,14 @@ node_modules/.pnpm_patches/
 
 # 本地安装包（不入库）
 /FeelFish-Setup-4.0.21.exe
+
+# 图标实验产物（v2 定稿，1:1/预览脚本不入库）
+icon-preview.html
+icon-preview.png
+apps/desktop/icon-preview.html
+apps/desktop/icon-preview.png
+apps/desktop/scripts/convert-tex.mjs
+apps/desktop/scripts/gen-block-icons.mjs
+apps/desktop/scripts/inspect.mjs
+apps/desktop/scripts/mc-tex/
+.workbuddy/
