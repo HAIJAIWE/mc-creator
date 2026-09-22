@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { GenerateFilesRes } from '../../../shared/ipc-channels.js';
+import type { GenerateFilesRes, GenerateSpecRes } from '../../../shared/ipc-channels.js';
 
 describe('ipcClient 预览模式', () => {
   beforeEach(() => {
     (window as unknown as { __MC_PREVIEW__?: boolean }).__MC_PREVIEW__ = true;
-    // 预览下不应访问 mcApi（用会抛错的桩验证分支绕过）
     (window as unknown as { mcApi?: unknown }).mcApi = undefined;
     vi.resetModules();
   });
@@ -45,5 +44,33 @@ describe('ipcClient 预览模式', () => {
     });
     expect(res.files).toEqual([]);
     expect(res.warnings[0]).toContain('不支持的生成器类型');
+  });
+
+  it('generateSpec 预览下按关键词生成 mod spec', async () => {
+    const { ipcClient } = await import('./ipc-client.js');
+    const res: GenerateSpecRes = await ipcClient.generateSpec('加一个红宝石剑', 'mod');
+    expect(res.ok).toBe(true);
+    expect(res.spec).toBeDefined();
+    const spec = res.spec as { modId: string; items: unknown[] };
+    expect(spec.modId).toBe('ruby');
+    expect(spec.items.length).toBeGreaterThan(0);
+  });
+
+  it('generateSpec 预览下按关键词生成 behavior_entity spec', async () => {
+    const { ipcClient } = await import('./ipc-client.js');
+    const res: GenerateSpecRes = await ipcClient.generateSpec(
+      '加一个友好的老虎实体',
+      'behavior_entity',
+    );
+    expect(res.ok).toBe(true);
+    const spec = res.spec as { entities: { hostile: boolean }[] };
+    expect(spec.entities[0].hostile).toBe(false);
+  });
+
+  it('generateSpec 预览下未知类型返回错误', async () => {
+    const { ipcClient } = await import('./ipc-client.js');
+    const res: GenerateSpecRes = await ipcClient.generateSpec('test', 'not_a_type' as never);
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('未知生成器类型');
   });
 });

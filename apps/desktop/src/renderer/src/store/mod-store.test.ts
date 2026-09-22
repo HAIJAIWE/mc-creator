@@ -112,4 +112,48 @@ describe('mod-store', () => {
     expect(parsed.state.spec).toBeUndefined();
     expect(parsed.state.files).toBeUndefined();
   });
+
+  it('applyGeneratedFiles 覆盖非手改文件、保护手改文件', () => {
+    const store = useModStore.getState();
+    store.setFiles([
+      { path: 'a.java', content: 'oldA' },
+      { path: 'b.json', content: 'oldB' },
+    ]);
+    // 模拟用户在代码 tab 手改 a.java（dirty）
+    store.updateFileContent('a.java', '手改A');
+    expect(useModStore.getState().dirtyFiles.has('a.java')).toBe(true);
+
+    const preserved = store.applyGeneratedFiles([
+      { path: 'a.java', content: 'genA' },
+      { path: 'b.json', content: 'genB' },
+      { path: 'c.json', content: 'genC' },
+    ]);
+
+    const s = useModStore.getState();
+    const a = s.files.find((f) => f.path === 'a.java');
+    const b = s.files.find((f) => f.path === 'b.json');
+    expect(a?.content).toBe('手改A'); // 手改保留
+    expect(b?.content).toBe('genB'); // 覆盖
+    expect(s.files.map((f) => f.path)).toContain('c.json'); // 新增
+    expect(preserved).toEqual(['a.java']);
+    // 应用后手改已作为新基准，dirty 清空
+    expect(s.dirtyFiles.size).toBe(0);
+  });
+
+  it('applyGeneratedFiles 保留 openTabs 与选中文件', () => {
+    const store = useModStore.getState();
+    store.setFiles([
+      { path: 'a.java', content: 'A' },
+      { path: 'b.java', content: 'B' },
+    ]);
+    store.selectFile('b.java');
+
+    store.applyGeneratedFiles([
+      { path: 'a.java', content: 'A2' },
+      { path: 'b.java', content: 'B2' },
+    ]);
+    const s = useModStore.getState();
+    expect(s.openTabs).toEqual(['a.java', 'b.java']);
+    expect(s.selectedFile).toBe('b.java');
+  });
 });

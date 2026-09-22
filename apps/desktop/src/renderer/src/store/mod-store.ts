@@ -10,6 +10,7 @@ import {
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
 import { useSpecHistoryStore } from './spec-history-store.js';
 import { resolveUiStorage } from './persist-storage.js';
+import { mergeGeneratedFiles } from '../lib/mergeGeneratedFiles.js';
 
 interface ModState {
   // 输入
@@ -43,6 +44,8 @@ interface ModState {
   setDescription: (d: string) => void;
   setSpec: (s: ModSpec | null) => void;
   setFiles: (f: FileNode[]) => void;
+  /** 应用生成文件（节点图「编译并应用」）：与现有 files 合并、保护手改，返回被保留的手改 path */
+  applyGeneratedFiles: (generated: FileNode[]) => string[];
   selectFile: (p: string) => void;
   closeFile: (p: string) => void;
   closeTab: (p: string) => void;
@@ -146,6 +149,14 @@ export const useModStore = createWithEqualityFn<ModState>()(
             dirtyFiles: new Set<string>(),
           };
         }),
+      // 节点图「编译并应用」：新生成文件与现有 files 合并（保护 dirty 手改），
+      // 复用 setFiles 的 tab/selectedFile 保留逻辑；返回被保留的手改 path 供 UI 提示
+      applyGeneratedFiles: (generated) => {
+        const state = get();
+        const { files, preserved } = mergeGeneratedFiles(generated, state.files, state.dirtyFiles);
+        get().setFiles(files);
+        return preserved;
+      },
       selectFile: (p) =>
         set((state) => {
           // 如果该文件尚未在 openTabs 中，追加到末尾

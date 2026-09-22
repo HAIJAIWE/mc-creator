@@ -33,6 +33,10 @@ window.mcApi = new Proxy({}, {
             if (name === 'loadCurseForgeConfig') return () => Promise.resolve({ apiKey: '' });
             // 模型配置：返回空配置
             if (name === 'loadModelConfig') return () => Promise.resolve({ name: '', modelId: '', baseURL: '', apiKey: '' });
+            // 多套模型配置
+            if (name === 'listModelProfiles') return () => Promise.resolve({ profiles: [], activeId: null });
+            if (name === 'saveModelProfiles') return () => Promise.resolve({ ok: true });
+            if (name === 'testModelConnection') return () => Promise.resolve({ ok: false, message: '预览环境不支持连通性测试（请在桌面应用中测试）' });
             // Git 系列返回空数据
             if (name === 'gitLog') return () => Promise.resolve({ log: [] });
             if (name === 'gitBranchList') return () => Promise.resolve({ branches: [], current: '' });
