@@ -60,3 +60,4 @@ apps/desktop/scripts/gen-block-icons.mjs
 apps/desktop/scripts/inspect.mjs
 apps/desktop/scripts/mc-tex/
 .workbuddy/
+fix_*.js

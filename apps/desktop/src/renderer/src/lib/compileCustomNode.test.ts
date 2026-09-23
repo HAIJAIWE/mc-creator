@@ -8,7 +8,7 @@ describe('compileCustomNode', () => {
     customNodeRegistry.clear();
   });
 
-  it('schema 已注册 + fields 齐全时返回 snippet（Mustache 渲染）', () => {
+  it('schema 已注册 + fields 齐全时返回 snippet（Mustache 渲染）', async () => {
     customNodeRegistry.register({
       typeId: 'mymod:crafter',
       label: '合成台',
@@ -33,7 +33,7 @@ describe('compileCustomNode', () => {
       codeLocked: false,
       formatVersion: 1,
     };
-    const result = compileCustomNode(data, data.customFields);
+    const result = await compileCustomNode(data, data.customFields);
     expect(result.error).toBeUndefined();
     expect(result.snippet).toBeDefined();
     expect(result.snippet!.code).toBe('int speed = 42;');
@@ -44,7 +44,7 @@ describe('compileCustomNode', () => {
     expect(_.snippetId).toBe('c1');
   });
 
-  it('customTypeId 为 null 时返回 error', () => {
+  it('customTypeId 为 null 时返回 error', async () => {
     const data: SubgraphNodeData = {
       nodeId: 'c2',
       label: 'x',
@@ -59,12 +59,12 @@ describe('compileCustomNode', () => {
       codeLocked: false,
       formatVersion: 1,
     };
-    const result = compileCustomNode(data, data.customFields);
+    const result = await compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeUndefined();
     expect(result.error).toContain('customTypeId');
   });
 
-  it('schema 未注册时返回 error', () => {
+  it('schema 未注册时返回 error', async () => {
     const data: SubgraphNodeData = {
       nodeId: 'c3',
       label: 'x',
@@ -79,12 +79,12 @@ describe('compileCustomNode', () => {
       codeLocked: false,
       formatVersion: 1,
     };
-    const result = compileCustomNode(data, data.customFields);
+    const result = await compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeUndefined();
     expect(result.error).toContain('未注册');
   });
 
-  it('required 字段缺失时返回 error', () => {
+  it('required 字段缺失时返回 error', async () => {
     customNodeRegistry.register({
       typeId: 'mymod:required',
       label: 'x',
@@ -109,12 +109,12 @@ describe('compileCustomNode', () => {
       codeLocked: false,
       formatVersion: 1,
     };
-    const result = compileCustomNode(data, data.customFields);
+    const result = await compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeUndefined();
     expect(result.error).toContain('speed');
   });
 
-  it('字段值做 Java 转义（防止注入）', () => {
+  it('字段值做 Java 转义（防止注入）', async () => {
     customNodeRegistry.register({
       typeId: 'mymod:escape',
       label: 'x',
@@ -139,7 +139,7 @@ describe('compileCustomNode', () => {
       codeLocked: false,
       formatVersion: 1,
     };
-    const result = compileCustomNode(data, data.customFields);
+    const result = await compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeDefined();
     // 字段值作为字符串内容保留（evil() 在字符串字面量内是数据，不是代码注入）
     expect(result.snippet!.code).toContain('evil()');
@@ -150,7 +150,7 @@ describe('compileCustomNode', () => {
     expect(result.snippet!.code).not.toContain('\\;');
   });
 
-  it('fields 净化：未在 schema 中定义的额外字段不参与渲染（问题 12）', () => {
+  it('fields 净化：未在 schema 中定义的额外字段不参与渲染（问题 12）', async () => {
     customNodeRegistry.register({
       typeId: 'mymod:filter',
       label: 'x',
@@ -177,7 +177,7 @@ describe('compileCustomNode', () => {
       codeLocked: false,
       formatVersion: 1,
     };
-    const result = compileCustomNode(data, data.customFields);
+    const result = await compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeDefined();
     expect(result.snippet!.code).toContain('int speed = 42');
     // extra 未在 schema 中定义，即使 customFields 提供了也不应被渲染（保留占位符）
@@ -185,7 +185,7 @@ describe('compileCustomNode', () => {
     expect(result.snippet!.code).not.toContain('LEAKED');
   });
 
-  it('fields 净化：number 类型字段非数字值回退为 0（问题 20）', () => {
+  it('fields 净化：number 类型字段非数字值回退为 0（问题 20）', async () => {
     customNodeRegistry.register({
       typeId: 'mymod:coerce',
       label: 'x',
@@ -211,14 +211,14 @@ describe('compileCustomNode', () => {
       codeLocked: false,
       formatVersion: 1,
     };
-    const result = compileCustomNode(data, data.customFields);
+    const result = await compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeDefined();
     // 非数字应回退为 0，避免注入非法 Java 标识符
     expect(result.snippet!.code).toBe('int speed = 0;');
     expect(result.snippet!.code).not.toContain('not-a-number');
   });
 
-  it('fields 净化：number 类型字段字符串数字被强制转为数字（问题 20）', () => {
+  it('fields 净化：number 类型字段字符串数字被强制转为数字（问题 20）', async () => {
     customNodeRegistry.register({
       typeId: 'mymod:coerce2',
       label: 'x',
@@ -244,7 +244,7 @@ describe('compileCustomNode', () => {
       codeLocked: false,
       formatVersion: 1,
     };
-    const result = compileCustomNode(data, data.customFields);
+    const result = await compileCustomNode(data, data.customFields);
     expect(result.snippet).toBeDefined();
     expect(result.snippet!.code).toBe('int count = 42;');
   });
@@ -253,7 +253,7 @@ describe('compileCustomNode', () => {
   // P0-3: condition 化代码生成（templateParts）
   // ============================================================
   describe('templateParts 条件化代码生成', () => {
-    it('templateParts 为空时回退到 codeTemplate（向后兼容）', () => {
+    it('templateParts 为空时回退到 codeTemplate（向后兼容）', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:fallback',
         label: 'x',
@@ -279,12 +279,12 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      const result = compileCustomNode(data, data.customFields);
+      const result = await compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
       expect(result.snippet!.code).toBe('// from codeTemplate\nint speed = 5;');
     });
 
-    it('templateParts 非空时优先使用，codeTemplate 被忽略', () => {
+    it('templateParts 非空时优先使用，codeTemplate 被忽略', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:prefer',
         label: 'x',
@@ -310,13 +310,13 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      const result = compileCustomNode(data, data.customFields);
+      const result = await compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
       expect(result.snippet!.code).toBe('// from templateParts\nint speed = 9;');
       expect(result.snippet!.code).not.toContain('SHOULD_BE_IGNORED');
     });
 
-    it('多 part 按数组顺序拼接', () => {
+    it('多 part 按数组顺序拼接', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:multi',
         label: 'x',
@@ -345,12 +345,12 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      const result = compileCustomNode(data, data.customFields);
+      const result = await compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
       expect(result.snippet!.code).toBe('PART1=X;PART2;PART3;');
     });
 
-    it('condition equals=true 时渲染对应 part', () => {
+    it('condition equals=true 时渲染对应 part', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:cond_eq',
         label: 'x',
@@ -394,12 +394,12 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      const result = compileCustomNode(data, data.customFields);
+      const result = await compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
       expect(result.snippet!.code).toBe('CLASS_START;ADVANCED_BLOCK;CLASS_END;');
     });
 
-    it('condition equals 不匹配时跳过对应 part', () => {
+    it('condition equals 不匹配时跳过对应 part', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:cond_skip',
         label: 'x',
@@ -439,12 +439,12 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      const result = compileCustomNode(data, data.customFields);
+      const result = await compileCustomNode(data, data.customFields);
       expect(result.snippet).toBeDefined();
       expect(result.snippet!.code).toBe('START;END;');
     });
 
-    it('condition in 数组匹配任一即渲染', () => {
+    it('condition in 数组匹配任一即渲染', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:cond_in',
         label: 'x',
@@ -483,7 +483,9 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      expect(compileCustomNode(data1, data1.customFields).snippet!.code).toBe('ENCHANT_GLOW;');
+      expect((await compileCustomNode(data1, data1.customFields)).snippet!.code).toBe(
+        'ENCHANT_GLOW;',
+      );
 
       // tier=iron 不匹配
       const data2: SubgraphNodeData = {
@@ -491,10 +493,10 @@ describe('compileCustomNode', () => {
         nodeId: 'tp6b',
         customFields: { tier: 'iron' },
       };
-      expect(compileCustomNode(data2, data2.customFields).snippet!.code).toBe('');
+      expect((await compileCustomNode(data2, data2.customFields)).snippet!.code).toBe('');
     });
 
-    it('condition 字段缺失视为不匹配', () => {
+    it('condition 字段缺失视为不匹配', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:cond_missing',
         label: 'x',
@@ -534,11 +536,11 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      const result = compileCustomNode(data, data.customFields);
+      const result = await compileCustomNode(data, data.customFields);
       expect(result.snippet!.code).toBe('DEFAULT;');
     });
 
-    it('condition 引用未在 schema 中定义的字段视为不匹配（不抛错）', () => {
+    it('condition 引用未在 schema 中定义的字段视为不匹配（不抛错）', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:cond_unknown_field',
         label: 'x',
@@ -569,13 +571,13 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      const result = compileCustomNode(data, data.customFields);
+      const result = await compileCustomNode(data, data.customFields);
       // 未定义字段的 condition 不应触发，避免用户通过额外字段绕过 schema 控制
       expect(result.snippet!.code).toBe('SAFE;');
       expect(result.snippet!.code).not.toContain('LEAKED');
     });
 
-    it('condition 同时有 equals 和 in，满足任一即渲染（并集）', () => {
+    it('condition 同时有 equals 和 in，满足任一即渲染（并集）', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:cond_union',
         label: 'x',
@@ -615,15 +617,15 @@ describe('compileCustomNode', () => {
           formatVersion: 1,
         }) as SubgraphNodeData;
       // equals 匹配
-      expect(compileCustomNode(mk('u1', 'a'), { v: 'a' }).snippet!.code).toBe('MATCH;');
+      expect((await compileCustomNode(mk('u1', 'a'), { v: 'a' })).snippet!.code).toBe('MATCH;');
       // in 匹配
-      expect(compileCustomNode(mk('u2', 'c'), { v: 'c' }).snippet!.code).toBe('MATCH;');
-      expect(compileCustomNode(mk('u3', 'd'), { v: 'd' }).snippet!.code).toBe('MATCH;');
+      expect((await compileCustomNode(mk('u2', 'c'), { v: 'c' })).snippet!.code).toBe('MATCH;');
+      expect((await compileCustomNode(mk('u3', 'd'), { v: 'd' })).snippet!.code).toBe('MATCH;');
       // 都不匹配
-      expect(compileCustomNode(mk('u4', 'b'), { v: 'b' }).snippet!.code).toBe('');
+      expect((await compileCustomNode(mk('u4', 'b'), { v: 'b' })).snippet!.code).toBe('');
     });
 
-    it('templateParts 内的 Mustache 块语法（if/each）正常工作', () => {
+    it('templateParts 内的 Mustache 块语法（if/each）正常工作', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:cond_block',
         label: 'x',
@@ -657,13 +659,13 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      const result = compileCustomNode(data, data.customFields);
+      const result = await compileCustomNode(data, data.customFields);
       expect(result.snippet!.code).toContain('boolean glow=true;');
       expect(result.snippet!.code).toContain('String name="MyBlock";');
       expect(result.snippet!.code).toContain('"a", "b",');
     });
 
-    it('number 字段在 condition equals 中按字符串比较', () => {
+    it('number 字段在 condition equals 中按字符串比较', async () => {
       customNodeRegistry.register({
         typeId: 'mymod:cond_num',
         label: 'x',
@@ -694,7 +696,7 @@ describe('compileCustomNode', () => {
         codeLocked: false,
         formatVersion: 1,
       };
-      const result = compileCustomNode(data, data.customFields);
+      const result = await compileCustomNode(data, data.customFields);
       // number 3 经 String() 后与 '3' 相等
       expect(result.snippet!.code).toBe('TIER_3;DEFAULT;');
     });

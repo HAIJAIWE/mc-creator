@@ -291,11 +291,7 @@ export function MiddlePanel() {
           aria-controls="middle-tabpanel-preview"
           tabIndex={activeTab === 'preview' ? 0 : -1}
           onClick={() => setActiveTab('preview')}
-          className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
-            activeTab === 'preview'
-              ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-              : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-          }`}
+          className={`mc-tab px-3 py-1 ${activeTab === 'preview' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="star" size={12} />
           预览
@@ -307,11 +303,7 @@ export function MiddlePanel() {
           aria-controls="middle-tabpanel-lowcode"
           tabIndex={activeTab === 'lowcode' ? 0 : -1}
           onClick={() => setActiveTab('lowcode')}
-          className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
-            activeTab === 'lowcode'
-              ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-              : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-          }`}
+          className={`mc-tab px-3 py-1 ${activeTab === 'lowcode' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="grid" size={12} />
           低代码
@@ -323,11 +315,7 @@ export function MiddlePanel() {
           aria-controls="middle-tabpanel-resources"
           tabIndex={activeTab === 'resources' ? 0 : -1}
           onClick={() => setActiveTab('resources')}
-          className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
-            activeTab === 'resources'
-              ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-              : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-          }`}
+          className={`mc-tab px-3 py-1 ${activeTab === 'resources' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="image" size={12} />
           资源
@@ -339,11 +327,7 @@ export function MiddlePanel() {
           aria-controls="middle-tabpanel-nbt"
           tabIndex={activeTab === 'nbt' ? 0 : -1}
           onClick={() => setActiveTab('nbt')}
-          className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
-            activeTab === 'nbt'
-              ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-              : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-          }`}
+          className={`mc-tab px-3 py-1 ${activeTab === 'nbt' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="box" size={12} />
           NBT
@@ -355,11 +339,7 @@ export function MiddlePanel() {
           aria-controls="middle-tabpanel-code"
           tabIndex={activeTab === 'code' ? 0 : -1}
           onClick={() => setActiveTab('code')}
-          className={`flex items-center gap-1.5 rounded-mc px-3 py-1 text-xs font-medium transition-colors ${
-            activeTab === 'code'
-              ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-              : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-          }`}
+          className={`mc-tab px-3 py-1 ${activeTab === 'code' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="terminal" size={12} />
           代码

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { shallow } from 'zustand/shallow';
-import { FolderOpen, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { Loader, McVersion } from '@mc-creator/shared';
 import { MC_VERSIONS } from '@mc-creator/shared';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
@@ -159,7 +159,7 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
                   onClick={handleNew}
                   className="flex w-full items-center gap-2 rounded-mc px-2 py-1.5 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text"
                 >
-                  <FolderOpen className="h-3 w-3 text-mc-accent" />
+                  <McIcon scope="pixel" name="folder" size={12} className="text-mc-accent" />
                   新建项目
                 </button>
                 <button
@@ -167,7 +167,7 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
                   disabled={importing}
                   className="flex w-full items-center gap-2 rounded-mc px-2 py-1.5 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text disabled:opacity-50"
                 >
-                  <FolderOpen className="h-3 w-3 text-mc-gold" />
+                  <McIcon scope="pixel" name="folder" size={12} className="text-mc-gold" />
                   {importing ? '导入中…' : '导入项目'}
                 </button>
                 <button

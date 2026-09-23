@@ -9,7 +9,6 @@ import { ModeSwitcher } from './ModeSwitcher';
 import { GeneratedCodePreview } from './GeneratedCodePreview.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 import { useEditorModeStore } from '../../store/editor-mode-store.js';
-import { compileNodeGraph } from '../../lib/compileNodeGraph.js';
 import { downloadGraphAsJson } from '../../lib/nodeGraphSerializer.js';
 import { saveGraphToDisk, loadGraphFromDisk } from '../../lib/nodeGraphPersistence.js';
 import { useRecentGraphs } from '../../lib/useRecentGraphs.js';
@@ -18,6 +17,10 @@ import { RecentGraphsMenu } from './RecentGraphsMenu.js';
 import { DebuggerPanel } from './DebuggerPanel.js';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { OnboardingTour } from './onboarding/OnboardingTour.js';
+import { useModStore } from '../../store/mod-store.js';
+import { useDebuggerStore } from '../../store/debugger-store.js';
+import { specToNodeGraph } from '../../lib/specToNodeGraph.js';
+import { applyGraphToProject } from '../../lib/applyGraphToProject.js';
 
 /**
  * P1 dogfood 修复：从 compileResult 中提取编译消息（替代硬编码空数组）。
@@ -130,6 +133,13 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   const { announce, LiveRegion } = useLiveRegion({ clearAfterMs: 3000 });
 
   const mode = useEditorModeStore((s) => s.mode);
+  // 单一真相源接入：只有 mod 类型支持节点图 ↔ spec 双向同步
+  const generatorType = useModStore((s) => s.generatorType);
+  const spec = useModStore((s) => s.spec);
+  const loader = useModStore((s) => s.loader);
+  const mcVersion = useModStore((s) => s.mcVersion);
+  const setSpec = useModStore((s) => s.setSpec);
+  const isModSupported = generatorType === 'mod';
   // 性能：拆分 graph 订阅为细粒度原子选择器，避免节点拖动等高频 graph 变更
   // 触发整个工作区重渲染。回调内需要完整 graph 时用 useNodeGraphStore.getState()
   // 取最新值，避免在 useCallback 依赖项中引用整个 graph 对象。
@@ -216,12 +226,81 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
     [readOnly, commit, addNode],
   );
 
-  // 编译节点图：结果存入 store，由 NodeGraphEditor 高亮错误节点、工具栏徽章显示状态
-  const handleCompile = useCallback(() => {
-    // 性能：用 getState() 取最新 graph，避免订阅整个 graph 触发 handler 重建
-    const result = compileNodeGraph(useNodeGraphStore.getState().graph);
-    setCompileResult(result);
-  }, [setCompileResult]);
+  // 编译并应用节点图：compileNodeGraph → setSpec → 生成文件 → applyGeneratedFiles（保护手改）
+  const handleApply = useCallback(async () => {
+    const graph = useNodeGraphStore.getState().graph;
+    const result = await applyGraphToProject(graph, { generatorType, loader, mcVersion });
+    // 无论成败都把编译结果喂给错误高亮 / 编译徽章
+    setCompileResult({ spec: result.spec, warnings: result.warnings, errors: result.errors });
+    if (result.errors.length > 0) {
+      announce(`编译失败：${result.errors.length} 个错误，未应用到项目`);
+      return;
+    }
+    setSpec(result.spec);
+    const preserved = useModStore.getState().applyGeneratedFiles(result.files);
+    announce(
+      preserved.length > 0
+        ? `已应用节点图到项目；${preserved.length} 个手改文件已保留`
+        : '已应用节点图到项目',
+    );
+  }, [generatorType, loader, mcVersion, setSpec, setCompileResult, announce]);
+
+  /** 启动调试器：在编译错误节点设置断点并启动调试器 */
+  const handleDebug = useCallback(async () => {
+    const graph = useNodeGraphStore.getState().graph;
+    const result = await applyGraphToProject(graph, { generatorType, loader, mcVersion });
+    setCompileResult({ spec: result.spec, warnings: result.warnings, errors: result.errors });
+
+    // 在错误节点设置断点（优先使用带定位的结构化错误）
+    const errorMessages = result.errorsWithLocation ?? [];
+    if (errorMessages.length > 0) {
+      const nextBreakpoints = new Set(useDebuggerStore.getState().breakpoints);
+      for (const error of errorMessages) {
+        const nodeId = error.location?.nodeId;
+        if (nodeId && graph.nodes.some((node) => node.id === nodeId)) {
+          nextBreakpoints.add(nodeId);
+        }
+      }
+      useDebuggerStore.setState({ breakpoints: nextBreakpoints });
+    }
+
+    // 启动调试器（只启动一次）
+    useDebuggerStore.getState().start(graph);
+  }, [generatorType, loader, mcVersion, setCompileResult]);
+
+  /** 手动「从 Spec 导入」：以 modStore.spec 重建画布（覆盖前确认） */
+  const handleImportFromSpec = useCallback(() => {
+    if (!spec || !isModSupported) return;
+    const current = useNodeGraphStore.getState().graph;
+    if (current.nodes.length > 0) {
+      if (!window.confirm(`将以 Spec 重建画布，覆盖当前 ${current.nodes.length} 个节点，确定？`)) {
+        return;
+      }
+    }
+    const { graph, warnings } = specToNodeGraph(spec);
+    useNodeGraphStore.getState().commit();
+    useNodeGraphStore.getState().loadGraph(graph);
+    announce(
+      warnings.length > 0
+        ? `已从 Spec 导入画布；${warnings.length} 条提示（含未渲染类型说明）`
+        : '已从 Spec 导入画布',
+    );
+  }, [spec, isModSupported, announce]);
+
+  // 自动导入：整 session 仅一次（空画布 + mod + 有 spec），避免覆盖用户手工搭的图
+  const autoImportRef = useRef(false);
+  useEffect(() => {
+    if (readOnly || autoImportRef.current) return;
+    autoImportRef.current = true; // 无论本次是否导入，session 内不再自动导入
+    if (!isModSupported || !spec) return;
+    if (useNodeGraphStore.getState().graph.nodes.length > 0) return;
+    const { graph, warnings } = specToNodeGraph(spec);
+    useNodeGraphStore.getState().loadGraph(graph);
+    if (warnings.length > 0) {
+      announce(`已从 Spec 自动导入画布；${warnings.length} 条提示（未渲染类型仅可表单编辑）`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅首次挂载执行一次
+  }, []);
 
   // 导出节点图为 JSON 文件（触发浏览器下载）
   const handleExport = useCallback(() => {
@@ -337,6 +416,24 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
           }
     : null;
 
+  // 非 mod 类型不支持节点图，渲染掩蔽提示（hooks 已全部调用完毕）
+  if (!isModSupported) {
+    return (
+      <div className="flex h-full flex-col bg-mc-bg" role="application" aria-label="低代码工作区">
+        <div className="flex items-center gap-2 border-b border-mc-border bg-mc-surface px-3 py-2 text-xs text-mc-dim">
+          <McIcon scope="pixel" name="info-box" size={14} aria-hidden="true" />
+          <span>
+            低代码节点编辑器当前仅支持 Mod 项目（Fabric / NeoForge / Quilt）。当前项目类型：
+            {generatorType}
+          </span>
+        </div>
+        <div className="flex flex-1 items-center justify-center text-sm text-mc-mute">
+          请将顶部类型切换为 Mod 后再使用节点图
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col bg-mc-bg" role="application" aria-label="低代码工作区">
       {/* 顶部工具栏 */}
@@ -382,6 +479,20 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
               ↷
             </button>
           </div>
+        )}
+
+        {/* 从 Spec 导入：把 modStore.spec（AI/表单产物）渲染到画布 */}
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={handleImportFromSpec}
+            disabled={!isModSupported || !spec}
+            aria-label="从 Spec 导入画布"
+            title="以当前 ModSpec 重建画布（覆盖前会确认）"
+            className="rounded-mc px-2 py-1 text-[11px] text-mc-mute transition-colors hover:bg-mc-surface-2 hover:text-mc-text disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ⇄ 从 Spec 导入
+          </button>
         )}
 
         {/* 清空 */}
@@ -528,17 +639,30 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
             </span>
           )}
 
-          {/* 编译 */}
+          {/* 编译并应用 */}
           <button
             type="button"
-            onClick={handleCompile}
+            onClick={handleApply}
             data-onboarding="compile"
-            aria-label="编译节点图"
-            title="编译节点图为 ModSpec"
+            aria-label="编译节点图并应用到项目"
+            title="编译节点图 → 更新 Spec → 重新生成项目文件（手改文件会保留）"
             className="flex items-center gap-1 rounded-mc bg-mc-accent px-3 py-1 text-[11px] font-medium text-white transition-colors hover:bg-mc-accent/80"
           >
             <span aria-hidden="true">⚙</span>
-            编译
+            编译并应用
+          </button>
+
+          {/* 调试：在编译错误处设置断点并启动调试器 */}
+          <button
+            type="button"
+            onClick={handleDebug}
+            aria-label="启动调试器（在编译错误处设置断点）"
+            title="启动调试器，在编译错误节点设置断点并单步执行"
+            className="flex items-center gap-1 rounded-mc bg-purple-600/80 px-3 py-1 text-[11px] font-medium text-white transition-colors hover:bg-purple-600"
+            disabled={!compileResult || compileResult.errors.length === 0}
+          >
+            <span aria-hidden="true">🐛</span>
+            调试
           </button>
         </div>
       </div>

@@ -92,10 +92,8 @@ export function TabBar() {
                 selectFile(path);
               }
             }}
-            className={`group flex cursor-pointer items-center gap-1.5 rounded-mc border-b-2 px-2 py-1 text-xs transition-colors ${
-              isSelected
-                ? 'border-mc-accent bg-mc-surface-2 text-mc-text'
-                : 'border-transparent text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
+            className={`mc-tab cursor-pointer px-2 py-1 ${
+              isSelected ? 'mc-tab-selected' : 'mc-tab-idle'
             }`}
           >
             <span aria-hidden="true">{getFileIcon(path)}</span>

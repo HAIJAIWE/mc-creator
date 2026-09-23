@@ -22,7 +22,7 @@ import {
   getSystemMode,
   type ColorMode,
 } from '../lib/themes.js';
-import type { ModelConfigRes } from '../../../shared/ipc-channels.js';
+import type { ModelProfile } from '../../../shared/ipc-channels.js';
 
 interface SettingsPanelProps {
   leftWidth: number;
@@ -37,38 +37,52 @@ interface Preset {
   modelId: string;
   apiKeyPlaceholder?: string;
   local?: boolean;
+  /** 该 provider 的常用模型（用于 modelId 下拉提示） */
+  models?: string[];
 }
 
 const MODEL_PRESETS: Preset[] = [
   {
-    name: 'OpenAI',
-    baseURL: 'https://api.openai.com/v1',
-    modelId: 'gpt-4o-mini',
-    apiKeyPlaceholder: 'sk-...',
-  },
-  {
     name: 'DeepSeek',
     baseURL: 'https://api.deepseek.com/v1',
-    modelId: 'deepseek-chat',
+    modelId: 'deepseek-flash',
     apiKeyPlaceholder: 'sk-...',
+    models: ['deepseek-flash', 'deepseek-v4-pro', 'deepseek-v4-flash'],
+  },
+  {
+    name: 'Kimi（月之暗面）',
+    baseURL: 'https://api.moonshot.cn/v1',
+    modelId: 'kimi-k2.5',
+    apiKeyPlaceholder: 'sk-...',
+    models: ['kimi-k2.5', 'kimi-k3', 'kimi-k3-max', 'kimi-k2.7-code'],
   },
   {
     name: '通义千问',
     baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    modelId: 'qwen-plus',
+    modelId: 'qwen3.5-plus',
     apiKeyPlaceholder: 'sk-...',
+    models: ['qwen3.5-plus', 'qwen3.8-max', 'qwen3.7-max-preview'],
   },
   {
     name: '智谱 GLM',
     baseURL: 'https://open.bigmodel.cn/api/paas/v4',
-    modelId: 'glm-4-flash',
+    modelId: 'glm-5.3-flash',
     apiKeyPlaceholder: '...',
+    models: ['glm-5.3-flash', 'glm-5.3-max', 'glm-5.2', 'glm-5'],
+  },
+  {
+    name: 'OpenAI',
+    baseURL: 'https://api.openai.com/v1',
+    modelId: 'gpt-5.6-luna',
+    apiKeyPlaceholder: 'sk-...',
+    models: ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
   },
   {
     name: 'Ollama (本地)',
     baseURL: 'http://localhost:11434/v1',
-    modelId: 'qwen2.5:7b',
+    modelId: 'qwen3:8b',
     local: true,
+    models: ['qwen3:8b', 'qwen2.5:7b', 'deepseek-r1:8b', 'llama3.1:8b'],
   },
   {
     name: 'LM Studio (本地)',
@@ -123,11 +137,15 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('model');
 
-  // === 模型配置 ===
-  const { name, modelId, baseURL, apiKey, setConfig } = useModelConfigStore();
-  const [form, setForm] = useState({ name, modelId, baseURL, apiKey });
+  // === 模型配置（多套并存，可切换/测试） ===
+  const { setConfig, setProfiles, profiles, activeId } = useModelConfigStore();
+  // 正在编辑的配置 id（null = 新建）
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: '', modelId: '', baseURL: '', apiKey: '' });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   // === CurseForge 配置 ===
   const [cfApiKey, setCfApiKey] = useState('');
@@ -144,12 +162,25 @@ export function SettingsPanel({
   );
 
   useEffect(() => {
-    ipcClient.loadModelConfig().then((c: ModelConfigRes) => {
-      setConfig(c);
-      setForm(c);
-    });
+    ipcClient
+      .listModelProfiles<{ profiles: ModelProfile[]; activeId: string | null }>()
+      .then((r) => {
+        setProfiles(r.profiles, r.activeId);
+        const first = r.profiles[0] ?? null;
+        setEditingId(first?.id ?? null);
+        setForm(
+          first
+            ? {
+                name: first.name,
+                modelId: first.modelId,
+                baseURL: first.baseURL,
+                apiKey: first.apiKey,
+              }
+            : { name: '', modelId: '', baseURL: '', apiKey: '' },
+        );
+      });
     ipcClient.loadCurseForgeConfig().then((c) => setCfApiKey(c.apiKey));
-  }, [setConfig]);
+  }, [setConfig, setProfiles]);
 
   // 系统模式变化时（仅 system 模式下）同步 UI 状态：effectiveMode + activeTheme
   useEffect(() => {
@@ -170,11 +201,114 @@ export function SettingsPanel({
 
   const saveModel = async () => {
     setSaving(true);
-    await ipcClient.saveModelConfig(form);
-    setConfig(form);
+    setTestResult(null);
+    const existing = profiles.find((p) => p.id === editingId) ?? null;
+    const id = editingId ?? `p_${Date.now().toString(36)}`;
+    const next: ModelProfile = {
+      id,
+      name: form.name.trim() || existing?.name || '未命名配置',
+      modelId: form.modelId.trim(),
+      baseURL: form.baseURL.trim(),
+      // 留空 = 保留已存 Key（避免误清空）
+      apiKey: form.apiKey || existing?.apiKey || '',
+    };
+    if (!next.modelId || !next.baseURL) {
+      setTestResult({ ok: false, message: '请填写模型 ID 与 Base URL' });
+      setSaving(false);
+      return;
+    }
+    const list = existing ? profiles.map((p) => (p.id === id ? next : p)) : [...profiles, next];
+    const active = activeId ?? id;
+    await ipcClient.saveModelProfiles({ profiles: list, activeId: active });
+    setProfiles(list, active);
+    setEditingId(id);
+    setForm(next);
+    // 同步给运行时（顶部 API 状态/模型对比/生成均读取当前配置）
+    setConfig({
+      name: next.name,
+      modelId: next.modelId,
+      baseURL: next.baseURL,
+      apiKey: next.apiKey,
+    });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  /** 切换生效配置（不弹窗，直接落盘 + 刷新运行时） */
+  const activateProfile = async (id: string) => {
+    const target = profiles.find((p) => p.id === id);
+    if (!target) return;
+    await ipcClient.saveModelProfiles({ profiles, activeId: id });
+    setProfiles(profiles, id);
+    setEditingId(id);
+    setForm({
+      name: target.name,
+      modelId: target.modelId,
+      baseURL: target.baseURL,
+      apiKey: target.apiKey,
+    });
+    setTestResult(null);
+  };
+
+  const removeProfile = async (id: string) => {
+    const list = profiles.filter((p) => p.id !== id);
+    if (list.length === 0) {
+      setProfiles([], null);
+      setEditingId(null);
+      setForm({ name: '', modelId: '', baseURL: '', apiKey: '' });
+      return;
+    }
+    const active = activeId === id ? list[0].id : activeId;
+    const nextActive = active ?? list[0].id;
+    await ipcClient.saveModelProfiles({ profiles: list, activeId: nextActive });
+    if (editingId === id) {
+      setEditingId(list[0].id);
+      setForm({
+        name: list[0].name,
+        modelId: list[0].modelId,
+        baseURL: list[0].baseURL,
+        apiKey: list[0].apiKey,
+      });
+    }
+    setProfiles(list, nextActive);
+    setTestResult(null);
+  };
+
+  const newProfile = () => {
+    setEditingId(null);
+    setForm({ name: '', modelId: '', baseURL: '', apiKey: '' });
+    setTestResult(null);
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    const existing = profiles.find((p) => p.id === editingId);
+    const key = form.apiKey || existing?.apiKey || '';
+    try {
+      const r = await ipcClient.testModelConnection({
+        baseURL: form.baseURL,
+        modelId: form.modelId,
+        apiKey: key,
+      });
+      setTestResult(r);
+    } catch (e) {
+      setTestResult({ ok: false, message: (e as Error).message });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const applyModelPreset = (p: Preset) => {
+    // 仅当正在新建或表单仍为空时自动填 name；已有名字保留（允许同名多套）
+    setForm((prev) => ({
+      ...prev,
+      name: prev.name || p.name,
+      baseURL: p.baseURL,
+      modelId: p.modelId,
+    }));
+    setTestResult(null);
   };
 
   const saveCf = async () => {
@@ -183,10 +317,6 @@ export function SettingsPanel({
     setCfSaving(false);
     setCfSaved(true);
     setTimeout(() => setCfSaved(false), 2000);
-  };
-
-  const applyModelPreset = (p: Preset) => {
-    setForm((prev) => ({ ...prev, name: p.name, baseURL: p.baseURL, modelId: p.modelId }));
   };
 
   const applyLayoutPreset = (preset: (typeof LAYOUT_PRESETS)[0]) => {
@@ -245,11 +375,75 @@ export function SettingsPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto p-3">
-        {/* Tab 1: 模型配置 */}
+        {/* Tab 1: 模型配置（多套并存 + 切换 + 测试） */}
         {activeTab === 'model' && (
           <div className="space-y-3">
+            {/* 配置列表 */}
             <div>
-              <div className="mb-2 text-xs text-mc-mute">快速预设（点击填充）：</div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs text-mc-mute">已保存配置（点击即切换为生效项）：</span>
+                <button
+                  type="button"
+                  onClick={newProfile}
+                  className="mc-btn-ghost !py-0.5 !text-xs"
+                >
+                  + 新建配置
+                </button>
+              </div>
+              {profiles.length === 0 ? (
+                <div className="rounded-mc border border-dashed border-mc-border p-2 text-xs text-mc-mute">
+                  还没有配置，从下方服务商任选一个开始填写
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {profiles.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => void activateProfile(p.id)}
+                      className={`inline-flex items-center gap-1 rounded-mc px-2 py-1 text-xs transition-colors ${
+                        activeId === p.id
+                          ? 'bg-mc-accent text-white'
+                          : 'bg-mc-surface-2 text-mc-dim hover:bg-mc-surface-3 hover:text-mc-text'
+                      }`}
+                      title={`切换为生效配置：${p.baseURL}`}
+                    >
+                      {p.name}
+                      {activeId === p.id && <span aria-hidden="true">✓</span>}
+                      <span
+                        role="button"
+                        aria-label={`删除配置 ${p.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void removeProfile(p.id);
+                        }}
+                        className="ml-0.5 opacity-60 transition-opacity hover:opacity-100"
+                      >
+                        ✕
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {testResult && (
+                <div
+                  role="status"
+                  className={`mt-2 rounded-mc px-2 py-1 text-xs ${
+                    testResult.ok
+                      ? 'bg-mc-accent/15 text-mc-accent-bright'
+                      : 'bg-red-500/15 text-red-400'
+                  }`}
+                >
+                  {testResult.ok ? '✓' : '✗'} {testResult.message}
+                </div>
+              )}
+            </div>
+
+            {/* 服务商快速预设 */}
+            <div>
+              <div className="mb-2 text-xs text-mc-mute">
+                服务商预设（点击填充 Base URL / 模型）：
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {MODEL_PRESETS.map((p) => (
                   <button
@@ -274,6 +468,7 @@ export function SettingsPanel({
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="mc-input"
                 placeholder="如 DeepSeek"
+                aria-label="配置名称"
               />
             </div>
             <div>
@@ -282,8 +477,15 @@ export function SettingsPanel({
                 value={form.modelId}
                 onChange={(e) => setForm({ ...form, modelId: e.target.value })}
                 className="mc-input"
-                placeholder="如 gpt-4o-mini, deepseek-chat"
+                placeholder="如 deepseek-flash / kimi-k2.5 / gpt-5.6-luna"
+                list="model-options"
+                aria-label="模型 ID"
               />
+              <datalist id="model-options">
+                {MODEL_PRESETS.flatMap((p) => p.models ?? [p.modelId]).map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="text-xs text-mc-dim">Base URL</label>
@@ -292,6 +494,7 @@ export function SettingsPanel({
                 onChange={(e) => setForm({ ...form, baseURL: e.target.value })}
                 className="mc-input"
                 placeholder="https://api.openai.com/v1"
+                aria-label="Base URL"
               />
             </div>
             <div>
@@ -301,13 +504,21 @@ export function SettingsPanel({
                 value={form.apiKey}
                 onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
                 className="mc-input"
-                placeholder="sk-..."
+                placeholder="留空 = 保留已保存的 Key；本地模型可不填"
+                aria-label="API Key"
               />
             </div>
 
             <div className="flex items-center gap-2">
               <button onClick={saveModel} disabled={saving} className="mc-btn-primary">
-                {saving ? '保存中…' : '保存'}
+                {saving ? '保存中…' : '保存配置'}
+              </button>
+              <button
+                onClick={handleTestConnection}
+                disabled={testing || !form.baseURL || !form.modelId}
+                className="mc-btn-ghost"
+              >
+                {testing ? '测试中…' : '测试连接'}
               </button>
               {saved && <span className="text-xs text-mc-accent">已保存</span>}
             </div>

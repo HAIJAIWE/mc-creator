@@ -3,7 +3,6 @@ import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
 import { useToast } from './useToast.js';
 import type { Project, GeneratorType } from '../../../shared/ipc-channels.js';
-import { GENERATOR_TYPES } from '../../../shared/ipc-channels.js';
 import { FolderInput, FolderOutput } from 'lucide-react';
 import { McMark } from './McMark.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
@@ -62,6 +61,30 @@ const LOADER_LABEL: Record<string, string> = {
   quilt: 'Quilt',
   legacy_fabric: 'Legacy Fabric',
 };
+
+/** 空态「内容类型」按创作方向分组，替代一锅端平铺 */
+const TYPE_GROUPS: { title: string; hint: string; types: GeneratorType[] }[] = [
+  {
+    title: 'Java 版模组',
+    hint: 'Fabric / NeoForge / Quilt 生态',
+    types: ['mod', 'datapack', 'modpack', 'resource_pack'],
+  },
+  {
+    title: '脚本与增强',
+    hint: '数据驱动与脚本化内容',
+    types: ['kubejs', 'crafttweaker', 'enchantment'],
+  },
+  {
+    title: '服务器与外观',
+    hint: '服务器配置、启动器与皮肤',
+    types: ['server', 'launcher', 'skin'],
+  },
+  {
+    title: '基岩版 Add-on',
+    hint: 'Bedrock 行为包、物品与实体',
+    types: ['behavior_pack', 'behavior_item', 'behavior_entity'],
+  },
+];
 
 export function Dashboard() {
   const projects = useProjectStore((s) => s.projects);
@@ -153,9 +176,7 @@ export function Dashboard() {
           <div>
             <h1 className="font-display text-xl font-bold tracking-tight">
               MC 创作器
-              <span className="ml-2 align-middle text-xs font-normal text-mc-mute">
-                MC Creator
-              </span>
+              <span className="ml-2 align-middle text-xs font-normal text-mc-mute">MC Creator</span>
             </h1>
             <div className="text-xs text-mc-mute">AI 驱动的 Minecraft 内容创作工具</div>
           </div>
@@ -208,33 +229,63 @@ export function Dashboard() {
             加载中…
           </div>
         ) : projects.length === 0 ? (
-          <div className="mx-auto max-w-4xl">
-            <div className="mb-8 text-center">
-              <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
-                <McMark className="h-9 w-9 text-mc-accent" />
+          <div className="mx-auto max-w-5xl px-2">
+            <div className="mb-10 text-center">
+              <div className="mx-auto mb-5 inline-flex h-20 w-20 items-center justify-center rounded-mc-lg border border-mc-border-strong bg-mc-surface-2 shadow-[var(--mc-sheen),var(--mc-shadow-block)]">
+                <McMark className="h-11 w-11 text-mc-accent" />
               </div>
-              <h2 className="mb-2 font-display text-xl font-bold">选择你要创建的内容类型</h2>
+              <h2 className="mb-2 font-display text-2xl font-bold">选择你要创建的内容类型</h2>
               <p className="text-sm text-mc-mute">
-                让 AI 帮你生成 Mod、数据包、整合包等 Minecraft 内容
+                按分类开始创作：模组、数据包、脚本、基岩版 Add-on……
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {(GENERATOR_TYPES as readonly GeneratorType[]).map((type) => {
-                const icon = TYPE_ICON[type];
-                return (
-                  <button
-                    key={type}
-                    onClick={() => handleNew(type)}
-                    className="mc-card group flex flex-col items-center gap-3 p-5 transition-colors hover:border-mc-accent"
-                  >
-                    <div className="flex h-12 w-12 items-center justify-center rounded-mc-lg bg-mc-surface-3 transition-colors group-hover:bg-mc-accent/20">
-                      <McIcon scope={icon.scope} name={icon.name} size={24} />
-                    </div>
-                    <div className="text-sm font-medium text-mc-text">{TYPE_LABEL[type]}</div>
-                    <div className="text-center text-xs text-mc-mute">{TYPE_DESC[type]}</div>
-                  </button>
-                );
-              })}
+
+            <div className="space-y-9 pb-8">
+              {TYPE_GROUPS.map((group) => (
+                <section key={group.title} aria-label={group.title}>
+                  <header className="mb-3 flex items-baseline gap-3">
+                    <h3 className="font-display text-xs font-bold uppercase tracking-wider text-mc-dim">
+                      {group.title}
+                    </h3>
+                    <span className="hidden text-xs text-mc-mute sm:inline">{group.hint}</span>
+                    <span className="h-px flex-1 bg-mc-border" aria-hidden="true" />
+                  </header>
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                    {group.types.map((type) => {
+                      const icon = TYPE_ICON[type];
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => handleNew(type)}
+                          className="mc-card group relative flex min-h-[150px] flex-col items-center gap-2.5 p-5 transition-all hover:-translate-y-0.5 hover:border-mc-accent hover:shadow-[var(--mc-shadow-block)]"
+                        >
+                          {/* hover 顶部草绿高光线 */}
+                          <span
+                            aria-hidden="true"
+                            className="absolute inset-x-1.5 top-1.5 h-[3px] rounded-full bg-mc-accent opacity-0 transition-opacity group-hover:opacity-100"
+                          />
+                          <div className="flex h-12 w-12 items-center justify-center rounded-mc-lg bg-mc-surface-3 shadow-[var(--mc-sheen)] transition-all group-hover:scale-110 group-hover:bg-mc-accent/15">
+                            <McIcon scope={icon.scope} name={icon.name} size={26} />
+                          </div>
+                          <div className="text-sm font-semibold text-mc-text">
+                            {TYPE_LABEL[type]}
+                          </div>
+                          <div className="text-center text-xs leading-relaxed text-mc-mute">
+                            {TYPE_DESC[type]}
+                          </div>
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1 text-xs font-bold text-mc-accent opacity-0 transition-opacity group-hover:opacity-100"
+                          >
+                            创建
+                            <McIcon scope="pixel" name="arrow-right" size={12} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           </div>
         ) : (
@@ -247,7 +298,7 @@ export function Dashboard() {
                   return (
                     <div
                       key={p.id}
-                      className="mc-card flex flex-col p-4 transition-colors hover:border-mc-accent"
+                      className="mc-card flex flex-col p-4 transition-all hover:-translate-y-0.5 hover:border-mc-accent"
                     >
                       <div className="mb-3 flex items-start gap-3">
                         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-mc-lg bg-mc-surface-3">

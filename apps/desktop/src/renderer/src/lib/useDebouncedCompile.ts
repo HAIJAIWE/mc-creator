@@ -52,9 +52,9 @@ export function useDebouncedCompile(
     setIsCompiling(true);
 
     // 防抖：延迟 delay ms 再编译，避免连续编辑时频繁编译
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       try {
-        const result = compileNodeGraph(graph);
+        const result = await compileNodeGraph(graph);
         setCompileResult(result);
 
         // 仅当编译通过（无 errors）时才用 FabricAdapter 生成文件

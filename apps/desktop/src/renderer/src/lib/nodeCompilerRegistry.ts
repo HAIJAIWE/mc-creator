@@ -100,6 +100,7 @@ export interface CompilerOutput {
  * - `sanitizedModId`：净化后的合法命名空间，供需要拼 id 的编译器使用
  * - `nodeMap`：节点索引 Map，供 BFS 编译器 O(1) 查找目标节点（替代 O(n) 线性扫描）
  * - `compileLoopBody`：编译 loop 节点的 body 子图代码（供 loop 编译器递归调用）
+ * - `warnings`：警告收集数组，供编译器（如 compileCodeNode）报告解析警告
  */
 export interface CompileContext {
   graph: NodeGraph;
@@ -107,14 +108,16 @@ export interface CompileContext {
   /** P2 dogfood 优化：节点索引 Map，BFS 中 O(1) 查找节点 */
   nodeMap?: Map<string, ModNode>;
   compileLoopBody: (bodySubgraphId: string | undefined) => string;
+  /** P2-4 dogfood：警告收集数组，供编译器报告端口签名解析等非致命问题 */
+  warnings?: string[];
 }
 
 /** 单个节点编译器：处理指定 kind 的节点，返回贡献到 ModSpec 的产出 */
 export interface NodeCompiler {
   /** 处理的节点类型（一个 kind 只能注册一个 compiler，后注册覆盖先注册） */
   kind: NodeKind;
-  /** 编译函数：抛出的异常由 compileAll 捕获转为 error */
-  compile: (node: ModNode, ctx: CompileContext) => CompilerOutput;
+  /** 编译函数：抛出的异常由 compileAll 捕获转为 error，支持 async */
+  compile: (node: ModNode, ctx: CompileContext) => CompilerOutput | Promise<CompilerOutput>;
 }
 
 // === 注册表 ===
@@ -191,10 +194,10 @@ export function mergeOutput(dst: CompilerOutput, src: CompilerOutput): void {
  * @param ctx 编译上下文
  * @returns 合并后的产出 + 中央收集的 errors（不含编译器自定义 errors，那些在 output.errors 里）
  */
-export function compileAll(
+export async function compileAll(
   nodes: ModNode[],
   ctx: CompileContext,
-): { output: CompilerOutput; errors: string[] } {
+): Promise<{ output: CompilerOutput; errors: string[] }> {
   const output: CompilerOutput = {};
   const errors: string[] = [];
 
@@ -202,7 +205,7 @@ export function compileAll(
     const compiler = getCompiler(node.data.kind);
     if (!compiler) continue; // comment / 未知 kind：静默跳过
     try {
-      const result = compiler.compile(node, ctx);
+      const result = await compiler.compile(node, ctx);
       mergeOutput(output, result);
     } catch (e) {
       errors.push(`${node.data.kind}节点 ${node.id} 编译失败：${(e as Error).message}`);

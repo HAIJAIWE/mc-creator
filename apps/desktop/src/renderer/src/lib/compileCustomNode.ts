@@ -9,6 +9,39 @@ import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegis
 import { renderMustache } from '../components/lowcode/custom/mustacheRender.js';
 
 /**
+ * 尝试使用沙箱化 Mustache 渲染（主进程 isolated-vm 沙箱）。
+ * 如果不可用（测试环境、主进程未注册处理器等），返回 null 以便回退到本地渲染。
+ */
+async function renderMustacheSandboxed(
+  template: string,
+  fields: Record<string, unknown>,
+): Promise<string | null> {
+  try {
+    // 运行在 Electron 渲染进程中时，window.sandboxedMustache 由 preload 暴露
+    // 测试环境/无 Electron 时为 undefined
+    const api = (
+      globalThis as {
+        sandboxedMustache?: {
+          renderMustache: (
+            t: string,
+            f: Record<string, unknown>,
+          ) => Promise<{ ok: boolean; result?: string; error?: string }>;
+        };
+      }
+    ).sandboxedMustache;
+    if (!api) return null;
+    const result = await api.renderMustache(template, fields);
+    if (result.ok && result.result !== undefined) return result.result;
+    // 沙箱渲染失败（如超时、内存超限），记录错误并返回 null 回退
+    console.warn('[compileCustomNode] 沙箱渲染失败，回退本地渲染:', result.error);
+    return null;
+  } catch (err) {
+    console.warn('[compileCustomNode] 沙箱渲染异常，回退本地渲染:', err);
+    return null;
+  }
+}
+
+/**
  * 编译自定义节点为 Java 代码片段，包装为 CustomCodeSnippetSpec。
  *
  * 流程：
@@ -31,10 +64,10 @@ import { renderMustache } from '../components/lowcode/custom/mustacheRender.js';
  *
  * 返回 { snippet?, error? }，由 compileNodeGraph push 到 customCode 数组。
  */
-export function compileCustomNode(
+export async function compileCustomNode(
   data: SubgraphNodeData,
   fields: Record<string, unknown>,
-): { snippet?: CustomCodeSnippetSpec; error?: string } {
+): Promise<{ snippet?: CustomCodeSnippetSpec; error?: string }> {
   if (!data.customTypeId) {
     return { error: `节点 ${data.nodeId} 的 customTypeId 为 null，不能作为自定义节点编译` };
   }
@@ -60,8 +93,9 @@ export function compileCustomNode(
   // 渲染代码：P0-3 优先使用 templateParts，否则回退到 codeTemplate
   const code =
     schema.templateParts && schema.templateParts.length > 0
-      ? renderTemplateParts(schema.templateParts, sanitizedFields, schema.fields)
-      : renderMustache(schema.codeTemplate, sanitizedFields);
+      ? await renderTemplateParts(schema.templateParts, sanitizedFields, schema.fields)
+      : ((await renderMustacheSandboxed(schema.codeTemplate, sanitizedFields)) ??
+        renderMustache(schema.codeTemplate, sanitizedFields));
 
   return {
     snippet: {
@@ -88,20 +122,22 @@ export function compileCustomNode(
  * 注：字段值统一通过 String() 转换后与 equals/in 中的字符串比较，
  * 这样 number 字段 3 与 condition equals='3' 可匹配。
  */
-function renderTemplateParts(
+async function renderTemplateParts(
   parts: CustomNodeTemplatePart[],
   sanitizedFields: Record<string, unknown>,
   schemaFields: CustomNodeFieldSchema[],
-): string {
+): Promise<string> {
   const schemaFieldKeys = new Set(schemaFields.map((f) => f.key));
   let result = '';
   for (const part of parts) {
     if (!part.condition) {
-      result += renderMustache(part.template, sanitizedFields);
+      const sandboxed = await renderMustacheSandboxed(part.template, sanitizedFields);
+      result += sandboxed ?? renderMustache(part.template, sanitizedFields);
       continue;
     }
     if (evaluateCondition(part.condition, sanitizedFields, schemaFieldKeys)) {
-      result += renderMustache(part.template, sanitizedFields);
+      const sandboxed = await renderMustacheSandboxed(part.template, sanitizedFields);
+      result += sandboxed ?? renderMustache(part.template, sanitizedFields);
     }
   }
   return result;

@@ -11,7 +11,6 @@ import {
   toPascal,
   type ModSpecLike,
 } from './mod-common.js';
-
 export function fabricMainClass(spec: ModSpecLike, pkg: string, mainCls: string): FileNode {
   // 条件性生成子模块初始化调用（仅当 spec 中对应字段非空时）
   const initCalls: string[] = ['ModItems.initialize();', 'ModBlocks.initialize();'];

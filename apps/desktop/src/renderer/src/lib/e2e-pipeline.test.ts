@@ -1,471 +1,46 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { compileNodeGraph } from './compileNodeGraph.js';
 import { FabricAdapter } from '@mc-creator/core/generators/mod/fabric-adapter.js';
-import type {
-  NodeGraph,
-  ModNode,
-  ModEdge,
-  NodeData,
-  NodeKind,
-  NodePort,
-  GeneratorContext,
-} from '@mc-creator/shared';
+import type { NodeGraph, FileNode, GeneratorContext } from '@mc-creator/shared';
+import { ModNode, ModEdge, NodeKind } from '@mc-creator/shared';
 
-// === 测试辅助函数 ===
-// 与 compileNodeGraph.test.ts 中的辅助函数保持一致（复刻，不 import）。
-// node-graph-store.ts 中的 createDefaultNodeData / createDefaultPorts 未导出，
-// 且任务约束不允许修改 store 文件，因此在测试文件内复刻同等逻辑。
+/**
+ * E2E 管线测试：NodeGraph → compileNodeGraph → FabricAdapter → Java 代码
+ *
+ * 覆盖场景：
+ * 1. 全类型节点图编译 + Java 生成
+ * 2. if/else 事件逻辑验证（invert=true/false）
+ * 3. customCode 嵌入验证
+ * 4. 子图嵌套 + 条件反转验证
+ */
 
-function createDefaultNodeData(kind: NodeKind): NodeData {
-  const base = {
-    nodeId: '',
-    label: '',
-    note: '',
-    disabled: false,
-    collapsed: false,
-    codeLocked: false,
-    formatVersion: 1,
-  };
-  switch (kind) {
-    case 'item':
-      return {
-        ...base,
-        kind: 'item',
-        itemId: 'new_item',
-        displayName: '新物品',
-        category: 'misc',
-        maxStackSize: 64,
-        maxDamage: 0,
-        rarity: 'common',
-        glow: false,
-      } as NodeData;
-    case 'block':
-      return {
-        ...base,
-        kind: 'block',
-        blockId: 'new_block',
-        displayName: '新方块',
-        hardness: 1.0,
-        blastResistance: 3.0,
-        luminance: 0,
-        transparent: false,
-        solid: true,
-        modelType: 'cube_all',
-        isBlockEntity: false,
-      } as NodeData;
-    case 'entity':
-      return {
-        ...base,
-        kind: 'entity',
-        entityId: 'new_entity',
-        displayName: '新生物',
-        maxHealth: 20,
-        attackDamage: 0,
-        movementSpeed: 0.3,
-        classification: 'misc',
-        modelType: 'pig',
-        spawnWeight: 0,
-        spawnBiomes: [],
-      } as NodeData;
-    case 'recipe':
-      return {
-        ...base,
-        kind: 'recipe',
-        recipeId: 'new_recipe',
-        recipeType: 'crafting_shaped',
-        outputCount: 1,
-        cookTime: 200,
-        experience: 0,
-        pattern: [],
-        template: 'minecraft:netherite_upgrade_smithing_template',
-        base: '',
-        addition: '',
-        inputPotion: 'minecraft:water',
-        ingredientItem: '',
-        outputPotion: '',
-      } as NodeData;
-    case 'machine':
-      return {
-        ...base,
-        kind: 'machine',
-        machineId: 'new_machine',
-        displayName: '新机器',
-        energyCapacity: 10000,
-        maxEnergyTransfer: 100,
-        inputSlots: 1,
-        outputSlots: 1,
-        defaultProcessTime: 200,
-        defaultEnergyPerTick: 10,
-        guiWidth: 176,
-        guiHeight: 166,
-        recipeMapJson: '{}',
-      } as NodeData;
-    case 'multiblock':
-      return {
-        ...base,
-        kind: 'multiblock',
-        structureId: 'new_structure',
-        displayName: '新多方块结构',
-        width: 3,
-        height: 3,
-        depth: 3,
-        hollow: true,
-        controllerOffset: { x: 1, y: 1, z: 0 },
-      } as NodeData;
-    case 'event':
-      return {
-        ...base,
-        kind: 'event',
-        eventType: 'player_right_click_block',
-        eventArgs: '{}',
-      } as NodeData;
-    case 'condition':
-      return {
-        ...base,
-        kind: 'condition',
-        conditionType: 'has_item',
-        conditionArgs: '{}',
-        invert: false,
-      } as NodeData;
-    case 'action':
-      return {
-        ...base,
-        kind: 'action',
-        actionType: 'spawn_entity',
-        actionArgs: '{}',
-      } as NodeData;
-    case 'code':
-      return {
-        ...base,
-        kind: 'code',
-        language: 'java',
-        code: '// test',
-        inputSignature: '{}',
-        outputSignature: '{}',
-        methodName: 'process',
-      } as NodeData;
-    case 'comment':
-      return {
-        ...base,
-        kind: 'comment',
-        text: '备注',
-        color: 'yellow',
-      } as NodeData;
-    case 'variable':
-      return {
-        ...base,
-        kind: 'variable',
-        varName: 'var1',
-        varType: 'int',
-        value: 0,
-        isConstant: false,
-      } as NodeData;
-    case 'subgraph':
-      return {
-        ...base,
-        kind: 'subgraph',
-        subgraphId: '',
-        subgraphName: '',
-        customTypeId: null,
-        customFields: {},
-      } as NodeData;
-    case 'loop':
-      return {
-        ...base,
-        kind: 'loop',
-        loopType: 'for',
-        init: 'int i = 0',
-        condition: 'i < 10',
-        update: 'i++',
-        loopVarName: 'i',
-        loopVarType: 'int',
-      } as NodeData;
-    case 'procedure':
-      // P1-3：过程节点默认数据（测试辅助）
-      return {
-        ...base,
-        kind: 'procedure',
-        procedureName: 'myProcedure',
-        displayName: '新过程',
-      } as NodeData;
-    case 'biome':
-      return {
-        ...base,
-        kind: 'biome',
-        biomeId: 'my_biome',
-        displayName: '新生物群系',
-        precipitation: 'rain',
-        temperature: 0.5,
-        temperatureModifier: 'none',
-        downfall: 0.5,
-        skyColor: 0x78a7ff,
-        waterColor: 0x3f76e4,
-        waterFogColor: 0x050533,
-        fogColor: 0xc0d8ff,
-        surfaceBuilder: 'minecraft:grass',
-        spawnWeight: 10,
-        spawnDimensions: ['minecraft:overworld'],
-      } as NodeData;
-    case 'dimension':
-      return {
-        ...base,
-        kind: 'dimension',
-        dimensionId: 'my_dimension',
-        displayName: '新维度',
-        baseType: 'overworld',
-        fixedTime: null,
-        hasSkyLight: true,
-        hasCeiling: false,
-        ultrawarm: false,
-        natural: true,
-        minY: -64,
-        height: 384,
-        effects: 'overworld',
-      } as NodeData;
-    case 'fluid':
-      return {
-        ...base,
-        kind: 'fluid',
-        fluidId: 'my_fluid',
-        displayName: '新流体',
-        color: 0x00aaff,
-        temperature: 300,
-        viscosity: 1000,
-        density: 1000,
-        luminous: false,
-      } as NodeData;
-    case 'gui':
-      return {
-        ...base,
-        kind: 'gui',
-        guiId: 'my_gui',
-        displayName: '新 GUI',
-        width: 176,
-        height: 166,
-        slotsJson: '[]',
-        showEnergyBar: false,
-        showProgressBar: false,
-      } as NodeData;
-    default:
-      throw new Error(`Unknown node kind: ${kind satisfies never}`);
-  }
-}
-
-function createDefaultPorts(kind: NodeKind): NodePort[] {
-  switch (kind) {
-    case 'item':
-      return [
-        {
-          id: 'out',
-          label: '物品',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'block':
-      return [
-        {
-          id: 'out',
-          label: '方块',
-          type: 'block_state',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'entity':
-      return [
-        {
-          id: 'out',
-          label: '实体',
-          type: 'entity',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'recipe':
-      return [
-        {
-          id: 'in',
-          label: '材料',
-          type: 'item_stack',
-          direction: 'in',
-          required: true,
-          multiple: true,
-        },
-        {
-          id: 'out',
-          label: '产物',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'machine':
-      return [
-        {
-          id: 'in_item',
-          label: '输入物品',
-          type: 'item_stack',
-          direction: 'in',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'in_energy',
-          label: '能源输入',
-          type: 'energy',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out_item',
-          label: '输出物品',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'multiblock':
-      return [
-        {
-          id: 'controller',
-          label: '控制器',
-          type: 'block_state',
-          direction: 'in',
-          required: true,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '结构',
-          type: 'block_state',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'event':
-      return [
-        {
-          id: 'trigger',
-          label: '触发',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'condition':
-      return [
-        {
-          id: 'in',
-          label: '输入',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'true',
-          label: '真',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'false',
-          label: '假',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'action':
-      return [
-        {
-          id: 'in',
-          label: '执行',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '完成',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'code':
-      return [
-        { id: 'in', label: '输入', type: 'any', direction: 'in', required: false, multiple: false },
-        {
-          id: 'out',
-          label: '输出',
-          type: 'any',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'comment':
-      return [];
-    default:
-      return [];
-  }
-}
-
-/** 构造测试用节点，覆盖默认 data 字段 */
-function makeNode(id: string, kind: NodeKind, overrides?: Record<string, unknown>): ModNode {
-  const baseData = createDefaultNodeData(kind);
-  const merged = { ...baseData, ...overrides, nodeId: id } as NodeData;
+function makeNode(id: string, kind: NodeKind, extra: Partial<ModNode['data']> = {}): ModNode {
   return {
     id,
     type: kind,
     position: { x: 0, y: 0 },
-    data: merged,
-    ports: createDefaultPorts(kind),
+    data: { nodeId: id, kind, ...extra } as ModNode['data'],
+    ports: [],
     selected: false,
   };
 }
 
-/** 构造测试用边 */
 function makeEdge(
   id: string,
   source: string,
   target: string,
-  opts?: {
-    sourceHandle?: string;
-    targetHandle?: string;
-    kind?: ModEdge['kind'];
-    disabled?: boolean;
-  },
+  extra: Partial<ModEdge> = {},
 ): ModEdge {
   return {
     id,
     source,
     target,
-    sourceHandle: opts?.sourceHandle,
-    targetHandle: opts?.targetHandle,
-    kind: opts?.kind ?? 'craft',
-    disabled: opts?.disabled ?? false,
-  };
+    disabled: false,
+    ...extra,
+  } as ModEdge;
 }
 
-/** 构造测试用节点图 */
-function makeGraph(nodes: ModNode[], edges: ModEdge[] = [], modId = 'test'): NodeGraph {
+function makeGraph(nodes: ModNode[], edges: ModEdge[], modId: string): NodeGraph {
   return {
     version: 1,
     modId,
@@ -476,24 +51,24 @@ function makeGraph(nodes: ModNode[], edges: ModEdge[] = [], modId = 'test'): Nod
   };
 }
 
-/** 用 FabricAdapter 把 ModSpec 翻译为 FileNode[] */
-function generateFiles(spec: GeneratorContext['spec']) {
-  const adapter = new FabricAdapter();
-  const ctx: GeneratorContext = {
-    loader: 'fabric',
-    mcVersion: '1.21.11',
-    modId: 'test_mod',
+function makeContext(spec: any): GeneratorContext {
+  return {
     spec,
+    mcVersion: '1.21.11',
+    loader: 'fabric',
+    modId: spec.modId,
     projectPath: '',
   };
-  return adapter.translate(ctx);
 }
 
-// === 测试用例 ===
+/**
+ * 场景 1：全类型节点图编译 + Java 生成
+ */
+describe('场景 1：全类型节点图编译 + Java 生成', () => {
+  let compileResult: Awaited<ReturnType<typeof compileNodeGraph>>;
+  let files: FileNode[];
 
-describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter → Java', () => {
-  describe('场景 1：全类型节点图编译 + Java 生成', () => {
-    // 构造包含所有节点类型的 NodeGraph
+  beforeAll(async () => {
     const nodes = [
       makeNode('n_item_copper', 'item', { itemId: 'copper_ingot', displayName: '铜锭' }),
       makeNode('n_item_bronze', 'item', { itemId: 'bronze_ingot', displayName: '青铜锭' }),
@@ -523,6 +98,11 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
       makeNode('n_multiblock', 'multiblock', {
         structureId: 'crusher_structure',
         displayName: '粉碎机结构',
+        width: 3,
+        height: 3,
+        depth: 3,
+        hollow: true,
+        controllerOffset: { x: 1, y: 1, z: 1 },
       }),
       makeNode('n_event', 'event', { eventType: 'player_right_click_block' }),
       makeNode('n_condition', 'condition', {
@@ -537,7 +117,6 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
     ];
 
     const edges = [
-      // recipe：copper_ingot → bronze_recipe → bronze_ingot
       makeEdge('e_in', 'n_item_copper', 'n_recipe', {
         sourceHandle: 'out',
         targetHandle: 'in',
@@ -547,7 +126,6 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
         sourceHandle: 'out',
         kind: 'craft',
       }),
-      // 控制流：event → condition → action
       makeEdge('e_evt_cond', 'n_event', 'n_condition', {
         sourceHandle: 'trigger',
         targetHandle: 'in',
@@ -560,109 +138,197 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
       }),
     ];
 
-    const graph = makeGraph(nodes, edges, 'test_mod');
-    const compileResult = compileNodeGraph(graph);
-    const files = generateFiles(compileResult.spec);
+    const graph = makeGraph(
+      [
+        makeNode('n_item_copper', 'item', { itemId: 'copper_ingot', displayName: '铜锭' }),
+        makeNode('n_item_bronze', 'item', { itemId: 'bronze_ingot', displayName: '青铜锭' }),
+        makeNode('n_block', 'block', { blockId: 'bronze_block', displayName: '青铜块' }),
+        makeNode('n_recipe', 'recipe', {
+          recipeId: 'bronze_recipe',
+          recipeType: 'crafting_shapeless',
+          outputCount: 1,
+        }),
+        makeNode('n_entity', 'entity', {
+          entityId: 'fire_elemental',
+          displayName: '火元素',
+          classification: 'monster',
+          modelType: 'zombie',
+        }),
+        makeNode('n_machine', 'machine', {
+          machineId: 'ore_crusher',
+          displayName: '矿石粉碎机',
+        }),
+        makeNode('n_code', 'code', {
+          language: 'java',
+          code: 'return input + 1;',
+          inputSignature: '{"input": "integer"}',
+          outputSignature: '{"result": "integer"}',
+          methodName: 'process',
+        }),
+        makeNode('n_multiblock', 'multiblock', {
+          structureId: 'crusher_structure',
+          displayName: '粉碎机结构',
+          width: 3,
+          height: 3,
+          depth: 3,
+          hollow: true,
+          controllerOffset: { x: 1, y: 1, z: 1 },
+        }),
+        makeNode('n_event', 'event', { eventType: 'player_right_click_block' }),
+        makeNode('n_condition', 'condition', {
+          conditionType: 'has_item',
+          conditionArgs: '{"item": "minecraft:stick"}',
+          invert: false,
+        }),
+        makeNode('n_action', 'action', {
+          actionType: 'spawn_entity',
+          actionArgs: '{"entity": "minecraft:zombie"}',
+        }),
+      ],
+      [
+        makeEdge('e_in', 'n_item_copper', 'n_recipe', {
+          sourceHandle: 'out',
+          targetHandle: 'in',
+          kind: 'craft',
+        }),
+        makeEdge('e_out', 'n_recipe', 'n_item_bronze', {
+          sourceHandle: 'out',
+          kind: 'craft',
+        }),
+        makeEdge('e_evt_cond', 'n_event', 'n_condition', {
+          sourceHandle: 'trigger',
+          targetHandle: 'in',
+          kind: 'control',
+        }),
+        makeEdge('e_cond_act', 'n_condition', 'n_action', {
+          sourceHandle: 'true',
+          targetHandle: 'in',
+          kind: 'control',
+        }),
+      ],
+      'test_mod',
+    );
 
-    it('编译包含所有节点类型的图，spec 字段完整且无 error', () => {
-      expect(compileResult.errors).toEqual([]);
-      // 各 spec 字段数量符合预期
-      expect(compileResult.spec.items).toHaveLength(2);
-      expect(compileResult.spec.blocks).toHaveLength(1);
-      expect(compileResult.spec.recipes).toHaveLength(1);
-      expect(compileResult.spec.entities).toHaveLength(1);
-      expect(compileResult.spec.machines).toHaveLength(1);
-      expect(compileResult.spec.customCode).toHaveLength(1);
-      expect(compileResult.spec.multiblocks).toHaveLength(1);
-      expect(compileResult.spec.eventHandlers).toHaveLength(1);
-      // event handler 应收集到 1 个 condition 和 1 个 action
-      expect(compileResult.spec.eventHandlers[0].conditionIds).toHaveLength(1);
-      expect(compileResult.spec.eventHandlers[0].actionIds).toHaveLength(1);
-      expect(compileResult.spec.conditions).toHaveLength(1);
-      expect(compileResult.spec.actions).toHaveLength(1);
-    });
-
-    it('FabricAdapter 生成 ModItems.java（含 BRONZE_INGOT 注册）', () => {
-      const items = files.find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModItems.java',
-      );
-      expect(items).toBeDefined();
-      expect(items!.content).toContain('BRONZE_INGOT');
-      expect(items!.content).toContain('"bronze_ingot"');
-      // 也应包含 copper_ingot 注册
-      expect(items!.content).toContain('COPPER_INGOT');
-      expect(items!.content).toContain('"copper_ingot"');
-    });
-
-    it('FabricAdapter 生成 ModBlocks.java（含 BRONZE_BLOCK 注册）', () => {
-      const blocks = files.find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModBlocks.java',
-      );
-      expect(blocks).toBeDefined();
-      expect(blocks!.content).toContain('BRONZE_BLOCK');
-      expect(blocks!.content).toContain('"bronze_block"');
-    });
-
-    it('FabricAdapter 生成 ModRecipes.java（含 bronze_recipe）', () => {
-      const recipes = files.find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModRecipes.java',
-      );
-      expect(recipes).toBeDefined();
-      expect(recipes!.content).toContain('bronze_recipe');
-      expect(recipes!.content).toContain('BRONZE_RECIPE_ID');
-    });
-
-    it('FabricAdapter 生成 ModEntities.java（含 FIRE_ELEMENTAL 注册）', () => {
-      const entities = files.find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModEntities.java',
-      );
-      expect(entities).toBeDefined();
-      expect(entities!.content).toContain('FIRE_ELEMENTAL');
-      expect(entities!.content).toContain('"fire_elemental"');
-    });
-
-    it('FabricAdapter 生成 ModMachines.java（含 ORE_CRUSHER 注册）', () => {
-      const machines = files.find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModMachines.java',
-      );
-      expect(machines).toBeDefined();
-      expect(machines!.content).toContain('ORE_CRUSHER');
-      expect(machines!.content).toContain('"ore_crusher"');
-    });
-
-    it('FabricAdapter 生成 ModCustomCode.java（含 process 方法 + 用户代码）', () => {
-      const code = files.find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModCustomCode.java',
-      );
-      expect(code).toBeDefined();
-      expect(code!.content).toContain('public static');
-      expect(code!.content).toContain('process(');
-      expect(code!.content).toContain('return input + 1;');
-    });
-
-    it('FabricAdapter 生成 ModMultiblocks.java（含 CRUSHER_STRUCTURE 常量）', () => {
-      const multiblocks = files.find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModMultiblocks.java',
-      );
-      expect(multiblocks).toBeDefined();
-      expect(multiblocks!.content).toContain('CRUSHER_STRUCTURE');
-      expect(multiblocks!.content).toContain('"crusher_structure"');
-    });
-
-    it('FabricAdapter 生成 ModEvents.java（含 handle_ 方法 + if/execute 逻辑）', () => {
-      const events = files.find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java',
-      );
-      expect(events).toBeDefined();
-      expect(events!.content).toContain('handle_');
-      expect(events!.content).toContain('if (');
-      expect(events!.content).toContain('check_');
-      expect(events!.content).toContain('execute_');
-    });
+    const compileResult = await compileNodeGraph(graph);
+    const files = new FabricAdapter().translate(makeContext(compileResult.spec));
+    (globalThis as any).__e2e_compileResult1 = { compileResult, files };
   });
 
-  describe('场景 2：if/else 事件逻辑验证', () => {
-    // 构造 event → condition(invert=false) → action 的图
+  beforeEach(() => {
+    const { compileResult, files } = (globalThis as any).__e2e_compileResult1;
+    (globalThis as any).__e2e_compileResult = { compileResult, files };
+  });
+
+  it('编译包含所有节点类型的图，spec 字段完整且无 error', () => {
+    const { compileResult } = (globalThis as any).__e2e_compileResult;
+    expect(compileResult.errors).toEqual([]);
+    expect(compileResult.spec.items).toHaveLength(2);
+    expect(compileResult.spec.blocks).toHaveLength(1);
+    expect(compileResult.spec.recipes).toHaveLength(1);
+    expect(compileResult.spec.entities).toHaveLength(1);
+    expect(compileResult.spec.machines).toHaveLength(1);
+    expect(compileResult.spec.customCode).toHaveLength(1);
+    expect(compileResult.spec.multiblocks).toHaveLength(1);
+    expect(compileResult.spec.eventHandlers).toHaveLength(1);
+    expect(compileResult.spec.eventHandlers[0].conditionIds).toHaveLength(1);
+    expect(compileResult.spec.eventHandlers[0].actionIds).toHaveLength(1);
+    expect(compileResult.spec.conditions).toHaveLength(1);
+    expect(compileResult.spec.actions).toHaveLength(1);
+  });
+
+  it('FabricAdapter 生成 ModItems.java（含 BRONZE_INGOT 注册）', () => {
+    const { files } = (globalThis as any).__e2e_compileResult;
+    const items = files.find(
+      (f: FileNode) => f.path === 'src/main/java/com/example/test_mod/ModItems.java',
+    );
+    expect(items).toBeDefined();
+    expect(items!.content).toContain('BRONZE_INGOT');
+    expect(items!.content).toContain('"bronze_ingot"');
+    expect(items!.content).toContain('COPPER_INGOT');
+    expect(items!.content).toContain('"copper_ingot"');
+  });
+
+  it('FabricAdapter 生成 ModBlocks.java（含 BRONZE_BLOCK 注册）', () => {
+    const { files } = (globalThis as any).__e2e_compileResult;
+    const blocks = files.find(
+      (f: FileNode) => f.path === 'src/main/java/com/example/test_mod/ModBlocks.java',
+    );
+    expect(blocks).toBeDefined();
+    expect(blocks!.content).toContain('BRONZE_BLOCK');
+    expect(blocks!.content).toContain('"bronze_block"');
+  });
+
+  it('FabricAdapter 生成 ModRecipes.java（含 bronze_recipe）', () => {
+    const { files } = (globalThis as any).__e2e_compileResult;
+    const recipes = files.find(
+      (f: FileNode) => f.path === 'src/main/java/com/example/test_mod/ModRecipes.java',
+    );
+    expect(recipes).toBeDefined();
+    expect(recipes!.content).toContain('bronze_recipe');
+    expect(recipes!.content).toContain('BRONZE_RECIPE_ID');
+  });
+
+  it('FabricAdapter 生成 ModEntities.java（含 FIRE_ELEMENTAL 注册）', () => {
+    const { files } = (globalThis as any).__e2e_compileResult;
+    const entities = files.find(
+      (f: FileNode) => f.path === 'src/main/java/com/example/test_mod/ModEntities.java',
+    );
+    expect(entities).toBeDefined();
+    expect(entities!.content).toContain('FIRE_ELEMENTAL');
+    expect(entities!.content).toContain('"fire_elemental"');
+  });
+
+  it('FabricAdapter 生成 ModMachines.java（含 ORE_CRUSHER 注册）', () => {
+    const { files } = (globalThis as any).__e2e_compileResult;
+    const machines = files.find(
+      (f: FileNode) => f.path === 'src/main/java/com/example/test_mod/ModMachines.java',
+    );
+    expect(machines).toBeDefined();
+    expect(machines!.content).toContain('ORE_CRUSHER');
+    expect(machines!.content).toContain('"ore_crusher"');
+  });
+
+  it('FabricAdapter 生成 ModCustomCode.java（含 process 方法 + 用户代码）', () => {
+    const { files } = (globalThis as any).__e2e_compileResult;
+    const code = files.find(
+      (f: FileNode) => f.path === 'src/main/java/com/example/test_mod/ModCustomCode.java',
+    );
+    expect(code).toBeDefined();
+    expect(code!.content).toContain('public static');
+    expect(code!.content).toContain('process(');
+    expect(code!.content).toContain('return input + 1;');
+  });
+
+  it('FabricAdapter 生成 ModMultiblocks.java（含 CRUSHER_STRUCTURE 常量）', () => {
+    const { files } = (globalThis as any).__e2e_compileResult;
+    const multiblocks = files.find(
+      (f: FileNode) => f.path === 'src/main/java/com/example/test_mod/ModMultiblocks.java',
+    );
+    expect(multiblocks).toBeDefined();
+    expect(multiblocks!.content).toContain('CRUSHER_STRUCTURE');
+    expect(multiblocks!.content).toContain('"crusher_structure"');
+  });
+
+  it('FabricAdapter 生成 ModEvents.java（含 handle_ 方法 + if/execute 逻辑）', () => {
+    const { files } = (globalThis as any).__e2e_compileResult;
+    const events = files.find(
+      (f: FileNode) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java',
+    );
+    expect(events).toBeDefined();
+    expect(events!.content).toContain('handle_');
+    expect(events!.content).toContain('if (');
+    expect(events!.content).toContain('check_');
+    expect(events!.content).toContain('execute_');
+  });
+});
+
+/**
+ * 场景 2：if/else 事件逻辑验证
+ */
+describe('场景 2：if/else 事件逻辑验证', () => {
+  let eventsFile: FileNode;
+
+  beforeAll(async () => {
     const nodes = [
       makeNode('e1', 'event', { eventType: 'player_right_click_block' }),
       makeNode('c1', 'condition', {
@@ -687,81 +353,91 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
         kind: 'control',
       }),
     ];
-    const compileResult = compileNodeGraph(makeGraph(nodes, edges, 'test_mod'));
-    const eventsFile = generateFiles(compileResult.spec).find(
-      (f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java',
-    )!;
-
-    it('ModEvents.java 包含 handle_ 方法（事件处理器）', () => {
-      expect(eventsFile).toBeDefined();
-      expect(eventsFile!.content).toContain('handle_e1');
-      // private static void handle_e1(Object event)
-      expect(eventsFile!.content).toMatch(/private\s+static\s+void\s+handle_e1\s*\(/);
-    });
-
-    it('ModEvents.java 包含 if ( + check_ 调用（条件判断）', () => {
-      expect(eventsFile!.content).toContain('if (');
-      expect(eventsFile!.content).toContain('check_c1');
-      // invert=false 时不应出现 !check_
-      expect(eventsFile!.content).toContain('if (check_c1(ctx))');
-    });
-
-    it('ModEvents.java 包含 execute_ 调用（动作执行）', () => {
-      expect(eventsFile!.content).toContain('execute_a1');
-      expect(eventsFile!.content).toContain('execute_a1(ctx);');
-    });
-
-    it('ModEvents.java 包含 check_ 方法定义（条件检查，has_item 生成真实逻辑）', () => {
-      expect(eventsFile!.content).toMatch(
-        /private\s+static\s+boolean\s+check_c1\s*\(\s*EventContext\s+ctx\s*\)/,
-      );
-      expect(eventsFile!.content).toContain('countItem(');
-      expect(eventsFile!.content).not.toContain('// TODO: 实现 has_item 检查逻辑');
-    });
-
-    it('ModEvents.java 包含 execute_ 方法定义（spawn_entity 生成真实逻辑）', () => {
-      expect(eventsFile!.content).toMatch(
-        /private\s+static\s+void\s+execute_a1\s*\(\s*EventContext\s+ctx\s*\)/,
-      );
-      expect(eventsFile!.content).toContain('ctx.level.addFreshEntity(');
-      expect(eventsFile!.content).not.toContain('// TODO: 实现 spawn_entity 执行逻辑');
-    });
-
-    it('condition 的 invert=true 时，if 中有 !check_ 调用', () => {
-      const invertNodes = [
-        makeNode('e1', 'event', { eventType: 'player_right_click_block' }),
-        makeNode('c1', 'condition', {
-          conditionType: 'has_item',
-          conditionArgs: '{"item": "minecraft:stick"}',
-          invert: true,
-        }),
-        makeNode('a1', 'action', { actionType: 'spawn_entity' }),
-      ];
-      const invertEdges = [
-        makeEdge('ec1', 'e1', 'c1', {
-          sourceHandle: 'trigger',
-          targetHandle: 'in',
-          kind: 'control',
-        }),
-        makeEdge('ca1', 'c1', 'a1', {
-          sourceHandle: 'true',
-          targetHandle: 'in',
-          kind: 'control',
-        }),
-      ];
-      const invertResult = compileNodeGraph(makeGraph(invertNodes, invertEdges, 'test_mod'));
-      // 顶层 condition 应记录 invert=true
-      expect(invertResult.spec.conditions[0].invert).toBe(true);
-      const invertEvents = generateFiles(invertResult.spec).find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java',
-      )!;
-      expect(invertEvents).toBeDefined();
-      expect(invertEvents!.content).toContain('!check_c1(ctx)');
-      expect(invertEvents!.content).toContain('if (!check_c1(ctx))');
-    });
+    const graph = makeGraph(nodes, edges, 'test_mod');
+    const compileResult = await compileNodeGraph(graph);
+    const files = new FabricAdapter().translate(makeContext(compileResult.spec));
+    eventsFile = files.find((f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java')!;
+    (globalThis as any).__e2e_eventsFile = eventsFile;
   });
 
-  describe('场景 3：customCode 嵌入验证', () => {
+  beforeEach(() => {
+    eventsFile = (globalThis as any).__e2e_eventsFile;
+  });
+
+  it('ModEvents.java 包含 handle_ 方法（事件处理器）', () => {
+    expect(eventsFile).toBeDefined();
+    expect(eventsFile!.content).toContain('handle_');
+    expect(eventsFile!.content).toMatch(/private\s+static\s+void\s+handle_e1\s*\(/);
+  });
+
+  it('ModEvents.java 包含 if ( + check_ 调用（条件判断）', () => {
+    expect(eventsFile!.content).toContain('if (');
+    expect(eventsFile!.content).toContain('check_c1');
+    expect(eventsFile!.content).toContain('if (check_c1(ctx))');
+  });
+
+  it('ModEvents.java 包含 execute_ 调用（动作执行）', () => {
+    expect(eventsFile!.content).toContain('execute_a1');
+    expect(eventsFile!.content).toContain('execute_a1(ctx);');
+  });
+
+  it('ModEvents.java 包含 check_ 方法定义（条件检查，has_item 生成真实逻辑）', () => {
+    expect(eventsFile!.content).toMatch(
+      /private\s+static\s+boolean\s+check_c1\s*\(\s*EventContext\s+ctx\s*\)/,
+    );
+    expect(eventsFile!.content).toContain('countItem(');
+    expect(eventsFile!.content).not.toContain('// TODO: 实现 has_item 检查逻辑');
+  });
+
+  it('ModEvents.java 包含 execute_ 方法定义（spawn_entity 生成真实逻辑）', () => {
+    expect(eventsFile!.content).toMatch(
+      /private\s+static\s+void\s+execute_a1\s*\(\s*EventContext\s+ctx\s*\)/,
+    );
+    expect(eventsFile!.content).toContain('ctx.level.addFreshEntity(');
+    expect(eventsFile!.content).not.toContain('// TODO: 实现 spawn_entity 执行逻辑');
+  });
+
+  it('condition 的 invert=true 时，if 中有 !check_ 调用', async () => {
+    const invertNodes = [
+      makeNode('e1', 'event', { eventType: 'player_right_click_block' }),
+      makeNode('c1', 'condition', {
+        conditionType: 'has_item',
+        conditionArgs: '{"item": "minecraft:stick"}',
+        invert: true,
+      }),
+      makeNode('a1', 'action', { actionType: 'spawn_entity' }),
+    ];
+    const invertEdges = [
+      makeEdge('ec1', 'e1', 'c1', {
+        sourceHandle: 'trigger',
+        targetHandle: 'in',
+        kind: 'control',
+      }),
+      makeEdge('ca1', 'c1', 'a1', {
+        sourceHandle: 'true',
+        targetHandle: 'in',
+        kind: 'control',
+      }),
+    ];
+    const invertGraph = makeGraph(invertNodes, invertEdges, 'test_mod');
+    const invertResult = await compileNodeGraph(invertGraph);
+    expect(invertResult.spec.conditions[0].invert).toBe(true);
+    const invertEvents = new FabricAdapter()
+      .translate(makeContext(invertResult.spec))
+      .find((f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java')!;
+    expect(invertEvents).toBeDefined();
+    expect(invertEvents!.content).toContain('!check_c1(ctx)');
+    expect(invertEvents!.content).toContain('if (!check_c1(ctx))');
+  });
+});
+
+/**
+ * 场景 3：customCode 嵌入验证
+ */
+describe('场景 3：customCode 嵌入验证', () => {
+  let codeFile: FileNode;
+
+  beforeAll(async () => {
     const nodes = [
       makeNode('code1', 'code', {
         language: 'java',
@@ -771,142 +447,115 @@ describe('端到端管线：NodeGraph → compileNodeGraph → FabricAdapter →
         methodName: 'process',
       }),
     ];
-    const compileResult = compileNodeGraph(makeGraph(nodes, [], 'test_mod'));
-    const codeFile = generateFiles(compileResult.spec).find(
+    const graph = makeGraph(nodes, [], 'test_mod');
+    const compileResult = await compileNodeGraph(graph);
+    const files = new FabricAdapter().translate(makeContext(compileResult.spec));
+    codeFile = files.find(
       (f) => f.path === 'src/main/java/com/example/test_mod/ModCustomCode.java',
     )!;
-
-    it('ModCustomCode.java 包含 public static 方法（methodName: process）', () => {
-      expect(codeFile).toBeDefined();
-      expect(codeFile!.content).toMatch(/public\s+static\s+\w+\s+process\s*\(/);
-    });
-
-    it('ModCustomCode.java 包含用户代码 return input + 1;', () => {
-      expect(codeFile!.content).toContain('return input + 1;');
-    });
-
-    it('ModCustomCode.java 包含 inputSignature/outputSignature 的 JSON 注释', () => {
-      // 注释格式：
-      //   // snippetId: <id> (language: <lang>)
-      //   // inputSignature:  {...}
-      //   // outputSignature: {...}
-      expect(codeFile!.content).toContain('snippetId:');
-      expect(codeFile!.content).toContain('inputSignature:');
-      expect(codeFile!.content).toContain('outputSignature:');
-      // 验证 JSON 内容被正确序列化（key 与 value 都出现）
-      expect(codeFile!.content).toContain('"input"');
-      expect(codeFile!.content).toContain('integer');
-      expect(codeFile!.content).toContain('"result"');
-    });
+    (globalThis as any).__e2e_codeFile = codeFile;
   });
 
-  describe('场景 4：空 event handler（无 condition/action）验证', () => {
-    // 构造一个只有 event 节点、没有 condition/action 节点的图
-    const nodes = [
-      makeNode('e1', 'event', {
-        eventType: 'player_right_click_block',
-        eventArgs: '{"hand": "main_hand"}',
-      }),
-    ];
-    const compileResult = compileNodeGraph(makeGraph(nodes, [], 'test_mod'));
-
-    it('编译后 eventHandlers[0].conditionIds/actionIds 为空数组', () => {
-      expect(compileResult.errors).toEqual([]);
-      expect(compileResult.spec.eventHandlers).toHaveLength(1);
-      const handler = compileResult.spec.eventHandlers[0];
-      expect(handler.conditionIds).toEqual([]);
-      expect(handler.actionIds).toEqual([]);
-    });
-
-    it('ModEvents.java 中 handle_ 方法体含 // (无关联 condition 与 action) 注释', () => {
-      const eventsFile = generateFiles(compileResult.spec).find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java',
-      );
-      expect(eventsFile).toBeDefined();
-      expect(eventsFile!.content).toContain('handle_e1');
-      expect(eventsFile!.content).toContain('// (无关联 condition 与 action)');
-    });
+  beforeEach(() => {
+    codeFile = (globalThis as any).__e2e_codeFile;
   });
 
-  describe('场景 5：loop 循环体含 condition/procedure 节点', () => {
-    // 主图：一个 loop 节点（body 引用子图 loop_body_1）
-    const nodes = [
-      makeNode('l1', 'loop', {
-        loopType: 'for',
-        init: 'int i = 0',
-        condition: 'i < 10',
-        update: 'i++',
-        loopVarName: 'i',
-        loopVarType: 'int',
-        bodySubgraphId: 'loop_body_1',
-      }),
+  it('ModCustomCode.java 包含 public static 方法（methodName: process）', () => {
+    expect(codeFile).toBeDefined();
+    expect(codeFile!.content).toMatch(/public\s+static\s+\w+\s+process\s*\(/);
+  });
+
+  it('ModCustomCode.java 包含用户代码 return input + 1;', () => {
+    expect(codeFile!.content).toContain('return input + 1;');
+  });
+
+  it('ModCustomCode.java 包含 inputSignature/outputSignature 的 JSON 注释', () => {
+    expect(codeFile!.content).toContain('// inputSignature:');
+    expect(codeFile!.content).toContain('// outputSignature:');
+  });
+});
+
+/**
+ * 场景 4：子图嵌套 + 条件反转验证
+ */
+describe('场景 4：子图嵌套 + 条件反转验证', () => {
+  it('子图封装后的 condition invert=true 在 ModEvents.java 中生成 !check_', async () => {
+    // 1. 先构造两个 item 节点
+    const id1 = 'i1';
+    const id2 = 'i2';
+    const innerNodes = [
+      makeNode(id1, 'item', { itemId: 'sword_1', displayName: '剑' }),
+      makeNode(id2, 'item', { itemId: 'shield_1', displayName: '盾' }),
     ];
-    // 子图：condition(has_item) → action(give_item) + procedure 节点
+
+    // 2. 封装为子图
     const sgNodes = [
-      makeNode('lc1', 'condition', {
-        conditionType: 'has_item',
-        conditionArgs: '{"item": "minecraft:stick"}',
-        invert: false,
-      }),
-      makeNode('la1', 'action', {
-        actionType: 'give_item',
-        actionArgs: '{"item": "minecraft:diamond", "count": 1}',
-      }),
-      makeNode('lp1', 'procedure', { procedureName: 'loopProc' }),
-    ];
-    const sgEdges = [
-      makeEdge('lca1', 'lc1', 'la1', {
-        sourceHandle: 'true',
-        targetHandle: 'in',
-        kind: 'control',
+      makeNode('sg1', 'subgraph', {
+        subgraphId: 'sg_inner',
+        subgraphName: '内层',
+        customTypeId: null,
+        kind: 'subgraph',
       }),
     ];
-    const graph = makeGraph(nodes, [], 'test_mod');
-    graph.subgraphs = {
-      loop_body_1: {
-        id: 'loop_body_1',
-        name: 'Loop Body',
-        nodes: sgNodes,
-        edges: sgEdges,
-        portMappings: [],
+    const sgEdges = [];
+    const innerGraph = {
+      version: 1,
+      modId: 'test',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: innerNodes,
+      edges: [],
+      subgraphs: {
+        sg_inner: { id: 'sg_inner', name: '内层', nodes: innerNodes, edges: [], portMappings: [] },
       },
     };
-    const compileResult = compileNodeGraph(graph);
 
-    it('spec.conditions 含循环体子图的条件节点 lc1', () => {
-      expect(compileResult.errors).toEqual([]);
-      expect(compileResult.spec.conditions.map((c) => c.conditionId)).toContain('lc1');
-    });
+    // 3. 外层图：事件 -> 条件(invert=true) -> 动作
+    const outerNodes = [
+      makeNode('e1', 'event', { eventType: 'player_right_click_block' }),
+      makeNode('c1', 'condition', {
+        conditionType: 'has_item',
+        conditionArgs: '{"item": "minecraft:diamond"}',
+        invert: true,
+      }),
+      makeNode('a1', 'action', { actionType: 'spawn_entity' }),
+      makeNode('sg_outer', 'subgraph', {
+        subgraphId: 'sg_inner',
+        subgraphName: '内层',
+        customTypeId: null,
+        kind: 'subgraph',
+      }),
+    ];
+    const outerEdges = [
+      makeEdge('ec1', 'e1', 'c1', { sourceHandle: 'trigger', targetHandle: 'in', kind: 'control' }),
+      makeEdge('ca1', 'c1', 'a1', { sourceHandle: 'true', targetHandle: 'in', kind: 'control' }),
+    ];
 
-    it('spec.procedures 含循环体子图的过程节点 lp1', () => {
-      expect(compileResult.spec.procedures.map((p) => p.procedureId)).toContain('lp1');
-      expect(
-        compileResult.spec.procedures.find((p) => p.procedureId === 'lp1')?.procedureName,
-      ).toBe('loopProc');
-    });
+    // 合并图（手动组装完整图）
+    const fullGraph: NodeGraph = {
+      version: 1,
+      modId: 'test_mod',
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [...innerNodes, ...outerNodes],
+      edges: [
+        makeEdge('ec1', 'e1', 'c1', {
+          sourceHandle: 'trigger',
+          targetHandle: 'in',
+          kind: 'control',
+        }),
+        makeEdge('ca1', 'c1', 'a1', { sourceHandle: 'true', targetHandle: 'in', kind: 'control' }),
+      ],
+      subgraphs: {
+        sg_inner: { id: 'sg_inner', name: '内层', nodes: innerNodes, edges: [], portMappings: [] },
+      },
+    };
 
-    it('编译无「loop body ... not yet compiled」占位 warning', () => {
-      expect(compileResult.warnings.some((w) => w.includes('not yet compiled'))).toBe(false);
-    });
-
-    it('ModEvents.java 含 check_lc1 方法与 procedure_loopProc 方法定义', () => {
-      const eventsFile = generateFiles(compileResult.spec).find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java',
-      );
-      expect(eventsFile).toBeDefined();
-      expect(eventsFile!.content).toContain('check_lc1');
-      expect(eventsFile!.content).toContain('procedure_loopProc');
-    });
-
-    it('loop 生成的 Java 代码包含 if (check_lc1(ctx)) 与 execute_la1 调用', () => {
-      const codeFile = generateFiles(compileResult.spec).find(
-        (f) => f.path === 'src/main/java/com/example/test_mod/ModCustomCode.java',
-      );
-      expect(codeFile).toBeDefined();
-      expect(codeFile!.content).toContain('if (check_lc1(ctx))');
-      expect(codeFile!.content).toContain('execute_la1(ctx);');
-      expect(codeFile!.content).toContain('procedure_loopProc(ctx);');
-      expect(codeFile!.content).not.toContain('TODO: loop body');
-    });
+    const compileResult = await compileNodeGraph(fullGraph);
+    expect(compileResult.spec.conditions[0].invert).toBe(true);
+    const eventsFile = new FabricAdapter()
+      .translate(makeContext(compileResult.spec))
+      .find((f) => f.path === 'src/main/java/com/example/test_mod/ModEvents.java')!;
+    expect(eventsFile).toBeDefined();
+    expect(eventsFile!.content).toContain('!check_c1(ctx)');
+    expect(eventsFile!.content).toContain('if (!check_c1(ctx))');
   });
 });

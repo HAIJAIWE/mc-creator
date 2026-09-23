@@ -24,8 +24,6 @@ import type {
 } from '@mc-creator/shared';
 import { compileVariable } from './compileVariable.js';
 import { inlineSubgraphNodes } from './compileSubgraph.js';
-import { compileLoop } from './compileLoop.js';
-import { compileCustomNode } from './compileCustomNode.js';
 import { subgraphManager } from '../components/lowcode/subgraph/subgraphManager.js';
 import {
   registerCompiler,
@@ -33,6 +31,15 @@ import {
   type CompileContext,
   type CompilerOutput,
 } from './nodeCompilerRegistry.js';
+import { compileLoopBody, compileLoopSubgraphSpecsAll } from './loopCompiler.js';
+import './compilerRegistry.js'; // 触发内置编译器注册副作用
+import {
+  createCompileError,
+  CompileErrors,
+  CompileError,
+  CompileErrorCode,
+  toErrorString,
+} from './compileErrors.js';
 
 /**
  * 节点图编译器
@@ -55,19 +62,96 @@ import {
  *   - 顶层 conditions/actions 数组保持扁平列表不变（向后兼容 P1.4）。
  */
 
+export interface CompileLocation {
+  nodeId: string;
+  /** 代码节点的行号（0-based） */
+  line?: number;
+  /** 代码节点的列号（0-based） */
+  column?: number;
+  /** 错误/警告所在的代码片段（用于高亮显示） */
+  snippet?: string;
+}
+
+export interface CompileMessage {
+  message: string;
+  location?: CompileLocation;
+}
+
 export interface CompileResult {
   /** 编译出的 ModSpec */
   spec: ModSpec;
-  /** 警告信息（非致命错误） */
+  /** 警告信息（非致命错误） - 兼容旧格式 */
   warnings: string[];
-  /** 错误信息（致命错误，spec 仍可部分使用） */
+  /** 错误信息（致命错误，spec 仍可部分使用） - 兼容旧格式 */
   errors: string[];
+  /** 结构化警告信息（包含节点定位） - 新格式 */
+  warningsWithLocation?: CompileMessage[];
+  /** 结构化错误信息（包含节点定位） - 新格式 */
+  errorsWithLocation?: CompileMessage[];
+  /** 结构化错误（带错误码、建议修复等） */
+  structuredErrors?: CompileError[];
+  /** 结构化警告 */
+  structuredWarnings?: CompileError[];
 }
 
 /** 编译入口 */
-export function compileNodeGraph(graph: NodeGraph): CompileResult {
+export async function compileNodeGraph(graph: NodeGraph): Promise<CompileResult> {
   const warnings: string[] = [];
   const errors: string[] = [];
+  const warningsWithLocation: CompileMessage[] = [];
+  const errorsWithLocation: CompileMessage[] = [];
+  const structuredWarnings: CompileError[] = [];
+  const structuredErrors: CompileError[] = [];
+
+  // Helper to add warning with nodeId (updates both old and new formats)
+  const addWarning = (
+    message: string,
+    nodeId?: string,
+    line?: number,
+    column?: number,
+    snippet?: string,
+    code?: string,
+    suggestion?: string,
+  ) => {
+    warnings.push(message);
+    warningsWithLocation.push({
+      message,
+      location: nodeId ? { nodeId, line, column, snippet } : undefined,
+    });
+    if (code) {
+      structuredWarnings.push(
+        createCompileError(code as any, message, {
+          nodeId,
+          location: { line, column, snippet },
+          suggestion,
+        }),
+      );
+    }
+  };
+  const addError = (
+    message: string,
+    nodeId?: string,
+    line?: number,
+    column?: number,
+    snippet?: string,
+    code?: string,
+    suggestion?: string,
+  ) => {
+    errors.push(message);
+    errorsWithLocation.push({
+      message,
+      location: nodeId ? { nodeId, line, column, snippet } : undefined,
+    });
+    if (code) {
+      structuredErrors.push(
+        createCompileError(code as any, message, {
+          nodeId,
+          location: { line, column, snippet },
+          suggestion,
+        }),
+      );
+    }
+  };
 
   // L-3 修复：惰性预取已安装外部 mod 列表（缓存为 null 时异步拉取一次）。
   // 本次编译仍以空缓存执行（isExternalModInstalled 返回 true 不误报），
@@ -87,7 +171,9 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   // 把 customTypeId 为 null 的 subgraph 节点替换为其引用的子图内部节点。
   // customTypeId 非空的 subgraph 节点（自定义节点）不展开，由 compileCustomNode 处理。
   const inlineResult = inlineSubgraphNodes(graph, subgraphManager);
-  warnings.push(...inlineResult.warnings);
+  for (const w of inlineResult.warnings) {
+    addWarning(w);
+  }
   const inlinedGraph = inlineResult.graph;
 
   // P2 dogfood 优化：重建内联展开后的节点索引（子图展开后节点可能变化）
@@ -106,8 +192,14 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   const compilableNodes = activeNodes.filter((n) => !lockedNodes.includes(n));
   for (const n of activeNodes) {
     if (n.data.codeLocked && !n.data.lockedCode && n.data.kind !== 'comment') {
-      warnings.push(
+      addWarning(
         `节点 ${n.id} 已锁定代码但 lockedCode 为空，回退到常规编译（请补全锁定代码或解锁节点）`,
+        n.id,
+        undefined,
+        undefined,
+        undefined,
+        CompileErrorCode.NODE_LOCKED_EMPTY,
+        '补全 lockedCode 或解锁节点',
       );
     }
   }
@@ -119,15 +211,37 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
 
   // 校验：modId 必须有（净化前为空才报错）
   if (!inlinedGraph.modId) {
-    errors.push('节点图缺少 modId，无法编译');
+    addError(
+      '节点图缺少 modId，无法编译',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      CompileErrorCode.GRAPH_MISSING_MODID,
+      '在图设置中填写 modId（小写字母/数字/下划线）',
+    );
   } else if (!sanitizedModId) {
     // P1-2 dogfood 修复：原始 modId 非空但净化后为空（全是非法字符），明确报错
-    errors.push(
+    addError(
       `modId「${inlinedGraph.modId}」净化后为空（全部为非法字符），请使用小写字母/数字/下划线`,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      CompileErrorCode.GRAPH_INVALID_MODID,
+      '修改 modId 仅包含 a-z、0-9、_',
     );
   } else if (sanitizedModId !== inlinedGraph.modId.toLowerCase()) {
     // 净化后与原始不同（含有非法字符被替换），发出 warning
-    warnings.push(`modId「${inlinedGraph.modId}」包含非法字符，已净化为「${sanitizedModId}」`);
+    addWarning(
+      `modId「${inlinedGraph.modId}」包含非法字符，已净化为「${sanitizedModId}」`,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      CompileErrorCode.GRAPH_MODID_SANITIZED,
+      '建议直接使用净化后的 modId',
+    );
   }
 
   // === P0-1: 锁定节点的手改代码先收集（跳过常规编译）===
@@ -161,11 +275,18 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     nodeMap: inlinedNodeMap,
     // P1-4 dogfood 修复：传入 warnings 数组以便 compileLoopBody 报告 condition/procedure 节点
     compileLoopBody: (bodySubgraphId) => compileLoopBody(inlinedGraph, bodySubgraphId, warnings),
+    warnings,
   };
-  const { output: dispatched, errors: dispatchErrors } = compileAll(compilableNodes, ctx);
-  errors.push(...dispatchErrors);
-  if (dispatched.errors) errors.push(...dispatched.errors);
-  if (dispatched.warnings) warnings.push(...dispatched.warnings);
+  const { output: dispatched, errors: dispatchErrors } = await compileAll(compilableNodes, ctx);
+  for (const message of dispatchErrors) {
+    addError(message);
+  }
+  if (dispatched.errors) {
+    for (const message of dispatched.errors) addError(message);
+  }
+  if (dispatched.warnings) {
+    for (const message of dispatched.warnings) addWarning(message);
+  }
 
   const items = dispatched.items ?? [];
   const blocks = dispatched.blocks ?? [];
@@ -224,7 +345,15 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
   );
   for (const ns of externalNamespaces) {
     if (!isExternalModInstalled(ns)) {
-      warnings.push(`引用了外部 mod 命名空间「${ns}」，但该 mod 未安装，运行时可能缺失依赖`);
+      addWarning(
+        `引用了外部 mod 命名空间「${ns}」，但该 mod 未安装，运行时可能缺失依赖`,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        CompileErrorCode.EXTERNAL_MOD_NOT_INSTALLED,
+        '安装对应的外部 mod 或移除引用',
+      );
     }
   }
 
@@ -261,8 +390,14 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
         // 否则 A→B→A 互递归会对 A 和 B 各报一条 error。
         if (!reportedCycleMembers.has(proc.procedureId)) {
           for (const memberId of inStack) reportedCycleMembers.add(memberId);
-          errors.push(
+          addError(
             `过程 ${proc.procedureId}（${proc.procedureName}）存在递归调用链，Java 运行时将导致 StackOverflowError`,
+            proc.procedureId,
+            undefined,
+            undefined,
+            undefined,
+            CompileErrorCode.CYCLE_PROCEDURE_RECURSIVE,
+            '移除过程间的相互调用',
           );
         }
       }
@@ -278,8 +413,14 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     }
     for (const proc of procedures) {
       if (!calledProcedureIds.has(proc.procedureId)) {
-        warnings.push(
+        addWarning(
           `过程 ${proc.procedureId}（${proc.procedureName}）未被任何事件或过程引用，生成的 Java 方法将无调用方`,
+          proc.procedureId,
+          undefined,
+          undefined,
+          undefined,
+          CompileErrorCode.PROCEDURE_UNUSED,
+          '在事件或其他过程中调用此过程，或删除它',
         );
       }
     }
@@ -328,12 +469,20 @@ export function compileNodeGraph(graph: NodeGraph): CompileResult {
     procedures,
   };
 
-  return { spec, warnings, errors };
+  return {
+    spec,
+    warnings,
+    errors,
+    warningsWithLocation,
+    errorsWithLocation,
+    structuredWarnings,
+    structuredErrors,
+  };
 }
 
 // === 节点编译函数 ===
 
-function compileItemNode(node: ModNode): ItemSpec {
+export function compileItemNode(node: ModNode): ItemSpec {
   if (node.data.kind !== 'item') {
     throw new Error(`节点 ${node.id} 不是 item 类型`);
   }
@@ -354,7 +503,7 @@ function compileItemNode(node: ModNode): ItemSpec {
   } as ItemSpec;
 }
 
-function compileBlockNode(node: ModNode): BlockSpec {
+export function compileBlockNode(node: ModNode): BlockSpec {
   if (node.data.kind !== 'block') {
     throw new Error(`节点 ${node.id} 不是 block 类型`);
   }
@@ -403,7 +552,7 @@ function inferSoundTypeFromBlock(data: {
  * - 输出：getOutgoingEdges 找到 recipe 连出的 item 节点（recipe.out → item），取第一个作为 output
  * - 无输出连线时报错（配方必须有产物）
  */
-function compileRecipeNode(
+export function compileRecipeNode(
   graph: NodeGraph,
   node: ModNode,
   nodeMap?: Map<string, ModNode>,
@@ -459,7 +608,7 @@ function compileRecipeNode(
 }
 
 /** 编译实体节点：直接从 EntityNodeData 映射到 EntitySpec */
-function compileEntityNode(node: ModNode): EntitySpec {
+export function compileEntityNode(node: ModNode): EntitySpec {
   if (node.data.kind !== 'entity') {
     throw new Error(`节点 ${node.id} 不是 entity 类型`);
   }
@@ -479,7 +628,7 @@ function compileEntityNode(node: ModNode): EntitySpec {
 }
 
 /** 编译机器节点：直接从 MachineNodeData 映射到 MachineSpec */
-function compileMachineNode(node: ModNode): MachineSpec {
+export function compileMachineNode(node: ModNode): MachineSpec {
   if (node.data.kind !== 'machine') {
     throw new Error(`节点 ${node.id} 不是 machine 类型`);
   }
@@ -514,7 +663,7 @@ function parseRecipeMap(json: string): Record<string, string> {
 }
 
 /** 编译生物群系节点 */
-function compileBiomeNode(node: ModNode): ModBiomeSpec {
+export function compileBiomeNode(node: ModNode): ModBiomeSpec {
   if (node.data.kind !== 'biome') {
     throw new Error(`节点 ${node.id} 不是 biome 类型`);
   }
@@ -538,7 +687,7 @@ function compileBiomeNode(node: ModNode): ModBiomeSpec {
 }
 
 /** 编译维度节点 */
-function compileDimensionNode(node: ModNode): ModDimensionSpec {
+export function compileDimensionNode(node: ModNode): ModDimensionSpec {
   if (node.data.kind !== 'dimension') {
     throw new Error(`节点 ${node.id} 不是 dimension 类型`);
   }
@@ -565,7 +714,7 @@ function compileDimensionNode(node: ModNode): ModDimensionSpec {
 }
 
 /** 编译流体节点 */
-function compileFluidNode(node: ModNode): FluidSpec {
+export function compileFluidNode(node: ModNode): FluidSpec {
   if (node.data.kind !== 'fluid') {
     throw new Error(`节点 ${node.id} 不是 fluid 类型`);
   }
@@ -582,7 +731,7 @@ function compileFluidNode(node: ModNode): FluidSpec {
 }
 
 /** 编译 GUI 节点：解析 slotsJson → GuiSlotSpec[] */
-function compileGuiNode(node: ModNode): GuiSpec {
+export function compileGuiNode(node: ModNode): GuiSpec {
   if (node.data.kind !== 'gui') {
     throw new Error(`节点 ${node.id} 不是 gui 类型`);
   }
@@ -615,7 +764,7 @@ function compileGuiNode(node: ModNode): GuiSpec {
  *
  * @param warnings P2-4：接收解析警告的数组（可选，向后兼容）
  */
-function compileCodeNode(node: ModNode, warnings?: string[]): CustomCodeSnippetSpec {
+export function compileCodeNode(node: ModNode, warnings?: string[]): CustomCodeSnippetSpec {
   if (node.data.kind !== 'code') {
     throw new Error(`节点 ${node.id} 不是 code 类型`);
   }
@@ -631,7 +780,7 @@ function compileCodeNode(node: ModNode, warnings?: string[]): CustomCodeSnippetS
 }
 
 /** 编译多方块节点：直接从 MultiBlockNodeData 映射到 MultiBlockSpec */
-function compileMultiblockNode(node: ModNode): MultiBlockSpec {
+export function compileMultiblockNode(node: ModNode): MultiBlockSpec {
   if (node.data.kind !== 'multiblock') {
     throw new Error(`节点 ${node.id} 不是 multiblock 类型`);
   }
@@ -660,7 +809,7 @@ function compileMultiblockNode(node: ModNode): MultiBlockSpec {
  *   （procedure 的 condition/action 体归属 procedure 自身，在 compileProcedureNode 收集）
  * - 这样 event handler 只负责「调用过程」，过程体逻辑在 procedure 方法内
  */
-function compileEventNode(
+export function compileEventNode(
   graph: NodeGraph,
   node: ModNode,
   warnings?: string[],
@@ -778,7 +927,7 @@ function collectProcedureCallArgs(
 }
 
 /** 编译条件节点：解析 conditionArgs JSON，扁平映射到 ConditionSpec。P2-4：warnings 报告解析失败 */
-function compileConditionNode(node: ModNode, warnings?: string[]): ConditionSpec {
+export function compileConditionNode(node: ModNode, warnings?: string[]): ConditionSpec {
   if (node.data.kind !== 'condition') {
     throw new Error(`节点 ${node.id} 不是 condition 类型`);
   }
@@ -793,7 +942,7 @@ function compileConditionNode(node: ModNode, warnings?: string[]): ConditionSpec
 }
 
 /** 编译动作节点：解析 actionArgs JSON，扁平映射到 ActionSpec。P2-4：warnings 报告解析失败 */
-function compileActionNode(node: ModNode, warnings?: string[]): ActionSpec {
+export function compileActionNode(node: ModNode, warnings?: string[]): ActionSpec {
   if (node.data.kind !== 'action') {
     throw new Error(`节点 ${node.id} 不是 action 类型`);
   }
@@ -822,7 +971,7 @@ function compileActionNode(node: ModNode, warnings?: string[]): ActionSpec {
  * 但 ProcedureSpec 只在 procedures 数组中出现一次（按节点 id 唯一），
  * Java 生成时产生单一方法定义 + 多处调用。
  */
-function compileProcedureNode(
+export function compileProcedureNode(
   graph: NodeGraph,
   node: ModNode,
   nodeMap?: Map<string, ModNode>,
@@ -891,7 +1040,7 @@ function compileProcedureNode(
  * P2-4 dogfood 修复：传入 warnings + nodeId 时，解析失败或类型不符会 push warning，
  * 帮助用户定位哪个节点的参数 JSON 有问题。不传时保持原有静默行为（向后兼容）。
  */
-function parseArgsJson(
+export function parseArgsJson(
   json: string,
   warnings?: string[],
   nodeId?: string,
@@ -923,7 +1072,7 @@ function parseArgsJson(
  *
  * P2-4 dogfood 修复：传入 warnings + nodeId 时，解析失败或类型不符会 push warning。
  */
-function parseSignatureJson(
+export function parseSignatureJson(
   json: string,
   warnings?: string[],
   nodeId?: string,
@@ -970,7 +1119,7 @@ function parseSignatureJson(
  * 原实现每次调用都线性扫描 graph.edges（O(E)），大型图中配方编译和事件 BFS 频繁调用
  * 导致编译慢。构建索引后降为 O(1) 查找 + O(k) 遍历（k 为实际连入/连出边数）。
  */
-function buildEdgeIndex(graph: NodeGraph): {
+export function buildEdgeIndex(graph: NodeGraph): {
   outgoing: Map<string, ModEdge[]>;
   incoming: Map<string, ModEdge[]>;
 } {
@@ -998,7 +1147,7 @@ function buildEdgeIndex(graph: NodeGraph): {
 let cachedEdgeGraphRef: NodeGraph | null = null;
 let cachedEdgeIndex: ReturnType<typeof buildEdgeIndex> | null = null;
 
-function getEdgeIndex(graph: NodeGraph): ReturnType<typeof buildEdgeIndex> {
+export function getEdgeIndex(graph: NodeGraph): ReturnType<typeof buildEdgeIndex> {
   if (cachedEdgeGraphRef === graph && cachedEdgeIndex) return cachedEdgeIndex;
   cachedEdgeGraphRef = graph;
   cachedEdgeIndex = buildEdgeIndex(graph);
@@ -1048,129 +1197,10 @@ export function findTargetNode(
 // === 阶段 C 辅助函数 ===
 
 /**
- * P2-5：遍历所有可编译的 loop 节点，汇总各 body 子图的 condition/procedure 编译结果。
- */
-function compileLoopSubgraphSpecsAll(
-  nodes: ModNode[],
-  graph: NodeGraph,
-  warnings?: string[],
-): { conditions: ConditionSpec[]; procedures: ProcedureSpec[] } {
-  const result: { conditions: ConditionSpec[]; procedures: ProcedureSpec[] } = {
-    conditions: [],
-    procedures: [],
-  };
-  for (const node of nodes) {
-    if (node.data.kind !== 'loop') continue;
-    if (!node.data.bodySubgraphId) continue;
-    const sub = compileLoopSubgraphSpecs(graph, node.data.bodySubgraphId, warnings);
-    result.conditions.push(...sub.conditions);
-    result.procedures.push(...sub.procedures);
-  }
-  return result;
-}
-
-/**
- * 编译循环节点的循环体：从 bodySubgraphId 引用的子图中提取代码节点/动作节点的代码，
- * 拼接为循环体代码字符串。无 bodySubgraphId 或子图未找到时返回空注释。
- *
- * P2-5：condition 节点编译为 `if (check_<id>(ctx)) { ... }`（条件方法由
- * compileLoopSubgraphSpecs 收集进 spec.conditions，adapter 生成 check_ 方法）；
- * procedure 节点编译为 `procedure_<name>(ctx);` 调用（同样由子图收集进 spec.procedures）。
- */
-function compileLoopBody(graph: NodeGraph, bodySubgraphId?: string, warnings?: string[]): string {
-  if (!bodySubgraphId) return '// no body';
-  const sg = subgraphManager.get(bodySubgraphId) ?? graph.subgraphs[bodySubgraphId];
-  if (!sg) return '// body subgraph not found';
-  const lines: string[] = [];
-  for (const node of sg.nodes) {
-    // 跳过禁用节点，与主编译流程一致
-    if (node.data.disabled) continue;
-    if (node.data.kind === 'code') {
-      // 与主编译流程一致：codeLocked 节点使用用户手改的 lockedCode
-      lines.push(
-        node.data.codeLocked && node.data.lockedCode ? node.data.lockedCode : node.data.code,
-      );
-    } else if (node.data.kind === 'action') {
-      lines.push(`execute_${node.id}(ctx);`);
-    } else if (node.data.kind === 'condition') {
-      // P2-5：循环体中的条件节点编译为 if (check_<id>(ctx)) 块，内嵌其 control 下游逻辑
-      const downstream = sg.edges
-        .filter((e) => e.source === node.id && e.kind === 'control' && !e.disabled)
-        .map((e) => sg.nodes.find((n) => n.id === e.target))
-        .filter((n): n is ModNode => !!n && !n.data.disabled);
-      const innerLines: string[] = [];
-      for (const dn of downstream) {
-        if (dn.data.kind === 'code') {
-          innerLines.push(
-            dn.data.codeLocked && dn.data.lockedCode ? dn.data.lockedCode : dn.data.code,
-          );
-        } else if (dn.data.kind === 'action') {
-          innerLines.push(`execute_${dn.id}(ctx);`);
-        } else if (dn.data.kind === 'procedure') {
-          innerLines.push(`procedure_${dn.data.procedureName}(ctx);`);
-        }
-      }
-      const inner =
-        innerLines.length > 0
-          ? innerLines.map((l) => `            ${l}`).join('\n')
-          : '            // (无循环体逻辑)';
-      lines.push(`if (check_${node.id}(ctx)) {\n${inner}\n        }`);
-    } else if (node.data.kind === 'procedure') {
-      // P2-5：循环体中的过程调用编译为 procedure_<name>(ctx);
-      lines.push(`procedure_${node.data.procedureName}(ctx);`);
-    }
-  }
-  return lines.length > 0 ? lines.join('\n  ') : '// empty body';
-}
-
-/**
- * P2-5：收集循环节点 body 子图中的 condition / procedure 节点，编译为 spec 字段，
- * 供 adapter 生成 check_<id> 方法与 procedure_<name> 方法（循环体代码引用它们）。
- * procedure 的体内逻辑基于子图自身的 nodes/edges 做 BFS（复用 compileProcedureNode）。
- */
-function compileLoopSubgraphSpecs(
-  graph: NodeGraph,
-  bodySubgraphId: string,
-  warnings?: string[],
-): { conditions: ConditionSpec[]; procedures: ProcedureSpec[] } {
-  const result: { conditions: ConditionSpec[]; procedures: ProcedureSpec[] } = {
-    conditions: [],
-    procedures: [],
-  };
-  const sg = subgraphManager.get(bodySubgraphId) ?? graph.subgraphs[bodySubgraphId];
-  if (!sg) return result;
-  for (const node of sg.nodes) {
-    if (node.data.disabled) continue;
-    if (node.data.kind === 'condition') {
-      try {
-        result.conditions.push(compileConditionNode(node, warnings));
-      } catch {
-        warnings?.push(`循环体中的条件节点 ${node.id} 编译失败`);
-      }
-    } else if (node.data.kind === 'procedure') {
-      try {
-        const sgGraph: NodeGraph = {
-          modId: graph.modId,
-          version: 1,
-          viewport: { x: 0, y: 0, zoom: 1 },
-          nodes: sg.nodes,
-          edges: sg.edges,
-          subgraphs: {},
-        };
-        result.procedures.push(compileProcedureNode(sgGraph, node));
-      } catch {
-        warnings?.push(`循环体中的过程节点 ${node.id} 编译失败`);
-      }
-    }
-  }
-  return result;
-}
-
-/**
  * 收集所有引用的外部 mod 命名空间（排除 'minecraft' 和当前 modId）。
  * P2-3 dogfood 修复：扫描范围扩展至 entities/machines/multiblocks 的 id 字段。
  */
-function collectExternalNamespaces(
+export function collectExternalNamespaces(
   items: ItemSpec[],
   blocks: BlockSpec[],
   recipes: ModRecipeSpec[],
@@ -1226,7 +1256,7 @@ export function preloadExternalMods(mods: Array<{ namespace: string; installed: 
  * 检查外部 mod 是否已安装（同步，读缓存）。
  * 缓存为 null 时（未 preload）默认返回 true（不误报），避免阻塞编译。
  */
-function isExternalModInstalled(namespace: string): boolean {
+export function isExternalModInstalled(namespace: string): boolean {
   if (!installedExternalModsCache) return true; // 未 preload，不误报
   return installedExternalModsCache.has(namespace);
 }
@@ -1237,7 +1267,7 @@ function isExternalModInstalled(namespace: string): boolean {
  * 规则：转小写 → 非 [a-z0-9_] 字符替换为下划线 → 折叠连续下划线 → 去除首尾下划线。
  * 空字符串或净化后为空时返回空字符串（由调用方决定回退值）。
  */
-function sanitizeModId(modId: string): string {
+export function sanitizeModId(modId: string): string {
   return modId
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, '_')
@@ -1251,7 +1281,7 @@ function sanitizeModId(modId: string): string {
  * 保留首次出现的 snippet，后续重复项被丢弃并产生 warning。
  * 子图内联展开后可能引入重复 snippetId，去重避免生成重复的 Java 方法/字段声明。
  */
-function deduplicateCustomCode(
+export function deduplicateCustomCode(
   snippets: CustomCodeSnippetSpec[],
   warnings: string[],
 ): CustomCodeSnippetSpec[] {
@@ -1277,157 +1307,3 @@ function deduplicateCustomCode(
 //
 // 注册在模块加载时执行（顶层副作用）。编译函数保持私有，仅通过 registry 暴露。
 // 注意：comment 节点不注册（compileAll 静默跳过，保持「仅文档用途」语义）。
-
-registerCompiler({
-  kind: 'item',
-  compile: (node) => ({ items: [compileItemNode(node)] }),
-});
-
-registerCompiler({
-  kind: 'block',
-  compile: (node) => ({ blocks: [compileBlockNode(node)] }),
-});
-
-registerCompiler({
-  kind: 'recipe',
-  // 配方编译需要查连线（输入/输出物品），通过 ctx.graph 访问内联展开后的图
-  // P2 dogfood 优化：传入 ctx.nodeMap 加速节点查找
-  compile: (node, ctx) => ({ recipes: [compileRecipeNode(ctx.graph, node, ctx.nodeMap)] }),
-});
-
-registerCompiler({
-  kind: 'entity',
-  compile: (node) => ({ entities: [compileEntityNode(node)] }),
-});
-
-registerCompiler({
-  kind: 'machine',
-  compile: (node) => ({ machines: [compileMachineNode(node)] }),
-});
-
-registerCompiler({
-  kind: 'biome',
-  compile: (node) => ({ biomes: [compileBiomeNode(node)] }),
-});
-
-registerCompiler({
-  kind: 'dimension',
-  compile: (node) => ({ dimensions: [compileDimensionNode(node)] }),
-});
-
-registerCompiler({
-  kind: 'fluid',
-  compile: (node) => ({ fluids: [compileFluidNode(node)] }),
-});
-
-registerCompiler({
-  kind: 'gui',
-  compile: (node) => ({ guis: [compileGuiNode(node)] }),
-});
-
-registerCompiler({
-  kind: 'code',
-  // CodeNode 代码原样收集到 customCode（保留端口签名，由 mod-generator 决定嵌入位置）
-  // P2-4 dogfood：解析端口签名 JSON 失败时通过 warnings 报告
-  compile: (node) => {
-    const warnings: string[] = [];
-    const spec = compileCodeNode(node, warnings);
-    const output: CompilerOutput = { customCode: [spec] };
-    if (warnings.length > 0) output.warnings = warnings;
-    return output;
-  },
-});
-
-registerCompiler({
-  kind: 'variable',
-  // variable → Java 字段声明，push 到 customCode
-  compile: (node) => {
-    if (node.data.kind !== 'variable') return {};
-    const { snippet } = compileVariable(node.data);
-    return { customCode: [snippet] };
-  },
-});
-
-registerCompiler({
-  kind: 'loop',
-  // loop → Java 循环代码，bodyCode 从 bodySubgraphId 子图编译（通过 ctx.compileLoopBody 递归）
-  compile: (node, ctx) => {
-    if (node.data.kind !== 'loop') return {};
-    const bodyCode = ctx.compileLoopBody(node.data.bodySubgraphId);
-    const { snippet } = compileLoop(node.data, bodyCode);
-    return { customCode: [snippet] };
-  },
-});
-
-registerCompiler({
-  kind: 'multiblock',
-  compile: (node) => ({ multiblocks: [compileMultiblockNode(node)] }),
-});
-
-registerCompiler({
-  kind: 'event',
-  // 事件编译需要沿 control 边 BFS 收集可达 condition/action，通过 ctx.graph 访问
-  // P2-4 dogfood：解析 eventArgs JSON 失败时通过 warnings 报告
-  // P2 dogfood 优化：传入 ctx.nodeMap 加速 BFS 中的节点查找
-  compile: (node, ctx) => {
-    const warnings: string[] = [];
-    const spec = compileEventNode(ctx.graph, node, warnings, ctx.nodeMap);
-    const output: CompilerOutput = { eventHandlers: [spec] };
-    if (warnings.length > 0) output.warnings = warnings;
-    return output;
-  },
-});
-
-registerCompiler({
-  kind: 'condition',
-  // P2-4 dogfood：解析 conditionArgs JSON 失败时通过 warnings 报告
-  compile: (node) => {
-    const warnings: string[] = [];
-    const spec = compileConditionNode(node, warnings);
-    const output: CompilerOutput = { conditions: [spec] };
-    if (warnings.length > 0) output.warnings = warnings;
-    return output;
-  },
-});
-
-registerCompiler({
-  kind: 'action',
-  // P2-4 dogfood：解析 actionArgs JSON 失败时通过 warnings 报告
-  compile: (node) => {
-    const warnings: string[] = [];
-    const spec = compileActionNode(node, warnings);
-    const output: CompilerOutput = { actions: [spec] };
-    if (warnings.length > 0) output.warnings = warnings;
-    return output;
-  },
-});
-
-registerCompiler({
-  kind: 'procedure',
-  // P1-3：过程编译需要沿 control 边 BFS 收集过程体，通过 ctx.graph 访问
-  // P2 dogfood 优化：传入 ctx.nodeMap 加速 BFS 中的节点查找
-  compile: (node, ctx) => ({ procedures: [compileProcedureNode(ctx.graph, node, ctx.nodeMap)] }),
-});
-
-registerCompiler({
-  kind: 'subgraph',
-  // 自定义节点（customTypeId 非空）用 compileCustomNode 渲染 codeTemplate。
-  // customTypeId 为 null 的 subgraph 节点已在 inlineSubgraphNodes 阶段内联展开，
-  // 此处兜底：customTypeId 为 null 时返回空产出（不报错，保持原「静默跳过」语义）。
-  // compileCustomNode 失败时返回 { error }（不抛异常），转成 output.errors 保留原始消息。
-  compile: (node) => {
-    if (node.data.kind !== 'subgraph') return {};
-    if (!node.data.customTypeId) return {};
-    const result = compileCustomNode(node.data, node.data.customFields);
-    if (result.error) {
-      return { errors: [`自定义节点 ${node.id} 编译失败：${result.error}`] };
-    }
-    if (result.snippet) {
-      return { customCode: [result.snippet] };
-    }
-    return {};
-  },
-});
-
-// comment 节点不注册 compiler：compileAll 遇到未注册 kind 静默跳过，
-// 保持「仅文档用途，不产生 spec/warning/error」语义。

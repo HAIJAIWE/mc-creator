@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { sandboxedMustacheApi } from './sandboxedMustache.js';
 import {
   IPC,
   EXPORT_ZIP,
@@ -19,6 +20,9 @@ import {
   IMPORT_PROJECT,
   LOAD_MODEL_CONFIG,
   SAVE_MODEL_CONFIG,
+  MODEL_LIST_PROFILES,
+  MODEL_SAVE_PROFILES,
+  MODEL_TEST_CONNECTION,
   CHAT,
   CHAT_STREAM,
   CHAT_STREAM_CHUNK,
@@ -73,6 +77,7 @@ import {
 } from '../shared/ipc-channels.js';
 
 const api = {
+  sandboxedMustache: sandboxedMustacheApi,
   generateSpec: (description: string, generatorType: GeneratorType) =>
     ipcRenderer.invoke(IPC.GENERATE_SPEC, { description, generatorType }),
   generateFiles: (req: {
@@ -84,6 +89,9 @@ const api = {
   build: (projectPath: string) => ipcRenderer.invoke(IPC.BUILD, { projectPath }),
   loadModelConfig: () => ipcRenderer.invoke(LOAD_MODEL_CONFIG),
   saveModelConfig: (config: unknown) => ipcRenderer.invoke(SAVE_MODEL_CONFIG, config),
+  listModelProfiles: <T = unknown>() => ipcRenderer.invoke(MODEL_LIST_PROFILES) as Promise<T>,
+  saveModelProfiles: (req: unknown) => ipcRenderer.invoke(MODEL_SAVE_PROFILES, req),
+  testModelConnection: (req: unknown) => ipcRenderer.invoke(MODEL_TEST_CONNECTION, req),
   chat: (message: string) => ipcRenderer.invoke(CHAT, { message }),
   /**
    * P12 chat 模式工具调用增强：chatStream 添加可选 context 参数。

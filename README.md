@@ -13,7 +13,7 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 
 | 类型             | 说明                                                                   | 产物                                                                                                                           |
 | ---------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Mod**          | Fabric / NeoForge 模组源码                                             | 完整 Gradle 项目 + `.jar` + `_meta.json` 元数据                                                                                |
+| **Mod**          | Fabric / NeoForge / Quilt / Legacy Fabric 模组源码                     | 完整 Gradle 项目 + `.jar` + `_meta.json` 元数据                                                                                |
 | **数据包**       | 原版数据包（配方 / 标签 / 函数 / 进度 / 战利品 / 谓词）                | `pack.mcmeta` + `data/<ns>/`                                                                                                   |
 | **整合包**       | Modrinth / CurseForge 格式                                             | `modrinth.index.json` 或 `manifest.json` + overrides + server-overrides                                                        |
 | **服务器配置**   | 服务端配置包 + 一键部署脚本                                            | `server.properties` / `eula.txt` / 启动脚本 / `ops.json` / `whitelist.json` / `mods/` + `deploy/`（systemd / Docker / backup） |
@@ -25,7 +25,7 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 | **行为包**       | 基岩版 Behavior Pack（实体 / 配方 / 战利品表）                         | `manifest.json` + `entities/` + `recipes/` + `loot_tables/`                                                                    |
 | **附魔**         | 1.21+ 数据驱动附魔（武器 / 工具 / 盔甲等 12 个预置模板）               | `data/<ns>/enchantment/<id>.json` + `tags/` + `lang/`                                                                          |
 | **行为物品**     | 基岩版自定义物品（物品定义 + 自动纹理）                                | `items/<id>.json`（minecraft:item）+ 纹理资源 + `lang/`                                                                        |
-| **行为实体**     | 基岩版自定义实体（怪物 AI 目标 / 内置几何 / 自动纹理 / 生成蛋）        | BP `entities/<id>.behavior.json` + RP `client_entity/` + `spawn_egg` + 纹理                                                     |
+| **行为实体**     | 基岩版自定义实体（怪物 AI 目标 / 内置几何 / 自动纹理 / 生成蛋）        | BP `entities/<id>.behavior.json` + RP `client_entity/` + `spawn_egg` + 纹理                                                    |
 
 ### 低代码节点编辑器
 
@@ -47,6 +47,11 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 - **外部 Mod API**：引用外部 mod 命名空间 → 编译时依赖检测 → 运行时缺失警告
 - **新手引导**：5 步交互式引导流程 + 模板搜索/分类筛选
 - **调试面板**：节点状态高亮 / 错误恢复 / 字段级校验提示
+- **过程节点**：命名可复用逻辑单元，编译为独立 Java 方法，支持嵌套调用
+- **PureCode 模式**：代码节点一键提升为独立源文件，支持 L3 级定制
+- **codeLock 代码锁定**：节点级代码锁定，用户手改代码优先编译
+- **IndexedDB 编译缓存**：图内容哈希为键，浏览器/Node 同构，24h TTL + 50 条上限
+- **结构化错误码体系**：`CompileErrorCode` 常量 + `CompileError` 接口 + 工厂函数，替代字符串匹配，支持国际化与建议修复
 
 ### 核心能力
 
@@ -102,6 +107,21 @@ mc-creator/
 │       │   │       │   └── middle/   # 各生成器类型预览面板（13 种类型全齐）
 │       │   │       ├── store/        # Zustand stores（mod-store / node-graph-store / drawer-store / debugger-store）
 │       │   │       └── lib/          # compileNodeGraph + 4 编译器 + ipc-client + monaco-theme
+│       │   │           ├── compileNodeGraph.ts      # 编译入口 / 流水线编排
+│       │   │           ├── loopCompiler.ts          # 循环体编译 / 子图 condition/procedure 收集
+│       │   │           ├── compilerRegistry.ts      # 17 个内置编译器注册
+│       │   │           ├── compileCache.ts          # IndexedDB / 内存缓存（统一接口）
+│       │   │           ├── incrementalCompiler.ts   # 增量编译入口（async + 缓存）
+│       │   │           ├── compileErrors.ts         # 结构化错误码体系
+│       │   │           ├── compileVariable.ts       # 变量节点编译
+│       │   │           ├── compileCustomNode.ts     # 自定义节点编译
+│       │   │           ├── compileLoop.ts           # 循环节点编译
+│       │   │           ├── compileSubgraph.ts       # 子图内联展开
+│       │   │           ├── nodeCompilerRegistry.ts  # 编译器注册表
+│       │   │           ├── applyGraphToProject.ts   # 图→Spec→文件 桥接
+│       │   │           ├── connectionRules.ts       # 连线校验（带错误码）
+│       │   │           ├── portValidation.ts        # 动态端口校验（带错误码）
+│       │   │           └── demoteFromPurecode.ts    # PureCode 降级
 │       │   └── shared/           # IPC 通道常量 + zod schema（main/preload/renderer 共享）
 │       └── electron.vite.config.ts
 ├── packages/
@@ -397,7 +417,7 @@ runGradleBuild
 | --------------------- | -------- | --------------- |
 | `@mc-creator/shared`  | 9        | 82              |
 | `@mc-creator/core`    | 36       | 581（+17 跳过） |
-| `@mc-creator/desktop` | 122      | 1452            |
+| `@mc-creator/desktop` | 125      | 1452            |
 
 低代码模块测试覆盖：432 个测试（55 个文件），覆盖全部 15 种节点组件、4 个编译器、子图系统、自定义节点系统、过程节点 / PureCode 模式。
 
@@ -451,8 +471,13 @@ runGradleBuild
 - ✅ P40：低代码增强（ProcedureNode 过程封装 + PureCode 模式切换 + codeLock 代码锁定 + 条件代码生成）
 - ✅ P41：核心增强（BuildCache 构建缓存 + recipe-adapter 配方适配 + 增量生成测试 + 数据包模板库扩展）
 - ✅ P42：文档同步（README 与实际代码状态对齐，10 种生成器 / 15 种节点 / 实测测试数）
-
 - ✅ P43：多版本扩展（MC 版本 4→8：新增 1.20.1 / 1.20.4 / 1.20.6 / 1.21.5 / 26.1 / 26.2；资源包 pack_format 自动映射 + 警告；Mod 构建脚本按版本分支适配 Fabric Loom 混淆/非混淆 + NeoForge MDG 1.0/2.0 DSL；各版本 Gradle wrapper 版本映射；8 版本 × 4 Loader 生成矩阵测试）
+- ✅ P44：编译器架构重构（`loopCompiler.ts` 循环编译分离 + `compilerRegistry.ts` 17 编译器注册表分离，主文件 -973 行）
+- ✅ P45：IndexedDB 编译缓存持久化（`compileCache.ts` 浏览器/Node 同构，`incrementalCompiler.ts` 异步入口自动读写，24h TTL + 50 条上限）
+- ✅ P46：结构化错误码体系（`compileErrors.ts` `CompileErrorCode` 常量 + `CompileError` 接口 + 工厂函数 `CompileErrors.*`，验证层全接入）
+- ✅ P47：验证层错误码接入（`connectionRules.ts` `validateConnection` + `portValidation.ts` 全分支带错误码，`ValidationError` 新增 `code` 字段）
+- ✅ P48：现代化代码重写（`fabric-assets.ts` / `recipe-json-generator.ts` / `texture-generator.ts` 从 `var`/C循环 → `const`/`let`/`for..of` + `.map`/`.filter`）
+- ✅ P49：electron-vite 配置类型修复（双 `@types/node` 版本冲突抑制，renderer plugins 加 `@ts-expect-error`）
 
 ### 未来可能
 

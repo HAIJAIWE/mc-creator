@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from 'react';
-import { GitBranch, Gamepad2 } from 'lucide-react';
 import { McMark } from './McMark.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
 
@@ -26,17 +25,26 @@ interface ActivityBarProps {
 export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
   const [hovered, setHovered] = useState<string | null>(null);
 
+  // 全部使用 MC 彩色像素图标（与 Dashboard 首页 gen-* 同款 16x16 调色板），非单色线条
   const activities: { id: Activity; icon: ReactNode; label: string }[] = [
-    { id: 'explorer', icon: <McIcon scope="pixel" name="folder" size={20} />, label: '资源管理器' },
-    { id: 'search', icon: <McIcon scope="pixel" name="search" size={20} />, label: '搜索' },
-    { id: 'git', icon: <GitBranch className="h-5 w-5" />, label: '源代码管理' },
-    { id: 'packages', icon: <McIcon scope="pixel" name="package" size={20} />, label: '包管理' },
-    { id: 'items', icon: <McIcon scope="pixel" name="box" size={20} />, label: '物品/配方' },
-    { id: 'blocks', icon: <McIcon scope="game" name="block-house" size={20} />, label: '方块编辑' },
-    { id: 'entity', icon: <McIcon scope="pixel" name="box" size={20} />, label: '实体 AI' },
-    { id: 'audio', icon: <McIcon scope="pixel" name="image" size={20} />, label: '音效事件' },
-    { id: 'cicd', icon: <McIcon scope="pixel" name="terminal" size={20} />, label: 'CI/CD' },
-    { id: 'game', icon: <Gamepad2 className="h-5 w-5" />, label: '游戏启动器' },
+    {
+      id: 'explorer',
+      icon: <McIcon scope="pixel" name="atb-folder" size={20} />,
+      label: '资源管理器',
+    },
+    { id: 'search', icon: <McIcon scope="pixel" name="atb-search" size={20} />, label: '搜索' },
+    { id: 'git', icon: <McIcon scope="pixel" name="atb-git" size={20} />, label: '源代码管理' },
+    { id: 'packages', icon: <McIcon scope="pixel" name="atb-chest" size={20} />, label: '包管理' },
+    { id: 'items', icon: <McIcon scope="pixel" name="atb-ingot" size={20} />, label: '物品/配方' },
+    { id: 'blocks', icon: <McIcon scope="pixel" name="atb-grass" size={20} />, label: '方块编辑' },
+    { id: 'entity', icon: <McIcon scope="pixel" name="atb-creeper" size={20} />, label: '实体 AI' },
+    { id: 'audio', icon: <McIcon scope="pixel" name="atb-note" size={20} />, label: '音效事件' },
+    { id: 'cicd', icon: <McIcon scope="pixel" name="atb-cmd" size={20} />, label: 'CI/CD' },
+    {
+      id: 'game',
+      icon: <McIcon scope="pixel" name="atb-gamepad" size={20} />,
+      label: '游戏启动器',
+    },
   ];
 
   /**
@@ -71,7 +79,7 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
 
   return (
     <div
-      className="flex w-12 flex-col items-center gap-1 bg-mc-bg py-2"
+      className="flex w-12 flex-col items-center gap-1 border-r border-mc-border bg-mc-bg py-2"
       role="toolbar"
       aria-label="活动栏"
       aria-orientation="vertical"
@@ -89,11 +97,7 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
             aria-label={label}
             aria-pressed={active === id}
             tabIndex={active === id ? 0 : -1}
-            className={`relative flex h-10 w-10 items-center justify-center rounded-mc transition-colors ${
-              active === id
-                ? 'bg-mc-surface-2 text-mc-text'
-                : 'text-mc-dim hover:bg-mc-surface hover:text-mc-text'
-            }`}
+            className={`mc-atb-btn ${active === id ? 'mc-atb-btn-active' : 'mc-atb-btn-idle'}`}
             title={label}
           >
             {Icon}
@@ -122,14 +126,12 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
           aria-label="设置"
           aria-pressed={active === 'settings'}
           tabIndex={active === 'settings' ? 0 : -1}
-          className={`relative flex h-10 w-10 items-center justify-center rounded-mc transition-colors ${
-            active === 'settings'
-              ? 'bg-mc-surface-2 text-mc-text'
-              : 'text-mc-dim hover:bg-mc-surface hover:text-mc-text'
+          className={`mc-atb-btn ${
+            active === 'settings' ? 'mc-atb-btn-active' : 'mc-atb-btn-idle'
           }`}
           title="设置"
         >
-          <McIcon scope="pixel" name="settings-cog" size={20} />
+          <McIcon scope="pixel" name="atb-cog" size={20} />
           {active === 'settings' && <span className="mc-active-bar" aria-hidden="true" />}
           {hovered === 'settings' && (
             <div
@@ -145,7 +147,7 @@ export function ActivityBar({ active, onChange, onHome }: ActivityBarProps) {
           type="button"
           onClick={() => onHome?.()}
           aria-label="返回项目仪表盘"
-          className="mt-1 flex h-10 w-10 items-center justify-center rounded-mc transition-colors hover:bg-mc-surface"
+          className="mc-atb-btn mc-atb-btn-idle mt-1"
           title="返回项目仪表盘"
         >
           <McMark className="h-6 w-6 text-mc-accent" />

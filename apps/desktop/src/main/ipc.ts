@@ -8,6 +8,7 @@ import JSZip from 'jszip';
 import { z } from 'zod';
 import { IPty, spawn as ptySpawn } from 'node-pty';
 import { LauncherService } from './launcher-service.js';
+import IsolatedVM, { Isolate, ExternalCopy } from 'isolated-vm';
 import {
   Orchestrator,
   runGradleBuild,
@@ -29,7 +30,15 @@ import * as nodeFs from 'fs';
 import type { ModSpec, McVersion } from '@mc-creator/shared';
 import { javaVersionFor } from '@mc-creator/shared';
 import { assertWithin, parseGitStatus } from './ipc-utils.js';
-import { loadModelConfig, saveModelConfig, type ModelConfigFull } from './model-config.js';
+import {
+  loadModelConfig,
+  saveModelConfig,
+  loadModelProfiles,
+  saveModelProfiles,
+  testModelConnection,
+  type ModelConfigFull,
+  type ModelProfile,
+} from './model-config.js';
 import { loadCurseForgeConfig, saveCurseForgeConfig } from './curseforge-config.js';
 import { loadProjects, saveProject, deleteProject, getProject } from './project-store.js';
 import { buildChatSystemMessage } from './chat-system-message.js';
@@ -72,6 +81,10 @@ import {
   BuildRequest,
   SaveModelConfigRequest,
   ModelConfigResponse,
+  ModelProfileListResponse,
+  ModelSaveProfilesRequest,
+  ModelTestConnectionRequest,
+  ModelTestConnectionResponse,
   ChatRequest,
   ChatStreamRequest,
   ExportZipRequest,
@@ -82,6 +95,9 @@ import {
   ProjectSchema,
   LOAD_MODEL_CONFIG,
   SAVE_MODEL_CONFIG,
+  MODEL_LIST_PROFILES,
+  MODEL_SAVE_PROFILES,
+  MODEL_TEST_CONNECTION,
   CHAT,
   CHAT_STREAM,
   CHAT_STREAM_CHUNK,
@@ -176,6 +192,9 @@ import {
   NodeGraphSaveRequest,
   NodeGraphLoadRequest,
   NodeGraphShowSaveDialogRequest,
+  SANDBOXED_MUSTACHE_RENDER,
+  SandboxedMustacheRenderRequest,
+  SandboxedMustacheRenderResponse,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -195,7 +214,7 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const orchestrator = getOrchestrator();
     // P16：按 generatorType 调用对应 prompt + schema 校验
     const spec = await orchestrator.generateSpecByType(req.description, req.generatorType);
-    return { spec: spec as Record<string, unknown>, raw: JSON.stringify(spec, null, 2) };
+    return { ok: true, spec: spec as Record<string, unknown>, raw: JSON.stringify(spec, null, 2) };
   });
 
   ipcMain.handle(IPC.GENERATE_FILES, async (_e, raw: unknown): Promise<GenerateFilesRes> => {
@@ -275,6 +294,24 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
     const req = SaveModelConfigRequest.parse(raw);
     saveModelConfig(req as ModelConfigFull);
     return { ok: true };
+  });
+
+  // 多套模型配置：列表 / 保存 / 连通性测试
+  ipcMain.handle(MODEL_LIST_PROFILES, async () => {
+    const { profiles, activeId } = loadModelProfiles();
+    return ModelProfileListResponse.parse({ profiles, activeId });
+  });
+
+  ipcMain.handle(MODEL_SAVE_PROFILES, async (_e, raw: unknown) => {
+    const req = ModelSaveProfilesRequest.parse(raw);
+    saveModelProfiles(req.profiles as ModelProfile[], req.activeId);
+    return { ok: true };
+  });
+
+  ipcMain.handle(MODEL_TEST_CONNECTION, async (_e, raw: unknown) => {
+    const req = ModelTestConnectionRequest.parse(raw);
+    const result = await testModelConnection(req.baseURL, req.modelId, req.apiKey);
+    return ModelTestConnectionResponse.parse(result);
   });
 
   // AI 聊天
@@ -1364,6 +1401,209 @@ ${req.buildLog}
     },
   );
 }
+// === 沙箱化 Mustache 渲染（P0 安全：防止自定义节点模板注入）===
+ipcMain.handle(
+  SANDBOXED_MUSTACHE_RENDER,
+  async (_e, raw: unknown): Promise<SandboxedMustacheRenderResponse> => {
+    const req = SandboxedMustacheRenderRequest.parse(raw);
+    const { template, fields } = req;
+
+    // 基础校验
+    if (typeof template !== 'string' || template.length > 50000) {
+      return { ok: false, error: '模板长度超限（最大 50KB）' };
+    }
+    if (typeof fields !== 'object' || fields === null) {
+      return { ok: false, error: 'fields 必须为对象' };
+    }
+    if (Object.keys(fields).length > 100) {
+      return { ok: false, error: 'fields 字段数超限（最大 100 个）' };
+    }
+
+    try {
+      // 创建隔离沙箱
+      const isolate = new Isolate({ memoryLimit: 64 }); // 64MB 内存限制
+      const context = await isolate.createContext({});
+      const jail = context.global;
+
+      // 注入安全的全局对象
+      await jail.set('template', new ExternalCopy(template).copyInto({}));
+      await jail.set('fields', new ExternalCopy(fields).copyInto({}));
+
+      // 注入安全的工具函数（只暴露渲染所需的最小功能）
+      await jail.set('escapeJavaStringLiteral', (s: string) => {
+        if (typeof s !== 'string') return String(s);
+        return s
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"')
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t');
+      });
+
+      // 在沙箱中运行渲染逻辑
+      const script = await isolate.compileScript(`
+(function() {
+  const TOKEN_PATTERN = /\\{\\{[^{}]+\\}\\}/g;
+
+  function tokenize(template) {
+    const tokens = [];
+    let lastIndex = 0;
+    const re = new RegExp(TOKEN_PATTERN);
+    let match;
+    while ((match = re.exec(template)) !== null) {
+      if (match.index > lastIndex) {
+        tokens.push({ type: 'text', value: template.slice(lastIndex, match.index) });
+      }
+      const raw = match[0];
+      const tag = raw.slice(2, -2).trim();
+      if (tag.startsWith('#if ')) {
+        tokens.push({ type: 'if', key: tag.slice(4).trim(), raw });
+      } else if (tag.startsWith('#each ')) {
+        tokens.push({ type: 'each', key: tag.slice(6).trim(), raw });
+      } else if (tag === 'else') {
+        tokens.push({ type: 'else', raw });
+      } else if (tag === '/if') {
+        tokens.push({ type: 'endif', raw });
+      } else if (tag === '/each') {
+        tokens.push({ type: 'endeach', raw });
+      } else if (tag === 'this') {
+        tokens.push({ type: 'this', raw });
+      } else if (tag.startsWith('this.')) {
+        tokens.push({ type: 'thisField', key: tag.slice(5).trim(), raw });
+      } else if (tag.startsWith('field:')) {
+        tokens.push({ type: 'field', key: tag.slice(6).trim(), raw });
+      } else {
+        tokens.push({ type: 'unknown', raw });
+      }
+      lastIndex = re.lastIndex;
+    }
+    if (lastIndex < template.length) {
+      tokens.push({ type: 'text', value: template.slice(lastIndex) });
+    }
+    return tokens;
+  }
+
+  function isTruthy(v) {
+    if (v === null || v === undefined) return false;
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'number') return v !== 0;
+    if (typeof v === 'string') return v.length > 0;
+    if (Array.isArray(v)) return v.length > 0;
+    if (typeof v === 'object') return Object.keys(v).length > 0;
+    return Boolean(v);
+  }
+
+  function renderValue(v) {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'object') {
+      try { return JSON.stringify(v); } catch { return String(v); }
+    }
+    return String(v);
+  }
+
+  function findBlockEnd(tokens, startIdx, blockType) {
+    const closeType = blockType === 'if' ? 'endif' : 'endeach';
+    let depth = 1;
+    let elseIdx = -1;
+    for (let j = startIdx + 1; j < tokens.length; j++) {
+      const t = tokens[j];
+      if (t.type === blockType) depth++;
+      else if (t.type === closeType) {
+        depth--;
+        if (depth === 0) return { closeIndex: j, elseIndex: elseIdx };
+      } else if (t.type === 'else' && blockType === 'if' && depth === 1 && elseIdx === -1) {
+        elseIdx = j;
+      }
+    }
+    return { closeIndex: -1, elseIndex: -1 };
+  }
+
+  function renderTokens(tokens, fields, currentThis) {
+    let result = '';
+    let i = 0;
+    while (i < tokens.length) {
+      const tok = tokens[i];
+      switch (tok.type) {
+        case 'text':
+          result += tok.value;
+          i++;
+          break;
+        case 'field':
+          if (!(tok.key in fields)) {
+            result += tok.raw;
+          } else {
+            result += escapeJavaStringLiteral(renderValue(fields[tok.key]));
+          }
+          i++;
+          break;
+        case 'this':
+          result += escapeJavaStringLiteral(renderValue(currentThis));
+          i++;
+          break;
+        case 'thisField':
+          const obj = currentThis !== null && typeof currentThis === 'object' ? currentThis : null;
+          if (obj && tok.key in obj) {
+            result += escapeJavaStringLiteral(renderValue(obj[tok.key]));
+          } else {
+            result += tok.raw;
+          }
+          i++;
+          break;
+        case 'if':
+        case 'each': {
+          const { closeIndex, elseIndex } = findBlockEnd(tokens, i, tok.type);
+          if (closeIndex === -1) {
+            result += tok.raw;
+            i++;
+            break;
+          }
+          const bodyTokens = elseIndex === -1 ? tokens.slice(i + 1, closeIndex) : tokens.slice(i + 1, elseIndex);
+          const elseTokens = elseIndex === -1 ? [] : tokens.slice(elseIndex + 1, closeIndex);
+
+          if (tok.type === 'if') {
+            const thisObj = currentThis !== null && typeof currentThis === 'object' ? currentThis : null;
+            let condVal;
+            if (thisObj && tok.key in thisObj) condVal = thisObj[tok.key];
+            else if (tok.key in fields) condVal = fields[tok.key];
+            else condVal = undefined;
+            if (isTruthy(condVal)) result += renderTokens(bodyTokens, fields, currentThis);
+            else result += renderTokens(elseTokens, fields, currentThis);
+          } else {
+            const thisObj = currentThis !== null && typeof currentThis === 'object' ? currentThis : null;
+            const arr = thisObj && tok.key in thisObj ? thisObj[tok.key] : tok.key in fields ? fields[tok.key] : undefined;
+            let items = [];
+            if (Array.isArray(arr)) items = arr;
+            else if (arr !== null && arr !== undefined) items = [arr];
+            for (const item of items) result += renderTokens(bodyTokens, fields, item);
+          }
+          i = closeIndex + 1;
+          break;
+        }
+        case 'else':
+        case 'endif':
+        case 'endeach':
+        case 'unknown':
+          result += tok.raw;
+          i++;
+          break;
+      }
+    }
+    return result;
+  }
+
+  const tokens = tokenize(template);
+  return renderTokens(tokens, fields, undefined);
+})()
+`);
+
+      const result = await script.run(context, { timeout: 1000 }); // 1秒超时
+      return { ok: true, result: result as string };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: '沙箱渲染失败：' + msg };
+    }
+  },
+);
 
 /** 默认编排器工厂（优先用配置的真实模型，否则 fallback Mock） */
 export function createDefaultOrchestrator(): Orchestrator {

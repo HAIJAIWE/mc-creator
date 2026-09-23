@@ -26,6 +26,7 @@ import {
   fabricLangJson,
   fabricItemModels,
   fabricEntityModels,
+  fabricModRecipeJson,
 } from './fabric-assets.js';
 import {
   fabricModJson,
@@ -233,6 +234,11 @@ export class FabricAdapter implements LoaderAdapter {
       name: 'recipes',
       hashInputs: (s) => s.recipes ?? [],
       generate: (s, pkg) => (s.recipes?.length ? [fabricModRecipesJava(s, pkg)] : []),
+    },
+    {
+      name: 'recipeJson',
+      hashInputs: (s) => s.recipes ?? [],
+      generate: (s, pkg) => (s.recipes?.length ? fabricModRecipeJson(s, pkg) : []),
     },
     {
       name: 'entities',

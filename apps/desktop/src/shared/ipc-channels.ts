@@ -142,8 +142,10 @@ export const GenerateSpecRequest = z.object({
   generatorType: z.enum(GENERATOR_TYPES).default('mod'),
 });
 export const GenerateSpecResponse = z.object({
-  spec: z.record(z.unknown()),
-  raw: z.string(),
+  ok: z.boolean(),
+  spec: z.record(z.unknown()).optional(),
+  raw: z.string().optional(),
+  error: z.string().optional(),
 });
 
 export const GenerateFilesRequest = z.object({
@@ -207,6 +209,46 @@ export type BuildRes = z.infer<typeof BuildResponse>;
 // === 模型配置 ===
 export const LOAD_MODEL_CONFIG = 'model:loadConfig';
 export const SAVE_MODEL_CONFIG = 'model:saveConfig';
+
+// 多套模型配置（profiles）管理 + 连通性测试
+export const MODEL_LIST_PROFILES = 'model:listProfiles';
+export const MODEL_SAVE_PROFILES = 'model:saveProfiles';
+export const MODEL_TEST_CONNECTION = 'model:testConnection';
+
+/** 一套模型配置（id 唯一；apiKey 在主进程加密存储/解密返回） */
+export const ModelProfileSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  modelId: z.string().min(1),
+  baseURL: z.string().min(1),
+  apiKey: z.string(),
+});
+export type ModelProfile = z.infer<typeof ModelProfileSchema>;
+
+export const ModelProfileListResponse = z.object({
+  profiles: z.array(ModelProfileSchema).default([]),
+  activeId: z.string().nullable().default(null),
+});
+export type ModelProfileListRes = z.infer<typeof ModelProfileListResponse>;
+
+export const ModelSaveProfilesRequest = z.object({
+  profiles: z.array(ModelProfileSchema),
+  activeId: z.string(),
+});
+export type ModelSaveProfilesReq = z.infer<typeof ModelSaveProfilesRequest>;
+
+export const ModelTestConnectionRequest = z.object({
+  baseURL: z.string().min(1),
+  modelId: z.string().min(1),
+  apiKey: z.string(),
+});
+export type ModelTestConnectionReq = z.infer<typeof ModelTestConnectionRequest>;
+
+export const ModelTestConnectionResponse = z.object({
+  ok: z.boolean(),
+  message: z.string(),
+});
+export type ModelTestConnectionRes = z.infer<typeof ModelTestConnectionResponse>;
 
 export const SaveModelConfigRequest = z.object({
   name: z.string(),
@@ -828,3 +870,20 @@ export type NodeGraphLoadRes = z.infer<typeof NodeGraphLoadResponse>;
 export type NodeGraphShowSaveDialogReq = z.infer<typeof NodeGraphShowSaveDialogRequest>;
 export type NodeGraphShowSaveDialogRes = z.infer<typeof NodeGraphShowSaveDialogResponse>;
 export type NodeGraphShowOpenDialogRes = z.infer<typeof NodeGraphShowOpenDialogResponse>;
+
+// === 沙箱化 Mustache 渲染（P0 安全：防止自定义节点模板注入）===
+export const SANDBOXED_MUSTACHE_RENDER = 'sandboxed:mustacheRender';
+
+export const SandboxedMustacheRenderRequest = z.object({
+  template: z.string().max(50000),
+  fields: z.record(z.unknown()).refine((val) => Object.keys(val).length <= 100, {
+    message: 'fields 字段数超限（最大 100 个）',
+  }),
+});
+export const SandboxedMustacheRenderResponse = z.object({
+  ok: z.boolean(),
+  result: z.string().optional(),
+  error: z.string().optional(),
+});
+export type SandboxedMustacheRenderRequest = z.infer<typeof SandboxedMustacheRenderRequest>;
+export type SandboxedMustacheRenderResponse = z.infer<typeof SandboxedMustacheRenderResponse>;

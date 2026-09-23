@@ -53,11 +53,7 @@ export function IconTabBar<K extends string>({
             aria-selected={selected}
             tabIndex={selected ? 0 : -1}
             onClick={() => onSelect(t.key)}
-            className={`flex items-center gap-1 rounded-mc px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              selected
-                ? 'bg-mc-surface-2 text-mc-text border-b-2 border-mc-accent'
-                : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
-            }`}
+            className={`mc-tab px-2.5 py-1 ${selected ? 'mc-tab-selected' : 'mc-tab-idle'}`}
           >
             {Icon && <Icon className="h-3 w-3" />}
             {t.label}

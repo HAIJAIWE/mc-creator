@@ -1,6 +1,6 @@
 import { resolve } from 'path';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
-import react from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react-swc';
 
 const workspacePkgs = ['@mc-creator/core', '@mc-creator/shared'];
 
@@ -13,7 +13,9 @@ export default defineConfig({
         '@mc-creator/shared': resolve(__dirname, '../../packages/shared/src'),
       },
     },
-    build: { rollupOptions: { input: { index: resolve(__dirname, 'src/main/index.ts') } } },
+    build: {
+      rollupOptions: { input: { index: resolve(__dirname, 'src/main/index.ts') } },
+    },
   },
   preload: {
     plugins: [externalizeDepsPlugin({ exclude: workspacePkgs })],
@@ -47,6 +49,7 @@ export default defineConfig({
         '@mc-creator/shared': resolve(__dirname, '../../packages/shared/src'),
       },
     },
+    // @ts-expect-error: electron-vite types reference root vite (@types/node@26), this package uses @types/node@20
     plugins: [react()],
   },
 });

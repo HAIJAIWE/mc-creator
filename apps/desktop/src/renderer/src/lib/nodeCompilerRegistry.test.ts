@@ -132,7 +132,7 @@ describe('nodeCompilerRegistry', () => {
   });
 
   describe('compileAll', () => {
-    it('按 kind 分发到注册的编译器', () => {
+    it('按 kind 分发到注册的编译器', async () => {
       const itemCalls: string[] = [];
       registerCompiler({
         kind: 'item',
@@ -143,7 +143,7 @@ describe('nodeCompilerRegistry', () => {
       });
 
       const nodes = [makeNode('n1', 'item'), makeNode('n2', 'item')];
-      const { output, errors } = compileAll(nodes, makeCtx());
+      const { output, errors } = await compileAll(nodes, makeCtx());
 
       expect(itemCalls).toEqual(['n1', 'n2']);
       expect(output.items).toHaveLength(2);
@@ -152,7 +152,7 @@ describe('nodeCompilerRegistry', () => {
       expect(errors).toEqual([]);
     });
 
-    it('保持节点图顺序（按入参 nodes 顺序）', () => {
+    it('保持节点图顺序（按入参 nodes 顺序）', async () => {
       registerCompiler({
         kind: 'item',
         compile: (node) => ({ items: [{ id: node.id, name: 'I' } as ItemSpec] }),
@@ -163,7 +163,7 @@ describe('nodeCompilerRegistry', () => {
       });
 
       const nodes = [makeNode('a', 'item'), makeNode('b', 'block'), makeNode('c', 'item')];
-      const { output } = compileAll(nodes, makeCtx());
+      const { output } = await compileAll(nodes, makeCtx());
 
       // items 数组保持 a, c（图顺序）
       expect(output.items?.map((i) => i.id)).toEqual(['a', 'c']);
@@ -171,19 +171,19 @@ describe('nodeCompilerRegistry', () => {
       expect(output.blocks?.map((b) => b.id)).toEqual(['b']);
     });
 
-    it('未注册 kind 静默跳过（不报错）', () => {
+    it('未注册 kind 静默跳过（不报错）', async () => {
       registerCompiler({
         kind: 'item',
         compile: () => ({ items: [{ id: 'x', name: 'X' } as ItemSpec] }),
       });
       // comment 未注册
       const nodes = [makeNode('n1', 'comment'), makeNode('n2', 'item')];
-      const { output, errors } = compileAll(nodes, makeCtx());
+      const { output, errors } = await compileAll(nodes, makeCtx());
       expect(output.items).toHaveLength(1);
       expect(errors).toEqual([]);
     });
 
-    it('编译器抛异常时转为 error，不中断其他节点', () => {
+    it('编译器抛异常时转为 error，不中断其他节点', async () => {
       registerCompiler({
         kind: 'item',
         compile: (node) => {
@@ -192,7 +192,7 @@ describe('nodeCompilerRegistry', () => {
         },
       });
       const nodes = [makeNode('good', 'item'), makeNode('bad', 'item')];
-      const { output, errors } = compileAll(nodes, makeCtx());
+      const { output, errors } = await compileAll(nodes, makeCtx());
       // good 节点仍编译成功
       expect(output.items).toHaveLength(1);
       expect(output.items?.[0].id).toBe('good');
@@ -202,7 +202,7 @@ describe('nodeCompilerRegistry', () => {
       expect(errors[0]).toContain('boom');
     });
 
-    it('编译器返回的 output.errors 直接合并（保留自定义错误消息）', () => {
+    it('编译器返回的 output.errors 直接合并（保留自定义错误消息）', async () => {
       registerCompiler({
         kind: 'subgraph',
         compile: (node) => ({
@@ -210,14 +210,14 @@ describe('nodeCompilerRegistry', () => {
         }),
       });
       const nodes = [makeNode('s1', 'subgraph')];
-      const { output, errors } = compileAll(nodes, makeCtx());
+      const { output, errors } = await compileAll(nodes, makeCtx());
       // output.errors 含编译器自定义消息
       expect(output.errors).toEqual(['自定义节点 s1 编译失败：schema 未注册']);
       // 中央 errors 为空（未抛异常）
       expect(errors).toEqual([]);
     });
 
-    it('编译器返回的 warnings 合并到 output.warnings', () => {
+    it('编译器返回的 warnings 合并到 output.warnings', async () => {
       registerCompiler({
         kind: 'item',
         compile: (node) => ({
@@ -226,17 +226,17 @@ describe('nodeCompilerRegistry', () => {
         }),
       });
       const nodes = [makeNode('n1', 'item'), makeNode('n2', 'item')];
-      const { output } = compileAll(nodes, makeCtx());
+      const { output } = await compileAll(nodes, makeCtx());
       expect(output.warnings).toEqual(['item n1 有建议', 'item n2 有建议']);
     });
 
-    it('空节点列表返回空 output', () => {
-      const { output, errors } = compileAll([], makeCtx());
+    it('空节点列表返回空 output', async () => {
+      const { output, errors } = await compileAll([], makeCtx());
       expect(output).toEqual({});
       expect(errors).toEqual([]);
     });
 
-    it('ctx 传递给编译器（graph/sanitizedModId/compileLoopBody 可用）', () => {
+    it('ctx 传递给编译器（graph/sanitizedModId/compileLoopBody 可用）', async () => {
       const ctx = makeCtx();
       ctx.sanitizedModId = 'mymod';
       // 用 holder 对象捕获 ctx，避免 let + 闭包赋值导致 TS CFA 把类型收窄为 null/never
@@ -248,7 +248,7 @@ describe('nodeCompilerRegistry', () => {
           return { items: [{ id: node.id, name: 'I' } as ItemSpec] };
         },
       });
-      compileAll([makeNode('n1', 'item')], ctx);
+      await compileAll([makeNode('n1', 'item')], ctx);
       expect(holder.ctx).toBeDefined();
       expect(holder.ctx?.sanitizedModId).toBe('mymod');
       expect(holder.ctx?.graph).toBe(ctx.graph);

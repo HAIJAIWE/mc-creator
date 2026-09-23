@@ -229,6 +229,30 @@ body {
     box-shadow: var(--mc-sheen);
   }
 
+  /* ---- 活动栏按钮：凸起方块激活态（顶面受光 + 底面暗边） ---- */
+  .mc-atb-btn {
+    @apply relative flex h-10 w-10 items-center justify-center rounded-mc transition-colors;
+  }
+  .mc-atb-btn-idle {
+    @apply text-mc-dim hover:bg-mc-surface hover:text-mc-text;
+  }
+  .mc-atb-btn-active {
+    @apply bg-mc-surface-2 text-mc-accent-bright;
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.07), inset 0 -2px 0 0 rgb(0 0 0 / 0.35);
+  }
+
+  /* ---- Tab 选中态：顶部草绿高光线 + 凸起面（替换 border-b-2 方案） ---- */
+  .mc-tab {
+    @apply flex items-center gap-1.5 rounded-mc text-xs font-medium transition-colors;
+  }
+  .mc-tab-idle {
+    @apply text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text;
+  }
+  .mc-tab-selected {
+    @apply bg-mc-surface-2 text-mc-text;
+    box-shadow: inset 0 2px 0 0 rgb(var(--mc-accent)), inset 0 -1px 0 0 rgb(0 0 0 / 0.30);
+  }
+
   /* 活动栏的草绿激活指示条（VS Code 风格：贴合 ActivityBar 最左边缘） */
   .mc-active-bar {
     @apply absolute -left-1 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-sm bg-mc-accent;

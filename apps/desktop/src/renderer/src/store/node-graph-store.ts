@@ -146,8 +146,8 @@ function genId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${nodeCounter.toString(36)}`;
 }
 
-/** 根据节点类型创建默认 data */
-function createDefaultNodeData(kind: NodeKind, _modId: string): NodeData {
+/** 根据节点类型创建默认 data（导出供 specToNodeGraph 反向渲染复用同套默认字段） */
+export function createDefaultNodeData(kind: NodeKind, _modId: string): NodeData {
   const base = {
     nodeId: '',
     label: '',

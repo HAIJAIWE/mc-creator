@@ -8,31 +8,31 @@ const MODEL_PRESETS = [
   {
     name: 'OpenAI',
     baseURL: 'https://api.openai.com/v1',
-    modelId: 'gpt-4o-mini',
+    modelId: 'gpt-5.6-luna',
     apiKeyPlaceholder: 'sk-...',
   },
   {
     name: 'DeepSeek',
     baseURL: 'https://api.deepseek.com/v1',
-    modelId: 'deepseek-chat',
+    modelId: 'deepseek-flash',
     apiKeyPlaceholder: 'sk-...',
   },
   {
     name: '通义千问',
     baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    modelId: 'qwen-plus',
+    modelId: 'qwen3.5-plus',
     apiKeyPlaceholder: 'sk-...',
   },
   {
     name: '智谱 GLM',
     baseURL: 'https://open.bigmodel.cn/api/paas/v4',
-    modelId: 'glm-4-flash',
+    modelId: 'glm-5.3-flash',
     apiKeyPlaceholder: '...',
   },
   {
     name: 'Ollama (本地)',
     baseURL: 'http://localhost:11434/v1',
-    modelId: 'qwen2.5:7b',
+    modelId: 'qwen3:8b',
     apiKeyPlaceholder: '',
   },
   {
