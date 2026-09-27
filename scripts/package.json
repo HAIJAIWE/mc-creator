@@ -1,0 +1,30 @@
+{
+  "name": "quick-sailor-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "drive_server": "ts-node scripts/drive_server.ts",
+    "fetch_server_assets": "ts-node scripts/fetch_server_assets.ts",
+    "fetch_toolchain": "ts-node scripts/fetch_toolchain.ts",
+    "instrument_mixins": "ts-node scripts/instrument_mixins.ts",
+    "isaccepted": "ts-node scripts/isaccepted.ts",
+    "logscan10": "ts-node scripts/logscan10.ts",
+    "logscan11": "ts-node scripts/logscan11.ts",
+    "logscan12": "ts-node scripts/logscan12.ts",
+    "logscan13": "ts-node scripts/logscan13.ts",
+    "logscan14": "ts-node scripts/logscan14.ts",
+    "logscan8": "ts-node scripts/logscan8.ts",
+    "logscan9": "ts-node scripts/logscan9.ts",
+    "isaccepted": "ts-node scripts/isaccepted.ts"
+  },
+  "dependencies": {
+    "unzipper": "^0.10.14"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}
