@@ -292,14 +292,14 @@ export function javaTypeFor(type: string): string {
       return 'String';
     case 'item':
     case 'itemstack':
-      return 'net.minecraft.world.item.ItemStack';
+      return 'net.minecraft.item.ItemStack';
     case 'block':
     case 'blockstate':
-      return 'net.minecraft.world.level.block.state.BlockState';
+      return 'net.minecraft.block.BlockState';
     case 'entity':
-      return 'net.minecraft.world.entity.Entity';
+      return 'net.minecraft.entity.Entity';
     case 'player':
-      return 'net.minecraft.server.level.ServerPlayer';
+      return 'net.minecraft.server.network.ServerPlayerEntity';
     default:
       return type;
   }
@@ -331,9 +331,9 @@ export function toPascal(s: string): string {
 }
 
 /**
- * PortType（节点图端口类型字符串）→ Java 类型映射（Mojang 映射）。
+ * PortType（节点图端口类型字符串）→ Java 类型映射（Yarn 映射）。
  * 用于 CustomCodeSnippetSpec.inputSignature/outputSignature 的类型转换。
- * 与 officialMojangMappings 一致，类名不含 Yarn 后缀（如 Vec3 而非 Vec3d）。
+ * 与 yarn mappings 一致，类名含 Yarn 后缀（如 Vec3d 而非 Vec3）。
  */
 export function portTypeToJava(portType: string): string {
   const lower = portType.toLowerCase();
@@ -370,7 +370,7 @@ export function portTypeToJava(portType: string): string {
     case 'pos':
       return 'Vec3';
     case 'nbt':
-      return 'CompoundTag';
+      return 'NbtCompound';
     default:
       return 'Object';
   }

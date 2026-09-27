@@ -72,7 +72,8 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     // NeoForge 官方已弃用 1.20.1（公共下载移除，推荐 Forge）；neoforgeVersion 为旧分支末版，构建需人工确认
     fabricLoaderVersion: '0.19.3',
     fabricApiVersion: '0.92.11+1.20.1',
-    fabricLoomVersion: '1.7-SNAPSHOT',
+    // loom 经真构建验证：1.7-SNAPSHOT 与 Gradle 8.14 不兼容（Problems.forNamespace），改用已验证的 1.9.2
+    fabricLoomVersion: '1.9.2',
     fabricLoaderMinVersion: '>=0.14.0',
     neoforgeVersion: '20.1.110',
     neoforgeModdevVersion: '1.0.21',

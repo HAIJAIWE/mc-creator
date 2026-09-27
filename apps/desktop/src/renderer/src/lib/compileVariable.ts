@@ -81,15 +81,14 @@ function formatValue(value: unknown, varType: VariableNodeData['varType']): stri
       // L-5 修复：显式比较，避免数字/字符串等 truthy 值被误生成 `= true;`
       return value === true ? 'true' : 'false';
     case 'item':
-      // Critical 修复：BuiltInRegistries.ITEM.getValue() 返回 Optional<Item>（非 ItemStack），
-      // Item 没有 copy() 方法，orElse(ItemStack.EMPTY) 类型不匹配。
-      // 正确写法：用 new ItemStack(Item) 包裹，与 block 分支同构。
-      return `new ItemStack(BuiltInRegistries.ITEM.getValue(new ResourceLocation("${escapeJavaStringLiteral(
+      // Critical 修复：yarn 下 Registries.ITEM.get(Identifier) 直接返回 Item（可 null），
+      // 用 requireNonNullElse 回落 Items.AIR，与 block 分支同构。
+      return `new ItemStack(java.util.Objects.requireNonNullElse(Registries.ITEM.get(new Identifier("${escapeJavaStringLiteral(
         String(value),
-      )}")).orElse(Items.AIR))`;
+      )}")), Items.AIR))`;
     case 'block':
-      return `BuiltInRegistries.BLOCK.getValue(new ResourceLocation("${escapeJavaStringLiteral(
+      return `java.util.Objects.requireNonNullElse(Registries.BLOCK.get(new Identifier("${escapeJavaStringLiteral(
         String(value),
-      )}")).orElse(Blocks.AIR).defaultBlockState()`;
+      )}")), Blocks.AIR).getDefaultState()`;
   }
 }

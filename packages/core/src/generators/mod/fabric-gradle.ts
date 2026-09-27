@@ -53,7 +53,9 @@ export function fabricBuildGradle(
   // 26.x 为非混淆版：插件 net.fabricmc.fabric-loom、无 mappings、依赖用 implementation（官方 26.1 模板）
   const isUnobfuscated = mcVersion.startsWith('26.');
   const loomPluginId = isUnobfuscated ? 'net.fabricmc.fabric-loom' : 'fabric-loom';
-  const mappingsLine = isUnobfuscated ? '' : '    mappings loom.officialMojangMappings()\n';
+  const mappingsLine = isUnobfuscated
+    ? ''
+    : '    mappings "net.fabricmc:yarn:${project.minecraft_version}+build.1:v2"\n';
   const depPrefix = isUnobfuscated ? 'implementation' : 'modImplementation';
   const content = `plugins {
     id '${loomPluginId}' version '${versions.fabricLoomVersion}'
@@ -91,10 +93,25 @@ java {
   return { path: 'build.gradle', content };
 }
 
-export function fabricSettingsGradle(): FileNode {
+export function fabricSettingsGradle(versions: LoaderVersionConfig): FileNode {
   return {
     path: 'settings.gradle',
-    content: `rootProject.name = 'mc-mod'\n`,
+    content: `pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url "https://maven.fabricmc.net/" }
+    }
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == "fabric-loom") {
+                useModule("net.fabricmc:fabric-loom:${versions.fabricLoomVersion}")
+            }
+        }
+    }
+}
+
+rootProject.name = 'mc-mod'
+`,
   };
 }
 
@@ -110,6 +127,7 @@ archives_base_name=${spec.modId}
 
 # Minecraft / Fabric
 minecraft_version=${mcVersion}
+yarn_mappings=${mcVersion}+build.1
 loader_version=${versions.fabricLoaderVersion}
 fabric_version=${versions.fabricApiVersion}
 `;

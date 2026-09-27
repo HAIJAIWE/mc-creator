@@ -20,6 +20,8 @@ import {
   fabricModMultiblocksJava,
   fabricModEventsJava,
   fabricBlockPlaceMixinFiles,
+  fabricItemPickupMixinFiles,
+  fabricMixinsJson,
 } from './fabric-java.js';
 import {
   fabricMetaJson,
@@ -38,11 +40,10 @@ import {
 
 /**
  * Fabric Loader Adapter（规格 §3.2）。
- * 生成 fabric.mod.json + Fabric Loom build.gradle（用 officialMojangMappings，非 Yarn）
- * + ModInitializer 入口 + Registry.register 注册代码 + 资源文件。
+ * 生成 fabric.mod.json + Fabric Loom build.gradle（用 Yarn mappings：net.fabricmc:yarn:${mcVersion}+build.1:v2，非 Mojang）
+ * + ModInitializer 入口 + Registries.register 注册代码 + 资源文件。
  *
- * 关键：用官方 mappings 使 Java 代码用 net.minecraft.world.item.Item 等官方名，
- * 与 NeoForge 一致，26.1 切换无需改 Adapter。
+ * 关键：用 Yarn mappings 使 Java 代码用 net.minecraft.item.Item 等官方名（与新管线一致）。
  *
  * P1.3/P1.4 扩展：消费 ModSpec 新增字段（recipes/entities/machines/customCode/multiblocks/
  * eventHandlers/conditions/actions），生成对应的 ModRecipes/ModEntities/ModMachines/
@@ -131,14 +132,16 @@ export class FabricAdapter implements LoaderAdapter {
       name: 'fabricModJson',
       // G-5 修复：用传入的 mcVersion（与 build.gradle/gradle.properties 一致），
       // 而非 spec.mcVersionHint（ModSpec 无此字段，恒为默认值且与 ctx.mcVersion 脱节）
-      // P2.2：block_place handler 存在时 fabric.mod.json 需声明 mixins 字段
+      // P2.2：block_place / item_pickup handler 存在时 fabric.mod.json 需声明 mixins 字段
       hashInputs: (s, mcVersion) => [
         s.modId,
         s.name,
         s.description,
         s.version,
         mcVersion,
-        (s.eventHandlers ?? []).some((h) => h.eventType === 'block_place'),
+        (s.eventHandlers ?? []).some(
+          (h) => h.eventType === 'block_place' || h.eventType === 'item_pickup',
+        ),
       ],
       generate: (s, pkg, mainCls, mcVersion, versions) => [
         fabricModJson(
@@ -147,7 +150,9 @@ export class FabricAdapter implements LoaderAdapter {
           mainCls,
           mcVersion,
           versions,
-          (s.eventHandlers ?? []).some((h) => h.eventType === 'block_place'),
+          (s.eventHandlers ?? []).some(
+            (h) => h.eventType === 'block_place' || h.eventType === 'item_pickup',
+          ),
         ),
       ],
     },
@@ -160,8 +165,8 @@ export class FabricAdapter implements LoaderAdapter {
     },
     {
       name: 'settingsGradle',
-      hashInputs: () => [],
-      generate: () => [fabricSettingsGradle()],
+      hashInputs: (_s, mcVersion) => [mcVersion],
+      generate: (_s, _pkg, _mainCls, _mcVersion, versions) => [fabricSettingsGradle(versions)],
     },
     {
       name: 'gradleProperties',
@@ -279,10 +284,18 @@ export class FabricAdapter implements LoaderAdapter {
           : [],
     },
     {
-      // P2.2 block_place 需 Mixin（Fabric API 无放置事件）：生成 Mixin 类 + mixins.json
-      name: 'blockPlaceMixin',
-      hashInputs: (s) => (s.eventHandlers ?? []).filter((h) => h.eventType === 'block_place'),
-      generate: (s, pkg) => fabricBlockPlaceMixinFiles(s, pkg),
+      // block_place / item_pickup 需 Mixin（Fabric API 无对应事件）：
+      // 生成 Mixin 类 + 共用的 mixins.json
+      name: 'mixins',
+      hashInputs: (s) =>
+        (s.eventHandlers ?? []).filter(
+          (h) => h.eventType === 'block_place' || h.eventType === 'item_pickup',
+        ),
+      generate: (s, pkg) => [
+        ...fabricBlockPlaceMixinFiles(s, pkg),
+        ...fabricItemPickupMixinFiles(s, pkg),
+        ...fabricMixinsJson(s, pkg),
+      ],
     },
     {
       name: 'lang',
