@@ -117,23 +117,31 @@ describe('NeoForgeAdapter Java 入口与注册代码', () => {
     expect(main!.content).toContain('ModBlocks.register(modEventBus)');
   });
 
-  it('生成 ModItems（DeferredRegister + 每个物品）', () => {
+  it('生成 ModItems（DeferredRegister Forge 风格 + 每个物品）', () => {
     const items = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java',
     );
     expect(items).toBeDefined();
-    expect(items!.content).toContain('DeferredRegister');
-    expect(items!.content).toContain('RUBY');
-    expect(items!.content).toContain('registerSimpleItem("ruby"');
+    expect(items!.content).toContain('DeferredRegister<Item> ITEMS');
+    expect(items!.content).toContain('ForgeRegistries.ITEMS');
+    expect(items!.content).toContain('RegistryObject<Item> RUBY');
+    expect(items!.content).toContain('ITEMS.register("ruby"');
+    expect(items!.content).toContain('new Item(new Item.Properties())');
+    expect(items!.content).not.toContain('registerSimpleItem');
+    expect(items!.content).not.toContain('DeferredItem');
   });
 
-  it('生成 ModBlocks（DeferredRegister + 每个方块）', () => {
+  it('生成 ModBlocks（DeferredRegister Forge 风格 + 配套 BlockItem）', () => {
     const blocks = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java',
     );
     expect(blocks).toBeDefined();
-    expect(blocks!.content).toContain('DeferredRegister');
+    expect(blocks!.content).toContain('DeferredRegister<Block> BLOCKS');
+    expect(blocks!.content).toContain('ForgeRegistries.BLOCKS');
+    expect(blocks!.content).toContain('BlockBehaviour.Properties.of()');
     expect(blocks!.content).toContain('RUBY_BLOCK');
+    expect(blocks!.content).toContain('RUBY_BLOCK_ITEM');
+    expect(blocks!.content).not.toContain('DeferredBlock');
   });
 });
 
@@ -289,13 +297,16 @@ describe('NeoForgeAdapter P1.4 字段消费（spec 非空时生成新文件）',
     // 真实 if 语句（非纯注释占位）
     expect(events!.content).toContain('if (check_cond_1(ctx))');
     expect(events!.content).toContain('execute_act_1(ctx);');
-    // NeoForge 事件注册：真实 IEventBus.addListener 调用（非占位注释）
-    expect(events!.content).toContain('modEventBus.addListener');
-    expect(events!.content).toContain('PlayerInteractEvent.RightClickBlock');
-    // 事件参数绑定：EventContext 类 + getter 绑定
+    // NeoForge 事件注册：Forge 总线 addListener（mod 总线收不到游戏事件）
+    expect(events!.content).toContain('MinecraftForge.EVENT_BUS');
+    expect(events!.content).toContain(
+      'net.minecraftforge.event.entity.player.PlayerInteractEvent.RightClickBlock',
+    );
+    expect(events!.content).not.toContain('modEventBus.addListener');
+    // 事件参数绑定：EventContext 类 + instanceof 守卫绑定（客户端不崩）
     expect(events!.content).toContain('private static class EventContext');
     expect(events!.content).toContain(
-      'ctx.player = (net.minecraft.server.level.ServerPlayer) event.getEntity();',
+      'ctx.player = event.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp ? sp : null;',
     );
     expect(events!.content).toContain('ctx.pos = event.getPos();');
   });
@@ -326,18 +337,21 @@ describe('NeoForgeAdapter P1.4 字段消费（spec 非空时生成新文件）',
     expect(events).toBeDefined();
     expect(events!.content).toContain('ctx.state = event.getBlockSnapshot().getReplacedBlock();');
     expect(events!.content).toContain('ctx.target = event.getEntity();');
-    expect(events!.content).toContain('ctx.stack = event.getItem();');
+    // getItem() 返回 ItemEntity，需 .getItem() 取 ItemStack
+    expect(events!.content).toContain('ctx.stack = event.getItem().getItem();');
+    // tick 按 Phase.END 过滤（START 阶段直接 return）
+    expect(events!.content).toContain('TickEvent.Phase.END');
     expect(events!.content).toContain('ctx.level = event.getServer().overworld();');
   });
 
-  it('mainClass 构造函数调用新的 initialize 方法', () => {
+  it('mainClass 构造函数调用新的 register/initialize 方法（事件走 Forge 总线无参 register）', () => {
     const main = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
     );
     expect(main).toBeDefined();
     expect(main!.content).toContain('ModCustomCode.initialize()');
     expect(main!.content).toContain('ModMultiblocks.initialize()');
-    expect(main!.content).toContain('ModEvents.initialize(modEventBus)');
+    expect(main!.content).toContain('ModEvents.register();');
   });
 });
 
@@ -450,24 +464,38 @@ describe('NeoForgeAdapter P1.3 字段消费（recipes/entities/machines 非空�
     expect(recipes!.content).toContain('ruby_sword_recipe');
   });
 
-  it('ModEntities.java 含 DeferredRegister 与 entityId', () => {
+  it('ModEntities.java 含 DeferredRegister(ForgeRegistries.ENTITY_TYPES) 与 entityId', () => {
     const entities = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEntities.java',
     );
     expect(entities).toBeDefined();
-    expect(entities!.content).toContain('DeferredRegister');
+    expect(entities!.content).toContain('DeferredRegister<EntityType<?>> ENTITIES');
+    expect(entities!.content).toContain('ForgeRegistries.ENTITY_TYPES');
+    expect(entities!.content).toContain('RegistryObject<EntityType<Pig>> RUBY_GOLEM');
+    expect(entities!.content).toContain('EntityType.Builder.<Pig>of(Pig::new');
+    expect(entities!.content).toContain('.sized(0.6f, 1.8f).build("ruby_golem")');
     expect(entities!.content).toContain('ruby_golem');
     expect(entities!.content).toContain('Ruby Golem');
+    expect(entities!.content).not.toContain('createEntities');
   });
 
-  it('ModMachines.java 含 DeferredRegister 与 machineId', () => {
+  it('ModMachines.java 含 DeferredRegister(BLOCK_ENTITY_TYPES/MENU_TYPES) 与 machineId', () => {
     const machines = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModMachines.java',
     );
     expect(machines).toBeDefined();
-    expect(machines!.content).toContain('DeferredRegister');
+    expect(machines!.content).toContain('ForgeRegistries.BLOCK_ENTITY_TYPES');
+    expect(machines!.content).toContain('ForgeRegistries.MENU_TYPES');
+    expect(machines!.content).toContain('RUBY_FURNACE_BE');
+    expect(machines!.content).toContain(
+      'BlockEntityType.Builder.of(RubyFurnaceBlockEntity::new, Blocks.STONE)',
+    );
+    expect(machines!.content).toContain(
+      'new MenuType<>((mid, inv) -> new RubyFurnaceMenu(mid, inv), FeatureFlags.DEFAULT_FLAGS)',
+    );
     expect(machines!.content).toContain('ruby_furnace');
     expect(machines!.content).toContain('Ruby Furnace');
+    expect(machines!.content).not.toContain('IMenuTypeExtension');
   });
 
   it('mainClass 构造函数调用 P1.3 模块的 register/initialize', () => {
@@ -682,15 +710,21 @@ describe('NeoForgeAdapter Task D 流体', () => {
     projectPath: '/proj',
   });
 
-  it('生成 ModFluids.java 用 DeferredRegister.Fluids', () => {
+  it('生成 ModFluids.java 用 FluidType + ForgeFlowingFluid（Forge 47 风格）', () => {
     const fluids = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModFluids.java',
     );
     expect(fluids).toBeDefined();
     expect(fluids!.content).toContain('public class ModFluids');
-    expect(fluids!.content).toContain('DeferredRegister.Fluids FLUIDS');
-    expect(fluids!.content).toContain('FLUIDS.register("ruby_juice"');
-    expect(fluids!.content).toContain('DeferredFluid');
+    expect(fluids!.content).toContain('DeferredRegister<FluidType> FLUID_TYPES');
+    expect(fluids!.content).toContain('ForgeRegistries.FLUID_TYPES.get()');
+    expect(fluids!.content).toContain('DeferredRegister<Fluid> FLUIDS');
+    expect(fluids!.content).toContain('ForgeRegistries.FLUIDS');
+    expect(fluids!.content).toContain('RUBY_JUICE_TYPE');
+    expect(fluids!.content).toContain('new ForgeFlowingFluid.Source(');
+    expect(fluids!.content).toContain('new ForgeFlowingFluid.Flowing(');
+    expect(fluids!.content).not.toContain('DeferredFluid');
+    expect(fluids!.content).not.toContain('SimpleFluid');
   });
 
   it('mainClass 调用 ModFluids.register(modEventBus)', () => {
@@ -794,33 +828,59 @@ describe('NeoForgeAdapter Mod 侧世界生成', () => {
     projectPath: '/proj',
   });
 
-  it('生成 ModBiomes.java 用 DeferredRegister.Biomes', () => {
+  it('生成 ModBiomes.java 只保留 ID 常量（动态注册表走数据包 JSON）', () => {
     const biomes = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBiomes.java',
     );
     expect(biomes).toBeDefined();
-    expect(biomes!.content).toContain('DeferredRegister.Biomes BIOMES');
-    expect(biomes!.content).toContain('BIOMES.register("ruby_plains"');
-    expect(biomes!.content).toContain('Precipitation.SNOW');
-    expect(biomes!.content).toContain('temperatureAdjustment');
+    expect(biomes!.content).toContain('RUBY_PLAINS_ID = "ruby_plains"');
+    expect(biomes!.content).not.toContain('DeferredRegister');
+    expect(biomes!.content).not.toContain('BiomeBuilder');
   });
 
-  it('生成 ModDimensions.java 用 DeferredRegister<DimensionType>', () => {
+  it('生成生物群系 worldgen/biome JSON（原版 codec 形状）', () => {
+    const bj = files.find(
+      (f) => f.path === 'src/main/resources/data/ruby_tools/worldgen/biome/ruby_plains.json',
+    );
+    expect(bj).toBeDefined();
+    const json = JSON.parse(bj!.content);
+    expect(json.temperature).toBe(-0.5);
+    expect(json.downfall).toBe(0.9);
+    expect(json.has_precipitation).toBe(true);
+    expect(json.temperature_modifier).toBe('frozen');
+    expect(json.effects.sky_color).toBe(0x78a7ff);
+    expect(json.effects.water_color).toBe(0x3f76e4);
+  });
+
+  it('生成 ModDimensions.java 只保留 ID 常量 + dimension/dimension_type JSON', () => {
     const dims = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModDimensions.java',
     );
     expect(dims).toBeDefined();
-    expect(dims!.content).toContain('Registries.DIMENSION_TYPE');
-    expect(dims!.content).toContain('DIMENSION_TYPES.register("ruby_dim"');
-    expect(dims!.content).toContain('OptionalLong.empty()');
+    expect(dims!.content).toContain('RUBY_DIM_ID = "ruby_dim"');
+    expect(dims!.content).not.toContain('DeferredRegister');
+    const dt = files.find(
+      (f) => f.path === 'src/main/resources/data/ruby_tools/dimension_type/ruby_dim.json',
+    );
+    expect(dt).toBeDefined();
+    const dtJson = JSON.parse(dt!.content);
+    expect(dtJson.infiniburn).toBe('minecraft:infiniburn_overworld');
+    expect(dtJson.effects).toBe('minecraft:overworld');
+    expect(dtJson.has_raids).toBe(true);
+    expect(dtJson.fixed_time).toBeUndefined();
+    const dim = files.find(
+      (f) => f.path === 'src/main/resources/data/ruby_tools/dimension/ruby_dim.json',
+    );
+    expect(dim).toBeDefined();
+    expect(JSON.parse(dim!.content).type).toBe('ruby_tools:ruby_dim');
   });
 
-  it('mainClass 调用 ModBiomes/ModDimensions register', () => {
+  it('mainClass 调用 ModBiomes/ModDimensions initialize（非 register）', () => {
     const main = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
     );
-    expect(main!.content).toContain('ModBiomes.register(modEventBus);');
-    expect(main!.content).toContain('ModDimensions.register(modEventBus);');
+    expect(main!.content).toContain('ModBiomes.initialize();');
+    expect(main!.content).toContain('ModDimensions.initialize();');
   });
 });
 
@@ -864,12 +924,16 @@ describe('NeoForgeAdapter Task 3 GUI', () => {
     projectPath: '/proj',
   });
 
-  it('生成 ModGuis.java 用 DeferredRegister.MENU', () => {
+  it('生成 ModGuis.java 用 DeferredRegister(MENU_TYPES) + new MenuType（AT 放行）', () => {
     const guis = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModGuis.java');
     expect(guis).toBeDefined();
-    expect(guis!.content).toContain('DeferredRegister');
-    expect(guis!.content).toContain('IMenuTypeExtension');
+    expect(guis!.content).toContain('DeferredRegister<MenuType<?>> MENUS');
+    expect(guis!.content).toContain('ForgeRegistries.MENU_TYPES');
+    expect(guis!.content).toContain(
+      'new MenuType<>((id, inv) -> new RubyFurnaceGuiMenu(id, inv), FeatureFlags.DEFAULT_FLAGS)',
+    );
     expect(guis!.content).toContain('RubyFurnaceGuiMenu');
+    expect(guis!.content).not.toContain('IMenuTypeExtension');
   });
 
   it('mainClass 调用 ModGuis.register(modEventBus)', () => {
@@ -920,20 +984,40 @@ describe('NeoForgeAdapter Task 4 Mod 侧结构', () => {
     projectPath: '/proj',
   });
 
-  it('生成 ModStructures.java 用 DeferredRegister<Structure>', () => {
+  it('生成 ModStructures.java 只保留 ID 常量 + structure/structure_set/template_pool JSON', () => {
     const structures = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModStructures.java',
     );
     expect(structures).toBeDefined();
-    expect(structures!.content).toContain('Registries.STRUCTURE');
-    expect(structures!.content).toContain('STRUCTURES.register("ruby_tower"');
-    expect(structures!.content).toContain('JigsawStructure');
+    expect(structures!.content).toContain('RUBY_TOWER_ID = "ruby_tower"');
+    expect(structures!.content).not.toContain('DeferredRegister');
+    expect(structures!.content).not.toContain('JigsawStructure');
+    const st = files.find(
+      (f) => f.path === 'src/main/resources/data/ruby_tools/worldgen/structure/ruby_tower.json',
+    );
+    expect(st).toBeDefined();
+    const stJson = JSON.parse(st!.content);
+    expect(stJson.type).toBe('minecraft:jigsaw');
+    expect(stJson.start_pool).toBe('ruby_tools:tower/start_pool');
+    expect(stJson.terrain_adaptation).toBe('none');
+    const ss = files.find(
+      (f) => f.path === 'src/main/resources/data/ruby_tools/worldgen/structure_set/ruby_tower.json',
+    );
+    expect(ss).toBeDefined();
+    expect(JSON.parse(ss!.content).placement.spread_type).toBe('triangular');
+    const tp = files.find(
+      (f) =>
+        f.path ===
+        'src/main/resources/data/ruby_tools/worldgen/template_pool/tower/start_pool.json',
+    );
+    expect(tp).toBeDefined();
+    expect(JSON.parse(tp!.content).fallback).toBe('minecraft:empty');
   });
 
-  it('mainClass 调用 ModStructures.register(modEventBus)', () => {
+  it('mainClass 调用 ModStructures.initialize()（非 register）', () => {
     const main = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
     );
-    expect(main!.content).toContain('ModStructures.register(modEventBus);');
+    expect(main!.content).toContain('ModStructures.initialize();');
   });
 });

@@ -468,6 +468,80 @@ Mixin 接线（`@Inject` 到 vanilla 方法，见 §11.2），旧管线亦改走
   旧管线（仅服务 `custom` 链）的 Mojang 订阅写法已随迁移删除，
   无残留。
 
+### 11.1.1 Quilt / NeoForge / Forge 适配器（2026-09）
+
+- Quilt 审计修了 6 个 bug：`build.gradle` 的 Mojang 映射→Yarn
+  （继承的 Java 本来就是 Yarn 名）；`quilt.mod.json` 入口移到
+  `quilt_loader.entrypoints.init`（字符串）；主类改 QSL 的
+  `org.quiltmc.qsl.base.api.entrypoint.ModInitializer#onInitialize(ModContainer)`
+  （quilt-loader 0.30.1 实测已删自家 `ModInitializer`，入口契约由 QFAPI 内 QSL 提供）；
+  有 block_place/item_pickup 时顶层声明 `"mixin"`；`settings.gradle`
+  声明 Quilt 仓库 + quilt-loom 解析；版本号全走配置表
+  （quilt maven 实测：loader 0.30.1、loom 1.15.1、QFAPI 按 MC：
+  1.20.1→7.7.0+0.92.2、1.20.4→9.0.0-alpha.8、1.20.6→10.0.0-alpha.3、
+  1.21.x→11.0.0-alpha.3；1.21.5+/26.x 无 QFAPI，留空 + 生成警告）；
+  增量改类别级替换（快照与产物一致）。
+  真实构建（Gradle 9.2.1 + JDK 23 运行 + Java 17 编译，quilt-loom 1.15.1）：
+  全量产物 `gradle build` **BUILD SUCCESSFUL**
+  （`compileJava` + `remapJar`，`quiltpipe-1.0.0.jar`：21 个类，
+  内嵌 `quilt.mod.json` 的 `init` 入口与 `mixin` 声明均正确）。
+  构建链路上抓到的模板 bug（已修）：quilt-loom 插件自身要求 JVM 21+
+  （Gradle 须跑在 JDK 21+，本机构建用 JDK 23；1.20.1 工程仍按
+  Java 17 编译）；1.15.1 要求 plugin api-version 9.2+（Gradle 不能再用
+  8.x，wrapper 固定 9.2.1 实测版）；`[6.0,)` 式滚动版本危险
+  （见 Forge 段）。注意：Gradle 运行 JVM 与工程目标 Java 是两回事，
+  Quilt 工程（即使 1.20.1/Java 17）也需要 Gradle 9.2+ + JVM 21+ 来跑构建。
+- NeoForge 20.1（1.20.1）重写：旧实现混用了 1.21+ 的
+  `net.neoforged.*`（`DeferredItem`/`createItems`/`IMenuTypeExtension`
+  等 1.20.1 不存在）+ Yarn 名 + mod 总线注册游戏事件（三处全错），
+  现按 1.20.1 真 API 重写（`net.minecraftforge.*` + Mojang 映射）：
+  `DeferredRegister.create(ForgeRegistries.*, MOD_ID)` +
+  `RegistryObject`；游戏事件走 `MinecraftForge.EVENT_BUS.<Event>addListener`
+  （显式泛型见证；mod 总线收不到）；菜单走 `new MenuType<>(factory,
+FeatureFlags.DEFAULT_FLAGS)`；流体走 `FluidType` +
+  `ForgeFlowingFluid.Source/Flowing`；生物群系/维度/结构 Java 侧只留
+  ID 常量，实体走数据包 JSON（新增 loader 无关的
+  `worldgen-json-generator.ts`：biome/dimension_type/dimension/
+  structure/structure_set/template_pool，形状对标原版 codec）。
+  条件/动作逻辑新增 Mojang 版（`mojang-event-logic.ts`：
+  `is/isOf`→`is`、`decrement`→`shrink`、`damage`→`hurt`、
+  `teleport`→`teleportTo`、`SPEED`→`MOVEMENT_SPEED` 等，
+  生物群系比较走 `Holder.unwrapKey().location()`）。
+  验证：Mojang 官方映射服务端/客户端 jar（Mojang ProGuard
+  mappings 经 mapping-io 转 tiny 后 tiny-remapper 直编）+
+  Forge 47 universal + fmlloader/fmlcore/javafmllanguage/eventbus
+  跑裸 `javac`，全量产物 21→5 个错误，剩余 5 个全部是 Forge AT
+  放行的访问级别（`BlockEntitySupplier`/`MenuType` 构造器/
+  `MenuSupplier`，`accesstransformer.cfg` 实测含对应条目），
+  真构建（见 Forge 段，同一套 Java）0 错误证实。
+  探针方法论债务：universal 是 SRG 名（`m_39994_` 默认方法在混合
+  classpath 下无法覆盖 Mojang 名），`IContainerFactory` 的 lambda
+  误报即来源于此，真构建 official 通道统一 remap 后消失；
+  为避开它菜单改用原版 `new MenuType<>`（同样 AT 放行）。
+- Forge 1.20.1（build 47.x）新建：Java 与 NeoForge 20.1 同版本
+  API 一致，直接 re-export（`forge-java.ts`，注释写明等价关系；
+  未来若支持 Forge 1.21+ 再 fork）。差异只在构建文件：
+  ForgeGradle 6（`net.minecraftforge.gradle` pin 死 **6.0.54** 实测版，
+  `[6.0,)` 滚动会误装 FG7 而要求 Gradle 9.3+）+ `official` 映射通道 +
+  `mods.toml`（`forge` 依赖 `[47,)`、`minecraft` `[1.20.1,1.21)`，
+  Forge 47 约定上闭合）+ `settings.gradle` 声明 Forge maven
+  （插件不在 Gradle Portal）。Forge 版本 47.4.23 取自 Forge maven
+  元数据（UA 绕过 403 后实测）。真实构建（Gradle 8.14.3 + JDK 17）：
+  全量产物 `gradle build` **BUILD SUCCESSFUL**
+  （`compileJava` + `jar` + `reobfJar`，`forgepipe-1.0.0.jar`：
+  16 个类）。因此 NeoForge 的 Java 也被同一构建证实
+  （代码同一套；NeoForge 自家 ModDevGradle 构建因
+  maven.neoforged.net 超时未做，记为诚实缺口）。
+- 工具链实测版本总表（均为在线元数据实测，非训练记忆）：
+  Forge 47.4.23、ForgeGradle 6.0.54、eventbus 6.2.33、
+  quilt-loader 0.30.1、quilt-loom 1.15.1、Gradle 9.2.1、
+  JDK 23（跑构建）/ JDK 17（编译 1.20.1 工程）。
+  环境坑：Forge maven 挡默认 UA（浏览器 UA 可过）；
+  services.gradle.org 直连超时，Gradle 发行版走腾讯镜像；
+  E:/Cache 下 write 工具落盘的文件 JVM 不可见
+  （javac 报找不到文件，python 可读；shell-python 复制一份即正常），
+  探针脚本一律用 shell 侧复制版。
+
 ### 11.2 Mixin 接线表 / Mixin wiring
 
 无稳定 Fabric API 的 4 种触发器走 Mixin（`@Inject`，notify-only，

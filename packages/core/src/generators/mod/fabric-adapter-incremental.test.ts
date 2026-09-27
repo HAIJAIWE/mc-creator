@@ -93,6 +93,34 @@ describe('FabricAdapter P1-4 增量构建（translateWithCache）', () => {
     expect(second.stats.filesUnchanged).toBe(second.files.length);
   });
 
+  it('新增 fluids 类别：mainClass 同步重新生成（含 ModFluids.initialize）', () => {
+    const cache = new BuildCache();
+    const mainPath = 'src/main/java/com/example/ruby_tools/RubyToolsMod.java';
+
+    // 首次构建（无 fluids）
+    const first = adapter.translateWithCache(makeCtx(makeSpec()), cache);
+    const firstMain = first.files.find((f) => f.path === mainPath);
+    expect(firstMain!.content).not.toContain('ModFluids.initialize()');
+
+    // 新增 fluids 后二次构建
+    const withFluids = makeSpec({
+      fluids: [
+        {
+          fluidId: 'juice',
+          displayName: 'Juice',
+          color: 0xff0000,
+          temperature: 300,
+          viscosity: 1000,
+          density: 1000,
+          luminous: false,
+        },
+      ],
+    });
+    const second = adapter.translateWithCache(makeCtx(withFluids), cache);
+    const secondMain = second.files.find((f) => f.path === mainPath);
+    expect(secondMain!.content).toContain('ModFluids.initialize()');
+  });
+
   it('修改单个 item：仅 items 类别重新生成，其他命中', () => {
     const baseSpec = makeSpec();
     const cache = new BuildCache();

@@ -48,7 +48,8 @@ describe('IPC schema 校验', () => {
       },
     };
     expect(GenerateFilesRequest.safeParse(valid).success).toBe(true);
-    expect(GenerateFilesRequest.safeParse({ ...valid, loader: 'forge' }).success).toBe(false);
+    expect(GenerateFilesRequest.safeParse({ ...valid, loader: 'forge' }).success).toBe(true);
+    expect(GenerateFilesRequest.safeParse({ ...valid, loader: 'rift' }).success).toBe(false);
   });
 
   it('GenerateFilesRequest 默认 generatorType 为 mod', () => {

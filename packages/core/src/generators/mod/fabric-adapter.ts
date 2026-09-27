@@ -127,7 +127,8 @@ export class FabricAdapter implements LoaderAdapter {
    *
    * 顺序与原 translate 的文件输出顺序保持一致（测试不依赖顺序，但保持稳定）。
    */
-  private categories: CategoryDescriptor<ModSpecLike>[] = [
+  /** Quilt 通过构造器替换其中 5 个类别（子类可见性需求），故为 protected。 */
+  protected categories: CategoryDescriptor<ModSpecLike>[] = [
     {
       name: 'fabricModJson',
       // G-5 修复：用传入的 mcVersion（与 build.gradle/gradle.properties 一致），
@@ -190,6 +191,11 @@ export class FabricAdapter implements LoaderAdapter {
         s.blocks.length > 0,
         (s.recipes?.length ?? 0) > 0,
         (s.entities?.length ?? 0) > 0,
+        (s.fluids?.length ?? 0) > 0,
+        (s.biomes?.length ?? 0) > 0,
+        (s.dimensions?.length ?? 0) > 0,
+        (s.guis?.length ?? 0) > 0,
+        (s.structures?.length ?? 0) > 0,
         (s.machines?.length ?? 0) > 0,
         (s.customCode?.length ?? 0) > 0,
         (s.multiblocks?.length ?? 0) > 0,

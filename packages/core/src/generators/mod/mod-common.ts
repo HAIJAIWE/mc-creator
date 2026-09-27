@@ -306,6 +306,43 @@ export function javaTypeFor(type: string): string {
 }
 
 /**
+ * P40：把低代码类型名映射为 Java 形参类型（Mojang 官方映射版，供 NeoForge/Forge 用）。
+ * 与 javaTypeFor 同构，仅 item/block/entity/player 四个走 Mojang 包名。
+ */
+export function javaTypeForMojang(type: string): string {
+  switch ((type ?? '').toLowerCase()) {
+    case 'int':
+    case 'integer':
+      return 'int';
+    case 'float':
+      return 'float';
+    case 'double':
+    case 'number':
+      return 'double';
+    case 'long':
+      return 'long';
+    case 'boolean':
+    case 'bool':
+      return 'boolean';
+    case 'string':
+    case 'text':
+      return 'String';
+    case 'item':
+    case 'itemstack':
+      return 'net.minecraft.world.item.ItemStack';
+    case 'block':
+    case 'blockstate':
+      return 'net.minecraft.world.level.block.state.BlockState';
+    case 'entity':
+      return 'net.minecraft.world.entity.Entity';
+    case 'player':
+      return 'net.minecraft.server.level.ServerPlayer';
+    default:
+      return type;
+  }
+}
+
+/**
  * 把任意字符串转为合法 Java 标识符片段（用于 check_<id>/execute_<id>/handle_<id> 方法名后缀）。
  * 保留原大小写与下划线，仅把非法字符替换为下划线；首字符为数字时加 _ 前缀。
  *
