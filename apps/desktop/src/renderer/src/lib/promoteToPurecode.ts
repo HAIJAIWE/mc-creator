@@ -127,7 +127,7 @@ function portTypeToJava(portType: string): string {
     case 'entity':
       return 'Entity';
     case 'player':
-      return 'Player';
+      return 'PlayerEntity';
     case 'world':
       return 'World';
     case 'fluid':
@@ -136,7 +136,7 @@ function portTypeToJava(portType: string): string {
     case 'redstone':
       return 'int';
     case 'nbt':
-      return 'CompoundTag';
+      return 'NbtCompound';
     default:
       return 'Object';
   }
@@ -311,7 +311,7 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:\${project.minecraft_version}"
-    mappings loom.officialMojangMappings()
+    mappings "net.fabricmc:yarn:\${project.minecraft_version}+build.1:v2"
     modImplementation "net.fabricmc:fabric-loader:\${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:\${project.fabric_version}"
 }

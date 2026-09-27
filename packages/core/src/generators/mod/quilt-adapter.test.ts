@@ -73,19 +73,30 @@ describe('QuiltAdapter 元数据与构建脚本', () => {
     expect(depIds).toContain('quilt_loader');
     expect(depIds).toContain('minecraft');
     expect(depIds).toContain('quilted_fabric_api');
-    // entrypoints
-    expect(json.entrypoints.main[0]).toBe('com.example.ruby_tools.RubyToolsMod');
+    // entrypoints：在 quilt_loader 内、键为 init、值为字符串（Quilt Loader 只认这个形状）
+    expect(json.quilt_loader.entrypoints.init).toBe('com.example.ruby_tools.RubyToolsMod');
+    expect(json.entrypoints).toBeUndefined();
+  });
+
+  it('无 Mixin 事件时 quilt.mod.json 不声明 mixin 字段', () => {
+    const qmj = files.find((f) => f.path === 'src/main/resources/quilt.mod.json');
+    expect(JSON.parse(qmj!.content).mixin).toBeUndefined();
   });
 
   it('不包含 fabric.mod.json', () => {
     expect(paths).not.toContain('src/main/resources/fabric.mod.json');
   });
 
-  it('build.gradle 含 org.quiltmc.loom 与 officialMojangMappings', () => {
+  it('build.gradle 含 org.quiltmc.loom（实测版本）与 Yarn mappings（与继承的 Yarn 代码一致）', () => {
     const bg = files.find((f) => f.path === 'build.gradle');
     expect(bg).toBeDefined();
     expect(bg!.content).toContain('org.quiltmc.loom');
-    expect(bg!.content).toContain('officialMojangMappings');
+    expect(bg!.content).toContain(`version '1.15.1'`);
+    // Java 代码是 Fabric 的 Yarn 代码，必须配 Yarn mappings 才能编译（Mojang 映射下包名全错）
+    expect(bg!.content).toContain(
+      'mappings "net.fabricmc:yarn:${project.minecraft_version}+build.1:v2"',
+    );
+    expect(bg!.content).not.toContain('officialMojangMappings');
     // 依赖改为 quilt-loader / quilted-fabric-api
     expect(bg!.content).toContain('org.quiltmc:quilt-loader');
     expect(bg!.content).toContain('org.quiltmc.quilted-fabric-api:quilted-fabric-api');
@@ -94,13 +105,30 @@ describe('QuiltAdapter 元数据与构建脚本', () => {
     expect(bg!.content).not.toContain('fabric.mod.json');
   });
 
-  it('gradle.properties 含 quilt_loader_version 与 quilt_version', () => {
+  it('settings.gradle 声明 Quilt 仓库与 quilt-loom 插件解析，wrapper 固定 Gradle 9.2.1', () => {
+    const sg = files.find((f) => f.path === 'settings.gradle');
+    expect(sg).toBeDefined();
+    expect(sg!.content).toContain('https://maven.quiltmc.org/repository/release/');
+    expect(sg!.content).toContain('org.quiltmc:loom:1.15.1');
+    const wp = files.find((f) => f.path === 'gradle/wrapper/gradle-wrapper.properties');
+    expect(wp).toBeDefined();
+    expect(wp!.content).toContain('gradle-9.2.1-bin.zip');
+  });
+
+  it('gradle.properties 版本走配置表（1.21.11 的 QFAPI 未确认，留空 + 注释）', () => {
     const gp = files.find((f) => f.path === 'gradle.properties');
     expect(gp).toBeDefined();
-    expect(gp!.content).toContain('quilt_loader_version=0.27.0');
-    expect(gp!.content).toContain('quilt_version=11.0.0-alpha.3+1.21.1');
+    expect(gp!.content).toContain('quilt_loader_version=0.30.1');
     expect(gp!.content).toContain('minecraft_version=1.21.11');
     expect(gp!.content).toContain('maven_group=com.example.ruby_tools');
+    // QFAPI 未知版本：占位注释提醒用户手动填写
+    expect(gp!.content).toContain('maven.quiltmc.org');
+  });
+
+  it('gradle.properties 在已知 MC 版本给出 QFAPI 真实版本（1.20.1）', () => {
+    const files1201 = adapter.translate({ ...CTX, mcVersion: '1.20.1' });
+    const gp = files1201.find((f) => f.path === 'gradle.properties');
+    expect(gp!.content).toContain('quilt_version=7.7.0+0.92.2-1.20.1');
   });
 });
 
@@ -113,12 +141,14 @@ describe('QuiltAdapter 复用 Fabric 逻辑', () => {
     expect(adapter.loader).toBe('quilt');
   });
 
-  it('Java 主类与 Fabric 一致（ModInitializer）', () => {
+  it('Java 主类实现 QSL 的 ModInitializer（onInitialize(ModContainer)）', () => {
     const main = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/RubyToolsMod.java',
     );
     expect(main).toBeDefined();
-    expect(main!.content).toContain('implements ModInitializer');
+    expect(main!.content).toContain('org.quiltmc.qsl.base.api.entrypoint.ModInitializer');
+    expect(main!.content).toContain('onInitialize(ModContainer mod)');
+    expect(main!.content).not.toContain('net.fabricmc.api.ModInitializer');
   });
 
   it('settings.gradle 与 lang/model/meta 资源文件均存在', () => {
@@ -365,5 +395,71 @@ describe('QuiltAdapter P1.3 字段消费（继承 FabricAdapter）', () => {
     expect(main!.content).toContain('ModRecipes.initialize()');
     expect(main!.content).toContain('ModEntities.initialize()');
     expect(main!.content).toContain('ModMachines.initialize()');
+  });
+});
+
+// === Quilt Mixin 接线（block_place/item_pickup 有 handler 时声明顶层 mixin 字段） ===
+
+const SPEC_MIXIN: ModSpec = ModSpecSchema.parse({
+  modId: 'ruby_tools',
+  version: '1.0.0',
+  name: 'Ruby Tools',
+  description: 'Mixin test',
+  items: [],
+  blocks: [],
+  license: 'MIT',
+  authors: [],
+  credits: '',
+  dependencies: [],
+  website: '',
+  eventHandlers: [{ handlerId: 'evt_place', eventType: 'block_place', eventArgs: {} }],
+  conditions: [],
+  actions: [],
+});
+
+describe('QuiltAdapter Mixin 接线', () => {
+  const adapter = new QuiltAdapter();
+  const files = adapter.translate({
+    loader: 'quilt',
+    mcVersion: '1.20.1',
+    modId: 'ruby_tools',
+    spec: SPEC_MIXIN,
+    projectPath: '/proj',
+  });
+
+  it('quilt.mod.json 顶层声明 mixin 字段（字符串，非数组）', () => {
+    const qmj = files.find((f) => f.path === 'src/main/resources/quilt.mod.json');
+    expect(qmj).toBeDefined();
+    expect(JSON.parse(qmj!.content).mixin).toBe('ruby_tools.mixins.json');
+  });
+
+  it('生成 Mixin 类与 ModEvents 通知入口', () => {
+    const mixin = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/mixin/ModBlockPlaceMixin.java',
+    );
+    expect(mixin).toBeDefined();
+    expect(mixin!.content).toContain('@Mixin(BlockItem.class)');
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events!.content).toContain('public static void notifyBlockPlaced(');
+  });
+});
+
+// === Quilt 增量缓存：类别级替换后快照与产物一致 ===
+
+describe('QuiltAdapter 增量缓存', () => {
+  it('二次 translateWithCache 命中缓存且文件一致', async () => {
+    const { BuildCache } = await import('../../builder/BuildCache.js');
+    const adapter = new QuiltAdapter();
+    const cache = new BuildCache();
+    const r1 = adapter.translateWithCache(CTX, cache);
+    const r2 = adapter.translateWithCache(CTX, cache);
+    expect(r2.files).toEqual(r1.files);
+    expect(r2.stats.cached).toBeGreaterThan(0);
+    // 产物中无 Fabric 特异文件残留
+    const paths = r2.files.map((f) => f.path);
+    expect(paths).not.toContain('src/main/resources/fabric.mod.json');
+    expect(paths).toContain('src/main/resources/quilt.mod.json');
   });
 });

@@ -10,7 +10,7 @@ import { mainClassName, packagePath } from './templates.js';
  * + Yarn mappings（旧 loom 不支持 officialMojangMappings）+ Java 8。
  *
  * Critical 修复：父类 FabricAdapter 生成的 Java 代码使用 Mojang 官方映射
- * （net.minecraft.world.item.Item、BuiltInRegistries、ResourceLocation.fromNamespaceAndPath、
+ * （net.minecraft.item.Item、Registries、Identifier.of、
  * 文本块 """ 等），与 Yarn mappings + Java 8 不兼容。
  * 本类 override translateWithCache 时替换 ModItems/ModBlocks/ModEntities 三个 Java 文件
  * 为 Yarn 1.16 兼容版本（net.minecraft.item.Item、Registry、Identifier、无文本块）。
@@ -124,8 +124,8 @@ fabric_version=0.42.0+1.16
 
   /**
    * Critical 修复：Yarn 1.16 兼容的 ModItems.java。
-   * 差异：net.minecraft.item.Item（非 world.item）、Registry（非 BuiltInRegistries）、
-   * Identifier（非 ResourceLocation）、new Item.Settings()（非 Item.Properties）。
+   * 差异：net.minecraft.item.Item（非 world.item）、Registry（非 Registries）、
+   * Identifier（非 ResourceLocation）、new Item.Settings()（非 FabricItemSettings）。
    */
   private legacyModItemsJava(spec: ModSpec, pkg: string, mainCls: string): FileNode {
     const fields = spec.items
@@ -134,7 +134,7 @@ fabric_version=0.42.0+1.16
     const regs = spec.items
       .map(
         (it) =>
-          `        ${it.id.toUpperCase()} = Registry.register(Registry.ITEM, new Identifier(${mainCls}.MOD_ID, "${it.id}"), new Item(new Item.Settings()));`,
+          `        ${it.id.toUpperCase()} = Registry.register(Registry.ITEM, Identifier.of(${mainCls}.MOD_ID, "${it.id}"), new Item(new Item.Settings()));`,
       )
       .join('\n');
     const content = `package ${pkg};
@@ -156,7 +156,7 @@ ${regs}
 
   /**
    * Critical 修复：Yarn 1.16 兼容的 ModBlocks.java。
-   * 差异：net.minecraft.block.Block、AbstractBlock.Settings.of()（非 Block.Properties.of()）。
+   * 差异：net.minecraft.block.Block、AbstractBlock.Settings.of()（非 Block.Settings.create()）。
    */
   private legacyModBlocksJava(spec: ModSpec, pkg: string, mainCls: string): FileNode {
     const fields = spec.blocks
@@ -165,7 +165,7 @@ ${regs}
     const regs = spec.blocks
       .map((b) => {
         const settings = `AbstractBlock.Settings.of().strength(${b.hardness}f, ${b.resistance ?? b.hardness}f)`;
-        return `        ${b.id.toUpperCase()} = Registry.register(Registry.BLOCK, new Identifier(${mainCls}.MOD_ID, "${b.id}"), new Block(${settings}));`;
+        return `        ${b.id.toUpperCase()} = Registry.register(Registry.BLOCK, Identifier.of(${mainCls}.MOD_ID, "${b.id}"), new Block(${settings}));`;
       })
       .join('\n');
     const content = `package ${pkg};
@@ -203,7 +203,7 @@ ${regs}
     const regs = entities
       .map((e) => {
         const category = this.legacyMobCategory(e.classification);
-        return `        ${e.entityId.toUpperCase()} = Registry.register(Registry.ENTITY_TYPE, new Identifier(${mainCls}.MOD_ID, "${e.entityId}"), EntityType.Builder.create(${this.legacyEntityFactory(e.modelType)}, ${category}).setDimensions(0.6f, 1.8f).build());`;
+        return `        ${e.entityId.toUpperCase()} = Registry.register(Registry.ENTITY_TYPE, Identifier.of(${mainCls}.MOD_ID, "${e.entityId}"), EntityType.Builder.create(${this.legacyEntityFactory(e.modelType)}, ${category}).setDimensions(0.6f, 1.8f).build());`;
       })
       .join('\n');
     const content = `package ${pkg};

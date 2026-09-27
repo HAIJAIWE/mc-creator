@@ -150,7 +150,7 @@ describe('compileVariable', () => {
     expect(snippet.code).toContain('evil()');
   });
 
-  it('item 类型转义字符串值（防止 ResourceLocation 注入）', () => {
+  it('item 类型转义字符串值（防止 Identifier 注入）', () => {
     const data: VariableNodeData = {
       nodeId: 'v8',
       label: 'x',
@@ -166,16 +166,16 @@ describe('compileVariable', () => {
       formatVersion: 1,
     };
     const { snippet } = compileVariable(data);
-    // ResourceLocation 字符串字面量内的引号需被转义为 \"
+    // Identifier 字符串字面量内的引号需被转义为 \"
     expect(snippet.code).toContain('\\"');
     // evil() 作为字符串数据保留（在字符串字面量内是安全的）
     expect(snippet.code).toContain('evil()');
-    // ResourceLocation 参数应为单个合法 Java 字符串字面量（转义后的 \" 不应断开字符串）
-    // 校验：ResourceLocation("...") 中 ... 部分匹配 Java 字符串字面量语法（含转义序列）
-    expect(snippet.code).toMatch(/ResourceLocation\("(?:[^"\\]|\\.)*"\)/);
+    // Identifier 参数应为单个合法 Java 字符串字面量（转义后的 \" 不应断开字符串）
+    // 校验：new Identifier("...") 中 ... 部分匹配 Java 字符串字面量语法（含转义序列）
+    expect(snippet.code).toMatch(/new Identifier\("(?:[^"\\]|\\.)*"\)/);
   });
 
-  it('block 类型转义字符串值（防止 ResourceLocation 注入）', () => {
+  it('block 类型转义字符串值（防止 Identifier 注入）', () => {
     const data: VariableNodeData = {
       nodeId: 'v9',
       label: 'x',
@@ -193,7 +193,7 @@ describe('compileVariable', () => {
     const { snippet } = compileVariable(data);
     expect(snippet.code).toContain('\\"');
     expect(snippet.code).toContain('inject()');
-    expect(snippet.code).toMatch(/ResourceLocation\("(?:[^"\\]|\\.)*"\)/);
+    expect(snippet.code).toMatch(/new Identifier\("(?:[^"\\]|\\.)*"\)/);
   });
 
   it('非法 varName 抛出错误（Java 标识符校验）', () => {

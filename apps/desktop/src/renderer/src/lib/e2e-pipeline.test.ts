@@ -385,7 +385,7 @@ describe('场景 2：if/else 事件逻辑验证', () => {
     expect(eventsFile!.content).toMatch(
       /private\s+static\s+boolean\s+check_c1\s*\(\s*EventContext\s+ctx\s*\)/,
     );
-    expect(eventsFile!.content).toContain('countItem(');
+    expect(eventsFile!.content).toContain('getInventory().main');
     expect(eventsFile!.content).not.toContain('// TODO: 实现 has_item 检查逻辑');
   });
 
@@ -393,7 +393,7 @@ describe('场景 2：if/else 事件逻辑验证', () => {
     expect(eventsFile!.content).toMatch(
       /private\s+static\s+void\s+execute_a1\s*\(\s*EventContext\s+ctx\s*\)/,
     );
-    expect(eventsFile!.content).toContain('ctx.level.addFreshEntity(');
+    expect(eventsFile!.content).toContain('ctx.level.spawnEntity(');
     expect(eventsFile!.content).not.toContain('// TODO: 实现 spawn_entity 执行逻辑');
   });
 

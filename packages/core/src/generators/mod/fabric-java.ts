@@ -62,15 +62,15 @@ export function fabricModItemsJava(spec: ModSpecLike, pkg: string, mainCls: stri
   const regs = spec.items
     .map(
       (it) =>
-        `        ${it.id.toUpperCase()} = Registry.register(BuiltInRegistries.ITEM, ResourceLocation.fromNamespaceAndPath(${mainCls}.MOD_ID, "${it.id}"), new Item(new Item.Properties()));`,
+        `        ${it.id.toUpperCase()} = Registry.register(Registries.ITEM, Identifier.of(${mainCls}.MOD_ID, "${it.id}"), new Item(new Item.Settings()));`,
     )
     .join('\n');
   const content = `package ${pkg};
 
-import net.minecraft.world.item.Item;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.item.Item;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.util.Identifier;
 
 public class ModItems {
 ${fields}
@@ -92,16 +92,16 @@ export function fabricModBlocksJava(spec: ModSpecLike, pkg: string, mainCls: str
     .join('\n');
   const regs = spec.blocks
     .map((b) => {
-      const settings = `Block.Properties.of().strength(${b.hardness}f, ${b.resistance ?? b.hardness}f)`;
-      return `        ${b.id.toUpperCase()} = Registry.register(BuiltInRegistries.BLOCK, ResourceLocation.fromNamespaceAndPath(${mainCls}.MOD_ID, "${b.id}"), new Block(${settings}));`;
+      const settings = `Block.Settings.create().strength(${b.hardness}f, ${b.resistance ?? b.hardness}f)`;
+      return `        ${b.id.toUpperCase()} = Registry.register(Registries.BLOCK, Identifier.of(${mainCls}.MOD_ID, "${b.id}"), new Block(${settings}));`;
     })
     .join('\n');
   const content = `package ${pkg};
 
-import net.minecraft.world.level.block.Block;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.block.Block;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.util.Identifier;
 
 public class ModBlocks {
 ${fields}
@@ -119,34 +119,68 @@ ${regs}
 
 /**
  * Task D：生成 ModFluids.java。
- * 流体注册：Registry.register(BuiltInRegistries.FLUID, ...)，SimpleFluid 为
- * net.minecraft.world.level.material.SimpleFluid 的自定义子类（流经/静止状态）。
- * 同时注册流体桶物品（ModItems.FLUID_BUCKET）。
+ * 流体注册：Registry.register(Registries.FLUID, ...)，每种流体生成一对
+ * FlowableFluid 子类（Still/Flowing，最小可编译实现）。
  */
 
 export function fabricModFluidsJava(spec: ModSpecLike, pkg: string): FileNode {
   const fields = (spec.fluids ?? [])
     .map((f) => {
       const upper = f.fluidId.toUpperCase();
-      return `    public static net.minecraft.world.level.material.Fluid ${upper};`;
+      return `    public static net.minecraft.fluid.Fluid ${upper};\n    public static net.minecraft.fluid.Fluid ${upper}_FLOWING;`;
     })
     .join('\n');
   const regs = (spec.fluids ?? [])
     .map((f) => {
       const upper = f.fluidId.toUpperCase();
-      return `        ${upper} = Registry.register(BuiltInRegistries.FLUID, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${f.fluidId}"), new SimpleFluid());`;
+      const pascal = toPascal(f.fluidId);
+      return `        // Fluid: ${f.fluidId} — 静止/流动成对注册。颜色/温度/粘度等表现层调优、
+        // 木桶/流体方块接线需配套资源与客户端渲染，见类注释。
+        ${upper} = Registry.register(Registries.FLUID, Identifier.of(MOD_ID, "${f.fluidId}"), new ${pascal}Fluid.Still());
+        ${upper}_FLOWING = Registry.register(Registries.FLUID, Identifier.of(MOD_ID, "${f.fluidId}_flowing"), new ${pascal}Fluid.Flowing());`;
     })
     .join('\n');
+  const classes = (spec.fluids ?? [])
+    .map((f) => {
+      const pascal = toPascal(f.fluidId);
+      const upper = f.fluidId.toUpperCase();
+      return `    // ${f.displayName}：最小可编译 FlowableFluid 实现（静止/流动）。
+    // 不含木桶物品、流体方块与客户端渲染——配套资源见 docs。
+    public static class ${pascal}Fluid extends net.minecraft.fluid.FlowableFluid {
+        @Override public net.minecraft.fluid.Fluid getFlowing() { return ${upper}_FLOWING; }
+        @Override public net.minecraft.fluid.Fluid getStill() { return ${upper}; }
+        @Override protected boolean isInfinite(net.minecraft.world.World world) { return false; }
+        @Override protected void beforeBreakingBlock(net.minecraft.world.WorldAccess world, net.minecraft.util.math.BlockPos pos, net.minecraft.block.BlockState state) { }
+        @Override protected int getFlowSpeed(net.minecraft.world.WorldView world) { return 4; }
+        @Override protected int getLevelDecreasePerBlock(net.minecraft.world.WorldView world) { return 1; }
+        @Override public int getLevel(net.minecraft.fluid.FluidState state) { return 8; }
+        @Override public boolean isStill(net.minecraft.fluid.FluidState state) { return this == getStill(); }
+        // 以下为 Fluid 抽象方法占位实现（FlowableFluid 未覆盖的部分）：水样默认值。
+        // 真实流体（木桶/流体方块/渲染/流量特性）需配套资源与客户端渲染，见类注释。
+        @Override public net.minecraft.item.Item getBucketItem() { return net.minecraft.item.Items.WATER_BUCKET; }
+        @Override protected boolean canBeReplacedWith(net.minecraft.fluid.FluidState state, net.minecraft.world.BlockView world, net.minecraft.util.math.BlockPos pos, net.minecraft.fluid.Fluid fluid, net.minecraft.util.math.Direction direction) { return false; }
+        // 注：getVelocity 由 FlowableFluid 提供流速实现，此处不覆盖。
+        @Override public int getTickRate(net.minecraft.world.WorldView world) { return 5; }
+        @Override protected float getBlastResistance() { return 100.0f; }
+        @Override public float getHeight(net.minecraft.fluid.FluidState state, net.minecraft.world.BlockView world, net.minecraft.util.math.BlockPos pos) { return 1.0f; }
+        @Override public float getHeight(net.minecraft.fluid.FluidState state) { return 1.0f; }
+        @Override protected net.minecraft.block.BlockState toBlockState(net.minecraft.fluid.FluidState state) { return net.minecraft.block.Blocks.WATER.getDefaultState(); }
+        @Override public net.minecraft.util.shape.VoxelShape getShape(net.minecraft.fluid.FluidState state, net.minecraft.world.BlockView world, net.minecraft.util.math.BlockPos pos) { return net.minecraft.util.shape.VoxelShapes.fullCube(); }
+        public static class Flowing extends ${pascal}Fluid { }
+        public static class Still extends ${pascal}Fluid { }
+    }`;
+    })
+    .join('\n\n');
   const content = `package ${pkg};
 
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.material.SimpleFluid;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 
 public class ModFluids {
     public static final String MOD_ID = "${javaEscape(spec.modId)}";
 ${fields}
+${classes}
 
     public static void initialize() {
 ${regs}
@@ -163,48 +197,49 @@ ${regs}
 
 /**
  * Mod 侧生物群系：生成 ModBiomes.java。
- * 用 Biome.biome(...) builder 构建 Biome 并注册到 BuiltInRegistries.BIOME。
- * 注册后可通过 biome_source/multi_noise 参数用于维度生成。
+ * Biome 属于动态注册表（数据驱动），不在 Registry.register 时序内直接注册；
+ * 此处生成 public static final 常量持有构造好的对象（配套 worldgen 数据包 JSON 才实际生效），
+ * initialize() 仅留注释，保证可编译且语义诚实。
  */
 
 export function fabricModBiomesJava(spec: ModSpecLike, pkg: string): FileNode {
   const fields = (spec.biomes ?? [])
-    .map(
-      (b) => `    public static net.minecraft.world.level.biome.Biome ${b.biomeId.toUpperCase()};`,
-    )
-    .join('\n');
-  const regs = (spec.biomes ?? [])
     .map((b) => {
-      const c = (v?: number) => (v !== undefined ? `0x${v.toString(16).padStart(6, '0')}` : 'null');
-      const grass = b.grassColor !== undefined ? `, ${c(b.grassColor)}` : '';
-      const foliage = b.foliageColor !== undefined ? `, ${c(b.foliageColor)}` : '';
-      return `        ${b.biomeId.toUpperCase()} = Registry.register(BuiltInRegistries.BIOME, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${b.biomeId}"), new net.minecraft.world.level.biome.Biome.BiomeBuilder()
-            .precipitation(net.minecraft.world.level.biome.Biome.Precipitation.${b.precipitation.toUpperCase()})
-            .temperature(${b.temperature}f)${b.temperatureModifier === 'frozen' ? '\n            .temperatureAdjustment(net.minecraft.world.level.biome.Biome.TemperatureModifier.FROZEN)' : ''}
+      const c = (v?: number) => (v !== undefined ? `0x${v.toString(16).padStart(6, '0')}` : '0');
+      const grass =
+        b.grassColor !== undefined ? `\n                .grassColor(${c(b.grassColor)})` : '';
+      const foliage =
+        b.foliageColor !== undefined ? `\n                .foliageColor(${c(b.foliageColor)})` : '';
+      // precipitation 在 Yarn 是 boolean（有无降水），'none' → false，其余 → true。
+      const precip = b.precipitation === 'none' ? 'false' : 'true';
+      return `    // Biome: ${b.biomeId} — ${b.displayName}（动态注册表内容，见类注释）
+    public static final net.minecraft.world.biome.Biome ${b.biomeId.toUpperCase()} = new net.minecraft.world.biome.Biome.Builder()
+            .precipitation(${precip})
+            .temperature(${b.temperature}f)${b.temperatureModifier === 'frozen' ? '\n            .temperatureModifier(net.minecraft.world.biome.Biome.TemperatureModifier.FROZEN)' : ''}
             .downfall(${b.downfall}f)
-            .specialEffects(new net.minecraft.world.level.biome.BiomeSpecialEffects.Builder()
+            .effects(new net.minecraft.world.biome.BiomeEffects.Builder()
                 .skyColor(${c(b.skyColor)})
                 .waterColor(${c(b.waterColor)})
                 .waterFogColor(${c(b.waterFogColor)})
-                .fogColor(${c(b.fogColor)})${grass ? `.grassColorOverride(${c(b.grassColor)})` : ''}${foliage ? `.foliageColorOverride(${c(b.foliageColor)})` : ''}
+                .fogColor(${c(b.fogColor)})${grass}${foliage}
                 .build())
-            .mobSpawnSettings(net.minecraft.world.level.biome.MobSpawnSettings.EMPTY)
-            .generationSettings(net.minecraft.world.level.biome.BiomeGenerationSettings.EMPTY)
-            .build());`;
+            .spawnSettings(net.minecraft.world.biome.SpawnSettings.INSTANCE)
+            .generationSettings(net.minecraft.world.biome.GenerationSettings.INSTANCE)
+            .build();`;
     })
     .join('\n');
   const content = `package ${pkg};
 
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 
 public class ModBiomes {
     public static final String MOD_ID = "${javaEscape(spec.modId)}";
 ${fields}
 
     public static void initialize() {
-${regs}
+        // 生物群系为动态注册表内容：随数据包 worldgen/biome JSON 下发，上方常量仅作 Java 侧引用占位。
     }
 }
 `;
@@ -216,36 +251,36 @@ ${regs}
 
 /**
  * Mod 侧维度：生成 ModDimensions.java。
- * 注册 DimensionType（dimension_type registry），维度可通过 /execute in <modid>:<dim> 访问。
- * 完整世界生成（LevelStem/ChunkGenerator）需数据包 worldgen 配合，此处注册维度类型为入口。
+ * DimensionType 属于动态注册表（数据驱动），不在 Registry.register 时序内直接注册；
+ * 此处生成 public static final 常量持有构造好的对象（配套 dimension_type 数据包 JSON 才实际生效），
+ * initialize() 仅留注释。维度可通过 /execute in <modid>:<dim> 访问（需数据包）。
  */
 
 export function fabricModDimensionsJava(spec: ModSpecLike, pkg: string): FileNode {
   const fields = (spec.dimensions ?? [])
-    .map(
-      (d) =>
-        `    public static net.minecraft.world.level.dimension.DimensionType ${d.dimensionId.toUpperCase()}_TYPE;`,
-    )
-    .join('\n');
-  const regs = (spec.dimensions ?? [])
     .map((d) => {
       const typeId = d.dimensionId.toUpperCase();
       const fixedTime =
         d.fixedTime !== null ? `OptionalLong.of(${d.fixedTime}L)` : 'OptionalLong.empty()';
+      const infiniburn = `"minecraft:infiniburn_${d.baseType === 'nether' ? 'nether' : 'overworld'}"`;
+      // effects 在 Yarn 是 Identifier（非 Optional），'none' 回落主世界 effects。
       const effects =
         d.effects === 'none'
-          ? 'Optional.empty()'
-          : `Optional.of(ResourceLocation.fromNamespaceAndPath("minecraft", "${d.effects}"))`;
-      const infiniburn = `"minecraft:infiniburn_${d.baseType === 'nether' ? 'nether' : 'overworld'}"`;
-      return `        ${typeId}_TYPE = Registry.register(BuiltInRegistries.DIMENSION_TYPE, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${d.dimensionId}"), new DimensionType(${fixedTime}, ${d.hasSkyLight}, ${d.hasCeiling}, ${d.ultrawarm}, ${d.natural}, ${d.coordinateScale}, ${d.bedWorks}, ${d.respawnAnchorWorks}, ${d.minY}, ${d.height}, ${d.logicalHeight}, ResourceLocation.parse(${infiniburn}), ${effects}, ${d.ambientLight}, ${d.piglinSafe}));`;
+          ? 'Identifier.of("minecraft", "overworld")'
+          : `Identifier.of("minecraft", "${d.effects}")`;
+      // MonsterSettings：piglinSafe 直传；hasRaids 取 !piglinSafe（主世界式默认；下界式取 false），
+      // 光照测试与方块光上限用原版主世界值；精细世界生成请走数据包 dimension_type JSON。
+      const monsterSettings = `new DimensionType.MonsterSettings(${d.piglinSafe}, ${!d.piglinSafe}, net.minecraft.util.math.intprovider.UniformIntProvider.create(0, 7), 0)`;
+      return `    // DimensionType: ${d.dimensionId} — ${d.displayName}（动态注册表内容，见类注释）
+    public static final net.minecraft.world.dimension.DimensionType ${typeId}_TYPE = new DimensionType(${fixedTime}, ${d.hasSkyLight}, ${d.hasCeiling}, ${d.ultrawarm}, ${d.natural}, ${d.coordinateScale}, ${d.bedWorks}, ${d.respawnAnchorWorks}, ${d.minY}, ${d.height}, ${d.logicalHeight}, net.minecraft.registry.tag.TagKey.of(net.minecraft.registry.RegistryKeys.BLOCK, new net.minecraft.util.Identifier(${infiniburn})), ${effects}, ${d.ambientLight}, ${monsterSettings});`;
     })
     .join('\n');
   const content = `package ${pkg};
 
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.dimension.DimensionType;
 import java.util.Optional;
 import java.util.OptionalLong;
 
@@ -254,7 +289,7 @@ public class ModDimensions {
 ${fields}
 
     public static void initialize() {
-${regs}
+        // 维度类型为动态注册表内容：随数据包 dimension_type JSON 下发，上方常量仅作 Java 侧引用占位。
     }
 }
 `;
@@ -285,15 +320,15 @@ export function fabricModGuisJava(spec: ModSpecLike, pkg: string): FileNode {
         .join('\n');
       const energyBar = g.showEnergyBar
         ? `\n            // 能源条（需 textures/gui/energy_bar.png 资源）
-            graphics.blit(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "textures/gui/energy_bar.png"), this.leftPos + 8, this.topPos + 16, 0, 0, 14, 54);`
+            graphics.drawTexture(net.minecraft.util.Identifier.of(MOD_ID, "textures/gui/energy_bar.png"), this.x + 8, this.y + 16, 0, 0, 14, 54);`
         : '';
       return `    // ${pascal}Menu：GUI 槽位布局（${slotCount} 槽）
-    public static class ${pascal}Menu extends AbstractContainerMenu {
-        private final net.minecraft.world.SimpleContainer machineInv;
+    public static class ${pascal}Menu extends ScreenHandler {
+        private final net.minecraft.inventory.SimpleInventory machineInv;
 
-        public ${pascal}Menu(int id, Inventory inv) {
+        public ${pascal}Menu(int id, PlayerInventory inv) {
             super(${pascal.toUpperCase()}_MENU_TYPE, id);
-            this.machineInv = new net.minecraft.world.SimpleContainer(${slotCount});
+            this.machineInv = new net.minecraft.inventory.SimpleInventory(${slotCount});
 ${slotAdds}
             // 玩家背包
             for (int row = 0; row < 3; row++) {
@@ -307,53 +342,55 @@ ${slotAdds}
         }
 
         @Override
-        public net.minecraft.world.item.ItemStack quickMoveStack(net.minecraft.world.entity.player.Player player, int index) {
-            return net.minecraft.world.item.ItemStack.EMPTY;
+        public net.minecraft.item.ItemStack quickMove(net.minecraft.entity.player.PlayerEntity player, int index) {
+            return net.minecraft.item.ItemStack.EMPTY;
         }
 
         @Override
-        public boolean stillValid(net.minecraft.world.entity.player.Player player) {
+        public boolean canUse(net.minecraft.entity.player.PlayerEntity player) {
             return true;
         }
     }
 
-    // ${pascal}Screen：GUI 渲染
-    public static class ${pascal}Screen extends net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<${pascal}Menu> {
-        public ${pascal}Screen(${pascal}Menu menu, Inventory inv, net.minecraft.network.chat.Component title) {
+    // ${pascal}Screen：GUI 渲染（客户端类，需客户端 jar 编译；服务端构建跳过）
+    public static class ${pascal}Screen extends net.minecraft.client.gui.screen.ingame.HandledScreen<${pascal}Menu> {
+        public ${pascal}Screen(${pascal}Menu menu, PlayerInventory inv, net.minecraft.text.Text title) {
             super(menu, inv, title);
-            this.imageWidth = ${g.width};
-            this.imageHeight = ${g.height};
+            this.backgroundWidth = ${g.width};
+            this.backgroundHeight = ${g.height};
         }
 
         @Override
-        protected void renderBg(net.minecraft.client.gui.GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-            graphics.blit(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "textures/gui/${g.guiId}.png"), this.leftPos, this.topPos, 0, 0, this.imageWidth, this.imageHeight);${energyBar}
+        protected void drawBackground(net.minecraft.client.gui.DrawContext graphics, float partialTick, int mouseX, int mouseY) {
+            graphics.drawTexture(net.minecraft.util.Identifier.of(MOD_ID, "textures/gui/${g.guiId}.png"), this.x, this.y, 0, 0, this.backgroundWidth, this.backgroundHeight);${energyBar}
         }
 
         @Override
-        public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        public void render(net.minecraft.client.gui.DrawContext graphics, int mouseX, int mouseY, float partialTick) {
             super.render(graphics, mouseX, mouseY, partialTick);
-            this.renderTooltip(graphics, mouseX, mouseY);
+            this.drawMouseoverTooltip(graphics, mouseX, mouseY);
         }
     }
 
-    public static final net.minecraft.world.inventory.MenuType<${pascal}Menu> ${pascal.toUpperCase()}_MENU_TYPE = new net.minecraft.world.inventory.MenuType<>((${pascal}Menu::new));`;
+    public static final net.minecraft.screen.ScreenHandlerType<${pascal}Menu> ${pascal.toUpperCase()}_MENU_TYPE = new net.minecraft.screen.ScreenHandlerType<>(${pascal}Menu::new, net.minecraft.resource.featuretoggle.FeatureFlags.VANILLA_FEATURES);`;
     })
     .join('\n\n');
   const regs = (spec.guis ?? [])
     .map((g) => {
       const pascal = toPascal(g.guiId);
-      return `        Registry.register(BuiltInRegistries.MENU, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${g.guiId}"), ${pascal.toUpperCase()}_MENU_TYPE);`;
+      // ScreenHandlerType 构造器/Factory 在 Yarn 为受限访问，Fabric transitive AW 已放行
+      //（fabric-transitive-access-wideners-v1），loom 真构建可编译；裸 javac 会报访问错误，属预期内。
+      return `        Registry.register(Registries.SCREEN_HANDLER, Identifier.of(MOD_ID, "${g.guiId}"), ${pascal.toUpperCase()}_MENU_TYPE);`;
     })
     .join('\n');
   const content = `package ${pkg};
 
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
+import net.minecraft.screen.ScreenHandler;
+import net.minecraft.screen.slot.Slot;
+import net.minecraft.entity.player.PlayerInventory;
 
 public class ModGuis {
     public static final String MOD_ID = "${javaEscape(spec.modId)}";
@@ -372,51 +409,52 @@ ${regs}
 
 /**
  * Mod 侧结构：生成 ModStructures.java。
- * 注册 Structure 与 StructureSet（jigsaw 结构，配套数据包 template_pool）。
- * 结构实际生成需数据包 worldgen 文件配合（structure/structure_set JSON）。
+ * Structure/StructureSet 属于动态注册表（数据驱动），不在 Registry.register 时序内直接注册；
+ * 此处生成 public static final 常量持有构造好的对象（结构实际生成需配套 worldgen 数据包 JSON），
+ * initialize() 仅留注释，保证可编译且语义诚实。
  */
 
 export function fabricModStructuresJava(spec: ModSpecLike, pkg: string): FileNode {
   const fields = (spec.structures ?? [])
-    .map(
-      (s) =>
-        `    public static net.minecraft.world.level.levelgen.structure.Structure ${s.structureId.toUpperCase()};
-    public static net.minecraft.world.level.levelgen.structure.StructureSet ${s.structureId.toUpperCase()}_SET;`,
-    )
-    .join('\n');
-  const regs = (spec.structures ?? [])
     .map((s) => {
       const id = s.structureId.toUpperCase();
-      return `        // Structure: ${s.structureId} — ${s.displayName}
-        // startPool=${s.startPool}, size=${s.size}, maxDistance=${s.maxDistance}
-        // biomes=${s.biomes}, terrainAdaptation=${s.terrainAdaptation}
-        // spacing=${s.spacing}, separation=${s.separation}, salt=${s.salt}
-        ${id} = Registry.register(BuiltInRegistries.STRUCTURE, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${s.structureId}"), new net.minecraft.world.level.levelgen.structure.structures.JigsawStructure(
-            net.minecraft.world.level.levelgen.structure.Structure.StructureSettingsHolder.empty(),
-            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "${s.startPool}"),
+      // 注意：startPool 指向数据包 template_pool（结构实际生成需配套 worldgen JSON）；
+      // Java 侧传 null 占位（仅在实际生成时才解引用，无数据包时结构保持惰性）；
+      // 空生物群系列表/空生成覆盖用显式泛型见证避免推断失败。
+      return `    // Structure: ${s.structureId} — ${s.displayName}
+    // startPool=${s.startPool}, size=${s.size}, maxDistance=${s.maxDistance}
+    // biomes=${s.biomes}, terrainAdaptation=${s.terrainAdaptation}
+    // spacing=${s.spacing}, separation=${s.separation}, salt=${s.salt}
+    public static final net.minecraft.world.gen.structure.Structure ${id} = new net.minecraft.world.gen.structure.JigsawStructure(
+            new net.minecraft.world.gen.structure.Structure.Config(
+                net.minecraft.registry.entry.RegistryEntryList.<net.minecraft.world.biome.Biome>of(java.util.List.of()),
+                java.util.Map.<net.minecraft.entity.SpawnGroup, net.minecraft.world.StructureSpawns>of(),
+                net.minecraft.world.gen.GenerationStep.Feature.SURFACE_STRUCTURES,
+                net.minecraft.world.gen.StructureTerrainAdaptation.${s.terrainAdaptation.toUpperCase()}
+            ),
+            null,
             ${s.size},
-            net.minecraft.world.level.levelgen.heightproviders.ConstantHeight.of(net.minecraft.world.level.levelgen.WorldGenContext.EMPTY),
-            false,
-            net.minecraft.world.level.levelgen.structure.terrainadaptation.TerrainAdjustment.${s.terrainAdaptation.toUpperCase()}
-        ));
-        ${id}_SET = Registry.register(BuiltInRegistries.STRUCTURE_SET, ResourceLocation.fromNamespaceAndPath(MOD_ID, "${s.structureId}"), new net.minecraft.world.level.levelgen.structure.StructureSet(
-            java.util.List.of(new net.minecraft.world.level.levelgen.structure.StructureSetEntry(${id}, 1)),
-            new net.minecraft.world.level.levelgen.placement.RandomSpreadStructurePlacement(${s.spacing}, ${s.separation}, ${s.salt}, net.minecraft.core.Direction.HORIZONTAL)
-        ));`;
+            net.minecraft.world.gen.heightprovider.ConstantHeightProvider.ZERO,
+            false
+        );
+    public static final net.minecraft.structure.StructureSet ${id}_SET = new net.minecraft.structure.StructureSet(
+            net.minecraft.registry.entry.RegistryEntry.<net.minecraft.world.gen.structure.Structure>of(${id}),
+            new net.minecraft.world.gen.chunk.placement.RandomSpreadStructurePlacement(${s.spacing}, ${s.separation}, net.minecraft.world.gen.chunk.placement.SpreadType.TRIANGULAR, ${s.salt})
+        );`;
     })
     .join('\n');
   const content = `package ${pkg};
 
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 
 public class ModStructures {
     public static final String MOD_ID = "${javaEscape(spec.modId)}";
 ${fields}
 
     public static void initialize() {
-${regs}
+        // 结构/结构集为动态注册表内容：随数据包 worldgen/structure + structure_set JSON 下发，上方常量仅作 Java 侧引用占位。
     }
 }
 `;
@@ -462,9 +500,9 @@ ${comments}
 }
 
 /**
- * 生成 ModEntities.java：用 Registry.register(BuiltInRegistries.ENTITY_TYPE, ...) 注册实体。
- * 使用 Mojang 官方映射（EntityType.Builder.of().sized(w, h).build()），
- * 与 NeoForge 一致，配合 officialMojangMappings 构建。
+ * 生成 ModEntities.java：用 Registry.register(Registries.ENTITY_TYPE, ...) 注册实体。
+ * 使用 Yarn 映射（EntityType.Builder.create().setDimensions(w, h).build()），
+ * 与 NeoForge 一致，配合 yarn mappings 构建。
  */
 
 export function fabricModEntitiesJava(spec: ModSpecLike, pkg: string): FileNode {
@@ -478,32 +516,32 @@ export function fabricModEntitiesJava(spec: ModSpecLike, pkg: string): FileNode 
     .join('\n');
   const regs = entities
     .map((e) => {
-      // 简化：根据 modelType 选择 MobCategory，根据 classification 映射
-      const category = fabricMojangMobCategory(e.classification);
+      // 简化：根据 modelType 选择 SpawnGroup，根据 classification 映射
+      const category = fabricYarnSpawnGroup(e.classification);
       const width = 0.6;
       const height = 1.8;
       return `        // Entity: ${e.entityId} (${e.modelType}, ${e.classification}) — ${e.displayName}
         // maxHealth=${e.maxHealth}, attackDamage=${e.attackDamage}, movementSpeed=${e.movementSpeed}
         // spawnWeight=${e.spawnWeight}, spawnBiomes=${JSON.stringify(e.spawnBiomes)}
-        ${e.entityId.toUpperCase()} = Registry.register(BuiltInRegistries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(${mainCls}.MOD_ID, "${e.entityId}"), EntityType.Builder.<${fabricEntityBaseClass(e.modelType)}>of(${fabricEntityFactoryMojang(e.modelType)}, ${category}).sized(${width}f, ${height}f).build("${e.entityId}"));`;
+        ${e.entityId.toUpperCase()} = Registry.register(Registries.ENTITY_TYPE, Identifier.of(${mainCls}.MOD_ID, "${e.entityId}"), EntityType.Builder.<${fabricEntityBaseClass(e.modelType)}>create(${fabricEntityFactoryYarn(e.modelType)}, ${category}).setDimensions(${width}f, ${height}f).build("${e.entityId}"));`;
     })
     .join('\n');
-  // G-1 修复：实体字段/工厂引用具体实体类（Zombie/Skeleton/...），必须补对应 import，
-  // 否则生成代码引用了未导入的类无法编译。
+  // G-1 修复：实体字段/工厂引用具体实体类（ZombieEntity/SkeletonEntity/...），必须补对应 import，
+  // 否则生成代码引用了未导入的类无法编译。Yarn 下具体类按 passive/mob 分包。
   const usedEntityClasses = [
     ...new Set(entities.map((e) => fabricEntityBaseClass(e.modelType))),
   ].sort();
   const entityImports = usedEntityClasses
-    .map((c) => `import net.minecraft.world.entity.${c};`)
+    .map((c) => `import ${fabricEntityPackage(c)}.${c};`)
     .join('\n');
   const content = `package ${pkg};
 
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.MobCategory;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.SpawnGroup;
 ${entityImports}
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.util.Identifier;
 
 public class ModEntities {
 ${fields}
@@ -520,7 +558,7 @@ ${regs}
 }
 
 /**
- * 生成 ModMachines.java：注册 BlockEntityType + MenuType（可编译占位骨架）。
+ * 生成 ModMachines.java：注册 BlockEntityType + ScreenHandlerType（可编译占位骨架）。
  *
  * G-2 修复：原实现引用不存在的 ModBlocks.${MACHINE_ID}（方块 id 与 machineId 不一定相同）
  * 和 ${Pascal}BlockEntity / ${Pascal}Menu 顶层类，生成代码无法编译。
@@ -534,7 +572,7 @@ export function fabricModMachinesJava(spec: ModSpecLike, pkg: string): FileNode 
   const fields = machines
     .map(
       (m) =>
-        `    public static BlockEntityType<?> ${m.machineId.toUpperCase()}_BE;\n    public static MenuType<?> ${m.machineId.toUpperCase()}_MENU;`,
+        `    public static BlockEntityType<?> ${m.machineId.toUpperCase()}_BE;\n    public static ScreenHandlerType<?> ${m.machineId.toUpperCase()}_MENU;`,
     )
     .join('\n');
   const placeholderClasses = machines
@@ -549,7 +587,7 @@ export function fabricModMachinesJava(spec: ModSpecLike, pkg: string): FileNode 
         public static final int PROCESS_TIME = ${m.defaultProcessTime};
         private int energy = 0;
         private int progress = 0;
-        private final net.minecraft.world.SimpleContainer inventory = new net.minecraft.world.SimpleContainer(${totalSlots});
+        private final net.minecraft.inventory.SimpleInventory inventory = new net.minecraft.inventory.SimpleInventory(${totalSlots});
 
         public ${pascal}BlockEntity(BlockPos pos, BlockState state) {
             super(${id}_BE, pos, state);
@@ -570,7 +608,7 @@ export function fabricModMachinesJava(spec: ModSpecLike, pkg: string): FileNode 
         }
 
         // 槽位访问：输入槽在前，输出槽在后
-        public net.minecraft.world.SimpleContainer getInventory() { return inventory; }
+        public net.minecraft.inventory.SimpleInventory getInventory() { return inventory; }
 
         // tick 处理：耗能推进加工进度（输出槽有空间时）
         public void tickServer() {
@@ -581,18 +619,18 @@ export function fabricModMachinesJava(spec: ModSpecLike, pkg: string): FileNode 
                 progress = 0;
                 // 配方映射：输入物品 ID → 输出物品 ID（未匹配时回退原样搬运）
                 for (int i = 0; i < ${m.inputSlots}; i++) {
-                    var stack = inventory.getItem(i);
+                    var stack = inventory.getStack(i);
                     if (!stack.isEmpty()) {
-                        var outStack = inventory.getItem(${m.inputSlots});
+                        var outStack = inventory.getStack(${m.inputSlots});
                         if (outStack.isEmpty()) {
-                            String outId = recipeOutput(stack.getItem().getDescriptionId());
+                            String outId = recipeOutput(stack.getItem().getTranslationKey());
                             if (outId != null) {
-                                var output = new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse(outId)), 1);
-                                inventory.setItem(${m.inputSlots}, output);
-                                stack.shrink(1);
+                                var output = new net.minecraft.item.ItemStack(net.minecraft.registry.Registries.ITEM.get(new net.minecraft.util.Identifier(outId)), 1);
+                                inventory.setStack(${m.inputSlots}, output);
+                                stack.decrement(1);
                             } else {
-                                inventory.setItem(${m.inputSlots}, stack.copyWithCount(1));
-                                stack.shrink(1);
+                                inventory.setStack(${m.inputSlots}, stack.copyWithCount(1));
+                                stack.decrement(1);
                             }
                         }
                         break;
@@ -613,12 +651,12 @@ ${machineRecipeCases(m)}
     }
 
     // ${pascal}Menu：输入槽(0..${m.inputSlots - 1}) + 输出槽(${m.inputSlots}..${totalSlots - 1}) + 玩家背包(9×3)
-    public static class ${pascal}Menu extends AbstractContainerMenu {
-        private final net.minecraft.world.SimpleContainer machineInv;
+    public static class ${pascal}Menu extends ScreenHandler {
+        private final net.minecraft.inventory.SimpleInventory machineInv;
 
-        public ${pascal}Menu(int id, Inventory inv) {
+        public ${pascal}Menu(int id, PlayerInventory inv) {
             super(${id}_MENU, id);
-            this.machineInv = new net.minecraft.world.SimpleContainer(${totalSlots});
+            this.machineInv = new net.minecraft.inventory.SimpleInventory(${totalSlots});
             // 机器槽位
             for (int i = 0; i < ${totalSlots}; i++) {
                 this.addSlot(new Slot(machineInv, i, 8 + (i % 9) * 18, 18 + (i / 9) * 18));
@@ -636,12 +674,12 @@ ${machineRecipeCases(m)}
         }
 
         @Override
-        public net.minecraft.world.item.ItemStack quickMoveStack(net.minecraft.world.entity.player.Player player, int index) {
-            return net.minecraft.world.item.ItemStack.EMPTY;
+        public net.minecraft.item.ItemStack quickMove(net.minecraft.entity.player.PlayerEntity player, int index) {
+            return net.minecraft.item.ItemStack.EMPTY;
         }
 
         @Override
-        public boolean stillValid(net.minecraft.world.entity.player.Player player) {
+        public boolean canUse(net.minecraft.entity.player.PlayerEntity player) {
             return true;
         }
     }`;
@@ -656,23 +694,26 @@ ${machineRecipeCases(m)}
         // inputSlots=${m.inputSlots}, outputSlots=${m.outputSlots}
         // processTime=${m.defaultProcessTime}, energyPerTick=${m.defaultEnergyPerTick}
         // guiWidth=${m.guiWidth}, guiHeight=${m.guiHeight}
-        ${id}_BE = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(${mainCls}.MOD_ID, "${m.machineId}"), BlockEntityType.Builder.of(${pascal}BlockEntity::new, Blocks.STONE).build(null));
-        ${id}_MENU = Registry.register(BuiltInRegistries.MENU, ResourceLocation.fromNamespaceAndPath(${mainCls}.MOD_ID, "${m.machineId}"), new MenuType<>(${pascal}Menu::new));`;
+        // BlockEntityType.Builder.create 的 Factory 接口同样由 Fabric transitive AW 放行，loom 真构建可编译。
+        ${id}_BE = Registry.register(Registries.BLOCK_ENTITY_TYPE, Identifier.of(${mainCls}.MOD_ID, "${m.machineId}"), BlockEntityType.Builder.create(${pascal}BlockEntity::new, Blocks.STONE).build(null));
+        ${id}_MENU = Registry.register(Registries.SCREEN_HANDLER, Identifier.of(${mainCls}.MOD_ID, "${m.machineId}"), new ScreenHandlerType<>(${pascal}Menu::new, FeatureFlags.VANILLA_FEATURES));`;
     })
     .join('\n');
   const content = `package ${pkg};
 
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.MenuType;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.screen.ScreenHandler;
+import net.minecraft.screen.ScreenHandlerType;
+import net.minecraft.screen.slot.Slot;
+import net.minecraft.resource.featuretoggle.FeatureFlags;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.util.Identifier;
 
 public class ModMachines {
 ${fields}
@@ -934,13 +975,26 @@ ${body}
   const blockPlaceHandlers = handlers.filter((h) => h.eventType === 'block_place');
   const notifyBlockPlaced = blockPlaceHandlers.length
     ? `    // block_place 事件通知入口（由 ModBlockPlaceMixin @Inject 调用，Fabric API 无放置事件）
-    public static void notifyBlockPlaced(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state, net.minecraft.server.level.ServerPlayer player) {
+    public static void notifyBlockPlaced(net.minecraft.world.World level, net.minecraft.util.math.BlockPos pos, net.minecraft.block.BlockState state, net.minecraft.server.network.ServerPlayerEntity player) {
         EventContext ctx = new EventContext();
-        ctx.level = level instanceof net.minecraft.server.level.ServerLevel sl ? sl : null;
+        ctx.level = level instanceof net.minecraft.server.world.ServerWorld sl ? sl : null;
         ctx.pos = pos;
         ctx.state = state;
         ctx.player = player;
 ${blockPlaceHandlers.map((h) => `        handle_${sanitizeIdent(h.handlerId)}(ctx);`).join('\n')}
+    }`
+    : '';
+
+  // item_pickup：Fabric 无拾取事件，由 ModItemPickupMixin @Inject 调用的公开通知入口。
+  const itemPickupHandlers = handlers.filter((h) => h.eventType === 'item_pickup');
+  const notifyItemPickedup = itemPickupHandlers.length
+    ? `    // item_pickup 事件通知入口（由 ModItemPickupMixin @Inject 调用，Fabric API 无拾取事件）
+    public static void notifyItemPickedup(net.minecraft.world.World level, net.minecraft.server.network.ServerPlayerEntity player, net.minecraft.item.ItemStack stack) {
+        EventContext ctx = new EventContext();
+        ctx.level = level instanceof net.minecraft.server.world.ServerWorld sl ? sl : null;
+        ctx.player = player;
+        ctx.stack = stack;
+${itemPickupHandlers.map((h) => `        handle_${sanitizeIdent(h.handlerId)}(ctx);`).join('\n')}
     }`
     : '';
 
@@ -980,6 +1034,7 @@ ${body}
   const allMethods = [
     handlerMethods,
     notifyBlockPlaced,
+    notifyItemPickedup,
     procedureMethods,
     conditionMethods,
     actionMethods,
@@ -990,12 +1045,12 @@ ${body}
   // 事件上下文：承载回调参数（Fabric 回调多参数在此绑定），供条件/动作逻辑读取
   const eventContextClass = `    // 事件上下文：回调参数绑定字段（事件未提供时保持 null，逻辑侧判空保护）
     private static class EventContext {
-        net.minecraft.server.level.ServerPlayer player = null;
-        net.minecraft.server.level.ServerLevel level = null;
-        net.minecraft.core.BlockPos pos = null;
-        net.minecraft.world.level.block.state.BlockState state = null;
-        net.minecraft.world.item.ItemStack stack = null;
-        net.minecraft.world.entity.Entity target = null;
+        net.minecraft.server.network.ServerPlayerEntity player = null;
+        net.minecraft.server.world.ServerWorld level = null;
+        net.minecraft.util.math.BlockPos pos = null;
+        net.minecraft.block.BlockState state = null;
+        net.minecraft.item.ItemStack stack = null;
+        net.minecraft.entity.Entity target = null;
     }`;
 
   const content = `package ${pkg};
@@ -1019,8 +1074,8 @@ ${registrations || '        // (无事件处理器)'}
 
 /**
  * P2.2 block_place 的 Mixin 支持（Fabric API 无放置事件）。
- * 生成 ModBlockPlaceMixin.java（@Inject BlockItem.place 的 RETURN 后通知 ModEvents.notifyBlockPlaced）
- * 与 <modId>.mixins.json（fabric.mod.json 通过 mixins 字段引用）。
+ * 生成 ModBlockPlaceMixin.java（@Inject BlockItem.place 公开单参重载的 RETURN 后通知
+ * ModEvents.notifyBlockPlaced）。mixins.json 由 fabricMixinsJson 统一生成。
  * 无 block_place handler 时返回空数组（不生成任何文件）。
  */
 
@@ -1030,11 +1085,11 @@ export function fabricBlockPlaceMixinFiles(spec: ModSpecLike, pkg: string): File
 
   const mixinClass = `package ${pkg}.mixin;
 
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.util.ActionResult;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.world.World;
+import net.minecraft.block.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -1042,52 +1097,118 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(BlockItem.class)
 public class ModBlockPlaceMixin {
-    // P2.2: 方块放置成功后通知 ModEvents（Fabric API 无现成放置事件）
-    @Inject(method = "place", at = @At("RETURN"))
-    private void onBlockPlaced(BlockPlaceContext context, CallbackInfoReturnable<InteractionResult> cir) {
-        if (cir.getReturnValue().consumesAction()) {
-            Level level = context.getLevel();
-            net.minecraft.core.BlockPos pos = context.getClickedPos();
-            BlockState state = level.getBlockState(pos);
-            net.minecraft.world.entity.player.Player player = context.getPlayer();
-            net.minecraft.server.level.ServerPlayer sp = player instanceof net.minecraft.server.level.ServerPlayer p ? p : null;
-            ${pkg}.ModEvents.notifyBlockPlaced(level, pos, state, sp);
+    // P2.2: 方块放置成功后通知 ModEvents（Fabric API 无现成放置事件）。
+    // @Inject 目标为唯一的 public place(ItemPlacementContext)（另一个 place(ctx, state)
+    // 重载是 protected 辅助方法，签名不同，不会双触发）；描述符写全以锁定目标。
+    @Inject(method = "place(Lnet/minecraft/item/ItemPlacementContext;)Lnet/minecraft/util/ActionResult;", at = @At("RETURN"))
+    private void onBlockPlaced(ItemPlacementContext context, CallbackInfoReturnable<ActionResult> cir) {
+        if (cir.getReturnValue().isAccepted()) {
+            World world = context.getWorld();
+            net.minecraft.util.math.BlockPos pos = context.getBlockPos();
+            BlockState state = world.getBlockState(pos);
+            net.minecraft.entity.player.PlayerEntity player = context.getPlayer();
+            net.minecraft.server.network.ServerPlayerEntity sp = player instanceof net.minecraft.server.network.ServerPlayerEntity p ? p : null;
+            ${pkg}.ModEvents.notifyBlockPlaced(world, pos, state, sp);
         }
     }
 }
 `;
 
-  const mixinsJson = JSON.stringify(
-    {
-      required: true,
-      package: `${pkg}.mixin`,
-      compatibilityLevel: 'JAVA_21',
-      mixins: ['ModBlockPlaceMixin'],
-      injectors: { defaultRequire: 1 },
-    },
-    null,
-    2,
-  );
-
+  // 注意：mixins.json 由 fabricMixinsJson 统一生成（多 Mixin 共用一个文件），
+  // 此处只返回 Mixin 类文件，避免同路径重复。
   return [
     {
       path: `src/main/java/${packagePath(spec.modId)}/mixin/ModBlockPlaceMixin.java`,
       content: mixinClass,
     },
+  ];
+}
+
+/**
+ * item_pickup 的 Mixin 支持（Fabric API 无拾取事件）。
+ * 生成 ModItemPickupMixin.java（@Inject ItemEntity.onPlayerCollision 的 TAIL 后通知
+ * ModEvents.notifyItemPickedup）。mixins.json 与 block_place 共用一个文件
+ * （见 fabricMixinsJson），无 item_pickup handler 时返回空数组。
+ * 注意：碰撞尝试即触发（背包满时 vanilla 也会拒绝），服务端用 instanceof 守卫。
+ */
+
+export function fabricItemPickupMixinFiles(spec: ModSpecLike, pkg: string): FileNode[] {
+  const hasItemPickup = (spec.eventHandlers ?? []).some((h) => h.eventType === 'item_pickup');
+  if (!hasItemPickup) return [];
+
+  const mixinClass = `package ${pkg}.mixin;
+
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(ItemEntity.class)
+public class ModItemPickupMixin {
+    // 碰撞尝试即触发（背包满时 vanilla 也会拒绝）；客户端世界直接返回
+    @Inject(method = "onPlayerCollision(Lnet/minecraft/entity/player/PlayerEntity;)V", at = @At("TAIL"))
+    private void onItemPickedUp(PlayerEntity player, CallbackInfo ci) {
+        if (((ItemEntity) (Object) this).getWorld() instanceof ServerWorld) {
+            ${pkg}.ModEvents.notifyItemPickedup(
+                ((ItemEntity) (Object) this).getWorld(),
+                (ServerPlayerEntity) player,
+                ((ItemEntity) (Object) this).getStack());
+        }
+    }
+}
+`;
+
+  return [
+    {
+      path: `src/main/java/${packagePath(spec.modId)}/mixin/ModItemPickupMixin.java`,
+      content: mixinClass,
+    },
+  ];
+}
+
+/**
+ * Mixin 配置（block_place / item_pickup 共用）：列出实际生成的 Mixin 类。
+ * 无 Mixin 事件时返回空数组（fabric.mod.json 也不声明，避免悬空引用启动崩溃）。
+ */
+
+export function fabricMixinsJson(spec: ModSpecLike, pkg: string): FileNode[] {
+  const names: string[] = [];
+  if ((spec.eventHandlers ?? []).some((h) => h.eventType === 'block_place')) {
+    names.push('ModBlockPlaceMixin');
+  }
+  if ((spec.eventHandlers ?? []).some((h) => h.eventType === 'item_pickup')) {
+    names.push('ModItemPickupMixin');
+  }
+  if (!names.length) return [];
+  return [
     {
       path: `src/main/resources/${spec.modId}.mixins.json`,
-      content: mixinsJson,
+      content: JSON.stringify(
+        {
+          required: true,
+          package: `${pkg}.mixin`,
+          compatibilityLevel: 'JAVA_17',
+          mixins: names,
+          injectors: { defaultRequire: 1 },
+        },
+        null,
+        2,
+      ),
     },
   ];
 }
 
 /**
  * 根据 eventType 生成 Fabric 事件注册调用（用全限定名避免 import 错误）。
- * 使用 Mojang 映射（与 officialMojangMappings 一致）：
- * - ServerPlayer（而非 Yarn 的 ServerPlayerEntity）
- * - ServerLevel（而非 Yarn 的 ServerWorld）
+ * 使用 Yarn 映射：
+ * - ServerPlayerEntity（Yarn 对应 Mojang 的 ServerPlayer）
+ * - ServerWorld（Yarn 对应 Mojang 的 ServerLevel）
  *
- * P1 dogfood 修复：ServerPlayerEvents.JOIN/LEAVE 回调签名含 ServerPlayer + MinecraftServer。
+ * P1 dogfood 修复：ServerPlayerEvents.JOIN/LEAVE 回调签名含 ServerPlayerEntity + MinecraftServer。
  * P2.1 事件参数绑定：回调多参数绑定为 EventContext 字段，不再只传 player。
  */
 
@@ -1096,28 +1217,28 @@ export function fabricEventRegistration(eventType: string, handlerMethod: string
     case 'tick':
       return `        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> {
             EventContext ctx = new EventContext();
-            ctx.level = server.overworld();
+            ctx.level = server.getOverworld();
             ${handlerMethod}(ctx);
         });`;
     case 'player_join':
-      return `        net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents.JOIN.register((player, server) -> {
+      return `        net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             EventContext ctx = new EventContext();
-            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
-            ctx.level = server.overworld();
+            ctx.player = handler.player;
+            ctx.level = (net.minecraft.server.world.ServerWorld) handler.player.getWorld();
             ${handlerMethod}(ctx);
         });`;
     case 'player_quit':
-      return `        net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents.LEAVE.register((player, server) -> {
+      return `        net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             EventContext ctx = new EventContext();
-            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
-            ctx.level = server.overworld();
+            ctx.player = handler.player;
+            ctx.level = (net.minecraft.server.world.ServerWorld) handler.player.getWorld();
             ${handlerMethod}(ctx);
         });`;
     case 'block_break':
       return `        net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
             EventContext ctx = new EventContext();
-            ctx.level = (net.minecraft.server.level.ServerLevel) world;
-            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
+            ctx.level = (net.minecraft.server.world.ServerWorld) world;
+            ctx.player = (net.minecraft.server.network.ServerPlayerEntity) player;
             ctx.pos = pos;
             ctx.state = state;
             ${handlerMethod}(ctx);
@@ -1125,56 +1246,51 @@ export function fabricEventRegistration(eventType: string, handlerMethod: string
     case 'player_right_click_block':
       return `        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
             EventContext ctx = new EventContext();
-            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
-            ctx.level = (net.minecraft.server.level.ServerLevel) world;
+            ctx.player = (net.minecraft.server.network.ServerPlayerEntity) player;
+            ctx.level = (net.minecraft.server.world.ServerWorld) world;
             ctx.pos = hitResult.getBlockPos();
             ${handlerMethod}(ctx);
-            return net.minecraft.world.InteractionResult.PASS;
+            return net.minecraft.util.ActionResult.PASS;
         });`;
     case 'player_right_click_item':
     case 'item_use':
       return `        net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register((player, world, hand) -> {
             EventContext ctx = new EventContext();
-            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
-            ctx.level = (net.minecraft.server.level.ServerLevel) world;
-            ctx.stack = player.getItemInHand(hand);
+            ctx.player = (net.minecraft.server.network.ServerPlayerEntity) player;
+            ctx.level = (net.minecraft.server.world.ServerWorld) world;
+            ctx.stack = player.getStackInHand(hand);
             ${handlerMethod}(ctx);
-            return net.minecraft.util.TypedActionResult.pass(player.getItemInHand(hand));
+            return net.minecraft.util.TypedActionResult.pass(player.getStackInHand(hand));
         });`;
     case 'player_left_click':
       return `        net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) -> {
             EventContext ctx = new EventContext();
-            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
-            ctx.level = (net.minecraft.server.level.ServerLevel) world;
+            ctx.player = (net.minecraft.server.network.ServerPlayerEntity) player;
+            ctx.level = (net.minecraft.server.world.ServerWorld) world;
             ctx.pos = pos;
             ${handlerMethod}(ctx);
-            return net.minecraft.world.InteractionResult.PASS;
+            return net.minecraft.util.ActionResult.PASS;
         });`;
     case 'item_pickup':
-      return `        net.fabricmc.fabric.api.event.player.PlayerPickupItemCallback.EVENT.register((player, itemEntity) -> {
-            EventContext ctx = new EventContext();
-            ctx.player = (net.minecraft.server.level.ServerPlayer) player;
-            ctx.level = (net.minecraft.server.level.ServerLevel) player.level();
-            ctx.target = itemEntity;
-            ctx.stack = itemEntity.getItem();
-            ${handlerMethod}(ctx);
-            return false;
-        });`;
+      // Fabric API 无拾取事件：由 ModItemPickupMixin 在 ItemEntity.onPlayerCollision 后调用 notifyItemPickedup
+      return `        // item_pickup: Fabric API 无拾取事件，由 ModItemPickupMixin @Inject 触发
+        // ModEvents.notifyItemPickedup(world, player, stack) 已在 Mixin 中调用`;
     case 'entity_death':
       // Fabric API ServerLivingEntityEvents.AFTER_DEATH：实体死亡后触发（target 绑定死亡实体）
       return `        net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             EventContext ctx = new EventContext();
             ctx.target = entity;
-            ctx.level = (net.minecraft.server.level.ServerLevel) entity.level();
+            ctx.level = (net.minecraft.server.world.ServerWorld) entity.getWorld();
             ${handlerMethod}(ctx);
         });`;
     case 'entity_hurt':
-      // Fabric API ServerLivingEntityEvents.AFTER_DAMAGE：实体受伤后触发（target 绑定受伤实体）
-      return `        net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damageTaken, blocked) -> {
+      // Fabric API ServerLivingEntityEvents.ALLOW_DAMAGE：受伤时触发（返回 true 不取消伤害）
+      return `        net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
             EventContext ctx = new EventContext();
             ctx.target = entity;
-            ctx.level = (net.minecraft.server.level.ServerLevel) entity.level();
+            ctx.level = (net.minecraft.server.world.ServerWorld) entity.getWorld();
             ${handlerMethod}(ctx);
+            return true;
         });`;
     case 'block_place':
       // Fabric API 无现成放置事件：由 ModBlockPlaceMixin 在 BlockItem.place 后调用 notifyBlockPlaced
@@ -1199,55 +1315,71 @@ export function fabricEventRegistration(eventType: string, handlerMethod: string
 export function fabricEntityBaseClass(modelType: string): string {
   switch (modelType) {
     case 'zombie':
-      return 'Zombie';
+      return 'ZombieEntity';
     case 'skeleton':
-      return 'Skeleton';
+      return 'SkeletonEntity';
     case 'creeper':
-      return 'Creeper';
+      return 'CreeperEntity';
     case 'pig':
-      return 'Pig';
+      return 'PigEntity';
     case 'cow':
-      return 'Cow';
+      return 'CowEntity';
     case 'custom':
     default:
       return 'Entity';
   }
 }
 
-/** 根据 modelType 返回实体工厂引用（Mojang 映射，类名不带 Entity 后缀） */
+/** modelType 对应实体类的 Yarn 包（passive/mob；Entity 在 entity 根包） */
 
-export function fabricEntityFactoryMojang(modelType: string): string {
+export function fabricEntityPackage(cls: string): string {
+  switch (cls) {
+    case 'PigEntity':
+    case 'CowEntity':
+      return 'net.minecraft.entity.passive';
+    case 'ZombieEntity':
+    case 'SkeletonEntity':
+    case 'CreeperEntity':
+      return 'net.minecraft.entity.mob';
+    default:
+      return 'net.minecraft.entity';
+  }
+}
+
+/** 根据 modelType 返回实体工厂引用（Yarn 映射，类名带 Entity 后缀） */
+
+export function fabricEntityFactoryYarn(modelType: string): string {
   switch (modelType) {
     case 'zombie':
-      return 'Zombie::new';
+      return 'ZombieEntity::new';
     case 'skeleton':
-      return 'Skeleton::new';
+      return 'SkeletonEntity::new';
     case 'creeper':
-      return 'Creeper::new';
+      return 'CreeperEntity::new';
     case 'pig':
-      return 'Pig::new';
+      return 'PigEntity::new';
     case 'cow':
-      return 'Cow::new';
+      return 'CowEntity::new';
     case 'custom':
     default:
       return 'Entity::new';
   }
 }
 
-/** classification → Mojang MobCategory 映射 */
+/** classification → Yarn SpawnGroup 映射 */
 
-export function fabricMojangMobCategory(classification: string): string {
+export function fabricYarnSpawnGroup(classification: string): string {
   switch (classification) {
     case 'animal':
-      return 'MobCategory.CREATURE';
+      return 'SpawnGroup.CREATURE';
     case 'monster':
-      return 'MobCategory.MONSTER';
+      return 'SpawnGroup.MONSTER';
     case 'water_creature':
-      return 'MobCategory.WATER_CREATURE';
+      return 'SpawnGroup.WATER_CREATURE';
     case 'ambient':
-      return 'MobCategory.AMBIENT';
+      return 'SpawnGroup.AMBIENT';
     case 'misc':
     default:
-      return 'MobCategory.MISC';
+      return 'SpawnGroup.MISC';
   }
 }

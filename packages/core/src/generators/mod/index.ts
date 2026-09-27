@@ -2,6 +2,7 @@ export * from './templates.js';
 export * from './adapter.js';
 export * from './fabric-adapter.js';
 export * from './neoforge-adapter.js';
+export * from './forge-adapter.js';
 export * from './mod-generator.js';
 export * from './fabric-assets.js';
 export * from './recipe-json-generator.js';

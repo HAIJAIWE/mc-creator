@@ -915,7 +915,7 @@ function collectProcedureCallArgs(
         args.push(src.data.varName);
       } else if (src.data.kind === 'item' && src.data.itemId) {
         args.push(
-          `net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse("minecraft:${src.data.itemId}"))`,
+          `net.minecraft.registry.Registries.ITEM.get(new net.minecraft.util.Identifier("minecraft:${src.data.itemId}"))`,
         );
       } else {
         args.push('');

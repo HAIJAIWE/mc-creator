@@ -36,7 +36,7 @@ describe('ModGenerator', () => {
 
   it('type/loaders/versions 声明正确', () => {
     expect(gen.type).toBe('mod');
-    expect(gen.loaders).toEqual(['fabric', 'neoforge', 'quilt', 'legacy_fabric']);
+    expect(gen.loaders).toEqual(['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'forge']);
     expect(gen.versions).toEqual([...MC_VERSIONS]);
   });
 

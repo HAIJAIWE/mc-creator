@@ -1,9 +1,10 @@
 import type { GeneratorContext, GenerationResult, FileNode } from '@mc-creator/shared';
 import type { Loader, McVersion } from '@mc-creator/shared';
-import { MC_VERSIONS } from '@mc-creator/shared';
+import { MC_VERSIONS, getLoaderVersions } from '@mc-creator/shared';
 import type { Generator } from '../types.js';
 import type { LoaderAdapter } from './adapter.js';
 import { FabricAdapter } from './fabric-adapter.js';
+import { ForgeAdapter } from './forge-adapter.js';
 import { LegacyFabricAdapter } from './legacy-fabric-adapter.js';
 import { NeoForgeAdapter } from './neoforge-adapter.js';
 import { QuiltAdapter } from './quilt-adapter.js';
@@ -25,7 +26,7 @@ export interface IncrementalGenerationResult extends GenerationResult {
  */
 export class ModGenerator implements Generator {
   readonly type = 'mod';
-  readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt', 'legacy_fabric'];
+  readonly loaders: Loader[] = ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'forge'];
   readonly versions: McVersion[] = [...MC_VERSIONS];
 
   // vanilla 没有 mod adapter（原版无 mod 加载器），故用 Partial。
@@ -34,6 +35,7 @@ export class ModGenerator implements Generator {
     neoforge: new NeoForgeAdapter(),
     quilt: new QuiltAdapter(),
     legacy_fabric: new LegacyFabricAdapter(),
+    forge: new ForgeAdapter(),
   };
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
@@ -76,6 +78,22 @@ export class ModGenerator implements Generator {
       } else {
         warnings.push('MC 26.2 的 Fabric API / Quilt 依赖版本尚未确认，构建前请核对版本号');
       }
+    }
+    // Quilt 的 QFAPI 仅覆盖部分 MC 版本（未知版本 quiltApiVersion 为空）
+    if (ctx.loader === 'quilt') {
+      const versions = ctx.loaderVersions ?? getLoaderVersions(ctx.mcVersion);
+      if (!versions.quiltApiVersion) {
+        warnings.push(
+          `MC ${ctx.mcVersion} 的 Quilted Fabric API 版本尚未确认，` +
+            '构建前请到 https://maven.quiltmc.org 核对 quilt_version 后填写 gradle.properties',
+        );
+      }
+    }
+    // Forge 适配器仅支持 MC 1.20.1（ForgeGradle 6 + build 47.x）
+    if (ctx.loader === 'forge' && ctx.mcVersion !== '1.20.1') {
+      warnings.push(
+        `Forge 适配器仅支持 MC 1.20.1（ForgeGradle 6 + build 47.x）；当前所选 ${ctx.mcVersion} 的版本号需人工确认`,
+      );
     }
     // Legacy Fabric 仅支持 MC 1.14–1.16，当前版本列表不含该范围
     if (ctx.loader === 'legacy_fabric') {

@@ -22,6 +22,8 @@ import { useDebuggerStore } from '../../store/debugger-store.js';
 import { useLiveRegion } from '../../lib/useLiveRegion.js';
 import { nodeTypes } from './nodes';
 import { isValidConnection as checkConnection } from './connectionRules.js';
+import { VerticalStepEdge } from './edges/VerticalStepEdge.js';
+import { CANVAS_GRID_SIZE, snapPosition, snapDragEndPosition } from '../../lib/snap.js';
 
 /**
  * 节点图主画布：React Flow 集成
@@ -31,7 +33,7 @@ import { isValidConnection as checkConnection } from './connectionRules.js';
  * - 处理拖拽新增节点（来自 NodePalette）
  * - 处理节点/连线变化（移动、删除、连线）
  * - 同步状态到 useNodeGraphStore
- * - 暴露 toolbar（撤销/重做/清空）
+ * - 暴露 toolbar（撤销/重做/清空/自动排版）
  *
  * 注意：React Flow 的 nodes/edges 类型与 ModNode/ModEdge 略有差异，
  * 这里做类型适配（data 字段对齐 NodeData discriminated union）。
@@ -163,7 +165,6 @@ export function NodeGraphEditor({
   const commit = useNodeGraphStore((s) => s.commit);
   const setViewport = useNodeGraphStore((s) => s.setViewport);
   const compileResult = useNodeGraphStore((s) => s.compileResult);
-  // a11y：当前选中节点 id，用于 aria-activedescendant（屏幕阅读器朗读当前聚焦节点）
   const selectedNodeId = useNodeGraphStore((s) => s.selectedNodeId);
 
   // 阶段 C：右键封装子图
@@ -246,7 +247,7 @@ export function NodeGraphEditor({
   }, [graph.nodes, compileResult, isDebugMode, debugCurrentNodeId, debugBreakpoints]);
   const flowEdges = useMemo(() => graph.edges.map(toFlowEdge), [graph.edges]);
 
-  // === 拖拽新增节点 ===
+  // === 拖拽新增节点（垂直模式：吸附网格 + 自动连线） ===
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -262,16 +263,51 @@ export function NodeGraphEditor({
         x: e.clientX,
         y: e.clientY,
       });
+
+      // 吸附到网格（与 dagre 布局/背景点阵一致，存量坐标永远落网格）
+      const snapped = snapPosition({
+        x: position.x,
+        y: position.y,
+      });
+
       commit();
       if (customTypeId) {
-        addCustomNode(customTypeId, position);
+        addCustomNode(customTypeId, snapped);
         return;
       }
       const kind = e.dataTransfer.getData('application/reactflow-node-kind') as NodeKind;
       if (!kind) return;
-      addNode(kind, position);
+
+      const newNodeId = addNode(kind, snapped);
+
+      // 自动连线：找最近的上方兼容节点
+      const candidates = graph.nodes
+        .filter((n) => n.id !== newNodeId && n.position.y < snapped.y) // 只找上方
+        .filter((n) =>
+          checkConnection(graph, {
+            source: n.id,
+            target: newNodeId,
+            sourceHandle: 'bottom',
+            targetHandle: 'top',
+          }),
+        );
+
+      if (candidates.length > 0) {
+        // 取垂直距离最近的
+        const nearest = candidates.reduce((a, b) =>
+          snapped.y - a.position.y < snapped.y - b.position.y ? a : b,
+        );
+        addEdge({
+          source: nearest.id,
+          target: newNodeId,
+          sourceHandle: 'bottom',
+          targetHandle: 'top',
+          kind: inferEdgeKind(nearest.type, kind),
+          disabled: false,
+        });
+      }
     },
-    [addNode, addCustomNode, commit],
+    [addNode, addCustomNode, commit, graph, addEdge],
   );
 
   // === 节点变化处理 ===
@@ -287,10 +323,11 @@ export function NodeGraphEditor({
       const hasDragStop = changes.some((c) => c.type === 'position' && c.dragging === false);
       if (hasRemoval || hasDragStop) commit();
 
-      // 应用变化到 store
+      // 应用变化到 store（拖拽结束时吸附网格，保证持久化坐标落网格）
       for (const change of changes) {
         if (change.type === 'position' && change.position) {
-          moveNode(change.id, change.position);
+          const snapped = snapDragEndPosition(change);
+          moveNode(change.id, snapped ?? change.position);
         } else if (change.type === 'remove') {
           removeNode(change.id);
         } else if (change.type === 'select') {
@@ -389,14 +426,13 @@ export function NodeGraphEditor({
       onDrop={onDrop}
       role="application"
       aria-label="节点图画布"
-      // a11y：aria-activedescendant 让屏幕阅读器朗读当前选中的节点（无需 DOM 聚焦）
-      // 选中节点 id 来自 node-graph-store；无选中时为 undefined（不渲染属性）
       aria-activedescendant={selectedNodeId ?? undefined}
     >
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={{ default: VerticalStepEdge }}
         onInit={(inst: ReactFlowInstance) => {
           rfInstanceRef.current = inst;
         }}
@@ -413,19 +449,27 @@ export function NodeGraphEditor({
         onPaneClick={() => {
           selectNode(null);
           selectEdge(null);
-          // P0 dogfood 修复：点击画布空白时关闭右键菜单
           setContextMenu(null);
         }}
-        fitView
         nodesConnectable={!readOnly}
         nodesDraggable={!readOnly}
         elementsSelectable={!readOnly}
+        // 拖拽实时吸附网格（视觉）；松手时 onNodesChange 再做一次持久化吸附
+        snapToGrid
+        snapGrid={[CANVAS_GRID_SIZE, CANVAS_GRID_SIZE]}
         deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
         multiSelectionKeyCode={['Meta', 'Control']}
         proOptions={{ hideAttribution: true }}
         className="bg-mc-bg"
+        // 垂直布局默认适应视图
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#3a3a3a" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={CANVAS_GRID_SIZE}
+          size={1}
+          color="#3a3a3a"
+        />
         <Controls
           className="!rounded-mc !border !border-mc-border !bg-mc-surface !shadow-md"
           showInteractive={!readOnly}

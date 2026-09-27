@@ -1,5 +1,12 @@
 /** Mod 加载器（规格 §1.2：Fabric + NeoForge + Quilt 同时支持；P27 新增 Legacy Fabric；launcher 支持全部含 vanilla） */
-export const LOADERS = ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'vanilla'] as const;
+export const LOADERS = [
+  'fabric',
+  'neoforge',
+  'quilt',
+  'legacy_fabric',
+  'forge',
+  'vanilla',
+] as const;
 export type Loader = (typeof LOADERS)[number];
 
 /** MC 版本（规格 §1.2：1.21.11 为主，26.x 为年度版；1.20.x/1.21.5 为生态常用旧版本） */
@@ -51,6 +58,20 @@ export interface LoaderVersionConfig {
   neoforgeLoaderVersionRange: string;
   /** NeoForge 最低版本范围（用于 mods.toml dependency versionRange，如 '[21.1,)'） */
   neoforgeVersionRange: string;
+  /** Quilt Loader 版本（如 '0.30.1'，quilt 元数据以该仓库实测为准） */
+  quiltLoaderVersion: string;
+  /** Quilt Loom Gradle 插件版本（如 '1.15.1'） */
+  quiltLoomVersion: string;
+  /** Quilted Fabric API 版本（按 MC 版本，如 '7.7.0+0.92.2-1.20.1'；未知留空） */
+  quiltApiVersion: string;
+  /** Forge 版本（1.20.1，如 '47.4.23'；Forge 适配器仅支持 1.20.1，其余留空） */
+  forgeVersion: string;
+  /** ForgeGradle 插件版本（文档约定滚动线，如 '[6.0,)'） */
+  forgeGradleVersion: string;
+  /** Forge loader 版本范围（用于 mods.toml loaderVersion，如 '[47,)'） */
+  forgeLoaderVersionRange: string;
+  /** Forge 版本范围（用于 mods.toml dependency versionRange，如 '[47,)'） */
+  forgeVersionRange: string;
   /**
    * 该版本配置是否为占位值（true 表示 loader 版本号是临时复用的，构建配置可能失败）。
    * 调用方应检查此标志并在 UI/警告中提示用户手动确认版本号。
@@ -72,12 +93,20 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     // NeoForge 官方已弃用 1.20.1（公共下载移除，推荐 Forge）；neoforgeVersion 为旧分支末版，构建需人工确认
     fabricLoaderVersion: '0.19.3',
     fabricApiVersion: '0.92.11+1.20.1',
-    fabricLoomVersion: '1.7-SNAPSHOT',
+    // loom 经真构建验证：1.7-SNAPSHOT 与 Gradle 8.14 不兼容（Problems.forNamespace），改用已验证的 1.9.2
+    fabricLoomVersion: '1.9.2',
     fabricLoaderMinVersion: '>=0.14.0',
     neoforgeVersion: '20.1.110',
     neoforgeModdevVersion: '1.0.21',
     neoforgeLoaderVersionRange: '[4,)',
     neoforgeVersionRange: '[20.1,)',
+    quiltLoaderVersion: '0.30.1',
+    quiltLoomVersion: '1.15.1',
+    quiltApiVersion: '7.7.0+0.92.2-1.20.1',
+    forgeVersion: '47.4.23',
+    forgeGradleVersion: '6.0.54', // FG6 最新（滚动 [6.0,) 会误装 FG7，需 Gradle 9.3+，故 pin 死）,
+    forgeLoaderVersionRange: '[47,)',
+    forgeVersionRange: '[47,)',
     isPlaceholder: true,
   },
   '1.20.4': {
@@ -89,6 +118,13 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     neoforgeModdevVersion: '1.0.21',
     neoforgeLoaderVersionRange: '[4,)',
     neoforgeVersionRange: '[20.4,)',
+    quiltLoaderVersion: '0.30.1',
+    quiltLoomVersion: '1.15.1',
+    quiltApiVersion: '9.0.0-alpha.8+0.97.0-1.20.4',
+    forgeVersion: '',
+    forgeGradleVersion: '6.0.54', // FG6 最新（滚动 [6.0,) 会误装 FG7，需 Gradle 9.3+，故 pin 死）,
+    forgeLoaderVersionRange: '[47,)',
+    forgeVersionRange: '[47,)',
   },
   '1.20.6': {
     fabricLoaderVersion: '0.19.3',
@@ -99,6 +135,13 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     neoforgeModdevVersion: '1.0.21',
     neoforgeLoaderVersionRange: '[4,)',
     neoforgeVersionRange: '[20.6,)',
+    quiltLoaderVersion: '0.30.1',
+    quiltLoomVersion: '1.15.1',
+    quiltApiVersion: '10.0.0-alpha.3+0.100.4-1.20.6',
+    forgeVersion: '',
+    forgeGradleVersion: '6.0.54', // FG6 最新（滚动 [6.0,) 会误装 FG7，需 Gradle 9.3+，故 pin 死）,
+    forgeLoaderVersionRange: '[47,)',
+    forgeVersionRange: '[47,)',
   },
   '1.21.1': {
     fabricLoaderVersion: '0.19.3',
@@ -109,6 +152,13 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     neoforgeModdevVersion: '1.0.21',
     neoforgeLoaderVersionRange: '[4,)',
     neoforgeVersionRange: '[21.1,)',
+    quiltLoaderVersion: '0.30.1',
+    quiltLoomVersion: '1.15.1',
+    quiltApiVersion: '11.0.0-alpha.3+0.102.0-1.21',
+    forgeVersion: '',
+    forgeGradleVersion: '6.0.54', // FG6 最新（滚动 [6.0,) 会误装 FG7，需 Gradle 9.3+，故 pin 死）,
+    forgeLoaderVersionRange: '[47,)',
+    forgeVersionRange: '[47,)',
   },
   '1.21.5': {
     fabricLoaderVersion: '0.19.3',
@@ -119,6 +169,13 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     neoforgeModdevVersion: '2.0.143',
     neoforgeLoaderVersionRange: '[4,)',
     neoforgeVersionRange: '[21.5,)',
+    quiltLoaderVersion: '0.30.1',
+    quiltLoomVersion: '1.15.1',
+    quiltApiVersion: '',
+    forgeVersion: '',
+    forgeGradleVersion: '6.0.54', // FG6 最新（滚动 [6.0,) 会误装 FG7，需 Gradle 9.3+，故 pin 死）,
+    forgeLoaderVersionRange: '[47,)',
+    forgeVersionRange: '[47,)',
   },
   '1.21.11': {
     fabricLoaderVersion: '0.19.3',
@@ -129,6 +186,13 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     neoforgeModdevVersion: '2.0.143',
     neoforgeLoaderVersionRange: '[4,)',
     neoforgeVersionRange: '[21.11,)',
+    quiltLoaderVersion: '0.30.1',
+    quiltLoomVersion: '1.15.1',
+    quiltApiVersion: '',
+    forgeVersion: '',
+    forgeGradleVersion: '6.0.54', // FG6 最新（滚动 [6.0,) 会误装 FG7，需 Gradle 9.3+，故 pin 死）,
+    forgeLoaderVersionRange: '[47,)',
+    forgeVersionRange: '[47,)',
   },
   '26.1': {
     // 实测版本（2026-07 在线核验）：26.1 已于 2026-03-24 正式发布
@@ -140,6 +204,13 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     neoforgeModdevVersion: '2.0.143',
     neoforgeLoaderVersionRange: '[4,)',
     neoforgeVersionRange: '[26.1,)',
+    quiltLoaderVersion: '0.30.1',
+    quiltLoomVersion: '1.15.1',
+    quiltApiVersion: '',
+    forgeVersion: '',
+    forgeGradleVersion: '6.0.54', // FG6 最新（滚动 [6.0,) 会误装 FG7，需 Gradle 9.3+，故 pin 死）,
+    forgeLoaderVersionRange: '[47,)',
+    forgeVersionRange: '[47,)',
   },
   '26.2': {
     // 26.2 已于 2026-06-16 发布；NeoForge 26.2 尚在 beta，标注实验性
@@ -151,6 +222,13 @@ export const LOADER_VERSIONS: Record<McVersion, LoaderVersionConfig> = {
     neoforgeModdevVersion: '2.0.143',
     neoforgeLoaderVersionRange: '[4,)',
     neoforgeVersionRange: '[26.2,)',
+    quiltLoaderVersion: '0.30.1',
+    quiltLoomVersion: '1.15.1',
+    quiltApiVersion: '',
+    forgeVersion: '',
+    forgeGradleVersion: '6.0.54', // FG6 最新（滚动 [6.0,) 会误装 FG7，需 Gradle 9.3+，故 pin 死）,
+    forgeLoaderVersionRange: '[47,)',
+    forgeVersionRange: '[47,)',
     isPlaceholder: true,
   },
 };

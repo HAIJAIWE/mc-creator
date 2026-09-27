@@ -292,6 +292,43 @@ export function javaTypeFor(type: string): string {
       return 'String';
     case 'item':
     case 'itemstack':
+      return 'net.minecraft.item.ItemStack';
+    case 'block':
+    case 'blockstate':
+      return 'net.minecraft.block.BlockState';
+    case 'entity':
+      return 'net.minecraft.entity.Entity';
+    case 'player':
+      return 'net.minecraft.server.network.ServerPlayerEntity';
+    default:
+      return type;
+  }
+}
+
+/**
+ * P40：把低代码类型名映射为 Java 形参类型（Mojang 官方映射版，供 NeoForge/Forge 用）。
+ * 与 javaTypeFor 同构，仅 item/block/entity/player 四个走 Mojang 包名。
+ */
+export function javaTypeForMojang(type: string): string {
+  switch ((type ?? '').toLowerCase()) {
+    case 'int':
+    case 'integer':
+      return 'int';
+    case 'float':
+      return 'float';
+    case 'double':
+    case 'number':
+      return 'double';
+    case 'long':
+      return 'long';
+    case 'boolean':
+    case 'bool':
+      return 'boolean';
+    case 'string':
+    case 'text':
+      return 'String';
+    case 'item':
+    case 'itemstack':
       return 'net.minecraft.world.item.ItemStack';
     case 'block':
     case 'blockstate':
@@ -331,9 +368,9 @@ export function toPascal(s: string): string {
 }
 
 /**
- * PortType（节点图端口类型字符串）→ Java 类型映射（Mojang 映射）。
+ * PortType（节点图端口类型字符串）→ Java 类型映射（Yarn 映射）。
  * 用于 CustomCodeSnippetSpec.inputSignature/outputSignature 的类型转换。
- * 与 officialMojangMappings 一致，类名不含 Yarn 后缀（如 Vec3 而非 Vec3d）。
+ * 与 yarn mappings 一致，类名含 Yarn 后缀（如 Vec3d 而非 Vec3）。
  */
 export function portTypeToJava(portType: string): string {
   const lower = portType.toLowerCase();
@@ -370,7 +407,7 @@ export function portTypeToJava(portType: string): string {
     case 'pos':
       return 'Vec3';
     case 'nbt':
-      return 'CompoundTag';
+      return 'NbtCompound';
     default:
       return 'Object';
   }

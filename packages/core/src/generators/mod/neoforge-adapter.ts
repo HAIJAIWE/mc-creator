@@ -28,16 +28,21 @@ import {
   neoforgeGradleProperties,
   neoforgeWrapperProperties,
 } from './neoforge-gradle.js';
+import {
+  worldgenBiomeJson,
+  worldgenDimensionJson,
+  worldgenStructureJson,
+} from './worldgen-json-generator.js';
 
 /**
- * NeoForge Loader Adapter（规格 §3.2）。
+ * NeoForge Loader Adapter（规格 §3.2，目标 NeoForge 20.1 / MC 1.20.1）。
  * 生成 mods.toml + NeoForge moddev build.gradle + @Mod 入口 + DeferredRegister 注册代码 + 资源。
- * NeoForge 本就用 Mojang 官方名，与 Fabric 的 officialMojangMappings 一致。
+ * NeoForge 20.1 用 Mojang 官方名（net.minecraftforge.* + Mojang 映射）。
  *
  * P1.3/P1.4 扩展：消费 ModSpec 新增字段（recipes/entities/machines/customCode/multiblocks/
  * eventHandlers/conditions/actions/procedures），生成对应的 ModRecipes/ModEntities/ModMachines/
- * ModCodeSnippets/ModMultiblocks/ModEvents Java 类。NeoForge 用 DeferredRegister/RegisterEvent
- * 替代 Fabric 的 Registry.register（实体/方块实体/菜单类型），其余生成模式与 Fabric 类似。
+ * ModCustomCode/ModMultiblocks/ModEvents Java 类。游戏事件走 MinecraftForge.EVENT_BUS
+ *（mod 总线收不到）；生物群系/维度/结构走 worldgen 数据包 JSON（动态注册表）。
  */
 export class NeoForgeAdapter implements LoaderAdapter {
   readonly loader = 'neoforge' as const;
@@ -159,6 +164,11 @@ export class NeoForgeAdapter implements LoaderAdapter {
         s.blocks.length > 0,
         (s.recipes?.length ?? 0) > 0,
         (s.entities?.length ?? 0) > 0,
+        (s.fluids?.length ?? 0) > 0,
+        (s.biomes?.length ?? 0) > 0,
+        (s.dimensions?.length ?? 0) > 0,
+        (s.guis?.length ?? 0) > 0,
+        (s.structures?.length ?? 0) > 0,
         (s.machines?.length ?? 0) > 0,
         (s.customCode?.length ?? 0) > 0,
         (s.multiblocks?.length ?? 0) > 0,
@@ -188,8 +198,7 @@ export class NeoForgeAdapter implements LoaderAdapter {
     {
       name: 'biomes',
       hashInputs: (s) => s.biomes ?? [],
-      generate: (s, pkg, mainCls) =>
-        s.biomes?.length ? [neoforgeModBiomesJava(s, pkg, mainCls)] : [],
+      generate: (s, pkg) => (s.biomes?.length ? [neoforgeModBiomesJava(s, pkg)] : []),
     },
     {
       name: 'dimensions',
@@ -199,7 +208,7 @@ export class NeoForgeAdapter implements LoaderAdapter {
     {
       name: 'guis',
       hashInputs: (s) => s.guis ?? [],
-      generate: (s, pkg) => (s.guis?.length ? [neoforgeModGuisJava(s, pkg)] : []),
+      generate: (s, pkg, mainCls) => (s.guis?.length ? [neoforgeModGuisJava(s, pkg, mainCls)] : []),
     },
     {
       name: 'structures',
@@ -245,6 +254,16 @@ export class NeoForgeAdapter implements LoaderAdapter {
         s.eventHandlers?.length || s.conditions?.length || s.actions?.length || s.procedures?.length
           ? [neoforgeModEventsJava(s, pkg, mainCls)]
           : [],
+    },
+    {
+      // 世界生成 datapack JSON（生物群系/维度/结构；动态注册表不走 Java 注册）
+      name: 'worldgen',
+      hashInputs: (s) => [s.biomes ?? [], s.dimensions ?? [], s.structures ?? []],
+      generate: (s) => [
+        ...worldgenBiomeJson(s),
+        ...worldgenDimensionJson(s),
+        ...worldgenStructureJson(s),
+      ],
     },
     {
       name: 'lang',

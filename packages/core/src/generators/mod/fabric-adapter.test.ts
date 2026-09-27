@@ -62,11 +62,13 @@ describe('FabricAdapter 元数据与构建脚本', () => {
     expect(json.entrypoints.main[0]).toBe('com.example.ruby_tools.RubyToolsMod');
   });
 
-  it('生成 build.gradle 含 fabric-loom 与 officialMojangMappings', () => {
+  it('生成 build.gradle 含 fabric-loom 与 yarn mappings', () => {
     const bg = files.find((f) => f.path === 'build.gradle');
     expect(bg).toBeDefined();
     expect(bg!.content).toContain('fabric-loom');
-    expect(bg!.content).toContain('officialMojangMappings');
+    expect(bg!.content).toContain(
+      'mappings "net.fabricmc:yarn:${project.minecraft_version}+build.1:v2"',
+    );
   });
 
   it('fabric.mod.json 的 java 依赖按 MC 版本（1.20.x → >=17，其余 >=21）', () => {
@@ -86,14 +88,16 @@ describe('FabricAdapter 元数据与构建脚本', () => {
     const bg = y2026.find((f) => f.path === 'build.gradle');
     expect(bg!.content).toContain("id 'net.fabricmc.fabric-loom'");
     expect(bg!.content).not.toContain("id 'fabric-loom'");
-    expect(bg!.content).not.toContain('officialMojangMappings');
+    expect(bg!.content).not.toContain('mappings "net.fabricmc:yarn:');
     expect(bg!.content).not.toContain('modImplementation');
     expect(bg!.content).toContain('implementation "net.fabricmc:fabric-loader:');
     expect(bg!.content).toContain('VERSION_25');
     const modern = adapter.translate({ ...CTX, mcVersion: '1.21.11' });
     const modernBg = modern.find((f) => f.path === 'build.gradle');
     expect(modernBg!.content).toContain("id 'fabric-loom'");
-    expect(modernBg!.content).toContain('officialMojangMappings');
+    expect(modernBg!.content).toContain(
+      'mappings "net.fabricmc:yarn:${project.minecraft_version}+build.1:v2"',
+    );
     expect(modernBg!.content).toContain('modImplementation');
   });
 
@@ -137,7 +141,8 @@ describe('FabricAdapter Java 入口与注册代码', () => {
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModItems.java',
     );
     expect(items).toBeDefined();
-    expect(items!.content).toContain('Registry.register');
+    expect(items!.content).toContain('Registry.register(Registries.ITEM');
+    expect(items!.content).toContain('new Item(new Item.Settings())');
     expect(items!.content).toContain('RUBY');
     expect(items!.content).toContain('"ruby"');
   });
@@ -147,7 +152,7 @@ describe('FabricAdapter Java 入口与注册代码', () => {
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBlocks.java',
     );
     expect(blocks).toBeDefined();
-    expect(blocks!.content).toContain('Registry.register');
+    expect(blocks!.content).toContain('Registry.register(Registries.BLOCK');
     expect(blocks!.content).toContain('RUBY_BLOCK');
     expect(blocks!.content).toContain('"ruby_block"');
   });
@@ -327,9 +332,9 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
     // 真实 if/else 逻辑（非纯注释占位）
     expect(events!.content).toContain('if (check_cond_1(ctx))');
     expect(events!.content).toContain('execute_act_1(ctx);');
-    // P1-7：has_item 条件生成真实检查逻辑（countItem），give_item 动作生成真实执行逻辑（place）
-    expect(events!.content).toContain('countItem(');
-    expect(events!.content).toContain('getInventory().place(');
+    // P1-7：has_item 条件生成真实检查逻辑（main 背包遍历），give_item 动作生成真实执行逻辑（insertStack）
+    expect(events!.content).toContain('getInventory().main');
+    expect(events!.content).toContain('getInventory().insertStack(');
     expect(events!.content).not.toContain('// TODO: 实现 has_item 检查逻辑');
     expect(events!.content).not.toContain('// TODO: 实现 give_item 执行逻辑');
     // initialize 方法（含 Fabric API 注册调用）
@@ -370,12 +375,46 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
     expect(events!.content).toContain(
       'net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register',
     );
-    expect(events!.content).toContain(
-      'net.fabricmc.fabric.api.event.player.PlayerPickupItemCallback.EVENT.register',
-    );
+    // item_pickup 无 Fabric API：由 ModItemPickupMixin 触发，注册器内仅留注释
+    expect(events!.content).toContain('item_pickup');
+    expect(events!.content).not.toContain('PlayerPickupItemCallback');
     expect(events!.content).not.toContain('TODO: 注册 player_left_click 事件');
     expect(events!.content).not.toContain('TODO: 注册 item_use 事件');
     expect(events!.content).not.toContain('TODO: 注册 item_pickup 事件');
+  });
+
+  it('item_pickup 生成 ModItemPickupMixin + notifyItemPickedup 入口', () => {
+    const SPEC_PICKUP: ModSpec = ModSpecSchema.parse({
+      modId: 'ruby_tools',
+      version: '1.0.0',
+      name: 'Ruby Tools',
+      description: 'Pickup mixin test',
+      items: [],
+      blocks: [],
+      license: 'MIT',
+      authors: [],
+      eventHandlers: [{ handlerId: 'evt_p', eventType: 'item_pickup', eventArgs: {} }],
+      conditions: [],
+      actions: [],
+    });
+    const files = adapter.translate({ ...CTX_P14, spec: SPEC_PICKUP });
+    const mixin = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/mixin/ModItemPickupMixin.java',
+    );
+    expect(mixin).toBeDefined();
+    expect(mixin!.content).toContain('@Mixin(ItemEntity.class)');
+    expect(mixin!.content).toContain(
+      '@Inject(method = "onPlayerCollision(Lnet/minecraft/entity/player/PlayerEntity;)V", at = @At("TAIL"))',
+    );
+    expect(mixin!.content).toContain('ModEvents.notifyItemPickedup(');
+    const mixinsJson = files.find((f) => f.path === 'src/main/resources/ruby_tools.mixins.json');
+    expect(mixinsJson).toBeDefined();
+    expect(JSON.parse(mixinsJson!.content).mixins).toContain('ModItemPickupMixin');
+    const events = files.find(
+      (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEvents.java',
+    );
+    expect(events!.content).toContain('public static void notifyItemPickedup(');
+    expect(events!.content).toContain('handle_evt_p(ctx);');
   });
 
   it('事件参数绑定：回调多参数绑定为 EventContext 字段', () => {
@@ -405,7 +444,9 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
     expect(events).toBeDefined();
     // EventContext 内部类定义
     expect(events!.content).toContain('private static class EventContext');
-    expect(events!.content).toContain('net.minecraft.server.level.ServerPlayer player = null;');
+    expect(events!.content).toContain(
+      'net.minecraft.server.network.ServerPlayerEntity player = null;',
+    );
     // 调用签名统一为 EventContext ctx
     expect(events!.content).toContain('handle_evt_break(EventContext ctx)');
     expect(events!.content).toContain('handle_evt_tick(EventContext ctx)');
@@ -413,10 +454,11 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
     expect(events!.content).toContain('ctx.pos = pos;');
     expect(events!.content).toContain('ctx.state = state;');
     expect(events!.content).toContain('ctx.pos = hitResult.getBlockPos();');
-    expect(events!.content).toContain('ctx.stack = player.getItemInHand(hand);');
-    expect(events!.content).toContain('ctx.stack = itemEntity.getItem();');
-    expect(events!.content).toContain('ctx.target = itemEntity;');
-    expect(events!.content).toContain('ctx.level = server.overworld();');
+    expect(events!.content).toContain('ctx.stack = player.getStackInHand(hand);');
+    // item_pickup 走 Mixin：注册器内仅留注释，绑定由 ModItemPickupMixin 完成
+    expect(events!.content).toContain('item_pickup');
+    expect(events!.content).not.toContain('PlayerPickupItemCallback');
+    expect(events!.content).toContain('ctx.level = server.getOverworld();');
   });
 
   it('entity_death / entity_hurt 注册到 ServerLivingEntityEvents 并绑定 target', () => {
@@ -445,11 +487,11 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
       'net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DEATH.register',
     );
     expect(events!.content).toContain(
-      'net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.AFTER_DAMAGE.register',
+      'net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents.ALLOW_DAMAGE.register',
     );
     expect(events!.content).toContain('ctx.target = entity;');
     expect(events!.content).toContain(
-      'ctx.level = (net.minecraft.server.level.ServerLevel) entity.level();',
+      'ctx.level = (net.minecraft.server.world.ServerWorld) entity.getWorld();',
     );
     expect(events!.content).not.toContain('TODO: 注册 entity_death 事件');
     expect(events!.content).not.toContain('TODO: 注册 entity_hurt 事件');
@@ -476,8 +518,10 @@ describe('FabricAdapter P1.4 字段消费（spec 非空时生成新文件）', (
     );
     expect(mixin).toBeDefined();
     expect(mixin!.content).toContain('@Mixin(BlockItem.class)');
-    expect(mixin!.content).toContain('@Inject(method = "place", at = @At("RETURN"))');
-    expect(mixin!.content).toContain('ModEvents.notifyBlockPlaced(level, pos, state, sp)');
+    expect(mixin!.content).toContain(
+      '@Inject(method = "place(Lnet/minecraft/item/ItemPlacementContext;)Lnet/minecraft/util/ActionResult;", at = @At("RETURN"))',
+    );
+    expect(mixin!.content).toContain('ModEvents.notifyBlockPlaced(world, pos, state, sp)');
     // mixins.json
     const mixinsJson = files.find((f) => f.path === 'src/main/resources/ruby_tools.mixins.json');
     expect(mixinsJson).toBeDefined();
@@ -898,7 +942,8 @@ describe('FabricAdapter P1.3 字段消费（recipes/entities/machines 非空时�
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModEntities.java',
     );
     expect(entities).toBeDefined();
-    expect(entities!.content).toContain('Registry.register');
+    expect(entities!.content).toContain('Registry.register(Registries.ENTITY_TYPE');
+    expect(entities!.content).toContain('.setDimensions(');
     expect(entities!.content).toContain('ruby_golem');
     expect(entities!.content).toContain('Ruby Golem');
   });
@@ -908,7 +953,7 @@ describe('FabricAdapter P1.3 字段消费（recipes/entities/machines 非空时�
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModMachines.java',
     );
     expect(machines).toBeDefined();
-    expect(machines!.content).toContain('Registry.register');
+    expect(machines!.content).toContain('Registry.register(Registries.BLOCK_ENTITY_TYPE');
     expect(machines!.content).toContain('ruby_furnace');
     expect(machines!.content).toContain('Ruby Furnace');
   });
@@ -925,7 +970,7 @@ describe('FabricAdapter P1.3 字段消费（recipes/entities/machines 非空时�
     expect(machines!.content).toContain('tickServer');
     expect(machines!.content).toContain('PROCESS_TIME');
     // Menu 槽位
-    expect(machines!.content).toContain('quickMoveStack');
+    expect(machines!.content).toContain('quickMove');
     expect(machines!.content).toContain('addSlot');
     // 无遗留 TODO 占位
     expect(machines!.content).not.toContain('// TODO');
@@ -1131,16 +1176,14 @@ describe('FabricAdapter P1.5 真实事件处理逻辑生成', () => {
     expect(events!.content).toContain('double dx = ctx.pos.getX() - 100.0;');
     expect(events!.content).toContain('Math.sqrt(dx * dx + dy * dy + dz * dz) < 10.0');
     expect(events!.content).not.toContain('需要位置上下文');
-    // 生物群系/方块条件：ctx.level.getBiome / ctx.state.is
-    expect(events!.content).toContain('ctx.level.getBiome(ctx.pos).is(');
-    expect(events!.content).toContain(
-      'ctx.state.is(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get',
-    );
-    // 方块操作动作：ctx.level.setBlock
-    expect(events!.content).toContain('ctx.level.setBlock(ctx.pos,');
-    expect(events!.content).toContain('Blocks.AIR.defaultBlockState(), 3)');
+    // 生物群系/方块条件：ctx.level.getBiome / ctx.state.isOf
+    expect(events!.content).toContain('ctx.level.getBiome(ctx.pos).matchesId(');
+    expect(events!.content).toContain('ctx.state.isOf(net.minecraft.registry.Registries.BLOCK.get');
+    // 方块操作动作：ctx.level.setBlockState（2 参 Yarn 签名）
+    expect(events!.content).toContain('ctx.level.setBlockState(ctx.pos,');
+    expect(events!.content).toContain('Blocks.AIR.getDefaultState())');
     // 实体生成/音效：ctx.level + ctx.pos
-    expect(events!.content).toContain('ctx.level.addFreshEntity(');
+    expect(events!.content).toContain('ctx.level.spawnEntity(');
     expect(events!.content).toContain('ctx.level.playSound(null, ctx.pos,');
     // 所有逻辑不再依赖 event instanceof 转型
     expect(events!.content).not.toContain('event instanceof');
@@ -1190,11 +1233,10 @@ describe('FabricAdapter Task D 流体', () => {
     );
     expect(fluids).toBeDefined();
     expect(fluids!.content).toContain('public class ModFluids');
-    expect(fluids!.content).toContain(
-      'public static net.minecraft.world.level.material.Fluid RUBY_JUICE;',
-    );
-    expect(fluids!.content).toContain('BuiltInRegistries.FLUID');
-    expect(fluids!.content).toContain('new SimpleFluid()');
+    expect(fluids!.content).toContain('public static net.minecraft.fluid.Fluid RUBY_JUICE;');
+    expect(fluids!.content).toContain('Registries.FLUID');
+    expect(fluids!.content).toContain('extends net.minecraft.fluid.FlowableFluid');
+    expect(fluids!.content).toContain('RUBY_JUICE_FLOWING');
   });
 
   it('mainClass 调用 ModFluids.initialize()', () => {
@@ -1333,25 +1375,30 @@ describe('FabricAdapter Mod 侧世界生成', () => {
     projectPath: '/proj',
   });
 
-  it('生成 ModBiomes.java 注册生物群系', () => {
+  it('生成 ModBiomes.java 持有生物群系常量（动态注册表，不直接 Registry.register）', () => {
     const biomes = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModBiomes.java',
     );
     expect(biomes).toBeDefined();
     expect(biomes!.content).toContain('public class ModBiomes');
-    expect(biomes!.content).toContain('BuiltInRegistries.BIOME');
+    expect(biomes!.content).toContain(
+      'public static final net.minecraft.world.biome.Biome RUBY_PLAINS',
+    );
+    expect(biomes!.content).toContain('new net.minecraft.world.biome.Biome.Builder()');
     expect(biomes!.content).toContain('ruby_plains');
-    expect(biomes!.content).toContain('Precipitation.RAIN');
+    expect(biomes!.content).toContain('.precipitation(true)');
     expect(biomes!.content).toContain('0x78a7ff');
   });
 
-  it('生成 ModDimensions.java 注册维度类型', () => {
+  it('生成 ModDimensions.java 持有维度类型常量（动态注册表，不直接 Registry.register）', () => {
     const dims = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModDimensions.java',
     );
     expect(dims).toBeDefined();
     expect(dims!.content).toContain('public class ModDimensions');
-    expect(dims!.content).toContain('BuiltInRegistries.DIMENSION_TYPE');
+    expect(dims!.content).toContain(
+      'public static final net.minecraft.world.dimension.DimensionType RUBY_DIM_TYPE',
+    );
     expect(dims!.content).toContain('ruby_dim');
     expect(dims!.content).toContain('OptionalLong.of(1000L)');
   });
@@ -1417,8 +1464,8 @@ describe('FabricAdapter Task 3 GUI', () => {
 
   it('ModGuis 含 Screen 渲染与能源条', () => {
     const guis = files.find((f) => f.path === 'src/main/java/com/example/ruby_tools/ModGuis.java');
-    expect(guis!.content).toContain('AbstractContainerScreen');
-    expect(guis!.content).toContain('renderBg');
+    expect(guis!.content).toContain('HandledScreen');
+    expect(guis!.content).toContain('drawBackground');
     expect(guis!.content).toContain('energy_bar.png');
   });
 
@@ -1470,17 +1517,21 @@ describe('FabricAdapter Task 4 Mod 侧结构', () => {
     projectPath: '/proj',
   });
 
-  it('生成 ModStructures.java 注册结构与结构集', () => {
+  it('生成 ModStructures.java 持有结构与结构集常量（动态注册表，不直接 Registry.register）', () => {
     const structures = files.find(
       (f) => f.path === 'src/main/java/com/example/ruby_tools/ModStructures.java',
     );
     expect(structures).toBeDefined();
     expect(structures!.content).toContain('public class ModStructures');
-    expect(structures!.content).toContain('BuiltInRegistries.STRUCTURE');
-    expect(structures!.content).toContain('BuiltInRegistries.STRUCTURE_SET');
+    expect(structures!.content).toContain(
+      'public static final net.minecraft.world.gen.structure.Structure RUBY_TOWER',
+    );
+    expect(structures!.content).toContain(
+      'public static final net.minecraft.structure.StructureSet RUBY_TOWER_SET',
+    );
     expect(structures!.content).toContain('ruby_tower');
     expect(structures!.content).toContain('JigsawStructure');
-    expect(structures!.content).toContain('TerrainAdjustment.BEARD_THIN');
+    expect(structures!.content).toContain('StructureTerrainAdaptation.BEARD_THIN');
     expect(structures!.content).toContain('RandomSpreadStructurePlacement');
   });
 
@@ -1520,8 +1571,7 @@ const SPEC_P40_POLISH: ModSpec = ModSpecSchema.parse({
       actionId: 'act_custom',
       actionType: 'custom',
       args: {},
-      customCode:
-        'ctx.player.sendSystemMessage(net.minecraft.network.chat.Component.literal("hi"));',
+      customCode: 'ctx.player.sendMessage(net.minecraft.text.Text.literal("hi"));',
     },
   ],
   machines: [
@@ -1574,7 +1624,7 @@ describe('FabricAdapter T2/T5/T6', () => {
 
   it('T2: custom 动作代码嵌入 execute_ 方法', () => {
     const events = files.find((f) => f.path.endsWith('ModEvents.java'));
-    expect(events!.content).toContain('Component.literal("hi")');
+    expect(events!.content).toContain('Text.literal("hi")');
   });
 
   it('T5: 配方映射生成 recipeOutput switch', () => {

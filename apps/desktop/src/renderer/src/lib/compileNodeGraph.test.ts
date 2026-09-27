@@ -18,6 +18,8 @@ import type {
   NodePort,
   SubgraphDefinition,
 } from '@mc-creator/shared';
+import { isCoreLibKind, buildLegacyPorts, buildLegacyDefaultFields } from '@mc-creator/shared';
+import { getCoreLibDefinition } from '@mc-creator/shared';
 
 // === 测试辅助函数 ===
 // node-graph-store.ts 中的 createDefaultNodeData / createDefaultPorts 未导出，
@@ -33,6 +35,14 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
     codeLocked: false,
     formatVersion: 1,
   };
+
+  // 新核心库节点：按 shared 定义生成透传数据
+  if (isCoreLibKind(kind)) {
+    const def = getCoreLibDefinition(kind);
+    if (!def) throw new Error(`Core lib definition missing for kind: ${kind}`);
+    return { ...base, kind, displayName: def.label, ...buildLegacyDefaultFields(def) } as NodeData;
+  }
+
   switch (kind) {
     case 'item':
       return {
@@ -253,12 +263,121 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
         showEnergyBar: false,
         showProgressBar: false,
       } as NodeData;
+    // 核心高频节点（P0/P1 优先级）
+    case 'entity_spawn':
+      return {
+        ...base,
+        kind: 'entity_spawn',
+        entityType: 'minecraft:zombie',
+        x: 0,
+        y: 64,
+        z: 0,
+        displayName: '生成实体',
+      } as NodeData;
+    case 'entity_damage':
+      return {
+        ...base,
+        kind: 'entity_damage',
+        amount: 6,
+        source: 'generic',
+        displayName: '造成伤害',
+      } as NodeData;
+    case 'strike_lightning':
+      return {
+        ...base,
+        kind: 'strike_lightning',
+        x: 0,
+        y: 64,
+        z: 0,
+        effectOnly: false,
+        displayName: '召唤闪电',
+      } as NodeData;
+    case 'play_sound':
+      return {
+        ...base,
+        kind: 'play_sound',
+        sound: 'minecraft:entity.lightning_bolt.thunder',
+        x: 0,
+        y: 64,
+        z: 0,
+        volume: 1,
+        pitch: 1,
+        displayName: '播放音效',
+      } as NodeData;
+    case 'give_item':
+      return {
+        ...base,
+        kind: 'give_item',
+        item: 'minecraft:diamond',
+        count: 1,
+        displayName: '给予物品',
+      } as NodeData;
+    case 'block_set':
+      return {
+        ...base,
+        kind: 'block_set',
+        block: 'minecraft:stone',
+        x: 0,
+        y: 64,
+        z: 0,
+        displayName: '放置方块',
+      } as NodeData;
+    case 'block_remove':
+      return {
+        ...base,
+        kind: 'block_remove',
+        x: 0,
+        y: 64,
+        z: 0,
+        drop: true,
+        displayName: '移除方块',
+      } as NodeData;
+    case 'entity_set_health':
+      return {
+        ...base,
+        kind: 'entity_set_health',
+        health: 20,
+        displayName: '设置实体生命值',
+      } as NodeData;
+    case 'entity_set_position':
+      return {
+        ...base,
+        kind: 'entity_set_position',
+        x: 0,
+        y: 64,
+        z: 0,
+        displayName: '设置实体位置',
+      } as NodeData;
+    case 'entity_play_sound':
+      return {
+        ...base,
+        kind: 'entity_play_sound',
+        sound: 'minecraft:entity.player.levelup',
+        volume: 1,
+        pitch: 1,
+        displayName: '实体播放音效',
+      } as NodeData;
+    case 'entity_set_velocity':
+      return {
+        ...base,
+        kind: 'entity_set_velocity',
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        displayName: '设置实体速度',
+      } as NodeData;
     default:
       throw new Error(`Unknown node kind: ${kind satisfies never}`);
   }
 }
 
 function createDefaultPorts(kind: NodeKind): NodePort[] {
+  // 新核心库节点：按 shared 定义生成端口表
+  if (isCoreLibKind(kind)) {
+    const def = getCoreLibDefinition(kind);
+    if (def) return buildLegacyPorts(def);
+  }
+
   switch (kind) {
     case 'item':
       return [
@@ -429,6 +548,245 @@ function createDefaultPorts(kind: NodeKind): NodePort[] {
       ];
     case 'comment':
       return [];
+    // 核心高频节点（P0/P1 优先级）
+    case 'entity_spawn':
+      return [
+        {
+          id: 'entity_type',
+          label: '实体类型',
+          type: 'entity',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        { id: 'x', label: 'X', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'y', label: 'Y', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'z', label: 'Z', type: 'number', direction: 'in', required: true, multiple: false },
+        {
+          id: 'world',
+          label: '世界',
+          type: 'entity',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+        {
+          id: 'entity',
+          label: '生成的实体',
+          type: 'entity',
+          direction: 'out',
+          required: false,
+          multiple: false,
+        },
+      ];
+    case 'entity_damage':
+      return [
+        {
+          id: 'entity',
+          label: '目标实体',
+          type: 'entity',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        {
+          id: 'amount',
+          label: '伤害值',
+          type: 'number',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        {
+          id: 'source',
+          label: '伤害来源',
+          type: 'string',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+      ];
+    case 'strike_lightning':
+      return [
+        { id: 'x', label: 'X', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'y', label: 'Y', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'z', label: 'Z', type: 'number', direction: 'in', required: true, multiple: false },
+        {
+          id: 'effect_only',
+          label: '仅视觉效果',
+          type: 'boolean',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+      ];
+    case 'play_sound':
+      return [
+        {
+          id: 'sound',
+          label: '音效 ID',
+          type: 'string',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        { id: 'x', label: 'X', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'y', label: 'Y', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'z', label: 'Z', type: 'number', direction: 'in', required: true, multiple: false },
+        {
+          id: 'volume',
+          label: '音量',
+          type: 'number',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+        {
+          id: 'pitch',
+          label: '音调',
+          type: 'number',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+      ];
+    case 'give_item':
+      return [
+        {
+          id: 'player',
+          label: '目标玩家',
+          type: 'entity',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        {
+          id: 'item',
+          label: '物品',
+          type: 'item_stack',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        {
+          id: 'count',
+          label: '数量',
+          type: 'number',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+      ];
+    case 'block_set':
+      return [
+        {
+          id: 'block',
+          label: '方块状态',
+          type: 'block_state',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        { id: 'x', label: 'X', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'y', label: 'Y', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'z', label: 'Z', type: 'number', direction: 'in', required: true, multiple: false },
+      ];
+    case 'block_remove':
+      return [
+        { id: 'x', label: 'X', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'y', label: 'Y', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'z', label: 'Z', type: 'number', direction: 'in', required: true, multiple: false },
+        {
+          id: 'drop',
+          label: '掉落物品',
+          type: 'boolean',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+      ];
+    case 'entity_set_health':
+      return [
+        {
+          id: 'entity',
+          label: '目标实体',
+          type: 'entity',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        {
+          id: 'health',
+          label: '生命值',
+          type: 'number',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+      ];
+    case 'entity_set_position':
+      return [
+        {
+          id: 'entity',
+          label: '目标实体',
+          type: 'entity',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        { id: 'x', label: 'X', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'y', label: 'Y', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'z', label: 'Z', type: 'number', direction: 'in', required: true, multiple: false },
+      ];
+    case 'entity_play_sound':
+      return [
+        {
+          id: 'entity',
+          label: '目标实体',
+          type: 'entity',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        {
+          id: 'sound',
+          label: '音效 ID',
+          type: 'string',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        {
+          id: 'volume',
+          label: '音量',
+          type: 'number',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+        {
+          id: 'pitch',
+          label: '音调',
+          type: 'number',
+          direction: 'in',
+          required: false,
+          multiple: false,
+        },
+      ];
+    case 'entity_set_velocity':
+      return [
+        {
+          id: 'entity',
+          label: '目标实体',
+          type: 'entity',
+          direction: 'in',
+          required: true,
+          multiple: false,
+        },
+        { id: 'vx', label: 'VX', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'vy', label: 'VY', type: 'number', direction: 'in', required: true, multiple: false },
+        { id: 'vz', label: 'VZ', type: 'number', direction: 'in', required: true, multiple: false },
+      ];
     default:
       return [];
   }
@@ -1143,7 +1501,7 @@ describe('compileNodeGraph', () => {
     expect(handler.procedureCallArgs).toEqual({
       p1: [
         'count',
-        'net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.parse("minecraft:diamond"))',
+        'net.minecraft.registry.Registries.ITEM.get(new net.minecraft.util.Identifier("minecraft:diamond"))',
       ],
     });
   });
