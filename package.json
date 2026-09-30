@@ -32,12 +32,15 @@
   "scripts": {
     "dev": "pnpm --filter @mc-creator/desktop dev",
     "test": "pnpm -r test",
+    "test:coverage": "pnpm -r --if-present run test:coverage",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,cjs,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,cjs,json,md}\"",
+    "check:docs": "node scripts/check-docs.mjs",
+    "check:bundle": "node scripts/check-bundle.mjs",
     "prepare": "husky || true"
   },
   "devDependencies": {

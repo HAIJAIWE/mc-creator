@@ -9,6 +9,7 @@ out/
 out_prev_*/
 *.jar
 vitest-out.txt
+coverage/
 
 # Electron 打包
 release/

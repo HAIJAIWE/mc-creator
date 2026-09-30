@@ -866,7 +866,7 @@ export const NODE_METADATA: NodeMeta[] = [
   },
   {
     kind: 'while_loop',
-    label: '循环',
+    label: '条件循环',
     description: '条件循环执行',
     icon: 'repeat',
     category: 'logic',

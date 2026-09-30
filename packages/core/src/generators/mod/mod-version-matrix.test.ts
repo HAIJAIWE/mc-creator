@@ -73,7 +73,10 @@ describe('版本×loader 矩阵（防回归）', () => {
         expect(bg).not.toContain('officialMojangMappings');
       } else {
         expect(bg).toContain("id 'fabric-loom'");
-        expect(bg).toContain('officialMojangMappings');
+        // 960dda0：旧 Fabric 管线已迁移到 Yarn mappings（经真实 loom 构建验证），
+        // 不再使用 officialMojangMappings（与 legacy/quilt 一致）
+        expect(bg).toContain('net.fabricmc:yarn:');
+        expect(bg).not.toContain('officialMojangMappings');
       }
       expect(fmj.depends.java).toBe(`>=${javaVersionFor('fabric', mcVersion)}`);
     },

@@ -10,6 +10,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -25,6 +26,7 @@
     "@types/node": "^26.1.1",
     "@types/pako": "^2.0.3",
     "@types/pngjs": "^6.0.5",
+    "@vitest/coverage-v8": "^2.1.9",
     "memfs": "^4.9.0",
     "vitest": "^2.0.0"
   }
