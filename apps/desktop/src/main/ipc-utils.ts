@@ -64,7 +64,9 @@ export function parseGitStatus(raw: string): {
       origPath = path.slice(0, arrow);
       path = path.slice(arrow + 4);
     }
-    files.push({ x, y, path, origPath });
+    const fileEntry: { x: string; y: string; path: string; origPath?: string } = { x, y, path };
+    if (origPath !== undefined) fileEntry.origPath = origPath;
+    files.push(fileEntry);
   }
   return { branch, upstream, ahead, behind, files, clean: files.length === 0 };
 }

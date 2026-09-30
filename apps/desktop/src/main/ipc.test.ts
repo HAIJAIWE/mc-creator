@@ -61,34 +61,58 @@ describe('P12 buildChatSystemMessage', () => {
 
   it('空对象 context 时返回增强 system message（包含默认前缀）', () => {
     // context 存在但所有字段为 undefined 时，应进入分支构建（包含默认前缀）
-    const msg = buildChatSystemMessage({});
+    const msg = buildChatSystemMessage({
+      generatorType: undefined,
+      description: undefined,
+      specSummary: undefined,
+    });
     expect(msg).toContain('你是 Minecraft mod 专家助手');
     expect(msg).toContain('请基于用户当前项目上下文回答');
   });
 
   it('context.generatorType=mod 时 system message 包含「模组」', () => {
-    const msg = buildChatSystemMessage({ generatorType: 'mod' });
+    const msg = buildChatSystemMessage({
+      generatorType: 'mod',
+      description: undefined,
+      specSummary: undefined,
+    });
     expect(msg).toContain('当前项目类型：模组');
   });
 
   it('context.generatorType=datapack 时 system message 包含「数据包」', () => {
-    const msg = buildChatSystemMessage({ generatorType: 'datapack' });
+    const msg = buildChatSystemMessage({
+      generatorType: 'datapack',
+      description: undefined,
+      specSummary: undefined,
+    });
     expect(msg).toContain('当前项目类型：数据包');
   });
 
   it('context.generatorType 为未知值时 system message 包含原值', () => {
-    const msg = buildChatSystemMessage({ generatorType: 'custom_xyz' });
+    const msg = buildChatSystemMessage({
+      generatorType: 'custom_xyz',
+      description: undefined,
+      specSummary: undefined,
+    });
     expect(msg).toContain('当前项目类型：custom_xyz');
   });
 
   it('context.description 时 system message 包含用户描述', () => {
-    const msg = buildChatSystemMessage({ description: '添加一个红宝石矿石' });
+    const msg = buildChatSystemMessage({
+      generatorType: undefined,
+      description: '添加一个红宝石矿石',
+      specSummary: undefined,
+    });
     expect(msg).toContain('用户对项目的描述：添加一个红宝石矿石');
   });
 
   it('context.specSummary 时 system message 包含 spec 摘要', () => {
     const summary = 'modId: ruby_mod\nitems[2]: ruby, ruby_sword';
-    const msg = buildChatSystemMessage({ specSummary: summary });
+    const msg = buildChatSystemMessage({
+      generatorType: undefined,
+      description: undefined,
+      specSummary: summary,
+    });
     expect(msg).toContain('当前 spec 摘要：');
     expect(msg).toContain(summary);
   });

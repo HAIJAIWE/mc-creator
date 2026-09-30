@@ -27,9 +27,9 @@ export const DEFAULT_CHAT_SYSTEM_MESSAGE =
 
 /** ChatStreamRequest 的 context 字段类型 */
 export interface ChatStreamContext {
-  generatorType?: string;
-  description?: string;
-  specSummary?: string;
+  generatorType: string | undefined;
+  description: string | undefined;
+  specSummary: string | undefined;
 }
 
 /**

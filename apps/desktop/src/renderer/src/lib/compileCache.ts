@@ -1,4 +1,4 @@
-import type { ModSpec } from '@mc-creator/shared';
+import type { ModNode, ModEdge, NodeGraph } from '@mc-creator/shared';
 import type { CompileResult } from './compileNodeGraph.js';
 
 const DB_NAME = 'mc-creator-cache';
@@ -21,27 +21,27 @@ export interface CacheMeta {
 }
 
 /** 计算图的哈希值（用于缓存键） */
-export async function computeGraphHash(graph: any): Promise<string> {
+export async function computeGraphHash(graph: NodeGraph): Promise<string> {
   // 使用稳定的序列化 + 简单哈希
   const relevant = {
     modId: graph.modId,
     nodes: graph.nodes
-      .map((n: any) => ({
+      .map((n: ModNode) => ({
         id: n.id,
         kind: n.data.kind,
         data: n.data,
       }))
-      .sort((a: any, b: any) => a.id.localeCompare(b.id)),
+      .sort((a, b) => a.id.localeCompare(b.id)),
     edges: graph.edges
-      .filter((e: any) => !e.disabled)
-      .map((e: any) => ({
+      .filter((e: ModEdge) => !e.disabled)
+      .map((e: ModEdge) => ({
         s: e.source,
         t: e.target,
         sh: e.sourceHandle,
         th: e.targetHandle,
         k: e.kind,
       }))
-      .sort((a: any, b: any) => `${a.s}:${a.sh}`.localeCompare(`${b.s}:${b.sh}`)),
+      .sort((a, b) => `${a.s}:${a.sh}`.localeCompare(`${b.s}:${b.sh}`)),
   };
   const str = JSON.stringify(relevant);
   // 简单的 FNV-1a 哈希
@@ -77,7 +77,7 @@ function openDB(): Promise<IDBDatabase> {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
 
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = () => {
       const db = request.result;
 
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -95,7 +95,8 @@ function openDB(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-async function closeDB(): Promise<void> {
+/** 关闭 IndexedDB 连接（测试/调试用，正常流程由浏览器管理连接生命周期） */
+export async function closeDB(): Promise<void> {
   if (dbPromise) {
     const db = await dbPromise;
     db.close();
@@ -112,7 +113,7 @@ export async function getCachedCompileResult(
   graphHash: string,
   modId: string,
 ): Promise<{
-  result: any;
+  result: CompileResult;
   timestamp: number;
 } | null> {
   const key = getCacheKey(graphHash, modId);
@@ -151,7 +152,7 @@ export async function getCachedCompileResult(
 export async function setCachedCompileResult(
   graphHash: string,
   modId: string,
-  result: any,
+  result: CompileResult,
   version: number = 1,
 ): Promise<void> {
   const key = getCacheKey(graphHash, modId);
@@ -234,8 +235,9 @@ export async function pruneCache(maxEntries: number = 50): Promise<void> {
         const request = index.openCursor(null, 'prev');
 
         let count = 0;
-        request.onsuccess = (event: Event) => {
-          const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+        request.onsuccess = () => {
+          // 经 request.result 直接取游标，无需 event.target 断言
+          const cursor: IDBCursorWithValue | null = request.result;
           if (cursor) {
             count++;
             if (count > maxEntries) {

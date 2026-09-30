@@ -69,9 +69,7 @@ function createChineseMenu(): Menu {
     },
     {
       label: '文件',
-      submenu: [
-        { label: '关闭窗口', role: 'close' },
-      ],
+      submenu: [{ label: '关闭窗口', role: 'close' }],
     },
     {
       label: '编辑',
@@ -104,9 +102,7 @@ function createChineseMenu(): Menu {
     },
     {
       label: '帮助',
-      submenu: [
-        { label: '开发者工具', role: 'toggleDevTools' },
-      ],
+      submenu: [{ label: '开发者工具', role: 'toggleDevTools' }],
     },
   ]);
 }

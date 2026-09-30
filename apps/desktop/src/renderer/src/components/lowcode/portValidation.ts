@@ -1,4 +1,5 @@
-import type { NodeGraph, NodePort, PortType } from '@mc-creator/shared';
+import type { NodeGraph, PortType } from '@mc-creator/shared';
+import { PortType as PortTypeSchema } from '@mc-creator/shared';
 import { findPort, arePortTypesCompatible } from './connectionRules';
 import { CompileErrorCode } from '../../lib/compileErrors.js';
 
@@ -50,7 +51,65 @@ export function loopVarTypeToPortType(loopVarType: 'int' | 'item' | 'block' | 's
   }
 }
 
-type NodeKind = 'variable' | 'loop' | 'procedure' | 'subgraph';
+/**
+ * Narrowing helpers：动态端口校验的输入是弱类型快照（Record<string, unknown>），
+ * 用守卫收敛为具体形状，避免断言逃逸。
+ */
+type VarType = 'int' | 'double' | 'string' | 'boolean' | 'item' | 'block';
+type LoopVarType = 'int' | 'item' | 'block' | 'string';
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+/** 端口类型守卫：经 Zod 校验收敛，非法定制字符串一律视为非法 */
+function isPortType(v: unknown): v is PortType {
+  return PortTypeSchema.safeParse(v).success;
+}
+
+function isVarType(v: unknown): v is VarType {
+  return (
+    v === 'int' ||
+    v === 'double' ||
+    v === 'string' ||
+    v === 'boolean' ||
+    v === 'item' ||
+    v === 'block'
+  );
+}
+
+function isLoopVarType(v: unknown): v is LoopVarType {
+  return v === 'int' || v === 'item' || v === 'block' || v === 'string';
+}
+
+interface ProcedureInput {
+  name: string;
+  type: PortType;
+}
+
+function asProcedureInputs(v: unknown): ProcedureInput[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (i): i is ProcedureInput => isRecord(i) && typeof i.name === 'string' && isPortType(i.type),
+  );
+}
+
+interface SubgraphPort {
+  externalPortId: string;
+  type: PortType;
+  direction: 'in' | 'out';
+}
+
+function asSubgraphPorts(v: unknown): SubgraphPort[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (p): p is SubgraphPort =>
+      isRecord(p) &&
+      typeof p.externalPortId === 'string' &&
+      isPortType(p.type) &&
+      (p.direction === 'in' || p.direction === 'out'),
+  );
+}
 
 /**
  * Validate dynamic port node connections for invalidation due to data changes.
@@ -64,7 +123,8 @@ export function validateDynamicPortConnections(
   const node = graph.nodes.find((n) => n.id === changedNodeId);
   if (!node) return { ok: true };
 
-  const kind = (node.data as any).kind as string;
+  // NodeData 为 discriminated union，kind 可直接读取
+  const kind = node.data.kind;
   const errors: ValidationError[] = [];
 
   const relatedEdges = graph.edges.filter(
@@ -76,15 +136,22 @@ export function validateDynamicPortConnections(
   // Use switch for better type narrowing
   switch (kind) {
     case 'variable': {
-      const oldType = (oldData as any)?.varType;
-      const newType = (newData as any)?.varType;
+      const oldType = oldData?.varType;
+      const newType = newData.varType;
       if (oldType !== newType) {
+        // 非法 varType 视为全不兼容（守卫失败即报错）
+        const sourcePortType: PortType | undefined = isVarType(newType)
+          ? varTypeToPortType(newType)
+          : undefined;
         for (const edge of graph.edges.filter((e) => e.source === changedNodeId)) {
           const targetNode = graph.nodes.find((n) => n.id === edge.target);
           if (!targetNode) continue;
           const targetPort = findPort(targetNode, edge.targetHandle);
-          const sourcePortType = varTypeToPortType(newType);
-          if (!targetPort || !arePortTypesCompatible(sourcePortType, targetPort.type)) {
+          if (
+            !targetPort ||
+            sourcePortType === undefined ||
+            !arePortTypesCompatible(sourcePortType, targetPort.type)
+          ) {
             errors.push({
               edgeId: edge.id,
               reason: `Variable type changed causing type incompatibility: ${sourcePortType} -> ${targetPort?.type}`,
@@ -100,17 +167,23 @@ export function validateDynamicPortConnections(
       break;
     }
     case 'loop': {
-      const oldType = (oldData as any)?.loopVarType;
-      const newType = (newData as any)?.loopVarType;
+      const oldType = oldData?.loopVarType;
+      const newType = newData.loopVarType;
       if (oldType !== newType) {
+        const sourcePortType: PortType | undefined = isLoopVarType(newType)
+          ? loopVarTypeToPortType(newType)
+          : undefined;
         for (const edge of graph.edges.filter(
           (e) => e.source === changedNodeId && e.sourceHandle === 'loop_var',
         )) {
           const targetNode = graph.nodes.find((n) => n.id === edge.target);
           if (!targetNode) continue;
           const targetPort = findPort(targetNode, edge.targetHandle);
-          const sourcePortType = loopVarTypeToPortType(newType);
-          if (!targetPort || !arePortTypesCompatible(sourcePortType, targetPort.type)) {
+          if (
+            !targetPort ||
+            sourcePortType === undefined ||
+            !arePortTypesCompatible(sourcePortType, targetPort.type)
+          ) {
             errors.push({
               edgeId: edge.id,
               reason: `Loop variable type changed causing type incompatibility: ${sourcePortType} -> ${targetPort?.type}`,
@@ -126,11 +199,9 @@ export function validateDynamicPortConnections(
       break;
     }
     case 'procedure': {
-      const oldInputs = ((oldData as any)?.inputs ?? []) as Array<{ name: string; type: string }>;
-      const newInputs = ((newData as any)?.inputs ?? []) as Array<{ name: string; type: string }>;
+      const newInputs = asProcedureInputs(newData.inputs);
 
-      const oldInputMap = new Map(oldInputs.map((i) => [`in_${i.name}`, i.type as PortType]));
-      const newInputMap = new Map(newInputs.map((i) => [`in_${i.name}`, i.type as PortType]));
+      const newInputMap = new Map(newInputs.map((i) => [`in_${i.name}`, i.type]));
 
       for (const edge of graph.edges.filter((e) => e.target === changedNodeId)) {
         const handle = edge.targetHandle ?? '';
@@ -167,23 +238,11 @@ export function validateDynamicPortConnections(
       break;
     }
     case 'subgraph': {
-      const oldPortMappings = ((oldData as any)?.portMappings ?? []) as Array<{
-        externalPortId: string;
-        type: string;
-        direction: 'in' | 'out';
-      }>;
-      const newPortMappings = ((newData as any)?.portMappings ?? []) as Array<{
-        externalPortId: string;
-        type: string;
-        direction: 'in' | 'out';
-      }>;
+      const oldPortMappings = asSubgraphPorts(oldData?.portMappings);
+      const newPortMappings = asSubgraphPorts(newData.portMappings);
 
-      const oldPortMap = new Map(
-        oldPortMappings.map((p) => [p.externalPortId, p.type as PortType]),
-      );
-      const newPortMap = new Map(
-        newPortMappings.map((p) => [p.externalPortId, p.type as PortType]),
-      );
+      const oldPortMap = new Map(oldPortMappings.map((p) => [p.externalPortId, p.type]));
+      const newPortMap = new Map(newPortMappings.map((p) => [p.externalPortId, p.type]));
 
       const relatedEdges = graph.edges.filter(
         (e) => e.source === changedNodeId || e.target === changedNodeId,

@@ -8,6 +8,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Globe,
 } from 'lucide-react';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModelConfigStore } from '../store/model-config-store.js';
@@ -23,6 +24,8 @@ import {
   type ColorMode,
 } from '../lib/themes.js';
 import type { ModelProfile } from '../../../shared/ipc-channels.js';
+import { getLocale, setLocale, getAvailableLocales, getLocaleDisplayName } from '../i18n.js';
+import { useTranslation } from '../hooks/useTranslation.js';
 
 interface SettingsPanelProps {
   leftWidth: number;
@@ -136,6 +139,7 @@ export function SettingsPanel({
   onRightWidthChange,
 }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('model');
+  const { t, tCommon } = useTranslation();
 
   // === 模型配置（多套并存，可切换/测试） ===
   const { setConfig, setProfiles, profiles, activeId } = useModelConfigStore();
@@ -348,16 +352,16 @@ export function SettingsPanel({
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-mc-border px-3 py-2">
         <McIcon scope="pixel" name="settings-cog" size={16} className="text-mc-accent" />
-        <span className="text-xs font-semibold text-mc-text">设置</span>
+        <span className="text-xs font-semibold text-mc-text">{tCommon('settings')}</span>
       </div>
 
       {/* Tab 切换 */}
       <div className="flex border-b border-mc-border">
         {(
           [
-            { id: 'model', label: '模型' },
+            { id: 'model', label: tCommon('model') },
             { id: 'curseforge', label: 'CurseForge' },
-            { id: 'appearance', label: '外观' },
+            { id: 'appearance', label: tCommon('appearance') },
           ] as { id: Tab; label: string }[]
         ).map((tab) => (
           <button
@@ -392,7 +396,7 @@ export function SettingsPanel({
               </div>
               {profiles.length === 0 ? (
                 <div className="rounded-mc border border-dashed border-mc-border p-2 text-xs text-mc-mute">
-                  还没有配置，从下方服务商任选一个开始填写
+                  {t('settings.noProfiles')}
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
@@ -406,13 +410,13 @@ export function SettingsPanel({
                           ? 'bg-mc-accent text-white'
                           : 'bg-mc-surface-2 text-mc-dim hover:bg-mc-surface-3 hover:text-mc-text'
                       }`}
-                      title={`切换为生效配置：${p.baseURL}`}
+                      title={t('settings.switchToActive', { baseURL: p.baseURL })}
                     >
                       {p.name}
                       {activeId === p.id && <span aria-hidden="true">✓</span>}
                       <span
                         role="button"
-                        aria-label={`删除配置 ${p.name}`}
+                        aria-label={t('settings.deleteProfile', { name: p.name })}
                         onClick={(e) => {
                           e.stopPropagation();
                           void removeProfile(p.id);
@@ -441,9 +445,7 @@ export function SettingsPanel({
 
             {/* 服务商快速预设 */}
             <div>
-              <div className="mb-2 text-xs text-mc-mute">
-                服务商预设（点击填充 Base URL / 模型）：
-              </div>
+              <div className="mb-2 text-xs text-mc-mute">{t('settings.providerPresets')}</div>
               <div className="flex flex-wrap gap-1.5">
                 {MODEL_PRESETS.map((p) => (
                   <button
@@ -451,7 +453,9 @@ export function SettingsPanel({
                     onClick={() => applyModelPreset(p)}
                     className="mc-btn-ghost !py-1 !text-xs"
                     title={
-                      p.local ? `本地模型，需先安装 ${p.name.split(' ')[0]}` : `云端：${p.baseURL}`
+                      p.local
+                        ? t('settings.localModel', { name: p.name.split(' ')[0] })
+                        : t('settings.cloudProvider', { baseURL: p.baseURL })
                     }
                   >
                     {p.local && <Circle className="mr-1 h-3 w-3 fill-current text-mc-accent" />}
@@ -462,24 +466,24 @@ export function SettingsPanel({
             </div>
 
             <div>
-              <label className="text-xs text-mc-dim">配置名称</label>
+              <label className="text-xs text-mc-dim">{t('settings.configName')}</label>
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="mc-input"
-                placeholder="如 DeepSeek"
-                aria-label="配置名称"
+                placeholder={t('settings.configNamePlaceholder')}
+                aria-label={t('settings.configName')}
               />
             </div>
             <div>
-              <label className="text-xs text-mc-dim">模型 ID</label>
+              <label className="text-xs text-mc-dim">{t('settings.modelId')}</label>
               <input
                 value={form.modelId}
                 onChange={(e) => setForm({ ...form, modelId: e.target.value })}
                 className="mc-input"
-                placeholder="如 deepseek-flash / kimi-k2.5 / gpt-5.6-luna"
+                placeholder={t('settings.modelIdPlaceholder')}
                 list="model-options"
-                aria-label="模型 ID"
+                aria-label={t('settings.modelId')}
               />
               <datalist id="model-options">
                 {MODEL_PRESETS.flatMap((p) => p.models ?? [p.modelId]).map((m) => (
@@ -488,39 +492,39 @@ export function SettingsPanel({
               </datalist>
             </div>
             <div>
-              <label className="text-xs text-mc-dim">Base URL</label>
+              <label className="text-xs text-mc-dim">{t('settings.baseUrl')}</label>
               <input
                 value={form.baseURL}
                 onChange={(e) => setForm({ ...form, baseURL: e.target.value })}
                 className="mc-input"
                 placeholder="https://api.openai.com/v1"
-                aria-label="Base URL"
+                aria-label={t('settings.baseUrl')}
               />
             </div>
             <div>
-              <label className="text-xs text-mc-dim">API Key</label>
+              <label className="text-xs text-mc-dim">{t('settings.apiKey')}</label>
               <input
                 type="password"
                 value={form.apiKey}
                 onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
                 className="mc-input"
-                placeholder="留空 = 保留已保存的 Key；本地模型可不填"
-                aria-label="API Key"
+                placeholder={t('settings.apiKeyPlaceholder')}
+                aria-label={t('settings.apiKey')}
               />
             </div>
 
             <div className="flex items-center gap-2">
               <button onClick={saveModel} disabled={saving} className="mc-btn-primary">
-                {saving ? '保存中…' : '保存配置'}
+                {saving ? tCommon('saving') : tCommon('save')}
               </button>
               <button
                 onClick={handleTestConnection}
                 disabled={testing || !form.baseURL || !form.modelId}
                 className="mc-btn-ghost"
               >
-                {testing ? '测试中…' : '测试连接'}
+                {testing ? tCommon('testing') : t('settings.testConnection')}
               </button>
-              {saved && <span className="text-xs text-mc-accent">已保存</span>}
+              {saved && <span className="text-xs text-mc-accent">{tCommon('saved')}</span>}
             </div>
           </div>
         )}
@@ -539,7 +543,7 @@ export function SettingsPanel({
                 >
                   console.curseforge.com
                 </a>{' '}
-                免费申请）
+                {t('settings.curseforgeFreeApply')}）
               </label>
               <input
                 type="password"
@@ -551,9 +555,9 @@ export function SettingsPanel({
             </div>
             <div className="flex items-center gap-2">
               <button onClick={saveCf} disabled={cfSaving} className="mc-btn-primary">
-                {cfSaving ? '保存中…' : '保存'}
+                {cfSaving ? tCommon('saving') : tCommon('save')}
               </button>
-              {cfSaved && <span className="text-xs text-mc-accent">已保存</span>}
+              {cfSaved && <span className="text-xs text-mc-accent">{tCommon('saved')}</span>}
             </div>
           </div>
         )}
@@ -563,7 +567,9 @@ export function SettingsPanel({
           <div className="space-y-4">
             {/* 布局预设 */}
             <div>
-              <div className="mb-2 text-xs font-medium text-mc-text">布局预设</div>
+              <div className="mb-2 text-xs font-medium text-mc-text">
+                {t('settings.layoutPresets')}
+              </div>
               <div className="space-y-1.5">
                 {LAYOUT_PRESETS.map((preset) => {
                   const Icon = preset.icon;
@@ -597,11 +603,11 @@ export function SettingsPanel({
 
             {/* 面板尺寸 */}
             <div>
-              <div className="mb-2 text-xs font-medium text-mc-text">面板尺寸</div>
+              <div className="mb-2 text-xs font-medium text-mc-text">{t('settings.panelSize')}</div>
               <div className="space-y-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-mc-dim">左侧</span>
+                    <span className="text-xs text-mc-dim">{t('settings.leftPanel')}</span>
                     <span className="text-xs text-mc-text-dim">{leftWidth}px</span>
                   </div>
                   <input
@@ -615,7 +621,7 @@ export function SettingsPanel({
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-mc-dim">右侧</span>
+                    <span className="text-xs text-mc-dim">{t('settings.rightPanel')}</span>
                     <span className="text-xs text-mc-text-dim">{rightWidth}px</span>
                   </div>
                   <input
@@ -632,13 +638,13 @@ export function SettingsPanel({
 
             {/* 颜色模式 */}
             <div>
-              <div className="mb-2 text-xs font-medium text-mc-text">颜色模式</div>
+              <div className="mb-2 text-xs font-medium text-mc-text">{t('settings.colorMode')}</div>
               <div className="grid grid-cols-3 gap-1.5">
                 {(
                   [
-                    { id: 'light', label: '亮色', icon: Sun },
-                    { id: 'dark', label: '暗色', icon: Moon },
-                    { id: 'system', label: '跟随系统', icon: Monitor },
+                    { id: 'light', label: t('settings.lightMode'), icon: Sun },
+                    { id: 'dark', label: t('settings.darkMode'), icon: Moon },
+                    { id: 'system', label: t('settings.systemMode'), icon: Monitor },
                   ] as { id: ColorMode; label: string; icon: typeof Sun }[]
                 ).map((m) => {
                   const Icon = m.icon;
@@ -663,7 +669,9 @@ export function SettingsPanel({
 
             {/* 主题颜色 */}
             <div>
-              <div className="mb-2 text-xs font-medium text-mc-text">主题颜色</div>
+              <div className="mb-2 text-xs font-medium text-mc-text">
+                {t('settings.themeColor')}
+              </div>
               <div className="space-y-1.5">
                 {MC_THEMES.filter((t) => t.mode === effectiveMode).map((theme) => {
                   const isActive = activeTheme === theme.id;
@@ -719,9 +727,38 @@ export function SettingsPanel({
               </div>
             </div>
 
+            {/* 语言设置 */}
+            <div>
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-mc-text">
+                <Globe className="h-3.5 w-3.5 text-mc-accent" />
+                {tCommon('language')}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {getAvailableLocales().map((loc) => {
+                  const isActive = getLocale() === loc;
+                  return (
+                    <button
+                      key={loc}
+                      onClick={() => setLocale(loc)}
+                      className={`flex items-center gap-1.5 rounded-mc px-2 py-1.5 text-xs transition-all border ${
+                        isActive
+                          ? 'bg-mc-accent/15 border-mc-accent/50 text-mc-accent-bright'
+                          : 'bg-mc-surface-2/50 border-transparent text-mc-text-dim hover:bg-mc-surface-2 hover:text-mc-text'
+                      }`}
+                    >
+                      {getLocaleDisplayName(loc)}
+                      {isActive && (
+                        <McIcon scope="pixel" name="check" size={12} className="text-mc-accent" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="border-t border-mc-border pt-2">
               <div className="text-xs text-mc-text-dim text-center">
-                提示：拖动面板边缘也可以调整宽度
+                {t('settings.dragToResizeHint')}
               </div>
             </div>
           </div>

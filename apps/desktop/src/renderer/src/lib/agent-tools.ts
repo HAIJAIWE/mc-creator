@@ -7,6 +7,71 @@
 import { ipcClient } from './ipc-client.js';
 import { generateFilesForType } from './generate-files.js';
 import { useModStore } from '../store/mod-store.js';
+import type { GeneratorContext, Loader, ModSpec } from '@mc-creator/shared';
+import { LOADERS } from '@mc-creator/shared';
+
+function isLoader(v: unknown): v is Loader {
+  return typeof v === 'string' && (LOADERS as readonly string[]).includes(v);
+}
+
+/** unknown 错误收敛为可展示文案（替代 `(e as Error).message` 断言） */
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+/** extra_params（Record<string, unknown>）的类型守卫读取，避免 `as number/boolean/string` 断言 */
+function getNumberParam(obj: Record<string, unknown>, key: string, fallback: number): number {
+  const v = obj[key];
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  return fallback;
+}
+
+function getBooleanParam(obj: Record<string, unknown>, key: string, fallback: boolean): boolean {
+  const v = obj[key];
+  if (typeof v === 'boolean') return v;
+  return fallback;
+}
+
+function getStringParam(obj: Record<string, unknown>, key: string, fallback: string): string {
+  const v = obj[key];
+  if (typeof v === 'string') return v;
+  return fallback;
+}
+
+function getStringArrayParam(
+  obj: Record<string, unknown>,
+  key: string,
+  fallback: string[],
+): string[] {
+  const v = obj[key];
+  if (Array.isArray(v) && v.every((i): i is string => typeof i === 'string')) return [...v];
+  return fallback;
+}
+
+function getEnumParam<T extends string>(
+  obj: Record<string, unknown>,
+  key: string,
+  fallback: T,
+  valid: readonly T[],
+): T {
+  const v = obj[key];
+  if (typeof v === 'string') {
+    const found = valid.find((x) => x === v);
+    if (found !== undefined) return found;
+  }
+  return fallback;
+}
+
+function getNullableNumberParam(
+  obj: Record<string, unknown>,
+  key: string,
+  fallback: number | null,
+): number | null {
+  const v = obj[key];
+  if (v === null || v === undefined) return fallback;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  return fallback;
+}
 
 /**
  * 把生成器结果文件合并写入 store：已有路径则更新内容，新路径则创建。
@@ -328,7 +393,7 @@ const applyContentTemplateTool: ToolDefinition = {
     let extraParams: Record<string, unknown> = {};
     if (args.extra_params) {
       try {
-        extraParams = JSON.parse(String(args.extra_params));
+        extraParams = JSON.parse(String(args.extra_params)) as unknown as Record<string, unknown>;
       } catch {
         return '错误：extra_params 不是有效 JSON';
       }
@@ -351,63 +416,72 @@ const applyContentTemplateTool: ToolDefinition = {
         case 'new_food':
           specObj = shared.newFoodTemplate({
             ...baseParams,
-            hunger: (extraParams.hunger as number) ?? 4,
-            saturation: (extraParams.saturation as number) ?? 0.3,
+            hunger: getNumberParam(extraParams, 'hunger', 4),
+            saturation: getNumberParam(extraParams, 'saturation', 0.3),
           }) as Record<string, unknown>;
           langKeys = shared.newFoodLangKeys(baseParams);
           break;
         case 'new_dimension':
           specObj = shared.newDimensionTemplate({
             ...baseParams,
-            fixedTime: (extraParams.fixedTime as number) ?? null,
-            hasSkyLight: (extraParams.hasSkyLight as boolean) ?? true,
-            hasCeiling: (extraParams.hasCeiling as boolean) ?? false,
-            coordinateScale: (extraParams.coordinateScale as number) ?? 1.0,
+            fixedTime: getNullableNumberParam(extraParams, 'fixedTime', null),
+            hasSkyLight: getBooleanParam(extraParams, 'hasSkyLight', true),
+            hasCeiling: getBooleanParam(extraParams, 'hasCeiling', false),
+            coordinateScale: getNumberParam(extraParams, 'coordinateScale', 1.0),
           }) as Record<string, unknown>;
           langKeys = shared.newDimensionLangKeys(baseParams);
           break;
         case 'new_enchantment':
           specObj = shared.newEnchantmentTemplate({
             ...baseParams,
-            maxLevel: (extraParams.maxLevel as number) ?? 3,
-            weight: (extraParams.weight as number) ?? 10,
-            supportedItems:
-              (extraParams.supportedItems as string) ?? '#minecraft:enchantable/sword',
-            slots: (extraParams.slots as string[]) ?? ['any'],
+            maxLevel: getNumberParam(extraParams, 'maxLevel', 3),
+            weight: getNumberParam(extraParams, 'weight', 10),
+            supportedItems: getStringParam(
+              extraParams,
+              'supportedItems',
+              '#minecraft:enchantable/sword',
+            ),
+            slots: getStringArrayParam(extraParams, 'slots', ['any']),
           }) as Record<string, unknown>;
           langKeys = shared.newEnchantmentLangKeys(baseParams);
           break;
         case 'new_effect':
           specObj = shared.newEffectTemplate({
             ...baseParams,
-            color: (extraParams.color as number) ?? 0xffffff,
-            instant: (extraParams.instant as boolean) ?? false,
-            beneficial: (extraParams.beneficial as boolean) ?? true,
+            color: getNumberParam(extraParams, 'color', 0xffffff),
+            instant: getBooleanParam(extraParams, 'instant', false),
+            beneficial: getBooleanParam(extraParams, 'beneficial', true),
           }) as Record<string, unknown>;
           langKeys = shared.newEffectLangKeys(baseParams);
           break;
         case 'new_structure':
           specObj = shared.newStructureTemplate({
             ...baseParams,
-            templatePool: (extraParams.templatePool as string) ?? 'minecraft:empty',
-            placementType:
-              (extraParams.placementType as 'jigsaw' | 'random_spread' | 'concentric_rings') ??
+            templatePool: getStringParam(extraParams, 'templatePool', 'minecraft:empty'),
+            placementType: getEnumParam(extraParams, 'placementType', 'jigsaw', [
               'jigsaw',
-            maxDistance: (extraParams.maxDistance as number) ?? 7,
-            size: (extraParams.size as number) ?? 7,
-            biomes: (extraParams.biomes as string) ?? '#minecraft:is_overworld',
+              'random_spread',
+              'concentric_rings',
+            ] as const),
+            maxDistance: getNumberParam(extraParams, 'maxDistance', 7),
+            size: getNumberParam(extraParams, 'size', 7),
+            biomes: getStringParam(extraParams, 'biomes', '#minecraft:is_overworld'),
           }) as Record<string, unknown>;
           langKeys = shared.newStructureLangKeys(baseParams);
           break;
         case 'new_biome':
           specObj = shared.newBiomeTemplate({
             ...baseParams,
-            precipitation: (extraParams.precipitation as 'none' | 'rain' | 'snow') ?? 'rain',
-            temperature: (extraParams.temperature as number) ?? 0.5,
-            downfall: (extraParams.downfall as number) ?? 0.4,
-            skyColor: (extraParams.skyColor as number) ?? 0x78a7ff,
-            waterColor: (extraParams.waterColor as number) ?? 0x3f76e4,
-            fogColor: (extraParams.fogColor as number) ?? 0xc0d8ff,
+            precipitation: getEnumParam(extraParams, 'precipitation', 'rain', [
+              'none',
+              'rain',
+              'snow',
+            ] as const),
+            temperature: getNumberParam(extraParams, 'temperature', 0.5),
+            downfall: getNumberParam(extraParams, 'downfall', 0.4),
+            skyColor: getNumberParam(extraParams, 'skyColor', 0x78a7ff),
+            waterColor: getNumberParam(extraParams, 'waterColor', 0x3f76e4),
+            fogColor: getNumberParam(extraParams, 'fogColor', 0xc0d8ff),
           }) as Record<string, unknown>;
           langKeys = shared.newBiomeLangKeys(baseParams);
           break;
@@ -425,13 +499,16 @@ const applyContentTemplateTool: ToolDefinition = {
       const store = useModStore.getState();
       const gen = new DatapackGenerator();
 
-      const ctx = {
-        loader: store.loader as any,
+      // DatapackSpec 与 GeneratorContext.spec（ModSpec 类型槽位）结构不同，
+      // 经 unknown 中转桥接（与 AgentPanel / project-store 做法一致）；
+      // 生成器内部会再转回 DatapackSpec。
+      const ctx: GeneratorContext = {
+        loader: store.loader,
         mcVersion: store.mcVersion,
         modId,
-        spec: parsed.data,
+        spec: parsed.data as unknown as ModSpec,
         projectPath: '',
-      } as any;
+      };
       const result = await gen.generate(ctx);
 
       // 写入文件
@@ -445,10 +522,16 @@ const applyContentTemplateTool: ToolDefinition = {
       const existingZh = storeState.files.find((f) => f.path === langZhPath);
 
       const mergedEn = existingEn
-        ? { ...JSON.parse(existingEn.content), ...langKeys.en }
+        ? {
+            ...(JSON.parse(existingEn.content) as unknown as Record<string, string>),
+            ...langKeys.en,
+          }
         : langKeys.en;
       const mergedZh = existingZh
-        ? { ...JSON.parse(existingZh.content), ...langKeys.zh }
+        ? {
+            ...(JSON.parse(existingZh.content) as unknown as Record<string, string>),
+            ...langKeys.zh,
+          }
         : langKeys.zh;
 
       if (existingEn) storeState.updateFileContent(langEnPath, JSON.stringify(mergedEn, null, 2));
@@ -456,8 +539,8 @@ const applyContentTemplateTool: ToolDefinition = {
       if (existingZh) storeState.updateFileContent(langZhPath, JSON.stringify(mergedZh, null, 2));
       else storeState.createFile(langZhPath, JSON.stringify(mergedZh, null, 2));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      storeState.setSpec(parsed.data as any);
+      // DatapackSpec → store ModSpec 桥接（经 unknown 中转，见上）
+      storeState.setSpec(parsed.data as unknown as ModSpec);
 
       const totalLangKeys = Object.keys(langKeys.en).length;
       return (
@@ -468,7 +551,7 @@ const applyContentTemplateTool: ToolDefinition = {
         `配方: ${parsed.data.recipes.length} | 附魔: ${parsed.data.enchantments.length} | 效果: ${parsed.data.effects.length} | 结构: ${parsed.data.structures.length} | 生物群系: ${parsed.data.biomes.length} | 标签: ${parsed.data.itemTags.length + parsed.data.blockTags.length}`
       );
     } catch (e) {
-      return `错误：应用模板失败: ${(e as Error).message}`;
+      return `错误：应用模板失败: ${toErrorMessage(e)}`;
     }
   },
 };
@@ -495,9 +578,9 @@ const generateDatapackTool: ToolDefinition = {
     const specJson = String(args.spec_json);
     let specObj: Record<string, unknown>;
     try {
-      specObj = JSON.parse(specJson);
+      specObj = JSON.parse(specJson) as unknown as Record<string, unknown>;
     } catch (e) {
-      return `错误：spec_json 不是有效的 JSON: ${(e as Error).message}`;
+      return `错误：spec_json 不是有效的 JSON: ${toErrorMessage(e)}`;
     }
 
     const store = useModStore.getState();
@@ -517,13 +600,13 @@ const generateDatapackTool: ToolDefinition = {
       const gen = new DatapackGenerator();
       // DatapackGenerator 内部会做 spec as unknown as DatapackSpec，这里桥接类型
 
-      const ctx = {
-        loader: store.loader as any,
+      const ctx: GeneratorContext = {
+        loader: store.loader,
         mcVersion: store.mcVersion,
         modId: parsed.data.packId,
-        spec: parsed.data,
+        spec: parsed.data as unknown as ModSpec,
         projectPath: '',
-      } as any;
+      };
 
       const result = await gen.generate(ctx);
 
@@ -531,8 +614,7 @@ const generateDatapackTool: ToolDefinition = {
       mergeFilesIntoStore(result.files);
 
       // 更新 spec（DatapackSpec 与 ModSpec 结构不同，需桥接）
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      useModStore.getState().setSpec(parsed.data as any);
+      useModStore.getState().setSpec(parsed.data as unknown as ModSpec);
 
       const summary = [
         `✅ 数据包生成成功！`,
@@ -563,7 +645,7 @@ const generateDatapackTool: ToolDefinition = {
       }
       return summary.join('\n');
     } catch (e) {
-      return `错误：生成数据包失败: ${(e as Error).message}`;
+      return `错误：生成数据包失败: ${toErrorMessage(e)}`;
     }
   },
 };
@@ -594,12 +676,13 @@ const generateModTool: ToolDefinition = {
   requiresApproval: true,
   execute: async (args) => {
     const specJson = String(args.spec_json);
-    const loader = String(args.loader ?? 'fabric');
+    // loader 经守卫收敛为 Loader（非法输入回退 fabric，而非 String 强转）
+    const loader: Loader = isLoader(args.loader) ? args.loader : 'fabric';
     let specObj: Record<string, unknown>;
     try {
-      specObj = JSON.parse(specJson);
+      specObj = JSON.parse(specJson) as unknown as Record<string, unknown>;
     } catch (e) {
-      return `错误：spec_json 不是有效的 JSON: ${(e as Error).message}`;
+      return `错误：spec_json 不是有效的 JSON: ${toErrorMessage(e)}`;
     }
 
     try {
@@ -613,22 +696,21 @@ const generateModTool: ToolDefinition = {
       }
 
       const gen = new ModGenerator();
-      const ctx = {
+      const ctx: GeneratorContext = {
         loader,
         // 使用当前项目选择的 MC 版本（而非硬编码 1.21.11）
         mcVersion: useModStore.getState().mcVersion,
         modId: parsed.data.modId,
         spec: parsed.data,
         projectPath: '',
-      } as never;
+      };
 
       const result = await gen.generate(ctx);
 
       // 将生成的文件写入 store
       mergeFilesIntoStore(result.files);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      useModStore.getState().setSpec(parsed.data as any);
+      useModStore.getState().setSpec(parsed.data);
 
       const summary = [
         `✅ Mod 生成成功！`,
@@ -653,7 +735,7 @@ const generateModTool: ToolDefinition = {
       }
       return summary.join('\n');
     } catch (e) {
-      return `错误：生成 Mod 失败: ${(e as Error).message}`;
+      return `错误：生成 Mod 失败: ${toErrorMessage(e)}`;
     }
   },
 };
@@ -700,25 +782,26 @@ const generateFilesTool: ToolDefinition = {
     const type = String(args.generator_type);
     let specObj: Record<string, unknown>;
     try {
-      specObj = JSON.parse(String(args.spec_json));
+      specObj = JSON.parse(String(args.spec_json)) as unknown as Record<string, unknown>;
     } catch (e) {
-      return `错误：spec_json 不是有效的 JSON: ${(e as Error).message}`;
+      return `错误：spec_json 不是有效的 JSON: ${toErrorMessage(e)}`;
     }
 
     try {
       const store = useModStore.getState();
+      const loaderOpt = typeof args.loader === 'string' ? args.loader : store.loader;
+      const mcVersionOpt = typeof args.mc_version === 'string' ? args.mc_version : store.mcVersion;
       const result = await generateFilesForType(type, specObj, {
-        loader: (args.loader as string | undefined) ?? store.loader,
-        mcVersion: (args.mc_version as string | undefined) ?? store.mcVersion,
+        loader: loaderOpt,
+        mcVersion: mcVersionOpt,
       });
 
       // 合并文件到 store（已有则更新，新增则创建）
       mergeFilesIntoStore(result.files);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      useModStore.getState().setSpec(result.spec as any);
+      useModStore.getState().setSpec(result.spec as unknown as ModSpec);
 
       const summary = [`✅ ${type} 生成成功！`, `生成文件: ${result.files.length} 个`];
-      const spec = result.spec as Record<string, unknown>;
+      const spec = result.spec as unknown as Record<string, unknown>;
       const counts = Object.entries(spec)
         .filter(([, v]) => Array.isArray(v) && v.length > 0)
         .map(([k, v]) => `  ${k}: ${(v as unknown[]).length}`);
@@ -728,7 +811,7 @@ const generateFilesTool: ToolDefinition = {
       }
       return summary.join('\n');
     } catch (e) {
-      return `错误：${(e as Error).message}`;
+      return `错误：${toErrorMessage(e)}`;
     }
   },
 };
@@ -756,7 +839,7 @@ const getProjectContextTool: ToolDefinition = {
       // 显示完整 spec（上限 4000 字符，足以覆盖大部分场景）
       lines.push(specStr.length > 4000 ? specStr.slice(0, 4000) + '\n... (截断)' : specStr);
       // Spec 内容摘要
-      const spec = state.spec as Record<string, unknown>;
+      const spec = state.spec as unknown as Record<string, unknown>;
       lines.push(`\n=== Spec 内容摘要 ===`);
       const countFields = [
         'recipes',

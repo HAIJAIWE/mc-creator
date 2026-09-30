@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
 import { useToast } from './useToast.js';
+import { useTranslation } from '../hooks/useTranslation.js';
 import type { Project, GeneratorType } from '../../../shared/ipc-channels.js';
 import { FolderInput, FolderOutput } from 'lucide-react';
 import { McMark } from './McMark.js';
@@ -96,6 +97,7 @@ export function Dashboard() {
   const importProject = useProjectStore((s) => s.importProject);
   const setView = useProjectStore((s) => s.setView);
   const toast = useToast();
+  const { t, tCommon } = useTranslation();
   const [importing, setImporting] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
 
@@ -140,9 +142,9 @@ export function Dashboard() {
     try {
       const res = await importProject();
       if (res.success) {
-        toast.success('导入成功');
-      } else if (res.error && res.error !== '已取消') {
-        toast.error(`导入失败：${res.error}`);
+        toast.success(tCommon('success'));
+      } else if (res.error && res.error !== tCommon('cancel')) {
+        toast.error(`${tCommon('import_failed')}: ${res.error}`);
       }
     } finally {
       setImporting(false);
@@ -154,9 +156,9 @@ export function Dashboard() {
     try {
       const res = await exportProject(p);
       if (res.ok && res.savedPath) {
-        toast.success(`已导出到 ${res.savedPath}`);
+        toast.success(`${tCommon('exported_to')} ${res.savedPath}`);
       } else if (!res.ok && !res.canceled) {
-        toast.error('导出失败');
+        toast.error(tCommon('export_failed'));
       }
     } finally {
       setExportingId(null);
@@ -183,14 +185,14 @@ export function Dashboard() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => handleNew()} className="mc-btn-primary">
-            <McIcon scope="pixel" name="plus" size={16} /> 新建项目
+            <McIcon scope="pixel" name="plus" size={16} /> {tCommon('new_project')}
           </button>
           <button onClick={handleImport} disabled={importing} className="mc-btn-ghost">
             {importing ? (
-              '导入中…'
+              tCommon('importing')
             ) : (
               <>
-                <FolderInput className="h-4 w-4" /> 导入项目
+                <FolderInput className="h-4 w-4" /> {tCommon('import')}
               </>
             )}
           </button>
@@ -234,10 +236,10 @@ export function Dashboard() {
               <div className="mx-auto mb-5 inline-flex h-20 w-20 items-center justify-center rounded-mc-lg border border-mc-border-strong bg-mc-surface-2 shadow-[var(--mc-sheen),var(--mc-shadow-block)]">
                 <McMark className="h-11 w-11 text-mc-accent" />
               </div>
-              <h2 className="mb-2 font-display text-2xl font-bold">选择你要创建的内容类型</h2>
-              <p className="text-sm text-mc-mute">
-                按分类开始创作：模组、数据包、脚本、基岩版 Add-on……
-              </p>
+              <h2 className="mb-2 font-display text-2xl font-bold">
+                {t('dashboard.selectContentType')}
+              </h2>
+              <p className="text-sm text-mc-mute">{t('dashboard.selectContentTypeHint')}</p>
             </div>
 
             <div className="space-y-9 pb-8">
@@ -291,7 +293,7 @@ export function Dashboard() {
         ) : (
           <div>
             <div className="mb-6">
-              <h2 className="mb-2 font-display text-lg font-bold">我的项目</h2>
+              <h2 className="mb-2 font-display text-lg font-bold">{t('dashboard.myProjects')}</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {projects.map((p) => {
                   const icon = TYPE_ICON[p.generatorType];
@@ -346,11 +348,13 @@ export function Dashboard() {
                           )}
                       </div>
                       <div className="mb-3 text-xs text-mc-mute">
-                        更新于 {new Date(p.updatedAt).toLocaleDateString()}
+                        {t('dashboard.updatedAt', {
+                          date: new Date(p.updatedAt).toLocaleDateString(),
+                        })}
                       </div>
                       <div className="mt-auto flex gap-2">
                         <button onClick={() => loadProject(p.id)} className="mc-btn-primary">
-                          打开
+                          {tCommon('open')}
                         </button>
                         <button
                           onClick={() => handleExport(p)}
@@ -358,22 +362,22 @@ export function Dashboard() {
                           className="mc-btn-ghost"
                         >
                           {exportingId === p.id ? (
-                            '导出中…'
+                            t('dashboard.exporting')
                           ) : (
                             <>
-                              <FolderOutput className="h-4 w-4" /> 导出
+                              <FolderOutput className="h-4 w-4" /> {tCommon('export')}
                             </>
                           )}
                         </button>
                         <button
                           onClick={() => {
-                            if (window.confirm(`确定删除项目「${p.name}」？此操作不可撤销。`)) {
+                            if (window.confirm(t('dashboard.deleteConfirm', { name: p.name }))) {
                               deleteProject(p.id);
                             }
                           }}
                           className="mc-btn-danger"
                         >
-                          删除
+                          {tCommon('delete')}
                         </button>
                       </div>
                     </div>

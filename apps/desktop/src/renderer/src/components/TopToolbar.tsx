@@ -8,6 +8,8 @@ import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
 import { useProjectStore } from '../store/project-store.js';
+import { LanguageSwitcher } from './LanguageSwitcher.js';
+import { useTranslation } from '../hooks/useTranslation.js';
 
 interface TopToolbarProps {
   /** 点击 API 状态指示时跳转到 settings activity */
@@ -31,6 +33,7 @@ const TYPE_LABELS: Record<GeneratorType, string> = {
 };
 
 export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
+  const { t, tCommon } = useTranslation();
   // 全局设置：类型 / Loader / 版本
   const { generatorType, loader, mcVersion, loading, setGeneratorType, setLoader, setMcVersion } =
     useModStore(
@@ -146,13 +149,17 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
         <div className="relative">
           <button onClick={handleLoadProjects} className="mc-btn-ghost !px-2 !py-1">
             <McIcon scope="pixel" name="folder" size={14} />
-            <span className="max-w-24 truncate text-xs">{currentProject?.name || '项目'}</span>
+            <span className="max-w-24 truncate text-xs">
+              {currentProject?.name || tCommon('project')}
+            </span>
           </button>
           {showProjectMenu && (
             <div className="mc-pop absolute left-0 top-full mt-1 z-50 w-56 overflow-hidden animate-mc-panel-in">
               <div className="flex items-center gap-2 border-b border-mc-border px-2 py-1.5">
                 <McIcon scope="pixel" name="folder" size={12} />
-                <span className="text-xs font-bold text-mc-dim">项目管理</span>
+                <span className="text-xs font-bold text-mc-dim">
+                  {t('topToolbar.projectManagement')}
+                </span>
               </div>
               <div className="space-y-0.5 p-1">
                 <button
@@ -160,7 +167,7 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
                   className="flex w-full items-center gap-2 rounded-mc px-2 py-1.5 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text"
                 >
                   <McIcon scope="pixel" name="folder" size={12} className="text-mc-accent" />
-                  新建项目
+                  {tCommon('new_project')}
                 </button>
                 <button
                   onClick={handleImport}
@@ -168,7 +175,7 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
                   className="flex w-full items-center gap-2 rounded-mc px-2 py-1.5 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text disabled:opacity-50"
                 >
                   <McIcon scope="pixel" name="folder" size={12} className="text-mc-gold" />
-                  {importing ? '导入中…' : '导入项目'}
+                  {importing ? tCommon('importing') : tCommon('import')}
                 </button>
                 <button
                   onClick={handleSave}
@@ -176,12 +183,14 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
                   className="flex w-full items-center gap-2 rounded-mc px-2 py-1.5 text-left text-xs text-mc-dim transition-colors hover:bg-mc-surface-2 hover:text-mc-text disabled:opacity-50"
                 >
                   <McIcon scope="pixel" name="save" size={12} />
-                  保存项目
+                  {t('topToolbar.saveProject')}
                 </button>
               </div>
               {projects.length > 0 && (
                 <div className="border-t border-mc-border">
-                  <div className="px-2 py-1 text-xs text-mc-mute">已有项目</div>
+                  <div className="px-2 py-1 text-xs text-mc-mute">
+                    {t('topToolbar.existingProjects')}
+                  </div>
                   <div className="max-h-32 overflow-y-auto">
                     {projects.map((p) => (
                       <button
@@ -243,25 +252,27 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
           ))}
         </select>
         {mcVersion === '26.2' && (
-          <span
-            className="text-[10px] text-mc-gold"
-            title="26.2 的 NeoForge 版本为 beta，构建配置可能需手动调整"
-          >
-            实验性
+          <span className="text-[10px] text-mc-gold" title={t('topToolbar.experimentalTooltip')}>
+            {t('topToolbar.experimental')}
           </span>
         )}
         {loading && <Loader2 className="h-3 w-3 animate-spin text-mc-mute" />}
       </div>
 
-      {/* 右侧：API Key 状态指示 */}
-      <button
-        onClick={onOpenSettings}
-        className="mc-btn-ghost !px-2 !py-1"
-        title={apiKey ? 'API Key 已配置' : '未配置 API Key，点击设置'}
-      >
-        <span className={`h-2 w-2 rounded-full ${apiKey ? 'bg-mc-accent' : 'bg-mc-redstone'}`} />
-        <span className="text-xs text-mc-dim">{apiKey ? '已配置' : '未配置'}</span>
-      </button>
+      {/* 右侧：语言切换 + API Key 状态指示 */}
+      <div className="flex items-center gap-2">
+        <LanguageSwitcher variant="compact" showLabel={false} />
+        <button
+          onClick={onOpenSettings}
+          className="mc-btn-ghost !px-2 !py-1"
+          title={apiKey ? t('topToolbar.apiKeyConfigured') : t('topToolbar.apiKeyNotConfigured')}
+        >
+          <span className={`h-2 w-2 rounded-full ${apiKey ? 'bg-mc-accent' : 'bg-mc-redstone'}`} />
+          <span className="text-xs text-mc-dim">
+            {apiKey ? tCommon('configured') : tCommon('notConfigured')}
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
