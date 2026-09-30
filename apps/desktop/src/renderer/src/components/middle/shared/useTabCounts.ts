@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { ComponentType } from 'react';
-import type { TabItem } from './IconTabBar.js';
+import type { TabItem, LucideIcon } from './IconTabBar.js';
 
 /**
  * 基础 Tab 配置（不含 count / hideCount 等运行时字段）。
@@ -9,7 +9,7 @@ import type { TabItem } from './IconTabBar.js';
 export interface BaseTab<K extends string> {
   key: K;
   label: string;
-  icon?: ComponentType<{ className?: string }>;
+  icon?: ComponentType<{ className?: string }> | LucideIcon;
 }
 
 /**

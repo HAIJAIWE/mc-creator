@@ -1,10 +1,17 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { CodeNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type CodeNode = Node<CodeNodeData, 'code'>;
+type CodeNodeComponentProps = {
+  id: string;
+  data: CodeNodeData;
+  selected?: boolean;
+};
 
 /**
  * 代码节点：L2 混合模式核心。
@@ -13,10 +20,10 @@ import { useDebugState } from './base/useNodeStates.js';
  * 端口：in (any) / out (any)
  * 颜色：mc-code（灰色）
  */
-function CodeNodeComponent({ id, data, selected }: NodeProps<CodeNodeData>) {
+function CodeNodeComponent({ id, data, selected }: CodeNodeComponentProps) {
   const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
   const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n) => n.id === id)?.ports ?? []);
+  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n: { id: string; ports: unknown[] }) => n.id === id)?.ports ?? []);
   const debugState = useDebugState(id);
 
   const languageLabel =
@@ -37,9 +44,9 @@ function CodeNodeComponent({ id, data, selected }: NodeProps<CodeNodeData>) {
       badge={languageLabel}
       ports={ports}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={() => toggleCollapse(id)}
       onOpenDrawer={() => openDrawer(id)}
     >

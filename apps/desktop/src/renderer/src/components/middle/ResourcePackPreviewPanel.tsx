@@ -22,10 +22,10 @@ import {
 } from './shared/index.js';
 import type {
   Column,
-  TabItem,
   ConflictGroup,
   ExportFormat,
   ExportHandler,
+  BaseTab,
 } from './shared/index.js';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import type {
@@ -39,7 +39,7 @@ import { Download, FileText, Image, Music, Box, Type, Languages } from 'lucide-r
 
 type Tab = 'textures' | 'sounds' | 'models' | 'fonts' | 'lang' | 'metadata' | 'export';
 
-const TABS: { key: Tab; label: string; icon: typeof Image }[] = [
+const TABS: BaseTab<Tab>[] = [
   { key: 'textures', label: '材质', icon: Image },
   { key: 'sounds', label: '音效', icon: Music },
   { key: 'models', label: '模型', icon: Box },
@@ -286,7 +286,7 @@ export function ResourcePackPreviewPanel() {
   }, [pack]);
 
   // ===== ID 重复检测 =====
-  const { conflicts, totalConflicts, conflictList } = useConflictDetection(
+  const { totalConflicts, conflictList } = useConflictDetection(
     pack,
     RP_CONFLICT_GROUPS,
   );

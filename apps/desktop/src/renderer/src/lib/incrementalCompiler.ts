@@ -1,4 +1,5 @@
 import type { NodeGraph } from '@mc-creator/shared';
+import type { CompileResult } from './compileNodeGraph.js';
 
 import {
   computeGraphHash,
@@ -10,12 +11,10 @@ import {
  * 增量编译器：简化版，专注于 IndexedDB 缓存
  */
 export class IncrementalCompiler {
-  private cache: { result: any; timestamp: number } | null = null;
-
   /**
    * 执行编译（带 IndexedDB 缓存）
    */
-  async compile(graph: any): Promise<any> {
+  async compile(graph: NodeGraph): Promise<CompileResult> {
     return compileGraph(graph);
   }
 
@@ -36,7 +35,7 @@ const CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 /**
  * 编译入口：按图内容哈希读写 IndexedDB 缓存
  */
-export async function compileGraph(graph: any): Promise<any> {
+export async function compileGraph(graph: NodeGraph): Promise<CompileResult> {
   const graphHash = await computeGraphHash(graph);
   const cached = await getCachedCompileResult(graphHash, graph.modId);
   if (cached && cached.result && Date.now() - cached.timestamp < CACHE_TTL_MS) {

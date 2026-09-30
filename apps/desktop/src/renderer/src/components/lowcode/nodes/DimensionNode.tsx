@@ -1,16 +1,23 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { DimensionNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type DimensionNode = Node<DimensionNodeData, 'dimension'>;
+type DimensionNodeComponentProps = {
+  id: string;
+  data: DimensionNodeData;
+  selected?: boolean;
+};
 
 /**
  * 维度节点：Mod 侧维度（维度类型模板 + 高度/天空等）。
  * 端口：无（独立内容节点）
  * 颜色：mc-dimension（深蓝）
  */
-function DimensionNodeComponent({ id, data, selected }: NodeProps<DimensionNodeData>) {
+function DimensionNodeComponent({ id, data, selected }: DimensionNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -22,9 +29,9 @@ function DimensionNodeComponent({ id, data, selected }: NodeProps<DimensionNodeD
       badge={data.baseType}
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

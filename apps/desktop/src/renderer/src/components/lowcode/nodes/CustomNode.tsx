@@ -32,8 +32,8 @@ function CustomNodeContentComponent({ data, selected, ports }: CustomNodeContent
         colorClass="mc-code"
         ports={ports}
         collapsed={data.collapsed}
-        selected={selected}
-        codeLocked={data.codeLocked}
+        selected={selected ?? false}
+        codeLocked={data.codeLocked ?? false}
         errorState="warning"
         onToggleCollapse={toggleCollapse}
         onOpenDrawer={openDrawer}
@@ -51,8 +51,8 @@ function CustomNodeContentComponent({ data, selected, ports }: CustomNodeContent
       badge="custom"
       ports={ports.length > 0 ? ports : schema.ports}
       collapsed={data.collapsed}
-      selected={selected}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

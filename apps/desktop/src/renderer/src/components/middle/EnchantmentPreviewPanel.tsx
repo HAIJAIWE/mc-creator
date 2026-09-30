@@ -38,11 +38,12 @@ import {
   type ExportHandler,
   type ConflictGroup,
   DataTable,
+  type BaseTab,
 } from './shared/index.js';
 
 type EnchantmentTab = 'enchantments' | 'lang' | 'metadata' | 'export';
 
-const TABS: { key: EnchantmentTab; label: string; icon: typeof Star }[] = [
+const TABS: BaseTab<EnchantmentTab>[] = [
   { key: 'enchantments', label: '附魔', icon: Star },
   { key: 'lang', label: '语言', icon: Languages },
   { key: 'metadata', label: '元数据', icon: FileText },
@@ -198,7 +199,7 @@ export function EnchantmentPreviewPanel() {
   }, [ench]);
 
   // ===== ID 重复检测 =====
-  const { conflicts, totalConflicts, conflictList } = useConflictDetection(
+  const { totalConflicts, conflictList } = useConflictDetection(
     ench,
     ENCHANT_CONFLICT_GROUPS,
   );

@@ -1,10 +1,17 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { ItemNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type ItemNode = Node<ItemNodeData, 'item'>;
+type ItemNodeComponentProps = {
+  id: string;
+  data: ItemNodeData;
+  selected?: boolean;
+};
 
 const RARITY_BADGE: Record<ItemNodeData['rarity'], string> = {
   common: '普通',
@@ -19,10 +26,10 @@ const RARITY_BADGE: Record<ItemNodeData['rarity'], string> = {
  * 端口：out (item_stack)
  * 颜色：mc-item（粉色）
  */
-function ItemNodeComponent({ id, data, selected }: NodeProps<ItemNodeData>) {
+function ItemNodeComponent({ id, data, selected }: ItemNodeComponentProps) {
   const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
   const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n) => n.id === id)?.ports ?? []);
+  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n: { id: string; ports: unknown[] }) => n.id === id)?.ports ?? []);
   const debugState = useDebugState(id);
 
   return (
@@ -33,9 +40,9 @@ function ItemNodeComponent({ id, data, selected }: NodeProps<ItemNodeData>) {
       badge={RARITY_BADGE[data.rarity]}
       ports={ports}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={() => toggleCollapse(id)}
       onOpenDrawer={() => openDrawer(id)}
     >

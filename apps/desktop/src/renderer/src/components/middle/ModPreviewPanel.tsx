@@ -24,10 +24,10 @@ import {
 } from './shared/index.js';
 import type {
   Column,
-  TabItem,
   ConflictGroup,
   ExportFormat,
   ExportHandler,
+  BaseTab,
 } from './shared/index.js';
 import type {
   ModSpec,
@@ -94,7 +94,7 @@ type BlockMaterialFilter =
   | 'water'
   | 'lava';
 
-const TABS: { key: ModTab; label: string; icon: typeof Boxes }[] = [
+const TABS: BaseTab<ModTab>[] = [
   { key: 'items', label: '物品', icon: Boxes },
   { key: 'blocks', label: '方块', icon: Layers },
   { key: 'dependencies', label: '依赖', icon: Package },
@@ -291,7 +291,10 @@ const ADVANCEMENT_FRAME_LABEL: Record<string, string> = {
 
 /** Mod 预览面板：9 分类 tab + 统计卡片 + 高级筛选 + 批量管理 + 导出 + 冲突检测 */
 export function ModPreviewPanel() {
-  const { spec, setSpec } = useModStore((s) => ({ spec: s.spec, setSpec: s.setSpec }), shallow);
+  const { spec, setSpec, unimplemented } = useModStore(
+    (s) => ({ spec: s.spec, setSpec: s.setSpec, unimplemented: s.unimplemented }),
+    shallow,
+  );
   const [activeTab, setActiveTab] = useState<ModTab>('items');
   const [query, setQuery] = useState('');
   const [rarityFilter, setRarityFilter] = useState<ItemRarityFilter>('all');
@@ -343,7 +346,7 @@ export function ModPreviewPanel() {
   }, [mod]);
 
   // ===== 冲突检测：id 重复 =====
-  const { conflicts, totalConflicts, conflictList } = useConflictDetection(
+  const { totalConflicts, conflictList } = useConflictDetection(
     mod,
     MOD_CONFLICT_GROUPS,
   );
@@ -763,6 +766,31 @@ export function ModPreviewPanel() {
           icon={<FunctionSquare className="h-3 w-3" />}
         />
       </StatCardGrid>
+
+      {/* 未实现清单横幅（Task 1.1：产物含 MC-Creator unsupported 占位时展示） */}
+      {unimplemented.length > 0 && (
+        <div
+          role="alert"
+          className="mx-3 mt-2 rounded border border-yellow-500/60 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200"
+        >
+          <div className="font-semibold">
+            有 {unimplemented.length} 项内容未能自动生成（已用安全占位代替，见 docs/unsupported.md）
+          </div>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {unimplemented.slice(0, 8).map((u, i) => (
+              <li key={i}>
+                {u.kind}={u.type}
+                {u.id ? `（id=${u.id}）` : ''}：{u.reason}
+              </li>
+            ))}
+          </ul>
+          {unimplemented.length > 8 && (
+            <div className="mt-1 opacity-80">
+              …等 {unimplemented.length} 项，导出 zip 的 UNIMPLEMENTED.md 含完整清单
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 冲突检测告警 */}
       <ConflictAlert totalConflicts={totalConflicts} conflicts={conflictList} />

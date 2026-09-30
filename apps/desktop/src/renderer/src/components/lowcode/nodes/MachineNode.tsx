@@ -1,9 +1,16 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { MachineNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type MachineNode = Node<MachineNodeData, 'machine'>;
+type MachineNodeComponentProps = {
+  id: string;
+  data: MachineNodeData;
+  selected?: boolean;
+};
 
 /**
  * 机器节点：方块实体 + GUI + 能源。
@@ -13,7 +20,7 @@ import { useDebugState } from './base/useNodeStates.js';
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
  * 避免每次任何节点变化都因 find 选择器触发重新渲染。
  */
-function MachineNodeComponent({ id, data, selected }: NodeProps<MachineNodeData>) {
+function MachineNodeComponent({ id, data, selected }: MachineNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -25,9 +32,9 @@ function MachineNodeComponent({ id, data, selected }: NodeProps<MachineNodeData>
       badge="BE+GUI"
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

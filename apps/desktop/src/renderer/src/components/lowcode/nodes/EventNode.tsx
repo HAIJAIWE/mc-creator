@@ -1,9 +1,16 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { EventNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type EventNode = Node<EventNodeData, 'event'>;
+type EventNodeComponentProps = {
+  id: string;
+  data: EventNodeData;
+  selected?: boolean;
+};
 
 const EVENT_TYPE_LABELS: Record<EventNodeData['eventType'], string> = {
   player_right_click_block: '右键方块',
@@ -29,7 +36,7 @@ const EVENT_TYPE_LABELS: Record<EventNodeData['eventType'], string> = {
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
  * 避免每次任何节点变化都因 find 选择器触发重新渲染。
  */
-function EventNodeComponent({ id, data, selected }: NodeProps<EventNodeData>) {
+function EventNodeComponent({ id, data, selected }: EventNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -41,9 +48,9 @@ function EventNodeComponent({ id, data, selected }: NodeProps<EventNodeData>) {
       badge="触发器"
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

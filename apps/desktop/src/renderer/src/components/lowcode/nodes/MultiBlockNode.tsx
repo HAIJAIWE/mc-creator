@@ -1,9 +1,16 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { MultiBlockNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type MultiBlockNode = Node<MultiBlockNodeData, 'multiblock'>;
+type MultiBlockNodeComponentProps = {
+  id: string;
+  data: MultiBlockNodeData;
+  selected?: boolean;
+};
 
 /**
  * 多方块结构节点：表达一个 3D 结构。
@@ -13,7 +20,7 @@ import { useDebugState } from './base/useNodeStates.js';
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
  * 避免每次任何节点变化都因 find 选择器触发重新渲染。
  */
-function MultiBlockNodeComponent({ id, data, selected }: NodeProps<MultiBlockNodeData>) {
+function MultiBlockNodeComponent({ id, data, selected }: MultiBlockNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -25,9 +32,9 @@ function MultiBlockNodeComponent({ id, data, selected }: NodeProps<MultiBlockNod
       badge={data.hollow ? '空心' : '实心'}
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

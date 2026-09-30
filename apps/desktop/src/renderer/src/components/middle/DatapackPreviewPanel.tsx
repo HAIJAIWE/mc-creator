@@ -9,7 +9,7 @@ import {
   IconTabBar,
   useTabStatus,
 } from './shared/index.js';
-import type { Column, TabItem, BaseTab } from './shared/index.js';
+import type { Column, BaseTab } from './shared/index.js';
 import type {
   DatapackSpec,
   FunctionSpec,
@@ -71,7 +71,7 @@ const validationTypeToTab: Record<string, DatapackTab> = {
   pack: 'recipes',
 };
 
-const TABS: { key: DatapackTab; label: string }[] = [
+const TABS: BaseTab<DatapackTab>[] = [
   { key: 'recipes', label: '配方' },
   { key: 'functions', label: '函数' },
   { key: 'loot', label: '战利品' },

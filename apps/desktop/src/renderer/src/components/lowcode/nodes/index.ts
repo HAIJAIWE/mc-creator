@@ -1,5 +1,4 @@
-import type { NodeKind } from '@mc-creator/shared';
-import { VerticalCoreNode } from './VerticalCoreNode.js';
+import type { NodeTypes } from '@xyflow/react';
 import { ItemNode } from './ItemNode.js';
 import { BlockNode } from './BlockNode.js';
 import { EntityNode } from './EntityNode.js';
@@ -25,9 +24,10 @@ import { GuiNode } from './GuiNode.js';
  *
  * React Flow 通过 nodeTypes 映射渲染对应组件。
  * 集中注册避免在每个使用 NodeGraphEditor 的地方重复定义。
+ * 组件内部使用类型收敛处理 data，注册表使用类型断言兼容 NodeTypes。
  */
 
-export const nodeTypes = {
+const nodeTypesRecord = {
   // 基础内容节点（有自定义组件）
   item: ItemNode,
   block: BlockNode,
@@ -54,11 +54,15 @@ export const nodeTypes = {
   gui: GuiNode,
 } as const;
 
-export type NodeTypeRegistry = typeof nodeTypes;
+// 类型断言兼容 React Flow NodeTypes（组件内部已处理 data 类型收敛）
+export const nodeTypes = nodeTypesRecord as NodeTypes;
+
+export type NodeTypeRegistry = typeof nodeTypesRecord;
 
 /** 节点类型元信息（用于 NodePalette 显示） */
 export interface NodeMeta {
-  kind: NodeKind;
+  /** 标识符（用于分类/显示，不一定对应 React Flow nodeTypes 的 key） */
+  kind: string;
   label: string;
   description: string;
   /** 像素图标名（McIcon scope=game） */

@@ -1,16 +1,23 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { FluidNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type FluidNode = Node<FluidNodeData, 'fluid'>;
+type FluidNodeComponentProps = {
+  id: string;
+  data: FluidNodeData;
+  selected?: boolean;
+};
 
 /**
  * 流体节点：Mod 侧流体（颜色/温度/黏度/发光）。
  * 端口：无（独立内容节点）
  * 颜色：mc-fluid（天蓝）
  */
-function FluidNodeComponent({ id, data, selected }: NodeProps<FluidNodeData>) {
+function FluidNodeComponent({ id, data, selected }: FluidNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -22,9 +29,9 @@ function FluidNodeComponent({ id, data, selected }: NodeProps<FluidNodeData>) {
       badge="流体"
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

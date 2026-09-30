@@ -1,6 +1,6 @@
 import type { Edge, Connection } from '@xyflow/react';
 import type { ModNode, NodeGraph, NodePort, PortType } from '@mc-creator/shared';
-import { CompileErrorCode, CompileErrors } from '../../lib/compileErrors.js';
+import { CompileErrorCode } from '../../lib/compileErrors.js';
 
 /**
  * 节点连线校验规则
@@ -115,9 +115,17 @@ export function isValidConnection(graph: NodeGraph, connection: Connection | Edg
  * - multiple 限制：目标端口 multiple=false 且已有连线则拒绝
  * - 返回 { ok: true } 或 { ok: false, reason: string }
  */
+interface ConnectionLike {
+  source: string;
+  target: string;
+  sourceHandle?: string | null | undefined;
+  targetHandle?: string | null | undefined;
+  id?: string;
+}
+
 export function validateConnection(
   graph: NodeGraph,
-  connection: Connection | Edge,
+  connection: ConnectionLike,
 ): { ok: true } | { ok: false; reason: string; code?: string } {
   const sourceId = connection.source;
   const targetId = connection.target;
@@ -198,8 +206,8 @@ export interface ValidationError {
   reason: string;
   sourceNodeId: string;
   targetNodeId: string;
-  sourceHandle?: string;
-  targetHandle?: string;
+  sourceHandle: string | undefined;
+  targetHandle: string | undefined;
 }
 
 export function validateGraphConnections(
@@ -244,7 +252,6 @@ export function detectControlFlowCycles(
     adjacency.set(edge.source, list);
   }
 
-  const WHITE = 0; // 未访问
   const GRAY = 1; // 访问中（在栈中）
   const BLACK = 2; // 已访问完
 

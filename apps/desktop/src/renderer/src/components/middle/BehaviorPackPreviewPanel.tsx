@@ -24,10 +24,10 @@ import {
 } from './shared/index.js';
 import type {
   Column,
-  TabItem,
   ConflictGroup,
   ExportFormat,
   ExportHandler,
+  BaseTab,
 } from './shared/index.js';
 import type {
   BehaviorPackSpec,
@@ -51,7 +51,7 @@ type BehaviorPackTab = 'entities' | 'recipes' | 'loot' | 'dependencies' | 'metad
 
 type RecipeTypeFilter = 'all' | 'shaped_crafting' | 'shapeless_crafting' | 'furnace';
 
-const TABS: { key: BehaviorPackTab; label: string; icon: typeof Boxes }[] = [
+const TABS: BaseTab<BehaviorPackTab>[] = [
   { key: 'entities', label: '实体', icon: Users },
   { key: 'recipes', label: '配方', icon: Boxes },
   { key: 'loot', label: '战利品表', icon: FileText },
@@ -245,7 +245,7 @@ export function BehaviorPackPreviewPanel() {
   }, [bp]);
 
   // ===== UUID 重复检测 =====
-  const { conflicts, totalConflicts, conflictList } = useConflictDetection(bp, BP_CONFLICT_GROUPS);
+  const { totalConflicts, conflictList } = useConflictDetection(bp, BP_CONFLICT_GROUPS);
 
   // ===== 实体筛选 =====
   const filteredEntities = useMemo(() => {

@@ -25,10 +25,10 @@ import {
 } from './shared/index.js';
 import type {
   Column,
-  TabItem,
   ConflictGroup,
   ExportFormat,
   ExportHandler,
+  BaseTab,
 } from './shared/index.js';
 import type {
   CraftTweakerSpec,
@@ -55,7 +55,7 @@ type CraftTweakerTab = 'recipes' | 'tags' | 'events' | 'tooltips' | 'lang' | 'me
 type RecipeTypeFilter = 'all' | 'shaped' | 'shapeless' | 'smelting' | 'stonecutting' | 'custom';
 type TagTypeFilter = 'all' | 'item' | 'block' | 'entity_type' | 'fluid';
 
-const TABS: { key: CraftTweakerTab; label: string; icon: typeof Boxes }[] = [
+const TABS: BaseTab<CraftTweakerTab>[] = [
   { key: 'recipes', label: '配方', icon: Boxes },
   { key: 'tags', label: '标签', icon: Tag },
   { key: 'events', label: '事件', icon: Flag },
@@ -318,7 +318,7 @@ export function CraftTweakerPreviewPanel() {
   }, [ct]);
 
   // ===== ID 重复检测 =====
-  const { conflicts, totalConflicts, conflictList } = useConflictDetection(ct, CT_CONFLICT_GROUPS);
+  const { totalConflicts, conflictList } = useConflictDetection(ct, CT_CONFLICT_GROUPS);
 
   // ===== 配方筛选 =====
   const filteredRecipes = useMemo(() => {

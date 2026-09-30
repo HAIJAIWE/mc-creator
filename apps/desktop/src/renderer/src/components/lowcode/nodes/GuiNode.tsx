@@ -1,16 +1,23 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { GuiNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type GuiNode = Node<GuiNodeData, 'gui'>;
+type GuiNodeComponentProps = {
+  id: string;
+  data: GuiNodeData;
+  selected?: boolean;
+};
 
 /**
  * GUI 节点：容器界面（槽位布局 + 能源/进度条）。
  * 端口：无（独立内容节点）
  * 颜色：mc-gui（金色）
  */
-function GuiNodeComponent({ id, data, selected }: NodeProps<GuiNodeData>) {
+function GuiNodeComponent({ id, data, selected }: GuiNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
   let slotCount = 0;
@@ -29,9 +36,9 @@ function GuiNodeComponent({ id, data, selected }: NodeProps<GuiNodeData>) {
       badge="GUI"
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

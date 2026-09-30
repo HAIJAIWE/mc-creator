@@ -8,7 +8,6 @@ import {
   FileText,
   Languages,
   Ghost,
-  Heart,
   Swords,
   Target,
   Boxes,
@@ -40,11 +39,12 @@ import {
   type ExportHandler,
   type ConflictGroup,
   DataTable,
+  type BaseTab,
 } from './shared/index.js';
 
 type EntityTab = 'entities' | 'lang' | 'metadata' | 'export';
 
-const TABS: { key: EntityTab; label: string; icon: typeof Ghost }[] = [
+const TABS: BaseTab<EntityTab>[] = [
   { key: 'entities', label: '实体', icon: Ghost },
   { key: 'lang', label: '语言', icon: Languages },
   { key: 'metadata', label: '元数据', icon: FileText },
@@ -197,7 +197,7 @@ export function BehaviorEntityPreviewPanel() {
   }, [be]);
 
   // ===== ID 重复检测 =====
-  const { conflicts, totalConflicts, conflictList } = useConflictDetection(
+  const { totalConflicts, conflictList } = useConflictDetection(
     be,
     ENTITY_CONFLICT_GROUPS,
   );

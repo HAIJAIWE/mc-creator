@@ -17,6 +17,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import type { SubgraphDefinition, ModNode, ModEdge } from '@mc-creator/shared';
 import { SubgraphBoundaryNode } from './SubgraphBoundaryNode.js';
+import type { NodeTypes } from '@xyflow/react';
 
 interface SubgraphEditorProps {
   /** 编辑的子图定义 */
@@ -25,7 +26,8 @@ interface SubgraphEditorProps {
   onChange: (sg: SubgraphDefinition) => void;
 }
 
-const subgraphNodeTypes = { boundary: SubgraphBoundaryNode };
+const subgraphNodeTypesRecord = { boundary: SubgraphBoundaryNode } as const;
+const subgraphNodeTypes: NodeTypes = subgraphNodeTypesRecord as NodeTypes;
 
 /**
  * 子图独立画布：在 SubgraphWorkspace 内渲染，编辑子图内部节点 + 边界节点。
@@ -81,8 +83,8 @@ export function SubgraphEditor({ subgraph, onChange }: SubgraphEditorProps) {
         id: e.id,
         source: e.source,
         target: e.target,
-        sourceHandle: e.sourceHandle,
-        targetHandle: e.targetHandle,
+        sourceHandle: e.sourceHandle ?? null,
+        targetHandle: e.targetHandle ?? null,
       })),
     [subgraph],
   );

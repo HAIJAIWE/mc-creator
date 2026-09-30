@@ -18,7 +18,7 @@ interface TreeNode {
   name: string;
   type: 'folder' | 'file';
   path: string;
-  children?: TreeNode[];
+  children?: TreeNode[] | undefined;
 }
 
 interface FlatNode {
@@ -68,7 +68,8 @@ function buildTree(files: { path: string; content: string }[]): TreeNode[] {
         };
         current.children?.push(child);
       }
-      current = child;
+      // child is guaranteed to be defined here (either found or created above)
+      current = child!;
     });
   });
 

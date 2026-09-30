@@ -1,8 +1,15 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { CommentNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
+
+type CommentNode = Node<CommentNodeData, 'comment'>;
+type CommentNodeComponentProps = {
+  id: string;
+  data: CommentNodeData;
+  selected?: boolean;
+};
 
 /**
  * 注释节点：仅文档用途，不参与编译。无端口。
@@ -11,7 +18,7 @@ import { useNodeActions } from './hooks/useNodeActions.js';
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer，
  * 避免内联回调创建不稳定引用。
  */
-function CommentNodeComponent({ id: _id, data, selected }: NodeProps<CommentNodeData>) {
+function CommentNodeComponent({ id: _id, data, selected }: CommentNodeComponentProps) {
   const { toggleCollapse, openDrawer } = useNodeActions(data.nodeId);
   const debugState = null; // comment 节点不支持调试
 
@@ -23,7 +30,7 @@ function CommentNodeComponent({ id: _id, data, selected }: NodeProps<CommentNode
       badge={data.color !== 'yellow' ? data.color : undefined}
       ports={[]}
       collapsed={data.collapsed}
-      selected={selected}
+      selected={selected ?? false}
       debugState={debugState}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}

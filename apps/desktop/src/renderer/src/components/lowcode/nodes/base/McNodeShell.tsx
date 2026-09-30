@@ -22,25 +22,25 @@ export interface McNodeShellProps {
   /** 头部色条 Tailwind class（如 'mc-item'/'mc-block'/'mc-variable'） */
   colorClass: string;
   /** 右上角徽章文本（如 'const'/'forEach'，可选） */
-  badge?: string;
+  badge?: string | undefined;
   /** 端口列表（来自 node.ports） */
   ports: NodePort[];
   /** 是否折叠 */
   collapsed: boolean;
   /** 是否选中 */
-  selected?: boolean;
+  selected?: boolean | undefined;
   /** 调试状态（折叠时在头部显示标记） */
-  debugState?: NodeDebugState;
+  debugState?: NodeDebugState | undefined;
   /** 错误状态（编译错误/警告时头部变色） */
-  errorState?: NodeErrorState;
+  errorState?: NodeErrorState | undefined;
   /** P0-1: 代码锁定状态（对标 MCreator codeLock），锁定时头部显示 🔒 + 外壳黄色边框 */
-  codeLocked?: boolean;
+  codeLocked?: boolean | undefined;
   /** 切换折叠回调 */
   onToggleCollapse: () => void;
   /** 打开抽屉回调（双击或点⚙） */
   onOpenDrawer: () => void;
   /** 摘要内容（展开时显示在头部下方） */
-  children?: ReactNode;
+  children?: ReactNode | undefined;
 }
 
 function McNodeShellComponent({

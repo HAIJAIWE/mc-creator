@@ -39,11 +39,12 @@ import {
   type ExportHandler,
   type ConflictGroup,
   DataTable,
+  type BaseTab,
 } from './shared/index.js';
 
 type ItemTab = 'items' | 'lang' | 'metadata' | 'export';
 
-const TABS: { key: ItemTab; label: string; icon: typeof Boxes }[] = [
+const TABS: BaseTab<ItemTab>[] = [
   { key: 'items', label: '物品', icon: Boxes },
   { key: 'lang', label: '语言', icon: Languages },
   { key: 'metadata', label: '元数据', icon: FileText },
@@ -196,7 +197,7 @@ export function BehaviorItemPreviewPanel() {
   }, [bp]);
 
   // ===== ID 重复检测 =====
-  const { conflicts, totalConflicts, conflictList } = useConflictDetection(
+  const { totalConflicts, conflictList } = useConflictDetection(
     bp,
     ITEM_CONFLICT_GROUPS,
   );

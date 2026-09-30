@@ -27,8 +27,8 @@ function ToolCallCard({
   duration,
 }: {
   call: AgentToolCall;
-  result?: string;
-  duration?: number;
+  result?: string | undefined;
+  duration?: number | undefined;
 }) {
   const tool = findTool(call.name);
   const [expanded, setExpanded] = useState(false);

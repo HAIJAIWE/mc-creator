@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { NodeProps } from '@xyflow/react';
+import type { NodeProps, Node } from '@xyflow/react';
 import type { CommentNodeData, NodePort, PortType } from '@mc-creator/shared';
 import { McNodeShell } from '../nodes/base/McNodeShell.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
@@ -21,37 +21,37 @@ export interface SubgraphBoundaryNodeData extends CommentNodeData {
   portType: PortType;
 }
 
-type SubgraphBoundaryNodeProps = NodeProps<SubgraphBoundaryNodeData>;
-
-function SubgraphBoundaryNodeComponent({ data, selected }: SubgraphBoundaryNodeProps) {
+function SubgraphBoundaryNodeComponent({ data, selected }: NodeProps<Node<Record<string, unknown>, string | undefined>>) {
   const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
+  // Type guard: narrow data from unknown via unknown to satisfy exactOptionalPropertyTypes
+  const nodeData = data as unknown as SubgraphBoundaryNodeData;
   const ports: NodePort[] = [
     {
-      id: data.boundaryType === 'in' ? 'out' : 'in',
-      label: data.portLabel,
-      type: data.portType,
-      direction: data.boundaryType === 'in' ? 'out' : 'in',
+      id: nodeData.boundaryType === 'in' ? 'out' : 'in',
+      label: nodeData.portLabel,
+      type: nodeData.portType,
+      direction: nodeData.boundaryType === 'in' ? 'out' : 'in',
       required: false,
-      multiple: data.boundaryType === 'in',
+      multiple: nodeData.boundaryType === 'in',
     },
   ];
 
   return (
     <McNodeShell
       icon="boundary"
-      title={data.label || (data.boundaryType === 'in' ? '输入' : '输出')}
+      title={nodeData.label || (nodeData.boundaryType === 'in' ? '输入' : '输出')}
       colorClass="mc-subgraph"
-      badge={data.boundaryType}
+      badge={nodeData.boundaryType}
       ports={ports}
-      collapsed={data.collapsed}
+      collapsed={Boolean(nodeData.collapsed)}
       selected={selected}
-      onToggleCollapse={() => toggleCollapse(data.nodeId)}
+      onToggleCollapse={() => toggleCollapse(nodeData.nodeId)}
       onOpenDrawer={() => {}}
     >
       <div className="text-[10px] text-mc-mute">
-        <span className="text-mc-text">{data.portLabel}</span>
+        <span className="text-mc-text">{nodeData.portLabel}</span>
         {' : '}
-        <span className="text-mc-dim">{data.portType}</span>
+        <span className="text-mc-dim">{nodeData.portType}</span>
       </div>
     </McNodeShell>
   );

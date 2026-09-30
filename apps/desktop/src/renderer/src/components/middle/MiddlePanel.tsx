@@ -26,6 +26,7 @@ import { PurecodeWorkspace } from '../purecode/PurecodeWorkspace.js';
 import { useModStore } from '../../store/mod-store.js';
 import { useEditorModeStore } from '../../store/editor-mode-store.js';
 import { ipcClient } from '../../lib/ipc-client.js';
+import { withUnimplementedMd } from '../../lib/unimplemented-md.js';
 import type { GeneratorType } from '@mc-creator/shared';
 
 type MiddleTab = 'preview' | 'lowcode' | 'resources' | 'nbt' | 'code';
@@ -162,7 +163,7 @@ export function MiddlePanel() {
           const s = useModStore.getState();
           if (s.files.length === 0) return;
           await ipcClient.exportZip({
-            files: s.files,
+            files: withUnimplementedMd(s.files, s.unimplemented),
             defaultName: `${s.generatorType}-export.zip`,
           });
         },

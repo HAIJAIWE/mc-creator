@@ -10,12 +10,12 @@ interface McNodeHeaderProps {
   title: string;
   /** Tailwind 颜色类名（如 'mc-item'），用于查 NODE_COLORS hex 值 */
   colorClass: string;
-  badge?: string;
+  badge?: string | undefined;
   collapsed: boolean;
-  debugState?: NodeDebugState;
-  errorState?: NodeErrorState;
+  debugState?: NodeDebugState | undefined;
+  errorState?: NodeErrorState | undefined;
   /** P0-1: 代码锁定状态（对标 MCreator codeLock），锁定时头部显示 🔒 标记 */
-  codeLocked?: boolean;
+  codeLocked?: boolean | undefined;
   onToggleCollapse: () => void;
   onOpenDrawer: () => void;
 }

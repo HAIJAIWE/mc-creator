@@ -354,23 +354,27 @@ export function GeneratedCodePreview({
               }
             >
               <LazyMonaco
-                height="100%"
-                language={getLanguage(selectedFile.path)}
-                value={selectedFile.content}
-                theme="vs-dark"
-                onChange={editing ? handleEditorChange : undefined}
-                options={{
-                  readOnly: !editing,
-                  minimap: { enabled: false },
-                  fontSize: 12,
-                  tabSize: 4,
-                  automaticLayout: true,
-                  scrollBeyondLastLine: false,
-                  wordWrap: 'on',
-                  lineNumbers: 'on',
-                  renderLineHighlight: 'all',
-                  bracketPairColorization: { enabled: true },
-                }}
+                // exactOptionalPropertyTypes workaround for @monaco-editor/react EditorProps
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                {...({
+                  height: '100%',
+                  language: getLanguage(selectedFile.path),
+                  value: selectedFile.content,
+                  theme: 'vs-dark',
+                  onChange: editing ? handleEditorChange : undefined,
+                  options: {
+                    readOnly: !editing,
+                    minimap: { enabled: false },
+                    fontSize: 12,
+                    tabSize: 4,
+                    automaticLayout: true,
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on',
+                    lineNumbers: 'on',
+                    renderLineHighlight: 'all',
+                    bracketPairColorization: { enabled: true },
+                  },
+                } as any)}
               />
             </Suspense>
           ) : (

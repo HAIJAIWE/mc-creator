@@ -4,9 +4,9 @@ interface FieldLabelProps {
   /** 字段显示名 */
   label: string;
   /** 是否必填（渲染 * 标记） */
-  required?: boolean;
+  required?: boolean | undefined;
   /** MC 领域解释文本（hover ? 显示，无则不渲染 ? 图标） */
-  tooltip?: string;
+  tooltip?: string | undefined;
 }
 
 function FieldLabelComponent({ label, required, tooltip }: FieldLabelProps) {

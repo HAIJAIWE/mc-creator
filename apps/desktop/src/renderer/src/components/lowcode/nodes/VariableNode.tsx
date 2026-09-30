@@ -1,8 +1,15 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { VariableNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
+
+type VariableNode = Node<VariableNodeData, 'variable'>;
+type VariableNodeComponentProps = {
+  id: string;
+  data: VariableNodeData;
+  selected?: boolean;
+};
 
 /**
  * 变量节点：定义全局变量/常量，可被其他节点引用。
@@ -11,7 +18,7 @@ import { useNodeActions } from './hooks/useNodeActions.js';
  * 颜色：mc-variable
  * 徽章：常量显示 'const'
  */
-function VariableNodeComponent({ data, selected }: NodeProps<VariableNodeData>) {
+function VariableNodeComponent({ data, selected }: VariableNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
 
   return (
@@ -22,8 +29,8 @@ function VariableNodeComponent({ data, selected }: NodeProps<VariableNodeData>) 
       badge={data.isConstant ? 'const' : undefined}
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

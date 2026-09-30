@@ -14,7 +14,7 @@ import {
   useBatchSelection,
   useTabCounts,
 } from './shared/index.js';
-import type { Column, TabItem, BaseTab } from './shared/index.js';
+import type { Column, BaseTab } from './shared/index.js';
 import type { ModpackSpec, ModEntry, OverrideFileSpec } from '@mc-creator/shared';
 import {
   Download,

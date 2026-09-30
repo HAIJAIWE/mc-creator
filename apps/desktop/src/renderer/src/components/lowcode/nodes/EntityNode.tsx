@@ -1,9 +1,16 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { EntityNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type EntityNode = Node<EntityNodeData, 'entity'>;
+type EntityNodeComponentProps = {
+  id: string;
+  data: EntityNodeData;
+  selected?: boolean;
+};
 
 /**
  * 生物节点：表达一个 Minecraft 实体。
@@ -13,7 +20,7 @@ import { useDebugState } from './base/useNodeStates.js';
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
  * 避免每次任何节点变化都因 find 选择器触发重新渲染。
  */
-function EntityNodeComponent({ id, data, selected }: NodeProps<EntityNodeData>) {
+function EntityNodeComponent({ id, data, selected }: EntityNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -25,9 +32,9 @@ function EntityNodeComponent({ id, data, selected }: NodeProps<EntityNodeData>) 
       badge={data.classification}
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

@@ -1,9 +1,16 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { RecipeNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type RecipeNode = Node<RecipeNodeData, 'recipe'>;
+type RecipeNodeComponentProps = {
+  id: string;
+  data: RecipeNodeData;
+  selected?: boolean;
+};
 
 const RECIPE_TYPE_LABELS: Record<RecipeNodeData['recipeType'], string> = {
   crafting_shaped: '有序合成',
@@ -26,7 +33,7 @@ const RECIPE_TYPE_LABELS: Record<RecipeNodeData['recipeType'], string> = {
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
  * 避免每次任何节点变化都因 find 选择器触发重新渲染。
  */
-function RecipeNodeComponent({ id, data, selected }: NodeProps<RecipeNodeData>) {
+function RecipeNodeComponent({ id, data, selected }: RecipeNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -38,9 +45,9 @@ function RecipeNodeComponent({ id, data, selected }: NodeProps<RecipeNodeData>) 
       badge={RECIPE_TYPE_LABELS[data.recipeType]}
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

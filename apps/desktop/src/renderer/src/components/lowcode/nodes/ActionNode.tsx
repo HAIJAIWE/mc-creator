@@ -1,10 +1,17 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { ActionNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type ActionNode = Node<ActionNodeData, 'action'>;
+type ActionNodeComponentProps = {
+  id: string;
+  data: ActionNodeData;
+  selected?: boolean;
+};
 
 const ACTION_TYPE_LABELS: Record<ActionNodeData['actionType'], string> = {
   spawn_entity: '生成实体',
@@ -27,23 +34,26 @@ const ACTION_TYPE_LABELS: Record<ActionNodeData['actionType'], string> = {
  * 端口：in (执行) / out (完成)
  * 颜色：mc-action（红色）
  */
-function ActionNodeComponent({ id, data, selected }: NodeProps<ActionNodeData>) {
+function ActionNodeComponent({ id, data, selected }: ActionNodeComponentProps) {
   const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
   const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n) => n.id === id)?.ports ?? []);
+  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n: { id: string; ports: unknown[] }) => n.id === id)?.ports ?? []);
   const debugState = useDebugState(id);
+
+  const actionType = data.actionType;
+  const title = ACTION_TYPE_LABELS[actionType] || data.label || '动作';
 
   return (
     <McNodeShell
       icon="fireball"
-      title={ACTION_TYPE_LABELS[data.actionType] || data.label || '动作'}
+      title={title}
       colorClass="mc-action"
       badge="执行"
       ports={ports}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={() => toggleCollapse(id)}
       onOpenDrawer={() => openDrawer(id)}
     >

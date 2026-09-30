@@ -1,11 +1,11 @@
 import { McIcon } from '../../../assets/mc-ui/McIcon';
 
-interface EmptyStateAction {
+export interface EmptyStateAction {
   label: string;
   onClick: () => void;
 }
 
-interface EmptyStateProps {
+export interface EmptyStateProps {
   icon: string;
   title: string;
   hint: string;

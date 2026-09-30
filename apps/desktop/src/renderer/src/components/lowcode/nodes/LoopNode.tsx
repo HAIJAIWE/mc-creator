@@ -1,8 +1,15 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { LoopNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
+
+type LoopNode = Node<LoopNodeData, 'loop'>;
+type LoopNodeComponentProps = {
+  id: string;
+  data: LoopNodeData;
+  selected?: boolean;
+};
 
 /**
  * 循环节点：for/forEach/while 批量逻辑。
@@ -11,7 +18,7 @@ import { useNodeActions } from './hooks/useNodeActions.js';
  * 颜色：mc-loop
  * 徽章：循环类型（for/forEach/while）
  */
-function LoopNodeComponent({ data, selected }: NodeProps<LoopNodeData>) {
+function LoopNodeComponent({ id, data, selected }: LoopNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
 
   return (
@@ -22,8 +29,8 @@ function LoopNodeComponent({ data, selected }: NodeProps<LoopNodeData>) {
       badge={data.loopType}
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

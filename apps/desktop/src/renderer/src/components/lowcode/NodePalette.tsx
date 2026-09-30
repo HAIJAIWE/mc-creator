@@ -273,9 +273,9 @@ function NodePaletteComponent({
 
 interface PaletteItemProps {
   meta: NodeMeta;
-  disabled?: boolean;
+  disabled: boolean | undefined;
   onDragStart: (e: React.DragEvent, kind: NodeKind) => void;
-  onClick?: (kind: NodeKind) => void;
+  onClick: ((kind: NodeKind) => void) | undefined;
 }
 
 const PaletteItem = memo(function PaletteItem({
@@ -284,13 +284,14 @@ const PaletteItem = memo(function PaletteItem({
   onDragStart,
   onClick,
 }: PaletteItemProps) {
-  const colorClass = COLOR_TEXT_CLASSES[meta.color] ?? COLOR_TEXT_CLASSES.gray;
+  const colorClass = COLOR_TEXT_CLASSES[meta.color as keyof typeof COLOR_TEXT_CLASSES] ?? COLOR_TEXT_CLASSES.gray;
+  const kind = meta.kind as NodeKind;
   return (
     <button
       type="button"
       draggable={!disabled}
-      onDragStart={(e) => onDragStart(e, meta.kind)}
-      onClick={() => onClick?.(meta.kind)}
+      onDragStart={(e) => onDragStart(e, kind)}
+      onClick={() => onClick?.(kind)}
       disabled={disabled}
       role="option"
       aria-selected="false"

@@ -1,10 +1,17 @@
 import { memo, useCallback } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { SubgraphNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { CustomNodeContent } from './CustomNode.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
+
+type SubgraphNode = Node<SubgraphNodeData, 'subgraph'>;
+type SubgraphNodeComponentProps = {
+  id: string;
+  data: SubgraphNodeData;
+  selected?: boolean;
+};
 
 /**
  * 子图节点：封装复用子图。
@@ -17,7 +24,7 @@ import { useNodeGraphStore } from '../../../store/node-graph-store.js';
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
  * 使用 useCallback 稳定化 enterSubgraph 回调。
  */
-function SubgraphNodeComponent({ data, selected }: NodeProps<SubgraphNodeData>) {
+function SubgraphNodeComponent({ id, data, selected }: SubgraphNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   // 子图节点特有：进入子图编辑 + 子图定义查找，不属于通用 useNodeActions 范畴
   const setEditingSubgraphId = useNodeGraphStore((s) => s.setEditingSubgraphId);
@@ -31,7 +38,7 @@ function SubgraphNodeComponent({ data, selected }: NodeProps<SubgraphNodeData>) 
 
   // 自定义节点：委托 CustomNodeContent
   if (data.customTypeId) {
-    return <CustomNodeContent data={data} selected={selected} ports={node?.ports ?? []} />;
+    return <CustomNodeContent data={data} selected={selected ?? false} ports={node?.ports ?? []} />;
   }
 
   // 普通子图
@@ -43,8 +50,8 @@ function SubgraphNodeComponent({ data, selected }: NodeProps<SubgraphNodeData>) 
       colorClass="mc-subgraph"
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      codeLocked={data.codeLocked ?? false}
       errorState={!subgraphFound && data.subgraphId ? 'warning' : undefined}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}

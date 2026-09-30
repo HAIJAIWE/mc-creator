@@ -12,8 +12,8 @@ import {
   IconTabBar,
   useTabCounts,
 } from './shared/index.js';
-import type { ServerSpec, OpEntry, WhitelistEntry, ServerModEntry } from '@mc-creator/shared';
 import type { BaseTab } from './shared/index.js';
+import type { ServerSpec, OpEntry, WhitelistEntry, ServerModEntry } from '@mc-creator/shared';
 import {
   Plus,
   Trash2,

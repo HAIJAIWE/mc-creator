@@ -1,9 +1,16 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { ProcedureNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type ProcedureNode = Node<ProcedureNodeData, 'procedure'>;
+type ProcedureNodeComponentProps = {
+  id: string;
+  data: ProcedureNodeData;
+  selected?: boolean;
+};
 
 /**
  * P1-3 过程节点：命名的可复用逻辑单元（对标 MCreator procedure）。
@@ -18,7 +25,7 @@ import { useDebugState } from './base/useNodeStates.js';
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
  * 避免每次任何节点变化都因 find 选择器触发重新渲染。
  */
-function ProcedureNodeComponent({ id, data, selected }: NodeProps<ProcedureNodeData>) {
+function ProcedureNodeComponent({ id, data, selected }: ProcedureNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -30,9 +37,9 @@ function ProcedureNodeComponent({ id, data, selected }: NodeProps<ProcedureNodeD
       badge="过程"
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

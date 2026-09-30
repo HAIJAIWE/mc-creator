@@ -1,20 +1,27 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { BlockNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useDebugState } from './base/useNodeStates.js';
 
+type BlockNode = Node<BlockNodeData, 'block'>;
+type BlockNodeComponentProps = {
+  id: string;
+  data: BlockNodeData;
+  selected?: boolean;
+};
+
 /**
  * 方块节点：表达一个 Minecraft 方块。
  * 端口：out (block_state)
  * 颜色：mc-block（橙色）
  */
-function BlockNodeComponent({ id, data, selected }: NodeProps<BlockNodeData>) {
+function BlockNodeComponent({ id, data, selected }: BlockNodeComponentProps) {
   const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
   const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n) => n.id === id)?.ports ?? []);
+  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n: { id: string; ports: unknown[] }) => n.id === id)?.ports ?? []);
   const debugState = useDebugState(id);
 
   return (
@@ -25,9 +32,9 @@ function BlockNodeComponent({ id, data, selected }: NodeProps<BlockNodeData>) {
       badge={data.isBlockEntity ? 'BE' : undefined}
       ports={ports}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={() => toggleCollapse(id)}
       onOpenDrawer={() => openDrawer(id)}
     >

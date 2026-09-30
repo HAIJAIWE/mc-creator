@@ -69,12 +69,12 @@ export function useTranslation() {
  * 简化版翻译 Hook（仅 t 函数）
  */
 export function useT() {
-  const _locale = useSyncExternalStore(
+  useSyncExternalStore(
     subscribeLocaleChange,
     getLocaleSnapshot,
     getServerLocaleSnapshot,
   );
 
-  // _locale 变化会触发重渲染，闭包 t 函数会自动读取最新语言
+  // locale 变化会触发重渲染，闭包 t 函数会自动读取最新语言
   return t;
 }

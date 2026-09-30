@@ -25,10 +25,10 @@ import {
 } from './shared/index.js';
 import type {
   Column,
-  TabItem,
   ConflictGroup,
   ExportFormat,
   ExportHandler,
+  BaseTab,
 } from './shared/index.js';
 import type {
   KubejsSpec,
@@ -59,7 +59,7 @@ type RecipeTypeFilter = 'all' | 'shaped' | 'shapeless' | 'smelting' | 'stonecutt
 type TagTypeFilter = 'all' | 'item' | 'block' | 'entity_type' | 'fluid' | 'function';
 type RegistryTypeFilter = 'all' | 'item' | 'block' | 'sound' | 'fluid';
 
-const TABS: { key: KubejsTab; label: string; icon: typeof Boxes }[] = [
+const TABS: BaseTab<KubejsTab>[] = [
   { key: 'recipes', label: '配方', icon: Boxes },
   { key: 'tags', label: '标签', icon: Tag },
   { key: 'events', label: '事件', icon: Flag },
@@ -379,7 +379,7 @@ export function KubejsPreviewPanel() {
   }, [kj]);
 
   // ===== ID 重复检测 =====
-  const { conflicts, totalConflicts, conflictList } = useConflictDetection(kj, KJ_CONFLICT_GROUPS);
+  const { totalConflicts, conflictList } = useConflictDetection(kj, KJ_CONFLICT_GROUPS);
 
   // ===== 配方筛选 =====
   const filteredRecipes = useMemo(() => {

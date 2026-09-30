@@ -103,13 +103,13 @@ export interface VerticalNodeShellProps {
   leftRows: BlockRow[];
   /** 右侧数据/分支输出行 */
   rightRows: BlockRow[];
-  badge?: string;
+  badge?: string | undefined;
   collapsed: boolean;
-  selected?: boolean;
-  codeLocked?: boolean;
+  selected?: boolean | undefined;
+  codeLocked?: boolean | undefined;
   onToggleCollapse: () => void;
   onOpenDrawer: () => void;
-  children?: ReactNode;
+  children?: ReactNode | undefined;
 }
 
 function rowHandleStyle(side: 'left' | 'right', color: string): CSSProperties {

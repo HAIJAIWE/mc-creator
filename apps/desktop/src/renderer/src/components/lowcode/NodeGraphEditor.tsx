@@ -81,8 +81,8 @@ function toFlowEdge(e: ModEdge): Edge {
     id: e.id,
     source: e.source,
     target: e.target,
-    sourceHandle: e.sourceHandle,
-    targetHandle: e.targetHandle,
+    sourceHandle: e.sourceHandle ?? null,
+    targetHandle: e.targetHandle ?? null,
     type: 'step', // 直角折线（MC 工业风）
     // control 边为静态虚线，其余 kind 在未禁用时动画
     animated: !e.disabled && e.kind !== 'control',

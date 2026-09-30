@@ -1,9 +1,4 @@
-import { EmptyState } from './EmptyState.js';
-
-interface EmptySpecStateAction {
-  label: string;
-  onClick: () => void;
-}
+import { EmptyState, type EmptyStateAction } from './EmptyState.js';
 
 interface EmptySpecStateProps {
   /** 标题中的 spec 名称，如 "Mod" / "行为包" */
@@ -12,7 +7,7 @@ interface EmptySpecStateProps {
   describe: string;
   icon?: string;
   /** 可选行动按钮，透传给 EmptyState */
-  action?: EmptySpecStateAction;
+  action?: EmptyStateAction;
 }
 
 /** 英文开头的名称前需空格（尚未生成 Mod Spec），中文不需要（尚未生成数据包 Spec） */
@@ -20,12 +15,11 @@ const needsSpacer = (word: string) => /^[A-Za-z]/.test(word);
 
 /** spec 未生成时的统一空状态：「尚未生成 X Spec」 */
 export function EmptySpecState({ label, describe, icon = 'box', action }: EmptySpecStateProps) {
-  return (
-    <EmptyState
-      icon={icon}
-      title={`尚未生成${needsSpacer(label) ? ' ' : ''}${label} Spec`}
-      hint={`在右侧 AgentPanel 描述你想要的${needsSpacer(describe) ? ' ' : ''}${describe}，生成 Spec 后即可预览`}
-      action={action}
-    />
-  );
+  const props: { icon: string; title: string; hint: string; action?: EmptyStateAction } = {
+    icon,
+    title: `尚未生成${needsSpacer(label) ? ' ' : ''}${label} Spec`,
+    hint: `在右侧 AgentPanel 描述你想要的${needsSpacer(describe) ? ' ' : ''}${describe}，生成 Spec 后即可预览`,
+  };
+  if (action !== undefined) props.action = action;
+  return <EmptyState {...props} />;
 }

@@ -1,16 +1,23 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { BiomeNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type BiomeNode = Node<BiomeNodeData, 'biome'>;
+type BiomeNodeComponentProps = {
+  id: string;
+  data: BiomeNodeData;
+  selected?: boolean;
+};
 
 /**
  * 生物群系节点：Mod 侧生物群系（降水/温度/颜色/地表）。
  * 端口：无（独立内容节点）
  * 颜色：mc-biome（青绿色）
  */
-function BiomeNodeComponent({ id, data, selected }: NodeProps<BiomeNodeData>) {
+function BiomeNodeComponent({ id, data, selected }: BiomeNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -22,9 +29,9 @@ function BiomeNodeComponent({ id, data, selected }: NodeProps<BiomeNodeData>) {
       badge="生物群系"
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

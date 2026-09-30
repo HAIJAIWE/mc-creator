@@ -8,9 +8,9 @@ export interface ValidationError {
   reason: string;
   sourceNodeId: string;
   targetNodeId: string;
-  sourceHandle?: string;
-  targetHandle?: string;
-  code?: string;
+  sourceHandle?: string | undefined;
+  targetHandle?: string | undefined;
+  code?: string | undefined;
 }
 
 /**

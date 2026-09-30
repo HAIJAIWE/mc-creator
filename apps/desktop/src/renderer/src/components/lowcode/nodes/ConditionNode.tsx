@@ -1,9 +1,16 @@
 import { memo } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type Node } from '@xyflow/react';
 import type { ConditionNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
 import { useDebugState } from './base/useNodeStates.js';
+
+type ConditionNode = Node<ConditionNodeData, 'condition'>;
+type ConditionNodeComponentProps = {
+  id: string;
+  data: ConditionNodeData;
+  selected?: boolean;
+};
 
 const CONDITION_TYPE_LABELS: Record<ConditionNodeData['conditionType'], string> = {
   has_item: '拥有物品',
@@ -27,7 +34,7 @@ const CONDITION_TYPE_LABELS: Record<ConditionNodeData['conditionType'], string> 
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
  * 避免每次任何节点变化都因 find 选择器触发重新渲染。
  */
-function ConditionNodeComponent({ id, data, selected }: NodeProps<ConditionNodeData>) {
+function ConditionNodeComponent({ id, data, selected }: ConditionNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   const debugState = useDebugState(id);
 
@@ -39,9 +46,9 @@ function ConditionNodeComponent({ id, data, selected }: NodeProps<ConditionNodeD
       badge={data.invert ? '取反' : undefined}
       ports={node?.ports ?? []}
       collapsed={data.collapsed}
-      selected={selected}
-      debugState={debugState}
-      codeLocked={data.codeLocked}
+      selected={selected ?? false}
+      debugState={debugState ?? undefined}
+      codeLocked={data.codeLocked ?? false}
       onToggleCollapse={toggleCollapse}
       onOpenDrawer={openDrawer}
     >

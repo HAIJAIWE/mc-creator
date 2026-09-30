@@ -30,7 +30,7 @@ export function FilterBar({
   return (
     <div className={className}>
       <div className="flex-1 min-w-[180px]">
-        <SearchInput value={query} onChange={onQueryChange} placeholder={searchPlaceholder} />
+        <SearchInput value={query} onChange={onQueryChange} placeholder={searchPlaceholder ?? '搜索…'} />
       </div>
       {children}
     </div>

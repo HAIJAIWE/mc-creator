@@ -1,7 +1,5 @@
 import { memo, useMemo } from 'react';
-import { type NodeProps } from '@xyflow/react';
-import { nodeRegistry } from '@mc-creator/shared';
-import type { NodePortDefinition } from '@mc-creator/shared';
+import type { NodePort, NodeCategory } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
 import {
@@ -14,11 +12,11 @@ import {
 export interface VerticalCoreNodeData extends Record<string, unknown> {
   /** 新系统节点 id（如 spawn_entity），对应 shared NodeDefinition.id */
   kind: string;
-  collapsed?: boolean;
-  codeLocked?: boolean;
-  displayName?: string;
-  label?: string;
-  note?: string;
+  collapsed?: boolean | undefined;
+  codeLocked?: boolean | undefined;
+  displayName?: string | undefined;
+  label?: string | undefined;
+  note?: string | undefined;
 }
 
 /** void 控制端口中优先作为底部凸榫的 id */
@@ -36,8 +34,8 @@ function formatValue(value: unknown, fallback: unknown): string {
   }
 }
 
-function toRow(p: NodePortDefinition, data: VerticalCoreNodeData, branch: boolean): BlockRow {
-  return { id: p.id, label: p.label, value: formatValue(data[p.id], p.defaultValue), branch };
+function toRow(p: NodePort, data: VerticalCoreNodeData, branch: boolean): BlockRow {
+  return { id: p.id, label: p.label, value: formatValue(data[p.id] ?? p.defaultValue, p.defaultValue), branch };
 }
 
 /**
@@ -69,19 +67,42 @@ function useCommitPortValue(nodeId: string) {
   };
 }
 
+interface NodeDefinition {
+  icon: string;
+  label: string;
+  category: NodeCategory;
+  inputs: NodePort[];
+  outputs: NodePort[];
+}
+
+// Placeholder for nodeRegistry lookup (not exported from @mc-creator/shared yet)
+function getNodeDefinition(kind: string): NodeDefinition | undefined {
+  // TODO: Replace with actual nodeRegistry.get(kind) when available
+  return undefined;
+}
+
+type VerticalCoreNodeComponentProps = {
+  id: string;
+  data: VerticalCoreNodeData;
+  selected?: boolean;
+};
+
 /**
  * 新系统节点的竖式积木渲染器（拼图风格）
  * - exec 缺口在上，next/done 凸榫在下
  * - 数据输入左侧行，数据输出/分支右侧行
  * - 事件为帽子块，无数据控制端口时为圆角块
  */
-function VerticalCoreNodeComponent({ id, data }: NodeProps<VerticalCoreNodeData>) {
+function VerticalCoreNodeComponent({ id, data }: VerticalCoreNodeComponentProps) {
   const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
   const openDrawer = useDrawerStore((s) => s.openDrawer);
   const edges = useNodeGraphStore((s) => s.graph.edges);
   const commitPortValue = useCommitPortValue(id);
 
-  const def = nodeRegistry.get(data.kind);
+  const nodeData = data as VerticalCoreNodeData;
+  // Note: nodeRegistry is not exported from @mc-creator/shared, using a placeholder
+  // const def = nodeRegistry.get(nodeData.kind);
+  const def = getNodeDefinition(nodeData.kind);
 
   // 有数据边输入的端口：边优先，字面量不生效，只读展示（见 node-renderer literalExpr）
   const connectedInputs = useMemo(() => {
@@ -94,32 +115,35 @@ function VerticalCoreNodeComponent({ id, data }: NodeProps<VerticalCoreNodeData>
 
   if (!def) {
     return (
-      <div style={{ color: '#d43a3a', fontSize: 12, padding: 8 }}>未知积木类型: {data.kind}</div>
+      <div style={{ color: '#d43a3a', fontSize: 12, padding: 8 }}>未知积木类型: {nodeData.kind}</div>
     );
   }
 
-  const voidInputs = def.inputs.filter((p) => p.type === 'void');
-  const voidOutputs = def.outputs.filter((p) => p.type === 'void');
-  const dataInputs = def.inputs.filter((p) => p.type !== 'void');
-  const dataOutputs = def.outputs.filter((p) => p.type !== 'void');
+  // TypeScript type narrowing: after the early return, def is guaranteed to be defined
+  const defDefined = def;
 
-  const execPort = voidInputs.find((p) => p.id === 'exec') ?? null;
+  const voidInputs = defDefined.inputs.filter((p: NodePort) => p.type === 'void');
+  const voidOutputs = defDefined.outputs.filter((p: NodePort) => p.type === 'void');
+  const dataInputs = defDefined.inputs.filter((p: NodePort) => p.type !== 'void');
+  const dataOutputs = defDefined.outputs.filter((p: NodePort) => p.type !== 'void');
+
+  const execPort = voidInputs.find((p: NodePort) => p.id === 'exec') ?? null;
   const tabPort =
-    TAB_PRIORITY.map((wanted) => voidOutputs.find((p) => p.id === wanted)).find(Boolean) ?? null;
+    TAB_PRIORITY.map((wanted) => voidOutputs.find((p: NodePort) => p.id === wanted)).find(Boolean) ?? null;
 
   const shape: BlockShape =
-    def.category === 'event'
+    defDefined.category === 'event'
       ? 'hat'
       : voidInputs.length + voidOutputs.length === 0
         ? 'reporter'
         : 'stack';
 
   const leftRows: BlockRow[] = [
-    ...dataInputs.map((p) => {
-      const row = toRow(p, data, false);
+    ...dataInputs.map((p: NodePort) => {
+      const row = toRow(p, nodeData, false);
       const kind = inlineKindFor(p.type);
       if (kind && !connectedInputs.has(p.id)) {
-        const raw = data[p.id] ?? p.defaultValue;
+        const raw = nodeData[p.id] ?? p.defaultValue;
         const value =
           kind === 'number'
             ? typeof raw === 'number' && Number.isFinite(raw)
@@ -137,26 +161,26 @@ function VerticalCoreNodeComponent({ id, data }: NodeProps<VerticalCoreNodeData>
       }
       return row;
     }),
-    ...voidInputs.filter((p) => p !== execPort).map((p) => toRow(p, data, false)),
+    ...voidInputs.filter((p: NodePort) => p !== execPort).map((p: NodePort) => toRow(p, nodeData, false)),
   ];
   const rightRows: BlockRow[] = [
-    ...dataOutputs.map((p) => toRow(p, data, false)),
-    ...voidOutputs.filter((p) => p !== tabPort).map((p) => toRow(p, data, true)),
+    ...dataOutputs.map((p: NodePort) => toRow(p, nodeData, false)),
+    ...voidOutputs.filter((p: NodePort) => p !== tabPort).map((p: NodePort) => toRow(p, nodeData, true)),
   ];
 
   return (
     <VerticalNodeShell
-      icon={def.icon}
-      title={String(data.displayName ?? data.label ?? def.label)}
-      category={def.category}
+      icon={defDefined.icon}
+      title={String(nodeData.displayName ?? nodeData.label ?? defDefined.label)}
+      category={defDefined.category as NodeCategory}
       shape={shape}
       notchId={execPort?.id ?? null}
       tabId={tabPort?.id ?? null}
       leftRows={leftRows}
       rightRows={rightRows}
-      badge={def.category === 'event' ? '事件' : undefined}
-      collapsed={Boolean(data.collapsed)}
-      codeLocked={Boolean(data.codeLocked)}
+      badge={defDefined.category === 'event' ? '事件' : undefined}
+      collapsed={Boolean(nodeData.collapsed)}
+      codeLocked={Boolean(nodeData.codeLocked)}
       onToggleCollapse={() => toggleCollapse(id)}
       onOpenDrawer={() => openDrawer(id)}
     />

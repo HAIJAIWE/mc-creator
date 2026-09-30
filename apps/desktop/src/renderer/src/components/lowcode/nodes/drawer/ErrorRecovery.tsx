@@ -3,13 +3,13 @@ import type { FieldSchema } from './editors/types.js';
 
 interface ErrorRecoveryProps {
   /** 错误文字（falsy 时不渲染） */
-  error?: string;
+  error?: string | undefined;
   /** 修复建议文字 */
-  suggestion?: string;
+  suggestion?: string | undefined;
   /** 一键修复按钮文字（需同时提供 onFix 才渲染按钮） */
-  fixLabel?: string;
+  fixLabel?: string | undefined;
   /** 一键修复回调 */
-  onFix?: () => void;
+  onFix?: (() => void) | undefined;
 }
 
 function ErrorRecoveryComponent({ error, suggestion, fixLabel, onFix }: ErrorRecoveryProps) {

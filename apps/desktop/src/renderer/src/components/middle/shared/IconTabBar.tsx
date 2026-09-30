@@ -1,17 +1,20 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, SVGProps } from 'react';
+
+/** Lucide 图标类型：使用宽泛类型兼容 exactOptionalPropertyTypes */
+export type LucideIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export interface TabItem<K extends string> {
   key: K;
   label: string;
-  icon?: ComponentType<{ className?: string }>;
+  icon?: ComponentType<{ className?: string }> | LucideIcon | undefined;
   /** 该 tab 的条目数；undefined 时不显示计数 */
-  count?: number;
+  count?: number | undefined;
   /** 即使 count 已知也不显示计数（用于 metadata/export 等非列表 tab） */
-  hideCount?: boolean;
+  hideCount?: boolean | undefined;
   /** 校验错误数；> 0 时在 tab 按钮右侧显示 ✗ 标记 */
-  error?: number;
+  error?: number | undefined;
   /** 校验警告数；> 0 且 error <= 0 时在 tab 按钮右侧显示 ⚠ 标记 */
-  warning?: number;
+  warning?: number | undefined;
 }
 
 export interface IconTabBarProps<K extends string> {
