@@ -74,25 +74,73 @@ function encodePNG(width, height, rgba) {
   ]);
 }
 
-// 渲染 256x256（每个 24x24 网格单元 = 256/24 ≈ 10.67px，用最近邻缩放）
-const scale = SIZE / 24;
-const px = Buffer.alloc(SIZE * SIZE * 4);
-for (let y = 0; y < SIZE; y++) {
-  for (let x = 0; x < SIZE; x++) {
-    const gx = Math.min(23, Math.floor(x / scale));
-    const gy = Math.min(23, Math.floor(y / scale));
-    const cell = GRID[gy][gx];
-    const c = cell === 2 ? GRASS : cell === 3 ? DIRT_SPECK : DIRT;
-    const idx = (y * SIZE + x) * 4;
-    px[idx] = c[0];
-    px[idx + 1] = c[1];
-    px[idx + 2] = c[2];
-    px[idx + 3] = c[3];
+// 渲染 icon（每个 24x24 网格单元按目标尺寸最近邻缩放）
+function renderIcon(size) {
+  const scale = size / 24;
+  const rgba = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const gx = Math.min(23, Math.floor(x / scale));
+      const gy = Math.min(23, Math.floor(y / scale));
+      const cell = GRID[gy][gx];
+      const c = cell === 2 ? GRASS : cell === 3 ? DIRT_SPECK : DIRT;
+      const idx = (y * size + x) * 4;
+      rgba[idx] = c[0];
+      rgba[idx + 1] = c[1];
+      rgba[idx + 2] = c[2];
+      rgba[idx + 3] = c[3];
+    }
   }
+  return rgba;
 }
 
-const outDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'build');
+/** ICO 容器：单 256x256 PNG 负载（Vista+ 支持，与 electron-builder win.icon 兼容） */
+function encodeICO(png256) {
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0); // reserved
+  header.writeUInt16LE(1, 2); // type: icon
+  header.writeUInt16LE(1, 4); // count
+  const entry = Buffer.alloc(16);
+  entry[0] = 0; // width 0 = 256
+  entry[1] = 0; // height 0 = 256
+  entry[2] = 0; // no palette
+  entry[3] = 0; // reserved
+  entry.writeUInt16LE(1, 4); // planes
+  entry.writeUInt16LE(32, 6); // bit count
+  entry.writeUInt32LE(png256.length, 8); // bytes
+  entry.writeUInt32LE(6 + 16, 12); // offset
+  return Buffer.concat([header, entry, png256]);
+}
+
+/** ICNS 容器：ic07(128) + ic08(256) PNG 负载（与 electron-builder mac.icon 兼容） */
+function encodeICNS(png128, png256) {
+  const entries = [];
+  for (const [type, data] of [
+    ['ic07', png128],
+    ['ic08', png256],
+  ]) {
+    const head = Buffer.alloc(8);
+    head.write(type, 0, 'ascii');
+    head.writeUInt32BE(8 + data.length, 4);
+    entries.push(head, data);
+  }
+  const body = Buffer.concat(entries);
+  const head = Buffer.alloc(8);
+  head.write('icns', 0, 'ascii');
+  head.writeUInt32BE(8 + body.length, 4);
+  return Buffer.concat([head, body]);
+}
+
+// 输出目录与 electron-builder.yml directories.buildResources 对齐
+const outDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'build-resources');
 mkdirSync(outDir, { recursive: true });
-const png = encodePNG(SIZE, SIZE, px);
-writeFileSync(join(outDir, 'icon.png'), png);
-console.log(`icon.png 已生成: ${png.length} bytes`);
+const png256 = encodePNG(SIZE, SIZE, renderIcon(SIZE));
+const png128 = encodePNG(128, 128, renderIcon(128));
+writeFileSync(join(outDir, 'icon.png'), png256);
+console.log(`icon.png: ${png256.length} bytes`);
+const ico = encodeICO(png256);
+writeFileSync(join(outDir, 'icon.ico'), ico);
+console.log(`icon.ico: ${ico.length} bytes`);
+const icns = encodeICNS(png128, png256);
+writeFileSync(join(outDir, 'icon.icns'), icns);
+console.log(`icon.icns: ${icns.length} bytes`);

@@ -1,34 +1,58 @@
-appId: com.mc-creator.app
+appId: com.mccreator.app
 productName: MC Creator
-# 本地构建不自动发布：避免 electron-builder 因未配置真实仓库地址而报 "Cannot detect repository"
-publish: null
 directories:
-  output: dist
-  buildResources: build
+  output: release
+  buildResources: build-resources
 files:
-  - out/**/*
-  - package.json
+  - from: out
+    filter:
+      - '**/*'
+      - '!**/node_modules/**'
+      - '!**/.vite/**'
 asar: true
-npmRebuild: false
+compression: maximum
 win:
-  icon: build/icon.png
   target:
-    - target: nsis
+    - target: zip
       arch:
         - x64
-  artifactName: ${productName}-${version}-setup.${ext}
-nsis:
-  oneClick: false
-  allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
-  createStartMenuShortcut: true
-  shortcutName: MC Creator
+  icon: build-resources/icon.ico
 linux:
   target:
-    - AppImage
-  category: Game
-  artifactName: ${productName}-${version}.${ext}
+    - target: AppImage
+      arch:
+        - x64
+    - target: dir
+      arch:
+        - x64
+  icon: build-resources/icon.png
+  category: Development
 mac:
   target:
-    - dmg
-  artifactName: ${productName}-${version}.${ext}
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: dir
+      arch:
+        - x64
+        - arm64
+  icon: build-resources/icon.icns
+  category: public.app-category.developer-tools
+extraResources:
+  - from: ../../packages/core/src/generators/mod
+    to: generators/mod
+    filter:
+      - '**/*.js'
+      - '**/*.d.ts'
+      - '**/*.json'
+  - from: ../../packages/shared/src
+    to: shared
+    filter:
+      - '**/*.js'
+      - '**/*.d.ts'
+      - '**/*.json'
+extraFiles:
+  - from: ./scripts/generate-icon.mjs
+    to: scripts/generate-icon.mjs
+publish: null

@@ -10,6 +10,10 @@ out_prev_*/
 *.jar
 vitest-out.txt
 coverage/
+# Electron 打包生成物（由 scripts/generate-icon.mjs + electron-builder 生成）
+apps/desktop/build-resources/
+apps/desktop/release/
+apps/desktop/dist/
 
 # Electron 打包
 release/
@@ -50,6 +54,11 @@ node_modules/.pnpm_patches/
 
 # 本地安装包（不入库）
 /FeelFish-Setup-4.0.21.exe
+
+# 本地测试杂物（不入库）：示例导出项目、工具链/构建下载物
+/gemcraft/
+/gemcraft-project.zip
+/gradle-*-bin.zip
 
 # 图标实验产物（v2 定稿，1:1/预览脚本不入库）
 icon-preview.html
