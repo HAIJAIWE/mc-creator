@@ -34,7 +34,12 @@ interface IPtySpawnOptions {
 let ptySpawn: ((file: string, args: string[], options: IPtySpawnOptions) => IPty) | null = null;
 let ptyAvailable = false;
 try {
-  const mod = await import('node-pty');
+  // 主进程打包为 CJS，不支持顶层 await：同步 require 做可选依赖探测即可
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mod = require('node-pty') as {
+    spawn?: (file: string, args: string[], options: IPtySpawnOptions) => IPty;
+    default?: { spawn?: (file: string, args: string[], options: IPtySpawnOptions) => IPty };
+  };
   ptySpawn = mod.spawn ?? mod.default?.spawn ?? null;
   ptyAvailable = !!ptySpawn;
 } catch {

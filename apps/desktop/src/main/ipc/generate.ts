@@ -481,7 +481,12 @@ let isolatedVmAvailable = false;
 let Isolate: IsolatedVmIsolate | undefined;
 let ExternalCopy: IsolatedVmExternalCopy | undefined;
 try {
-  const mod = await import('isolated-vm');
+  // 主进程打包为 CJS，不支持顶层 await：同步 require 做可选依赖探测即可
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mod = require('isolated-vm') as {
+    Isolate: unknown;
+    ExternalCopy: unknown;
+  };
   // isolated-vm 的类型与我们的接口不完全兼容，使用类型断言
   Isolate = mod.Isolate as unknown as IsolatedVmIsolate;
   ExternalCopy = mod.ExternalCopy as unknown as IsolatedVmExternalCopy;
