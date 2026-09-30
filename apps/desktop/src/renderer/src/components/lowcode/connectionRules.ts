@@ -1,4 +1,4 @@
-import type { Edge, Connection } from 'reactflow';
+import type { Edge, Connection } from '@xyflow/react';
 import type { ModNode, NodeGraph, NodePort, PortType } from '@mc-creator/shared';
 import { CompileErrorCode, CompileErrors } from '../../lib/compileErrors.js';
 

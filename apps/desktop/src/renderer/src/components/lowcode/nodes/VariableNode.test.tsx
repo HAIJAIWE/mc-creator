@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import { type ReactNode } from 'react';
 import { VariableNode } from './VariableNode.js';
 import type { VariableNodeData } from '@mc-creator/shared';

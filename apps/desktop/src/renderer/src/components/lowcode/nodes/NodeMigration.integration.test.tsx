@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { type ReactElement } from 'react';
-import { ReactFlowProvider, type NodeProps } from 'reactflow';
+import { ReactFlowProvider, type NodeProps } from '@xyflow/react';
 import type { ItemNodeData, RecipeNodeData, ConditionNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';

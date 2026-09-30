@@ -4,8 +4,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { NodeGraphEditor } from './NodeGraphEditor.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 
-vi.mock('reactflow', () => ({
-  default: ({ onNodeContextMenu }: { onNodeContextMenu?: (e: React.MouseEvent) => void }) => (
+vi.mock('@xyflow/react', () => ({
+  ReactFlow: ({ onNodeContextMenu }: { onNodeContextMenu?: (e: React.MouseEvent) => void }) => (
     <div
       data-testid="reactflow"
       onContextMenu={(e) => {

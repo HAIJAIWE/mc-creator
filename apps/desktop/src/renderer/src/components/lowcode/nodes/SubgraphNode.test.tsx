@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import { type ReactNode } from 'react';
 import { SubgraphNode } from './SubgraphNode.js';
 import { customNodeRegistry } from '../custom/customNodeRegistry.js';

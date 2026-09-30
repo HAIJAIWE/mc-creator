@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react';
-import ReactFlow, {
+import {
+  ReactFlow,
   Background,
   BackgroundVariant,
   Controls,
@@ -12,8 +13,8 @@ import ReactFlow, {
   type NodeChange,
   type EdgeChange,
   type Connection,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import type { SubgraphDefinition, ModNode, ModEdge } from '@mc-creator/shared';
 import { SubgraphBoundaryNode } from './SubgraphBoundaryNode.js';
 

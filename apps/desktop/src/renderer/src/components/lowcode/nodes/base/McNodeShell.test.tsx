@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ReactFlowProvider } from 'reactflow';
+import { ReactFlowProvider } from '@xyflow/react';
 import { McNodeShell } from './McNodeShell.js';
 import type { NodePort } from '@mc-creator/shared';
 

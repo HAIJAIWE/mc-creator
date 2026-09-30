@@ -35,7 +35,7 @@ export default defineConfig({
           // 把重型第三方库拆成独立 vendor chunk，避免单包过大、利于缓存
           manualChunks: {
             'vendor-monaco': ['@monaco-editor/react'],
-            'vendor-reactflow': ['reactflow'],
+            'vendor-xyflow': ['@xyflow/react'],
             'vendor-skinview3d': ['skinview3d'],
             'vendor-xterm': ['@xterm/xterm', '@xterm/addon-fit'],
             'vendor-react': ['react', 'react-dom', 'zustand'],

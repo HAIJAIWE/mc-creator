@@ -1,5 +1,5 @@
 import { memo, useMemo, type CSSProperties, type ReactNode } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position } from '@xyflow/react';
 import type { NodeCategory } from '@mc-creator/shared';
 import { McIcon } from '../../../../assets/mc-ui/McIcon.js';
 import { ChevronDown, ChevronUp, Settings, Lock } from 'lucide-react';

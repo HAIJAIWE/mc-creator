@@ -3,6 +3,7 @@ import type { FileNode } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 import { useModStore } from '../../store/mod-store.js';
 import { useDebouncedCompile } from '../../lib/useDebouncedCompile.js';
+import { tCompileError } from '../../i18n/index.js';
 
 /**
  * 懒加载 Monaco Editor：
@@ -265,6 +266,12 @@ export function GeneratedCodePreview({
               ✗ {err}
             </div>
           ))}
+          {/* i18n：若有结构化错误，展示翻译后的首条错误码消息 */}
+          {compileResult?.structuredErrors && compileResult.structuredErrors.length > 0 && (
+            <div className="mt-1 text-[10px] text-mc-accent" role="status">
+              {tCompileError(compileResult.structuredErrors[0].code)}
+            </div>
+          )}
           {remainingErrors > 0 && (
             <div className="mt-0.5 text-mc-mute">...还有 {remainingErrors} 个错误</div>
           )}

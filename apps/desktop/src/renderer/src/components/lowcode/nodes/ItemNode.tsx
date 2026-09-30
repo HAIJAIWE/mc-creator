@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { ItemNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';

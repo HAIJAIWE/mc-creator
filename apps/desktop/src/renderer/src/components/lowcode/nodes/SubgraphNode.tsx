@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import type { NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { SubgraphNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { CustomNodeContent } from './CustomNode.js';

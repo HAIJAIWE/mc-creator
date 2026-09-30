@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ReactFlow, {
+import {
+  ReactFlow,
   Background,
   BackgroundVariant,
   Controls,
@@ -14,8 +15,8 @@ import ReactFlow, {
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import type { NodeKind, EdgeKind, ModNode, ModEdge } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 import { useDebuggerStore } from '../../store/debugger-store.js';
@@ -418,6 +419,8 @@ export function NodeGraphEditor({
     [readOnly, onNodeDoubleClick],
   );
 
+  const SHORTCUTS = ['Delete', 'Backspace', 'Ctrl+D', 'Escape', 'Ctrl+Z', 'Ctrl+Y', 'Ctrl+Shift+Z'];
+
   return (
     <div
       ref={wrapperRef}
@@ -427,6 +430,7 @@ export function NodeGraphEditor({
       role="application"
       aria-label="节点图画布"
       aria-activedescendant={selectedNodeId ?? undefined}
+      aria-keyshortcuts={SHORTCUTS.join(' ')}
     >
       <ReactFlow
         nodes={flowNodes}

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { NodeProps } from 'reactflow';
+import type { NodeProps } from '@xyflow/react';
 import type { CommentNodeData, NodePort, PortType } from '@mc-creator/shared';
 import { McNodeShell } from '../nodes/base/McNodeShell.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';

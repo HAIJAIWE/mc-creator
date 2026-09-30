@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Connection, Edge } from 'reactflow';
+import type { Connection, Edge } from '@xyflow/react';
 import type { ModNode, NodeGraph, NodePort, PortType } from '@mc-creator/shared';
 import {
   findPort,

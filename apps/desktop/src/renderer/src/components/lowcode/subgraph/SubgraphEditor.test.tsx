@@ -8,8 +8,8 @@ import type { SubgraphDefinition, ModNode } from '@mc-creator/shared';
 // 捕获传递给 ReactFlow 的 props，用于验证交互回调
 let capturedReactFlowProps: Record<string, unknown> = {};
 
-vi.mock('reactflow', () => ({
-  default: (props: { children?: ReactNode } & Record<string, unknown>) => {
+vi.mock('@xyflow/react', () => ({
+  ReactFlow: (props: { children?: ReactNode } & Record<string, unknown>) => {
     capturedReactFlowProps = props;
     return <div data-testid="reactflow">{props.children}</div>;
   },

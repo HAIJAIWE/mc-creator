@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { type ReactElement } from 'react';
-import { ReactFlowProvider, type NodeProps } from 'reactflow';
+import { ReactFlowProvider, type NodeProps } from '@xyflow/react';
 import type { NodeData, NodeKind } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { ItemNode } from './ItemNode.js';

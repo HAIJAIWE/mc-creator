@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps, ReactFlowProvider } from 'reactflow';
+import { type NodeProps, ReactFlowProvider } from '@xyflow/react';
 import { type ReactElement } from 'react';
 import { MultiBlockNode } from './MultiBlockNode.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
