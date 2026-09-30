@@ -12,6 +12,8 @@
 export interface GenerateFilesOutcome {
   files: { path: string; content: string }[];
   warnings: string[];
+  /** 未实现清单（Task 1.1，仅 mod 生成器在有占位时返回） */
+  unimplemented?: Array<{ kind: string; type: string; id: string; reason: string }>;
   /** 校验并填充默认值后的完整 spec */
   spec: unknown;
 }
@@ -58,5 +60,10 @@ export async function generateFilesForType(
     projectPath: '',
   } as never);
 
-  return { files: result.files, warnings: result.warnings, spec: parsed.data };
+  return {
+    files: result.files,
+    warnings: result.warnings,
+    unimplemented: result.unimplemented ?? [],
+    spec: parsed.data,
+  };
 }

@@ -2,8 +2,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { type ReactElement } from 'react';
-import { ReactFlowProvider, type NodeProps } from '@xyflow/react';
-import type { NodeData, NodeKind } from '@mc-creator/shared';
+import { ReactFlowProvider } from '@xyflow/react';
+import type { NodeKind } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { ItemNode } from './ItemNode.js';
 import { BlockNode } from './BlockNode.js';
@@ -70,7 +70,7 @@ describe('节点迁移快照测试', () => {
     it(`${kind} 节点展开状态快照`, () => {
       const id = useNodeGraphStore.getState().addNode(kind, { x: 0, y: 0 });
       const data = useNodeGraphStore.getState().graph.nodes[0].data;
-      const props = { id, data, selected: false } as unknown as NodeProps<NodeData>;
+      const props = { id, data, selected: false };
 
       const { container } = renderWithProvider(<Component {...props} />);
       expect(container.firstChild).toMatchSnapshot();
@@ -80,7 +80,7 @@ describe('节点迁移快照测试', () => {
       const id = useNodeGraphStore.getState().addNode(kind, { x: 0, y: 0 });
       useNodeGraphStore.getState().toggleCollapse(id);
       const data = useNodeGraphStore.getState().graph.nodes[0].data;
-      const props = { id, data, selected: false } as unknown as NodeProps<NodeData>;
+      const props = { id, data, selected: false };
 
       const { container } = renderWithProvider(<Component {...props} />);
       expect(container.firstChild).toMatchSnapshot();
@@ -89,7 +89,7 @@ describe('节点迁移快照测试', () => {
     it(`${kind} 节点选中状态快照`, () => {
       const id = useNodeGraphStore.getState().addNode(kind, { x: 0, y: 0 });
       const data = useNodeGraphStore.getState().graph.nodes[0].data;
-      const props = { id, data, selected: true } as unknown as NodeProps<NodeData>;
+      const props = { id, data, selected: true };
 
       const { container } = renderWithProvider(<Component {...props} />);
       expect(container.firstChild).toMatchSnapshot();

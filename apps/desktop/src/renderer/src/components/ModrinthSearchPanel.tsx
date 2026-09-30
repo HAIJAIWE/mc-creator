@@ -79,7 +79,12 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
     setSelectedHit(null);
     setVersions([]);
     try {
-      const res = await ipcClient.modrinthSearch({ query: q, loader, mcVersion });
+      const req: { query: string; loader?: string; mcVersion?: string; limit?: number } = {
+        query: q,
+      };
+      if (loader) req.loader = loader;
+      if (mcVersion) req.mcVersion = mcVersion;
+      const res = await ipcClient.modrinthSearch(req);
       setHits(res.hits);
     } catch (e) {
       setError((e as Error).message);
@@ -95,11 +100,12 @@ export function ModrinthSearchPanel({ onPick, onClose, loader, mcVersion }: Prop
     setVersionsError(null);
     setVersionsLoading(true);
     try {
-      const res = await ipcClient.modrinthVersions({
+      const req: { projectId: string; loader?: string; mcVersion?: string } = {
         projectId: hit.project_id,
-        loader,
-        mcVersion,
-      });
+      };
+      if (loader) req.loader = loader;
+      if (mcVersion) req.mcVersion = mcVersion;
+      const res = await ipcClient.modrinthVersions(req);
       setVersions(res.versions);
     } catch (e) {
       setVersionsError((e as Error).message);

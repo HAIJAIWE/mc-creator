@@ -160,7 +160,7 @@ export class LauncherService {
     const entries = Object.entries(objects);
     let done = 0;
     onProgress?.('assets', 0, entries.length);
-    for (const [path, obj] of entries) {
+    for (const [, obj] of entries) {
       const hash = obj.hash;
       const dest = join(this.baseDir, 'assets', 'objects', hash.slice(0, 2), hash);
       if (!(await exists(dest))) {

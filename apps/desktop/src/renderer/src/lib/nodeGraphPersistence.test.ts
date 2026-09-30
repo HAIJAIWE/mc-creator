@@ -145,10 +145,6 @@ function makeNode(id: string, kind: NodeKind): ModNode {
   };
 }
 
-function _makeEdge(id: string, source: string, target: string): ModEdge {
-  return { id, source, target, kind: 'craft', disabled: false };
-}
-
 function makeGraph(modId = 'test_mod', nodes: ModNode[] = [], edges: ModEdge[] = []): NodeGraph {
   return {
     version: 1,

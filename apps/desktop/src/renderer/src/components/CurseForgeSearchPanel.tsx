@@ -155,7 +155,12 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
     setFiles([]);
     saveHistory(searchQuery);
     try {
-      const res = await ipcClient.curseforgeSearch({ query: searchQuery, loader, mcVersion });
+      const req: { query: string; loader?: string; mcVersion?: string; limit?: number } = {
+        query: searchQuery,
+      };
+      if (loader) req.loader = loader;
+      if (mcVersion) req.mcVersion = mcVersion;
+      const res = await ipcClient.curseforgeSearch(req);
       setHits(res.hits);
     } catch (e) {
       setError((e as Error).message);
@@ -171,7 +176,10 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
     setFilesError(null);
     setFilesLoading(true);
     try {
-      const res = await ipcClient.curseforgeFiles({ modId: hit.id, loader, mcVersion });
+      const req: { modId: number; loader?: string; mcVersion?: string } = { modId: hit.id };
+      if (loader) req.loader = loader;
+      if (mcVersion) req.mcVersion = mcVersion;
+      const res = await ipcClient.curseforgeFiles(req);
       setFiles(res.files);
     } catch (e) {
       setFilesError((e as Error).message);

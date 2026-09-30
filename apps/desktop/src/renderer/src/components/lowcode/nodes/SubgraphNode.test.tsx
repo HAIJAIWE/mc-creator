@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps } from '@xyflow/react';
 import { type ReactNode } from 'react';
 import { SubgraphNode } from './SubgraphNode.js';
 import { customNodeRegistry } from '../custom/customNodeRegistry.js';
@@ -62,11 +61,7 @@ describe('SubgraphNode', () => {
       formatVersion: 1,
       customFields: {},
     };
-    render(
-      <SubgraphNode
-        {...({ id: 's1', data, selected: false } as unknown as NodeProps<SubgraphNodeData>)}
-      />,
-    );
+    render(<SubgraphNode {...{ id: 's1', data, selected: false }} />);
     expect(screen.getByTestId('title').textContent).toBe('我的合成');
     expect(screen.getByTestId('children').textContent).toContain('合成铁剑');
     expect(screen.getByTestId('children').textContent).toContain('双击进入子图');
@@ -97,11 +92,7 @@ describe('SubgraphNode', () => {
       formatVersion: 1,
       customFields: {},
     };
-    render(
-      <SubgraphNode
-        {...({ id: 's2', data, selected: false } as unknown as NodeProps<SubgraphNodeData>)}
-      />,
-    );
+    render(<SubgraphNode {...{ id: 's2', data, selected: false }} />);
     // CustomNodeContent 渲染自定义节点摘要
     expect(screen.getByTestId('children').textContent).toContain('mymod:crafter');
   });
@@ -121,11 +112,7 @@ describe('SubgraphNode', () => {
       formatVersion: 1,
       customFields: {},
     };
-    render(
-      <SubgraphNode
-        {...({ id: 's3', data, selected: false } as unknown as NodeProps<SubgraphNodeData>)}
-      />,
-    );
+    render(<SubgraphNode {...{ id: 's3', data, selected: false }} />);
     expect(screen.getByTestId('children').textContent).toContain('子图未找到');
   });
 });

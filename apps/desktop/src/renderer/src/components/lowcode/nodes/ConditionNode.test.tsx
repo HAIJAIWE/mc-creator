@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { type ReactElement } from 'react';
 import { ConditionNode } from './ConditionNode.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
@@ -19,7 +19,7 @@ describe('ConditionNode (McNodeShell)', () => {
   it('渲染 McNodeShell + 真/假端口', () => {
     const id = useNodeGraphStore.getState().addNode('condition', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as ConditionNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<ConditionNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<ConditionNode {...props} />);
 

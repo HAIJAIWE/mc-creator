@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ModeSwitcher } from './ModeSwitcher.js';
@@ -108,6 +108,7 @@ describe('ModeSwitcher a11y 键盘导航', () => {
     const container = screen.getByRole('radiogroup');
     const lowcodeBtn = screen.getByRole('radio', { name: /L1 低代码/ });
     const hybridBtn = screen.getByRole('radio', { name: /L2 混合/ });
+    expect(hybridBtn).toBeInTheDocument();
 
     lowcodeBtn.focus();
     expect(lowcodeBtn).toHaveFocus();

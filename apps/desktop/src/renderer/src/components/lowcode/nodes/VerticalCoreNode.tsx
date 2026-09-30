@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
-import type { NodePort, NodeCategory } from '@mc-creator/shared';
+import type { NodePort } from '@mc-creator/shared';
+import { nodeRegistry } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
 import {
@@ -35,7 +36,12 @@ function formatValue(value: unknown, fallback: unknown): string {
 }
 
 function toRow(p: NodePort, data: VerticalCoreNodeData, branch: boolean): BlockRow {
-  return { id: p.id, label: p.label, value: formatValue(data[p.id] ?? p.defaultValue, p.defaultValue), branch };
+  return {
+    id: p.id,
+    label: p.label,
+    value: formatValue(data[p.id] ?? p.defaultValue, p.defaultValue),
+    branch,
+  };
 }
 
 /**
@@ -67,20 +73,6 @@ function useCommitPortValue(nodeId: string) {
   };
 }
 
-interface NodeDefinition {
-  icon: string;
-  label: string;
-  category: NodeCategory;
-  inputs: NodePort[];
-  outputs: NodePort[];
-}
-
-// Placeholder for nodeRegistry lookup (not exported from @mc-creator/shared yet)
-function getNodeDefinition(kind: string): NodeDefinition | undefined {
-  // TODO: Replace with actual nodeRegistry.get(kind) when available
-  return undefined;
-}
-
 type VerticalCoreNodeComponentProps = {
   id: string;
   data: VerticalCoreNodeData;
@@ -100,9 +92,7 @@ function VerticalCoreNodeComponent({ id, data }: VerticalCoreNodeComponentProps)
   const commitPortValue = useCommitPortValue(id);
 
   const nodeData = data as VerticalCoreNodeData;
-  // Note: nodeRegistry is not exported from @mc-creator/shared, using a placeholder
-  // const def = nodeRegistry.get(nodeData.kind);
-  const def = getNodeDefinition(nodeData.kind);
+  const def = nodeRegistry.get(nodeData.kind);
 
   // 有数据边输入的端口：边优先，字面量不生效，只读展示（见 node-renderer literalExpr）
   const connectedInputs = useMemo(() => {
@@ -115,24 +105,26 @@ function VerticalCoreNodeComponent({ id, data }: VerticalCoreNodeComponentProps)
 
   if (!def) {
     return (
-      <div style={{ color: '#d43a3a', fontSize: 12, padding: 8 }}>未知积木类型: {nodeData.kind}</div>
+      <div style={{ color: '#d43a3a', fontSize: 12, padding: 8 }}>
+        未知积木类型: {nodeData.kind}
+      </div>
     );
   }
 
-  // TypeScript type narrowing: after the early return, def is guaranteed to be defined
-  const defDefined = def;
-
-  const voidInputs = defDefined.inputs.filter((p: NodePort) => p.type === 'void');
-  const voidOutputs = defDefined.outputs.filter((p: NodePort) => p.type === 'void');
-  const dataInputs = defDefined.inputs.filter((p: NodePort) => p.type !== 'void');
-  const dataOutputs = defDefined.outputs.filter((p: NodePort) => p.type !== 'void');
+  // if (!def) 早退后，def 收窄为 NodeDefinition
+  const voidInputs = def.inputs.filter((p: NodePort) => p.type === 'void');
+  const voidOutputs = def.outputs.filter((p: NodePort) => p.type === 'void');
+  const dataInputs = def.inputs.filter((p: NodePort) => p.type !== 'void');
+  const dataOutputs = def.outputs.filter((p: NodePort) => p.type !== 'void');
 
   const execPort = voidInputs.find((p: NodePort) => p.id === 'exec') ?? null;
   const tabPort =
-    TAB_PRIORITY.map((wanted) => voidOutputs.find((p: NodePort) => p.id === wanted)).find(Boolean) ?? null;
+    TAB_PRIORITY.map((wanted) => voidOutputs.find((p: NodePort) => p.id === wanted)).find(
+      Boolean,
+    ) ?? null;
 
   const shape: BlockShape =
-    defDefined.category === 'event'
+    def.category === 'event'
       ? 'hat'
       : voidInputs.length + voidOutputs.length === 0
         ? 'reporter'
@@ -161,24 +153,28 @@ function VerticalCoreNodeComponent({ id, data }: VerticalCoreNodeComponentProps)
       }
       return row;
     }),
-    ...voidInputs.filter((p: NodePort) => p !== execPort).map((p: NodePort) => toRow(p, nodeData, false)),
+    ...voidInputs
+      .filter((p: NodePort) => p !== execPort)
+      .map((p: NodePort) => toRow(p, nodeData, false)),
   ];
   const rightRows: BlockRow[] = [
     ...dataOutputs.map((p: NodePort) => toRow(p, nodeData, false)),
-    ...voidOutputs.filter((p: NodePort) => p !== tabPort).map((p: NodePort) => toRow(p, nodeData, true)),
+    ...voidOutputs
+      .filter((p: NodePort) => p !== tabPort)
+      .map((p: NodePort) => toRow(p, nodeData, true)),
   ];
 
   return (
     <VerticalNodeShell
-      icon={defDefined.icon}
-      title={String(nodeData.displayName ?? nodeData.label ?? defDefined.label)}
-      category={defDefined.category as NodeCategory}
+      icon={def.icon}
+      title={String(nodeData.displayName ?? nodeData.label ?? def.label)}
+      category={def.category}
       shape={shape}
       notchId={execPort?.id ?? null}
       tabId={tabPort?.id ?? null}
       leftRows={leftRows}
       rightRows={rightRows}
-      badge={defDefined.category === 'event' ? '事件' : undefined}
+      badge={def.category === 'event' ? '事件' : undefined}
       collapsed={Boolean(nodeData.collapsed)}
       codeLocked={Boolean(nodeData.codeLocked)}
       onToggleCollapse={() => toggleCollapse(id)}

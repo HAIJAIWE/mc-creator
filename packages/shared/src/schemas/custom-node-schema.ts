@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { NodePort, PortType } from './node-graph-spec.js';
+import { NodePort, PortType, NodeCategory } from './node-graph-spec.js';
 
 /**
  * 自定义节点类型 schema（阶段 C）
@@ -100,3 +100,43 @@ export const CustomNodeSchema = z.object({
   templateParts: z.array(CustomNodeTemplatePart).default([]),
 });
 export type CustomNodeSchema = z.infer<typeof CustomNodeSchema>;
+
+// === Built-in node definition registry (for VerticalCoreNode) ===
+
+/** 内置节点定义（用于竖式积木渲染器查找） */
+export interface NodeDefinition {
+  id: string;
+  label: string;
+  category: NodeCategory;
+  icon: string;
+  inputs: NodePort[];
+  outputs: NodePort[];
+}
+
+type NodeRegistryMap = Map<string, NodeDefinition>;
+
+const builtInNodeRegistry = new Map<string, NodeDefinition>();
+
+/** 注册内置节点定义 */
+export function registerNodeDefinition(def: NodeDefinition): void {
+  builtInNodeRegistry.set(def.id, def);
+}
+
+/** 获取内置节点定义 */
+export function getNodeDefinition(id: string): NodeDefinition | undefined {
+  return builtInNodeRegistry.get(id);
+}
+
+/** 内置节点注册表单例（供 VerticalCoreNode 使用） */
+export const nodeRegistry = {
+  get: (id: string) => builtInNodeRegistry.get(id),
+  has: (id: string) => builtInNodeRegistry.has(id),
+  set: (id: string, def: NodeDefinition) => builtInNodeRegistry.set(id, def),
+  entries: () => builtInNodeRegistry.entries(),
+  keys: () => builtInNodeRegistry.keys(),
+  values: () => builtInNodeRegistry.values(),
+  forEach: (callback: (value: NodeDefinition, key: string, map: NodeRegistryMap) => void) =>
+    builtInNodeRegistry.forEach(callback),
+  clear: () => builtInNodeRegistry.clear(),
+  size: builtInNodeRegistry.size,
+};

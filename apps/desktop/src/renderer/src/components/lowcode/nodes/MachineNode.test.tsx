@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { type ReactElement } from 'react';
 import { MachineNode } from './MachineNode.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
@@ -19,7 +19,7 @@ describe('MachineNode (McNodeShell)', () => {
   it('渲染 McNodeShell 头部 + 端口标签', () => {
     const id = useNodeGraphStore.getState().addNode('machine', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as MachineNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<MachineNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<MachineNode {...props} />);
 

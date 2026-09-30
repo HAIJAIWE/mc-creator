@@ -176,12 +176,6 @@ const RECIPE_RUBY_SWORD_JSON = `{
 
 const RECIPE_INVALID_JSON = `{not valid json`;
 
-const _RECIPE_NOT_RECIPE_JSON = `{
-  "type": "minecraft:mob_spawner",
-  "spawnType": "zombie"
-}
-`;
-
 // ============================================================================
 // === extractModId 测试 ===
 // ============================================================================

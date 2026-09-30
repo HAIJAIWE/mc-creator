@@ -312,7 +312,12 @@ const runCommandTool: ToolDefinition = {
     const cwd = args.cwd ? String(args.cwd) : undefined;
     try {
       // 通过已有终端 IPC spawn 一个临时 PTY 执行命令
-      const { pid } = await ipcClient.terminalSpawn({ cols: 120, rows: 24, cwd });
+      const spawnReq: { cols: number; rows: number; cwd?: string; shell?: string } = {
+        cols: 120,
+        rows: 24,
+      };
+      if (cwd) spawnReq.cwd = cwd;
+      const { pid } = await ipcClient.terminalSpawn(spawnReq);
       const mcApi = window.mcApi;
       // L-3 修复：订阅 terminal:data / terminal:exit 收集命令输出，而不是固定等待 5s
       // 预览环境（vite mock）下 onTerminalData 是 no-op，事件永不触发，走超时兜底

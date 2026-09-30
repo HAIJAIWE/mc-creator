@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { type ReactElement } from 'react';
 import { BlockNode } from './BlockNode.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
@@ -19,7 +19,7 @@ describe('BlockNode (McNodeShell)', () => {
   it('渲染 McNodeShell 头部 + 摘要', () => {
     const id = useNodeGraphStore.getState().addNode('block', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as BlockNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<BlockNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<BlockNode {...props} />);
 
@@ -32,7 +32,7 @@ describe('BlockNode (McNodeShell)', () => {
       .getState()
       .addNode('block', { x: 0, y: 0 }, { isBlockEntity: true } as never);
     const data = useNodeGraphStore.getState().graph.nodes[0].data as BlockNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<BlockNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<BlockNode {...props} />);
 

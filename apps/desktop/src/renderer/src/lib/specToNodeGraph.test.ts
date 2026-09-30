@@ -43,9 +43,7 @@ describe('specToNodeGraph（A 桥：spec → 节点图）', () => {
   });
 
   it('itemCategory 非法值归一化为 misc', () => {
-    const { graph } = specToNodeGraph(
-      makeSpec({ items: [{ id: 'x', name: 'X', itemCategory: 'trident' }] }),
-    );
+    specToNodeGraph(makeSpec({ items: [{ id: 'x', name: 'X', itemCategory: 'trident' }] }));
     // Parse 会用 literal 校验——这里绕过 parse 直接对象让 specToNodeGraph 处理
     // 详情见下方 normalize 用例（直接构造不合法的 itemCategory 走 parse 会失败，改用合法值之外的运行时）
   });

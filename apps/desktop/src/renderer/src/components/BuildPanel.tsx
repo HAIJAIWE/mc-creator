@@ -23,6 +23,8 @@ export function BuildPanel() {
     jarPath,
     loading,
     fixLog,
+    buildStats,
+    mcVersion,
     setBuildResult,
     setLoading,
     setError,
@@ -36,6 +38,8 @@ export function BuildPanel() {
       jarPath: s.jarPath,
       loading: s.loading,
       fixLog: s.fixLog,
+      buildStats: s.buildStats,
+      mcVersion: s.mcVersion,
       setBuildResult: s.setBuildResult,
       setLoading: s.setLoading,
       setError: s.setError,
@@ -52,6 +56,13 @@ export function BuildPanel() {
   const [streamJarPath, setStreamJarPath] = useState<string | null>(null);
   const [buildCount, setBuildCount] = useState(0);
   const streamLogRef = useRef('');
+  // Phase 3.2：三态进度（准备→编译→修复建议）+ 尝试次数 + 取消守卫
+  const [phase, setPhase] = useState<'idle' | 'preparing' | 'building'>('idle');
+  const [attempts, setAttempts] = useState<number | null>(null);
+  const [estimatedSteps, setEstimatedSteps] = useState<number | null>(null);
+  const cancelledRef = useRef(false);
+  // Phase 3.2：JDK 预检拦截后的下载链接（与 error 文案配套展示）
+  const [jdkUrl, setJdkUrl] = useState<string | null>(null);
 
   // 部署与运行（离线账号，无需微软 OAuth）
   const [jarAbs, setJarAbs] = useState<string | null>(null);
@@ -71,39 +82,91 @@ export function BuildPanel() {
   const toAbs = (root: string, p: string | null): string | null =>
     !p ? null : p.includes(':') || p.startsWith('/') ? p : `${root}/${p}`;
 
+  // Phase 3.2：JDK 预检（点编译前拦截，不符则给下载链接）
+  const precheckJava = async (): Promise<boolean> => {
+    setJdkUrl(null);
+    try {
+      const pre = await ipcClient.checkJava(mcVersion);
+      if (!pre.ok) {
+        setError(pre.message);
+        setJdkUrl(pre.downloadUrl);
+        return false;
+      }
+      return true;
+    } catch {
+      // 预检通道不可用时不阻塞构建（主进程 BUILD 内仍有兜底校验）
+      return true;
+    }
+  };
+
+  // Phase 3.2：取消构建（kill gradle 子进程，迟到的 invoke 结果丢弃）
+  const cancelBuild = async () => {
+    cancelledRef.current = true;
+    try {
+      await ipcClient.abortBuild();
+    } catch {
+      /* 通道不可用也继续本地复位 */
+    }
+    setLoading(false);
+    setStreamBuilding(false);
+    setPhase('idle');
+    setError('已取消构建（已生成文件保留）');
+  };
+
   const build = async () => {
+    if (!(await precheckJava())) return;
+    cancelledRef.current = false;
     setLoading(true);
+    setPhase('preparing');
+    setAttempts(null);
+    setEstimatedSteps(null);
     setError(null);
+    setJdkUrl(null);
     setFixLog([]);
     setShowFixSuggest(false);
     setFixSuggestion('');
     try {
       // P22-4：先把内存中的 files 写入临时目录，再用该路径构建（避免硬编码 /tmp/mc-mod）
-      const { projectPath } = await ipcClient.prepareBuildDir(files);
+      const filesForPrepare: { path: string; content: string }[] = files.map((f) => ({
+        path: f.path,
+        content: f.content,
+      }));
+      const { projectPath, estimatedSteps: steps } =
+        await ipcClient.prepareBuildDir(filesForPrepare);
+      if (cancelledRef.current) return;
+      setEstimatedSteps(steps ?? null);
+      setPhase('building');
       const res = await ipcClient.buildWithFix(projectPath);
+      if (cancelledRef.current) return;
       setBuildResult({ success: res.success, log: res.log, jarPath: res.jarPath });
       setJarAbs(toAbs(projectPath, res.jarPath));
       setFixLog(res.fixLog ?? []);
+      setAttempts(res.attempts ?? null);
       setBuildCount((c) => c + 1);
     } catch (e) {
-      setError((e as Error).message);
+      if (!cancelledRef.current) setError((e as Error).message);
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
+      setPhase('idle');
     }
   };
 
   const buildStream = async () => {
+    if (!(await precheckJava())) return;
+    cancelledRef.current = false;
     setStreamBuilding(true);
     setStreamSuccess(null);
     setStreamJarPath(null);
     streamLogRef.current = '';
     setStreamLog('');
     setError(null);
+    setJdkUrl(null);
     setBuildCount((c) => c + 1);
 
     let projectPath = '';
 
     const onChunk = (chunk: BuildStreamChunkT) => {
+      if (cancelledRef.current) return;
       streamLogRef.current += chunk.text;
       setStreamLog(streamLogRef.current);
       if (chunk.done) {
@@ -121,11 +184,17 @@ export function BuildPanel() {
 
     try {
       // P22-4：先把内存中的 files 写入临时目录，再启动流式构建
-      const prepared = await ipcClient.prepareBuildDir(files);
+      const filesForPrepare: { path: string; content: string }[] = files.map((f) => ({
+        path: f.path,
+        content: f.content,
+      }));
+      const prepared = await ipcClient.prepareBuildDir(filesForPrepare);
+      if (cancelledRef.current) return;
       projectPath = prepared.projectPath;
       // P22-3：await Promise 以捕获 invoke 失败
       await ipcClient.buildStream(projectPath, onChunk);
     } catch (e) {
+      if (cancelledRef.current) return;
       setStreamBuilding(false);
       setStreamSuccess(false);
       setError((e as Error).message);
@@ -141,7 +210,7 @@ export function BuildPanel() {
     setIsFixSuggesting(true);
 
     // 只取前 5 个主要文件，内容截断到 2000 字符
-    const filesPreview = files.slice(0, 5).map((f) => ({
+    const filesPreview: { path: string; content: string }[] = files.slice(0, 5).map((f) => ({
       path: f.path,
       content: f.content.slice(0, 2000),
     }));
@@ -168,6 +237,10 @@ export function BuildPanel() {
     setStreamSuccess(null);
     setStreamJarPath(null);
     setJarAbs(null);
+    setAttempts(null);
+    setEstimatedSteps(null);
+    setPhase('idle');
+    setJdkUrl(null);
     setMcInfo(null);
     setMcDirOverride(null);
     setDeployMsg(null);
@@ -249,6 +322,12 @@ export function BuildPanel() {
         >
           {streamBuilding ? '流式编译中…' : '流式编译'}
         </button>
+        {/* Phase 3.2：取消按钮（kill gradle 子进程，已生成文件保留） */}
+        {(loading || streamBuilding) && (
+          <button onClick={cancelBuild} className="mc-btn-ghost">
+            取消
+          </button>
+        )}
         {(streamLog || buildLog) && (
           <button onClick={clearStreamLog} className="mc-btn-ghost">
             清空日志
@@ -259,7 +338,35 @@ export function BuildPanel() {
         {fixLog.length > 0 && (
           <span className="text-xs text-mc-text-dim">修复次数：{fixLog.length}</span>
         )}
+        {/* Phase 3.2：编译尝试次数（buildWithFix 最多 3 次） */}
+        {attempts !== null && (
+          <span className="text-xs text-mc-text-dim">编译（{attempts}/3 次）</span>
+        )}
+        {/* Phase 3.2：增量缓存命中显示（主进程 GENERATE_FILES 已透传 buildStats） */}
+        {buildStats && (
+          <span
+            className="text-xs text-mc-text-dim"
+            role="status"
+            aria-label="增量构建缓存命中情况"
+            title={`产物文件 ${buildStats.filesTotal} 个，其中 ${buildStats.filesUnchanged} 个内容未变`}
+          >
+            缓存命中 {buildStats.cached}/{buildStats.total} 类别 · 重编 {buildStats.regenerated}
+          </span>
+        )}
       </div>
+
+      {/* Phase 3.2：三态进度（准备→编译→修复建议） */}
+      {(loading || streamBuilding) && (
+        <div
+          className="mb-2 text-xs text-mc-text-dim"
+          role="status"
+          aria-label={phase === 'preparing' ? '正在准备构建目录' : '正在编译'}
+        >
+          {phase === 'preparing'
+            ? '准备构建目录…'
+            : `编译中…${estimatedSteps !== null ? `（${estimatedSteps} 个文件）` : ''}（AI 修复最多 3 次）`}
+        </div>
+      )}
 
       {/* 一次性构建结果提示 */}
       {buildSuccess === true && <span className="text-sm text-mc-accent">编译成功！</span>}
@@ -305,15 +412,24 @@ export function BuildPanel() {
         </div>
       )}
 
-      {/* AI 修复建议面板 */}
+      {/* AI 修复建议面板（Phase 3.2：默认折叠，不堆日志） */}
       {showFixSuggest && (
-        <div className="mc-card mb-2 mt-2 overflow-hidden border border-mc-gold/30">
-          <div className="flex items-center justify-between border-b border-mc-border bg-mc-gold/10 px-3 py-1.5">
-            <span className="text-xs font-semibold text-mc-gold">AI 修复建议</span>
-            <button onClick={closeFixSuggest} className="text-mc-text-dim hover:text-mc-text">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
+        <details className="mc-card mb-2 mt-2 overflow-hidden border border-mc-gold/30">
+          <summary className="cursor-pointer list-none border-b border-mc-border bg-mc-gold/10 px-3 py-1.5">
+            <span className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-mc-gold">AI 修复建议（点击展开）</span>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  closeFixSuggest();
+                }}
+                className="text-mc-text-dim hover:text-mc-text"
+                aria-label="关闭 AI 修复建议"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          </summary>
           <div className="max-h-60 overflow-auto p-3 text-xs whitespace-pre-wrap text-mc-text">
             {isFixSuggesting && !fixSuggestion && (
               <span className="inline-flex items-center gap-1 text-mc-text-dim">
@@ -341,7 +457,7 @@ export function BuildPanel() {
               </span>
             )}
           </div>
-        </div>
+        </details>
       )}
 
       {/* 部署与运行（离线账号，无需微软登录） */}
@@ -385,6 +501,20 @@ export function BuildPanel() {
       )}
 
       {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
+      {/* Phase 3.2：JDK 预检拦截后的下载链接 */}
+      {jdkUrl && (
+        <div className="mb-2 text-xs">
+          <span className="text-mc-text-dim">JDK 下载：</span>
+          <a
+            href={jdkUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-mc-gold hover:underline"
+          >
+            {jdkUrl}
+          </a>
+        </div>
+      )}
       {fixLog.length > 0 && (
         <div className="mb-2 space-y-1">
           <div className="text-xs font-semibold text-mc-text-dim">修复过程</div>

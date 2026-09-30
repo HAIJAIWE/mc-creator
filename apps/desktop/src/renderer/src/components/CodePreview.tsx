@@ -5,6 +5,7 @@ import { shallow } from 'zustand/shallow';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
+import { withUnimplementedMd } from '../lib/unimplemented-md.js';
 import type { FileNode } from '@mc-creator/shared';
 import type { GeneratorType } from '../../../shared/ipc-channels.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
@@ -81,19 +82,28 @@ function computeDefaultName(generatorType: GeneratorType, spec: unknown): string
 
 export function CodePreview() {
   // P3 性能：shallow 选择器避免 buildLog 流式更新触发重渲染
-  const { files, previousFiles, selectedFile, generatorType, spec, updateFileContent, dirtyFiles } =
-    useModStore(
-      (s) => ({
-        files: s.files,
-        previousFiles: s.previousFiles,
-        selectedFile: s.selectedFile,
-        generatorType: s.generatorType,
-        spec: s.spec,
-        updateFileContent: s.updateFileContent,
-        dirtyFiles: s.dirtyFiles,
-      }),
-      shallow,
-    );
+  const {
+    files,
+    previousFiles,
+    selectedFile,
+    generatorType,
+    spec,
+    updateFileContent,
+    dirtyFiles,
+    unimplemented,
+  } = useModStore(
+    (s) => ({
+      files: s.files,
+      previousFiles: s.previousFiles,
+      selectedFile: s.selectedFile,
+      generatorType: s.generatorType,
+      spec: s.spec,
+      updateFileContent: s.updateFileContent,
+      dirtyFiles: s.dirtyFiles,
+      unimplemented: s.unimplemented,
+    }),
+    shallow,
+  );
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
     null,
@@ -125,7 +135,11 @@ export function CodePreview() {
     setExportMsg(null);
     try {
       const defaultName = computeDefaultName(generatorType, spec);
-      const res = await ipcClient.exportZip({ files, defaultName });
+      // Task 1.1：有未实现条目时附带 UNIMPLEMENTED.md 清单
+      const res = await ipcClient.exportZip({
+        files: withUnimplementedMd(files, unimplemented),
+        defaultName,
+      });
       if (res.ok && res.savedPath) {
         setExportMsg({ type: 'success', text: `已导出到：${res.savedPath}` });
       }

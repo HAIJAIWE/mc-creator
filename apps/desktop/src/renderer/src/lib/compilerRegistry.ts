@@ -1,34 +1,7 @@
-import type {
-  ModNode,
-  ModSpec,
-  ItemSpec,
-  BlockSpec,
-  ModRecipeSpec,
-  ModRecipeInputSpec,
-  EntitySpec,
-  MachineSpec,
-  CustomCodeSnippetSpec,
-  MultiBlockSpec,
-  EventHandlerSpec,
-  ConditionSpec,
-  ActionSpec,
-  ProcedureSpec,
-  ProcedureNodeData,
-  ModBiomeSpec,
-  ModDimensionSpec,
-  FluidSpec,
-  GuiSpec,
-  GuiSlotSpec,
-} from '@mc-creator/shared';
 import { compileVariable } from './compileVariable.js';
 import { compileCustomNode } from './compileCustomNode.js';
 import { compileLoop } from './compileLoop.js';
-import {
-  registerCompiler,
-  type CompileContext,
-  type CompilerOutput,
-} from './nodeCompilerRegistry.js';
-import { getOutgoingEdges, findTargetNode } from './compileNodeGraph.js';
+import { registerCompiler } from './nodeCompilerRegistry.js';
 import {
   compileItemNode,
   compileBlockNode,
@@ -159,7 +132,7 @@ registerCompiler({
 // 编译时查找 customNodeRegistry 中的 schema，验证并转换为 customCode snippet
 registerCompiler({
   kind: 'subgraph',
-  compile: async (node, ctx) => {
+  compile: async (node, _ctx) => {
     if (node.data.kind !== 'subgraph') return {};
     if (!node.data.customTypeId) return {};
     const result = await compileCustomNode(node.data, node.data.customFields ?? {});

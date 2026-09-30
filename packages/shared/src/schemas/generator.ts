@@ -30,13 +30,31 @@ export const GeneratorContext = z.object({
   loaderVersions: z.custom<LoaderVersionConfig>().optional(),
 });
 
+/** 未实现条目（显性化占位：替代静默 `// TODO`，见 docs/unsupported.md） */
+export const UnimplementedItem = z.object({
+  /** 条目类别：condition | action | event */
+  kind: z.enum(['condition', 'action', 'event']),
+  /** 类型名（如 health_below / summon_lightning / custom） */
+  type: z.string(),
+  /** 关联 id（conditionId / actionId / handlerId，无关联时为空） */
+  id: z.string().default(''),
+  /** 未实现原因（UNSUPPORTED_REASONS 表中的固定文案，禁止自由文本） */
+  reason: z.string(),
+});
+
 /** 生成结果 */
 export const GenerationResult = z.object({
   files: z.array(FileNode),
   warnings: z.array(z.string()).default([]),
   buildCmd: z.string().default('./gradlew build'),
+  /**
+   * 未实现清单（可选，向后兼容：老调用方不传即视为空）。
+   * 凡产物 Java 中含 `MC-Creator: unsupported(...)` 注释，必在此登记对应条目。
+   */
+  unimplemented: z.array(UnimplementedItem).optional(),
 });
 
 export type FileNode = z.infer<typeof FileNode>;
 export type GeneratorContext = z.infer<typeof GeneratorContext>;
 export type GenerationResult = z.infer<typeof GenerationResult>;
+export type UnimplementedItem = z.infer<typeof UnimplementedItem>;

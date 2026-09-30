@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { type ReactElement } from 'react';
 import { CommentNode } from './CommentNode.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
@@ -19,7 +19,7 @@ describe('CommentNode (McNodeShell)', () => {
   it('渲染 McNodeShell + 备注文本', () => {
     const id = useNodeGraphStore.getState().addNode('comment', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as CommentNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<CommentNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<CommentNode {...props} />);
 

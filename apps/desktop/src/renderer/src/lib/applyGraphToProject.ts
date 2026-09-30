@@ -1,5 +1,4 @@
 import type { NodeGraph, ModSpec, FileNode } from '@mc-creator/shared';
-import { compileNodeGraph } from './compileNodeGraph.js';
 import { compileGraph } from './incrementalCompiler.js';
 import { generateFilesForType } from './generate-files.js';
 

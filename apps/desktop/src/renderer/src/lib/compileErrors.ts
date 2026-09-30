@@ -35,15 +35,17 @@ export interface CompileError {
   /** 人类可读消息 */
   message: string;
   /** 关联节点 ID（可选，用于定位高亮） */
-  nodeId?: string;
+  nodeId?: string | undefined;
   /** 关联边 ID（可选） */
-  edgeId?: string;
+  edgeId?: string | undefined;
   /** 代码位置（行/列/片段，用于代码节点） */
-  location?: { line?: number; column?: number; snippet?: string };
+  location?:
+    | { line?: number | undefined; column?: number | undefined; snippet?: string | undefined }
+    | undefined;
   /** 建议修复动作（可选） */
-  suggestion?: string;
+  suggestion?: string | undefined;
   /** 原始错误（如 JSON 解析异常） */
-  cause?: Error;
+  cause?: Error | undefined;
   /** 错误分类 */
   category: CompileErrorCategory;
   /** 时间戳 */
@@ -107,11 +109,13 @@ export function createCompileError(
   code: CompileErrorCode,
   message: string,
   options: {
-    nodeId?: string;
-    edgeId?: string;
-    location?: { line?: number; column?: number; snippet?: string };
-    suggestion?: string;
-    cause?: Error;
+    nodeId?: string | undefined;
+    edgeId?: string | undefined;
+    location?:
+      | { line?: number | undefined; column?: number | undefined; snippet?: string | undefined }
+      | undefined;
+    suggestion?: string | undefined;
+    cause?: Error | undefined;
   } = {},
 ): CompileError {
   const category = code.split('_')[0] as CompileErrorCategory;

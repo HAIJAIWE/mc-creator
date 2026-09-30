@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { type ReactElement } from 'react';
 import { ItemNode } from './ItemNode.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
@@ -19,7 +19,7 @@ describe('ItemNode (McNodeShell)', () => {
   it('渲染 McNodeShell 头部 + 摘要', () => {
     const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as ItemNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<ItemNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<ItemNode {...props} />);
 
@@ -31,7 +31,7 @@ describe('ItemNode (McNodeShell)', () => {
   it('显示物品 ID 摘要', () => {
     const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as ItemNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<ItemNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<ItemNode {...props} />);
 

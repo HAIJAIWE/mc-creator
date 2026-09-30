@@ -213,7 +213,7 @@ describe('isValidConnection', () => {
   it('source 为 null 拒绝', () => {
     const graph = makeGraph([makeNode('n1', [makePort('out', 'item_stack', 'out')])]);
     const conn: Connection = {
-      source: null,
+      source: null as unknown as string,
       target: 'n1',
       sourceHandle: 'out',
       targetHandle: 'in',
@@ -225,7 +225,7 @@ describe('isValidConnection', () => {
     const graph = makeGraph([makeNode('n1', [makePort('out', 'item_stack', 'out')])]);
     const conn: Connection = {
       source: 'n1',
-      target: null,
+      target: null as unknown as string,
       sourceHandle: 'out',
       targetHandle: 'in',
     };

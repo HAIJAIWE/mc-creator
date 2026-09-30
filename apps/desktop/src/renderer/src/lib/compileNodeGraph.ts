@@ -22,24 +22,12 @@ import type {
   GuiSpec,
   GuiSlotSpec,
 } from '@mc-creator/shared';
-import { compileVariable } from './compileVariable.js';
 import { inlineSubgraphNodes } from './compileSubgraph.js';
 import { subgraphManager } from '../components/lowcode/subgraph/subgraphManager.js';
-import {
-  registerCompiler,
-  compileAll,
-  type CompileContext,
-  type CompilerOutput,
-} from './nodeCompilerRegistry.js';
+import { compileAll, type CompileContext } from './nodeCompilerRegistry.js';
 import { compileLoopBody, compileLoopSubgraphSpecsAll } from './loopCompiler.js';
 import './compilerRegistry.js'; // 触发内置编译器注册副作用
-import {
-  createCompileError,
-  CompileErrors,
-  CompileError,
-  CompileErrorCode,
-  toErrorString,
-} from './compileErrors.js';
+import { createCompileError, CompileError, CompileErrorCode } from './compileErrors.js';
 
 /**
  * 节点图编译器
@@ -65,16 +53,16 @@ import {
 export interface CompileLocation {
   nodeId: string;
   /** 代码节点的行号（0-based） */
-  line?: number;
+  line?: number | undefined;
   /** 代码节点的列号（0-based） */
-  column?: number;
+  column?: number | undefined;
   /** 错误/警告所在的代码片段（用于高亮显示） */
-  snippet?: string;
+  snippet?: string | undefined;
 }
 
 export interface CompileMessage {
   message: string;
-  location?: CompileLocation;
+  location?: CompileLocation | undefined;
 }
 
 export interface CompileResult {
@@ -106,12 +94,12 @@ export async function compileNodeGraph(graph: NodeGraph): Promise<CompileResult>
   // Helper to add warning with nodeId (updates both old and new formats)
   const addWarning = (
     message: string,
-    nodeId?: string,
-    line?: number,
-    column?: number,
-    snippet?: string,
-    code?: string,
-    suggestion?: string,
+    nodeId?: string | undefined,
+    line?: number | undefined,
+    column?: number | undefined,
+    snippet?: string | undefined,
+    code?: CompileErrorCode | undefined,
+    suggestion?: string | undefined,
   ) => {
     warnings.push(message);
     warningsWithLocation.push({
@@ -120,7 +108,7 @@ export async function compileNodeGraph(graph: NodeGraph): Promise<CompileResult>
     });
     if (code) {
       structuredWarnings.push(
-        createCompileError(code as any, message, {
+        createCompileError(code, message, {
           nodeId,
           location: { line, column, snippet },
           suggestion,
@@ -130,12 +118,12 @@ export async function compileNodeGraph(graph: NodeGraph): Promise<CompileResult>
   };
   const addError = (
     message: string,
-    nodeId?: string,
-    line?: number,
-    column?: number,
-    snippet?: string,
-    code?: string,
-    suggestion?: string,
+    nodeId?: string | undefined,
+    line?: number | undefined,
+    column?: number | undefined,
+    snippet?: string | undefined,
+    code?: CompileErrorCode | undefined,
+    suggestion?: string | undefined,
   ) => {
     errors.push(message);
     errorsWithLocation.push({
@@ -144,7 +132,7 @@ export async function compileNodeGraph(graph: NodeGraph): Promise<CompileResult>
     });
     if (code) {
       structuredErrors.push(
-        createCompileError(code as any, message, {
+        createCompileError(code, message, {
           nodeId,
           location: { line, column, snippet },
           suggestion,
@@ -462,7 +450,7 @@ export async function compileNodeGraph(graph: NodeGraph): Promise<CompileResult>
     // GUI 界面（由 gui 节点编译）
     guis,
     // Mod 侧结构（当前无结构节点，恒为空数组；为 ModSpec 兼容保留）
-    structures: [],
+    structures,
     eventHandlers,
     conditions,
     actions,

@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { type ReactElement } from 'react';
-import { ReactFlowProvider, type NodeProps } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import type { ItemNodeData, RecipeNodeData, ConditionNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -23,7 +23,7 @@ describe('节点迁移集成测试', () => {
   it('点击节点设置按钮打开抽屉', () => {
     const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as ItemNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<ItemNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<ItemNode {...props} />);
 
@@ -35,7 +35,7 @@ describe('节点迁移集成测试', () => {
   it('点击折叠按钮切换 collapsed', () => {
     const id = useNodeGraphStore.getState().addNode('recipe', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as RecipeNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<RecipeNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<RecipeNode {...props} />);
 
@@ -46,7 +46,7 @@ describe('节点迁移集成测试', () => {
   it('condition 节点显示 true/false 端口', () => {
     const id = useNodeGraphStore.getState().addNode('condition', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as ConditionNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<ConditionNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<ConditionNode {...props} />);
 
@@ -58,7 +58,7 @@ describe('节点迁移集成测试', () => {
     const id = useNodeGraphStore.getState().addNode('recipe', { x: 0, y: 0 });
     useNodeGraphStore.getState().toggleCollapse(id);
     const data = useNodeGraphStore.getState().graph.nodes[0].data as RecipeNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<RecipeNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<RecipeNode {...props} />);
 

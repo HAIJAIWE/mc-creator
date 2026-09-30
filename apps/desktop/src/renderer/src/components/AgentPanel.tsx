@@ -45,6 +45,8 @@ export function AgentPanel() {
     spec,
     setSpec,
     setFiles,
+    setUnimplemented,
+    setBuildStats,
     setLoading,
     setError,
     loading,
@@ -59,6 +61,8 @@ export function AgentPanel() {
       spec: s.spec,
       setSpec: s.setSpec,
       setFiles: s.setFiles,
+      setUnimplemented: s.setUnimplemented,
+      setBuildStats: s.setBuildStats,
       setLoading: s.setLoading,
       setError: s.setError,
       loading: s.loading,
@@ -108,7 +112,7 @@ export function AgentPanel() {
       let res;
       try {
         res = await ipcClient.generateSpec(description, generatorType);
-      } catch (firstErr) {
+      } catch {
         await new Promise((r) => setTimeout(r, 800));
         res = await ipcClient.generateSpec(description, generatorType);
       }
@@ -146,6 +150,9 @@ export function AgentPanel() {
       });
       setFiles(res.files);
       setWarnings(res.warnings ?? []);
+      setUnimplemented(res.unimplemented ?? []);
+      // Phase 3.2：缓存命中展示（主进程 GENERATE_FILES 已透传 buildStats）
+      setBuildStats(res.buildStats ?? null);
     } catch (e) {
       setError((e as Error).message);
     } finally {

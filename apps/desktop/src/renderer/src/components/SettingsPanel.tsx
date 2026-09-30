@@ -24,7 +24,7 @@ import {
   type ColorMode,
 } from '../lib/themes.js';
 import type { ModelProfile } from '../../../shared/ipc-channels.js';
-import { getLocale, setLocale, getAvailableLocales, getLocaleDisplayName } from '../i18n.js';
+import { getLocale, setLocale, getAvailableLocales, getLocaleDisplayName } from '../i18n';
 import { useTranslation } from '../hooks/useTranslation.js';
 
 interface SettingsPanelProps {
@@ -190,7 +190,7 @@ export function SettingsPanel({
   useEffect(() => {
     if (activeMode !== 'system' || typeof window === 'undefined' || !window.matchMedia) return;
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
+    const handler = (_e?: MediaQueryListEvent) => {
       const newEffective = getSystemMode();
       setEffectiveMode(newEffective);
       setActiveTheme(getCurrentThemeId(newEffective));

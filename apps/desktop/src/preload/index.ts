@@ -35,6 +35,8 @@ import {
   AI_FIX_SUGGEST_CHUNK,
   BUILD_STREAM,
   BUILD_STREAM_CHUNK,
+  BUILD_ABORT,
+  BUILD_CHECK_JAVA,
   LIST_PROJECTS,
   GET_PROJECT,
   SAVE_PROJECT,
@@ -161,6 +163,9 @@ const api = {
     });
   },
   buildWithFix: (projectPath: string) => ipcRenderer.invoke(BUILD_WITH_FIX, { projectPath }),
+  // Phase 3.2：取消构建（kill 流式构建子进程）+ JDK 预检
+  abortBuild: () => ipcRenderer.invoke(BUILD_ABORT),
+  checkJava: (mcVersion?: string) => ipcRenderer.invoke(BUILD_CHECK_JAVA, { mcVersion }),
   buildStream: (projectPath: string, onChunk: (chunk: BuildStreamChunkT) => void) => {
     const handler = (_e: unknown, data: BuildStreamChunkT) => {
       onChunk(data);

@@ -173,6 +173,21 @@ export const GenerateFilesResponse = z.object({
       filesUnchanged: z.number(),
     })
     .optional(),
+  /**
+   * 未实现清单（Task 1.1，可选）。
+   * 仅 Mod 生成器在产物含 `MC-Creator: unsupported(...)` 占位时返回；
+   * UI 用其渲染黄色横幅 + 导出 UNIMPLEMENTED.md。
+   */
+  unimplemented: z
+    .array(
+      z.object({
+        kind: z.enum(['condition', 'action', 'event']),
+        type: z.string(),
+        id: z.string().default(''),
+        reason: z.string(),
+      }),
+    )
+    .optional(),
 });
 
 export const BuildRequest = z.object({
@@ -198,6 +213,27 @@ export const BuildStreamChunk = z.object({
 });
 export type BuildStreamReq = z.infer<typeof BuildStreamRequest>;
 export type BuildStreamChunkT = z.infer<typeof BuildStreamChunk>;
+
+// === 构建取消（Phase 3.2）：kill 流式构建子进程并保留已生成文件（占位实现：仅 kill 主进程直接 spawn 的 gradle 子进程） ===
+export const BUILD_ABORT = 'mod:buildAbort';
+export const BuildAbortResponse = z.object({
+  ok: z.boolean(),
+  killed: z.number().default(0),
+});
+export type BuildAbortRes = z.infer<typeof BuildAbortResponse>;
+
+// === JDK 预检（Phase 3.2）：点“编译”前校验本机 JDK 是否满足目标 MC 版本，不符则前端拦截 ===
+export const BUILD_CHECK_JAVA = 'mod:checkJava';
+export const BuildCheckJavaRequest = z.object({ mcVersion: z.string().optional() });
+export const BuildCheckJavaResponse = z.object({
+  java: z.number().nullable(),
+  need: z.number(),
+  ok: z.boolean(),
+  message: z.string(),
+  downloadUrl: z.string(),
+});
+export type BuildCheckJavaReq = z.infer<typeof BuildCheckJavaRequest>;
+export type BuildCheckJavaRes = z.infer<typeof BuildCheckJavaResponse>;
 
 export type GenerateSpecReq = z.infer<typeof GenerateSpecRequest>;
 export type GenerateSpecRes = z.infer<typeof GenerateSpecResponse>;
@@ -411,6 +447,8 @@ export const PrepareBuildDirRequest = z.object({
 });
 export const PrepareBuildDirResponse = z.object({
   projectPath: z.string(),
+  /** 预估构建步骤数（Phase 3.2：写入文件数，供前端三态进度“准备→编译”展示） */
+  estimatedSteps: z.number().default(0),
 });
 
 export type PrepareBuildDirReq = z.infer<typeof PrepareBuildDirRequest>;

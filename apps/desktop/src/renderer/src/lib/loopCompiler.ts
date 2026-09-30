@@ -1,14 +1,6 @@
-import type {
-  NodeGraph,
-  ModNode,
-  ModEdge,
-  ConditionSpec,
-  ProcedureSpec,
-  ProcedureNodeData,
-} from '@mc-creator/shared';
+import type { NodeGraph, ModNode, ConditionSpec, ProcedureSpec } from '@mc-creator/shared';
 import { compileConditionNode, compileProcedureNode } from './compileNodeGraph.js';
 import { subgraphManager } from '../components/lowcode/subgraph/subgraphManager.js';
-import { getOutgoingEdges, findTargetNode } from './compileNodeGraph.js';
 
 /**
  * 编译循环节点的循环体：从 bodySubgraphId 引用的子图中提取代码节点/动作节点的代码，
@@ -21,7 +13,7 @@ import { getOutgoingEdges, findTargetNode } from './compileNodeGraph.js';
 export function compileLoopBody(
   graph: NodeGraph,
   bodySubgraphId?: string,
-  warnings?: string[],
+  _warnings?: string[],
 ): string {
   if (!bodySubgraphId) return '// no body';
   const sg = subgraphManager.get(bodySubgraphId) ?? graph.subgraphs[bodySubgraphId];

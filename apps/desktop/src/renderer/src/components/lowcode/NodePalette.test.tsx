@@ -25,7 +25,8 @@ describe('NodePalette 阶段 C', () => {
     render(<NodePalette />);
     expect(screen.getByText('变量')).toBeTruthy();
     expect(screen.getByText('子图')).toBeTruthy();
-    expect(screen.getByText('循环')).toBeTruthy();
+    // 「循环」存在同名条目（loop 基础节点 + while_loop 条件循环），用 getAllByText 断言存在即可
+    expect(screen.getAllByText('循环').length).toBeGreaterThanOrEqual(1);
   });
 
   it('渲染「导入自定义节点」按钮', () => {

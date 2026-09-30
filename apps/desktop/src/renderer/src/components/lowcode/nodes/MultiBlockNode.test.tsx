@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { type ReactElement } from 'react';
 import { MultiBlockNode } from './MultiBlockNode.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
@@ -19,7 +19,7 @@ describe('MultiBlockNode (McNodeShell)', () => {
   it('渲染 McNodeShell 头部 + 端口', () => {
     const id = useNodeGraphStore.getState().addNode('multiblock', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as MultiBlockNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<MultiBlockNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<MultiBlockNode {...props} />);
 

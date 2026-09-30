@@ -138,12 +138,18 @@ export function useLiveRegion(options?: UseLiveRegionOptions): UseLiveRegionResu
   const LiveRegionComponent = useMemo<FC<{ id?: string; className?: string }>>(
     () =>
       function HookedLiveRegion({ id, className }) {
-        return createElement(LiveRegion, {
+        const props: {
+          message: string;
+          politeness: 'polite' | 'assertive';
+          id?: string;
+          className?: string;
+        } = {
           message,
           politeness,
-          id,
-          className,
-        });
+        };
+        if (id !== undefined) props.id = id;
+        if (className !== undefined) props.className = className;
+        return createElement(LiveRegion, props);
       },
     // message 是 React state，每次变化都会重新渲染 LiveRegion（这正是我们想要的）
 

@@ -65,79 +65,7 @@ function makeContext(spec: any): GeneratorContext {
  * 场景 1：全类型节点图编译 + Java 生成
  */
 describe('场景 1：全类型节点图编译 + Java 生成', () => {
-  let compileResult: Awaited<ReturnType<typeof compileNodeGraph>>;
-  let files: FileNode[];
-
   beforeAll(async () => {
-    const nodes = [
-      makeNode('n_item_copper', 'item', { itemId: 'copper_ingot', displayName: '铜锭' }),
-      makeNode('n_item_bronze', 'item', { itemId: 'bronze_ingot', displayName: '青铜锭' }),
-      makeNode('n_block', 'block', { blockId: 'bronze_block', displayName: '青铜块' }),
-      makeNode('n_recipe', 'recipe', {
-        recipeId: 'bronze_recipe',
-        recipeType: 'crafting_shapeless',
-        outputCount: 1,
-      }),
-      makeNode('n_entity', 'entity', {
-        entityId: 'fire_elemental',
-        displayName: '火元素',
-        classification: 'monster',
-        modelType: 'zombie',
-      }),
-      makeNode('n_machine', 'machine', {
-        machineId: 'ore_crusher',
-        displayName: '矿石粉碎机',
-      }),
-      makeNode('n_code', 'code', {
-        language: 'java',
-        code: 'return input + 1;',
-        inputSignature: '{"input": "integer"}',
-        outputSignature: '{"result": "integer"}',
-        methodName: 'process',
-      }),
-      makeNode('n_multiblock', 'multiblock', {
-        structureId: 'crusher_structure',
-        displayName: '粉碎机结构',
-        width: 3,
-        height: 3,
-        depth: 3,
-        hollow: true,
-        controllerOffset: { x: 1, y: 1, z: 1 },
-      }),
-      makeNode('n_event', 'event', { eventType: 'player_right_click_block' }),
-      makeNode('n_condition', 'condition', {
-        conditionType: 'has_item',
-        conditionArgs: '{"item": "minecraft:stick"}',
-        invert: false,
-      }),
-      makeNode('n_action', 'action', {
-        actionType: 'spawn_entity',
-        actionArgs: '{"entity": "minecraft:zombie"}',
-      }),
-    ];
-
-    const edges = [
-      makeEdge('e_in', 'n_item_copper', 'n_recipe', {
-        sourceHandle: 'out',
-        targetHandle: 'in',
-        kind: 'craft',
-      }),
-      makeEdge('e_out', 'n_recipe', 'n_item_bronze', {
-        sourceHandle: 'out',
-        kind: 'craft',
-      }),
-      makeEdge('e_evt_cond', 'n_event', 'n_condition', {
-        sourceHandle: 'trigger',
-        targetHandle: 'in',
-        kind: 'control',
-      }),
-      makeEdge('e_cond_act', 'n_condition', 'n_action', {
-        sourceHandle: 'true',
-        targetHandle: 'in',
-        kind: 'control',
-      }),
-    ];
-
     const graph = makeGraph(
       [
         makeNode('n_item_copper', 'item', { itemId: 'copper_ingot', displayName: '铜锭' }),
@@ -489,25 +417,6 @@ describe('场景 4：子图嵌套 + 条件反转验证', () => {
     ];
 
     // 2. 封装为子图
-    const sgNodes = [
-      makeNode('sg1', 'subgraph', {
-        subgraphId: 'sg_inner',
-        subgraphName: '内层',
-        customTypeId: null,
-        kind: 'subgraph',
-      }),
-    ];
-    const sgEdges = [];
-    const innerGraph = {
-      version: 1,
-      modId: 'test',
-      viewport: { x: 0, y: 0, zoom: 1 },
-      nodes: innerNodes,
-      edges: [],
-      subgraphs: {
-        sg_inner: { id: 'sg_inner', name: '内层', nodes: innerNodes, edges: [], portMappings: [] },
-      },
-    };
 
     // 3. 外层图：事件 -> 条件(invert=true) -> 动作
     const outerNodes = [
@@ -524,10 +433,6 @@ describe('场景 4：子图嵌套 + 条件反转验证', () => {
         customTypeId: null,
         kind: 'subgraph',
       }),
-    ];
-    const outerEdges = [
-      makeEdge('ec1', 'e1', 'c1', { sourceHandle: 'trigger', targetHandle: 'in', kind: 'control' }),
-      makeEdge('ca1', 'c1', 'a1', { sourceHandle: 'true', targetHandle: 'in', kind: 'control' }),
     ];
 
     // 合并图（手动组装完整图）

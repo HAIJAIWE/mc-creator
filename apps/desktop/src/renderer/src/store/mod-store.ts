@@ -23,6 +23,18 @@ interface ModState {
   files: FileNode[];
   previousFiles: FileNode[];
   selectedFile: string | null;
+  /** 未实现清单（Task 1.1：产物含 MC-Creator unsupported 占位时由 generate 写入，预览横幅+导出清单消费） */
+  unimplemented: Array<{ kind: string; type: string; id: string; reason: string }>;
+  setUnimplemented: (u: Array<{ kind: string; type: string; id: string; reason: string }>) => void;
+  /** 增量构建缓存统计（Phase 3.2：GENERATE_FILES 透传 buildStats，前端展示命中情况） */
+  buildStats: {
+    total: number;
+    cached: number;
+    regenerated: number;
+    filesTotal: number;
+    filesUnchanged: number;
+  } | null;
+  setBuildStats: (s: ModState['buildStats']) => void;
   // 已打开的标签页路径列表（有序，去重）
   openTabs: string[];
   // 分栏编辑：右侧面板选中的文件路径（null 表示未分栏）
@@ -79,6 +91,10 @@ export const useModStore = createWithEqualityFn<ModState>()(
       files: [],
       previousFiles: [],
       selectedFile: null,
+      unimplemented: [],
+      setUnimplemented: (u) => set({ unimplemented: u }),
+      buildStats: null,
+      setBuildStats: (s) => set({ buildStats: s }),
       openTabs: [],
       splitFile: null,
       dirtyFiles: new Set<string>(),
@@ -104,6 +120,8 @@ export const useModStore = createWithEqualityFn<ModState>()(
             files: [],
             previousFiles: [],
             selectedFile: null,
+            unimplemented: [],
+            buildStats: null,
             openTabs: [],
             splitFile: null,
             dirtyFiles: new Set<string>(),

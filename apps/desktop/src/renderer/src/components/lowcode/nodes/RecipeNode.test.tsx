@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { type ReactElement } from 'react';
 import { RecipeNode } from './RecipeNode.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
@@ -19,7 +19,7 @@ describe('RecipeNode (McNodeShell)', () => {
   it('渲染 McNodeShell 头部 + 摘要 + 端口标签', () => {
     const id = useNodeGraphStore.getState().addNode('recipe', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as RecipeNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<RecipeNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<RecipeNode {...props} />);
 

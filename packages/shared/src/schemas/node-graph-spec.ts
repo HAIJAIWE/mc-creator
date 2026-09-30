@@ -11,6 +11,11 @@ import { z } from 'zod';
  * 节点图最终编译为 ModSpec（已有 schema），由 mod-generator 生成 Java 文件。
  */
 
+// === 节点分类（用于 UI 配色） ===
+
+export const NodeCategory = z.enum(['event', 'getter', 'condition', 'action', 'flow', 'variable']);
+export type NodeCategory = z.infer<typeof NodeCategory>;
+
 // === 节点类型 ===
 
 export const NodeKind = z.enum([

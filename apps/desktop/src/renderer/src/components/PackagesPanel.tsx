@@ -198,7 +198,12 @@ export function PackagesPanel() {
 
   // ===== 依赖树 =====
   const depTree = useMemo(() => {
-    type TreeNode = { id: string; version?: string; children: TreeNode[]; dep?: DepLite };
+    type TreeNode = {
+      id: string;
+      version?: string | undefined;
+      children: TreeNode[];
+      dep?: DepLite | undefined;
+    };
     const root: TreeNode = { id: 'root', children: [] };
 
     // 顶层依赖
@@ -476,9 +481,14 @@ function DepTreeNode({
 }: {
   node: {
     id: string;
-    version?: string;
-    children: { id: string; version?: string; children: unknown[]; dep?: DepLite }[];
-    dep?: DepLite;
+    version?: string | undefined;
+    children: {
+      id: string;
+      version?: string | undefined;
+      children: unknown[];
+      dep?: DepLite | undefined;
+    }[];
+    dep?: DepLite | undefined;
   };
   depth: number;
 }) {

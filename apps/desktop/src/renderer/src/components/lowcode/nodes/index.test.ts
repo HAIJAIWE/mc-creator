@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nodeTypes, NODE_METADATA, NODE_CATEGORIES } from './index.js';
+import { nodeTypes, NODE_METADATA } from './index.js';
 
 describe('nodes/index（阶段 C 注册）', () => {
   it('nodeTypes 含 variable/subgraph/loop', () => {

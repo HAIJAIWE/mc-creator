@@ -140,8 +140,8 @@ export function TerminalPanel() {
       divRef.style.height = '100%';
       term.open(divRef);
 
-      // xterm 输入 → PTY（保存 disposer 供后续清理）
-      const _disposer = term.onData((data) => {
+      // xterm 输入 → PTY
+      term.onData((data) => {
         ipcClient.terminalWrite(res.pid, data).catch(() => {});
       });
 

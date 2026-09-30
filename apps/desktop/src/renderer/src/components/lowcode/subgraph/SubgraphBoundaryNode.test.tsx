@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps } from '@xyflow/react';
+import { type NodeProps, type Node } from '@xyflow/react';
 import { type ReactNode } from 'react';
-import { SubgraphBoundaryNode, type SubgraphBoundaryNodeData } from './SubgraphBoundaryNode.js';
+import { SubgraphBoundaryNode } from './SubgraphBoundaryNode.js';
 
 vi.mock('../nodes/base/McNodeShell.js', () => ({
   McNodeShell: ({
@@ -53,7 +53,7 @@ describe('SubgraphBoundaryNode', () => {
             formatVersion: 1,
           },
           selected: false,
-        } as unknown as NodeProps<SubgraphBoundaryNodeData>)}
+        } as unknown as NodeProps<Node<Record<string, unknown>, string | undefined>>)}
       />,
     );
     expect(screen.getByTestId('badge').textContent).toBe('in');
@@ -81,7 +81,7 @@ describe('SubgraphBoundaryNode', () => {
             formatVersion: 1,
           },
           selected: false,
-        } as unknown as NodeProps<SubgraphBoundaryNodeData>)}
+        } as unknown as NodeProps<Node<Record<string, unknown>, string | undefined>>)}
       />,
     );
     expect(screen.getByTestId('badge').textContent).toBe('out');

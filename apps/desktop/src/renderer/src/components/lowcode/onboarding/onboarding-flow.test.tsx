@@ -45,7 +45,7 @@ describe('新手引导全流程集成（Plan B Task 12）', () => {
 
   it('跳过引导后浮层消失', () => {
     const onSkip = vi.fn();
-    const { container } = render(<OnboardingTour step={0} onNext={() => {}} onSkip={onSkip} />);
+    render(<OnboardingTour step={0} onNext={() => {}} onSkip={onSkip} />);
     fireEvent.click(screen.getByText('跳过'));
     expect(onSkip).toHaveBeenCalledOnce();
   });

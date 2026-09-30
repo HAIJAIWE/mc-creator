@@ -12,6 +12,7 @@ import type {
   GeneratorType,
   Project,
   BuildStreamChunkT,
+  BuildCheckJavaRes,
   ModrinthSearchRes,
   ModrinthVersionsRes,
   CurseForgeSearchRes,
@@ -293,7 +294,11 @@ export const ipcClient = {
         spec: req.spec as never,
         projectPath: '',
       } as never);
-      return { files: result.files, warnings: result.warnings };
+      return {
+        files: result.files,
+        warnings: result.warnings,
+        unimplemented: result.unimplemented ?? [],
+      };
     }
     return window.mcApi.generateFiles(req);
   },
@@ -340,6 +345,9 @@ export const ipcClient = {
   ) => window.mcApi.fixSuggest(buildLog, files, onChunk),
   buildWithFix: (projectPath: string): Promise<BuildWithFixRes> =>
     window.mcApi.buildWithFix(projectPath),
+  // Phase 3.2：取消构建 + JDK 预检
+  abortBuild: (): Promise<{ ok: boolean; killed: number }> => window.mcApi.abortBuild(),
+  checkJava: (mcVersion?: string): Promise<BuildCheckJavaRes> => window.mcApi.checkJava(mcVersion),
   buildStream: (projectPath: string, onChunk: (chunk: BuildStreamChunkT) => void) =>
     window.mcApi.buildStream(projectPath, onChunk),
   exportZip: (req: {

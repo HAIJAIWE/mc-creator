@@ -215,7 +215,7 @@ interface ColorFieldProps {
   fieldKey: string;
   value: string;
   onChange: (v: unknown) => void;
-  onRemove?: () => void;
+  onRemove?: (() => void) | undefined;
 }
 
 function ColorField({ fieldKey, value, onChange, onRemove }: ColorFieldProps) {
@@ -246,7 +246,7 @@ interface ObjectFieldProps {
   value: Record<string, unknown>;
   depth: number;
   onChange: (v: unknown) => void;
-  onRemove?: () => void;
+  onRemove?: (() => void) | undefined;
 }
 
 function ObjectField({ fieldKey, value, depth, onChange, onRemove }: ObjectFieldProps) {
@@ -295,7 +295,7 @@ interface ArrayFieldProps {
   value: unknown[];
   depth: number;
   onChange: (v: unknown) => void;
-  onRemove?: () => void;
+  onRemove?: (() => void) | undefined;
 }
 
 function ArrayField({ fieldKey, value, depth, onChange, onRemove }: ArrayFieldProps) {

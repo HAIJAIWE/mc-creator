@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { type NodeProps, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { type ReactElement } from 'react';
 import { EntityNode } from './EntityNode.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
@@ -19,7 +19,7 @@ describe('EntityNode (McNodeShell)', () => {
   it('渲染 McNodeShell 头部 + 摘要', () => {
     const id = useNodeGraphStore.getState().addNode('entity', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as EntityNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<EntityNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<EntityNode {...props} />);
 
@@ -30,7 +30,7 @@ describe('EntityNode (McNodeShell)', () => {
   it('显示血量摘要', () => {
     const id = useNodeGraphStore.getState().addNode('entity', { x: 0, y: 0 });
     const data = useNodeGraphStore.getState().graph.nodes[0].data as EntityNodeData;
-    const props = { id, data, selected: false } as unknown as NodeProps<EntityNodeData>;
+    const props = { id, data, selected: false };
 
     renderWithProvider(<EntityNode {...props} />);
 
