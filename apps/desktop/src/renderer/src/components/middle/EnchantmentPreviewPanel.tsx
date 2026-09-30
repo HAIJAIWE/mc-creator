@@ -199,10 +199,7 @@ export function EnchantmentPreviewPanel() {
   }, [ench]);
 
   // ===== ID 重复检测 =====
-  const { totalConflicts, conflictList } = useConflictDetection(
-    ench,
-    ENCHANT_CONFLICT_GROUPS,
-  );
+  const { totalConflicts, conflictList } = useConflictDetection(ench, ENCHANT_CONFLICT_GROUPS);
 
   // ===== 附魔筛选 =====
   const filteredEnchantments = useMemo(() => {

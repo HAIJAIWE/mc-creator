@@ -23,20 +23,22 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 | **KubeJS 脚本**  | KubeJS mod 脚本包（配方 / 标签 / 事件 / 工具提示 / 注册）              | `pack.mcmeta` + `kubejs/server_scripts/` + `startup_scripts/` + `client_scripts/` + `lang/`                                    |
 | **CraftTweaker** | ZenScript 脚本包（配方 / 标签 / 事件 / 工具提示）                      | `pack.mcmeta` + `scripts/*.zs` + `lang/`                                                                                       |
 | **行为包**       | 基岩版 Behavior Pack（实体 / 配方 / 战利品表）                         | `manifest.json` + `entities/` + `recipes/` + `loot_tables/`                                                                    |
-| **附魔**         | 1.21+ 数据驱动附魔（武器 / 工具 / 盔甲等 12 个预置模板）               | `data/<ns>/enchantment/<id>.json` + `tags/` + `lang/`                                                                          |
+| **附魔**         | 1.21+ 数据驱动附魔（武器 / 工具 / 盔甲等 3 个预置模板）                | `data/<ns>/enchantment/<id>.json` + `tags/` + `lang/`                                                                          |
 | **行为物品**     | 基岩版自定义物品（物品定义 + 自动纹理）                                | `items/<id>.json`（minecraft:item）+ 纹理资源 + `lang/`                                                                        |
 | **行为实体**     | 基岩版自定义实体（怪物 AI 目标 / 内置几何 / 自动纹理 / 生成蛋）        | BP `entities/<id>.behavior.json` + RP `client_entity/` + `spawn_egg` + 纹理                                                    |
 
 ### 低代码节点编辑器
 
-内置 **Coze 风格的可视化节点图编辑器**，采用纯 MC 视觉美学（3D 凸起边框、像素字体、石头纹理、内嵌端口），支持 **15 种节点类型**：
+内置 **Coze 风格的可视化节点图编辑器**，采用纯 MC 视觉美学（3D 凸起边框、像素字体、石头纹理、内嵌端口），支持 **19 种节点类型**：
 
 | 分类     | 节点类型                                              | 说明                                                |
 | -------- | ----------------------------------------------------- | --------------------------------------------------- |
 | 内容节点 | item / block / entity / recipe / machine / multiblock | MC 内容定义                                         |
 | 逻辑节点 | event / condition / action                            | 事件驱动控制流                                      |
 | 代码节点 | code / comment / **procedure**                        | 自定义 Java 代码 / 备注 / 过程封装（PureCode 模式） |
-| 高级节点 | **variable** / **subgraph** / **loop** / **custom**   | 变量 / 子图封装 / 循环 / 自定义节点                 |
+| 高级节点 | **variable** / **subgraph** / **loop**                | 变量 / 子图封装 / 循环 / 自定义节点                 |
+| 世界生成 | **biome** / **dimension** / **fluid**                 | 生物群系 / 维度 / 流体                              |
+| 界面节点 | **gui**                                               | GUI 界面                                            |
 
 **高级功能：**
 
@@ -57,9 +59,9 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 
 - **Agent 双模式**：AgentPanel 支持 agent / chat 双模式 —— agent 模式走「描述 → Spec → 代码」生成链路，chat 模式与模型自由对话；内置 Spec 历史回滚 / 模板 / 多模型对比
 - **Spec-first 工作流**：自然语言描述 → AI 生成结构化 Spec → 用户审阅 → 生成代码 → 编译
-- **低代码节点图**：可视化拖拽编辑 → 编译为 ModSpec → 生成 Java 代码（支持 15 种节点 + 子图内联 + 自定义节点模板 + 过程封装/PureCode 模式）
+- **低代码节点图**：可视化拖拽编辑 → 编译为 ModSpec → 生成 Java 代码（支持 19 种节点 + 子图内联 + 自定义节点模板 + 过程封装/PureCode 模式）
 - **Spec 编辑器**：生成 Spec 后可直接在 Monaco 编辑器中修改 JSON 再生成代码
-- **Spec 模板库**：13 种生成器类型共 56 个预置模板（TemplatePicker UI），点击即预填描述
+- **Spec 模板库**：13 种生成器类型共 45 个预置模板（TemplatePicker UI），点击即预填描述
 - **Loader Adapter 抽象**：同一 ModSpec 按 Fabric / NeoForge / Quilt / Legacy Fabric 产出不同源码
 - **AI prompt 按类型优化**：每种生成器有独立的 schema 约束提示，提升 Spec 质量
 - **AI 模型接入**：基于 Vercel AI SDK，兼容 OpenAI 接口（云端 / 本地模型均可）
@@ -77,7 +79,7 @@ AI 驱动的 Minecraft 内容创作桌面客户端。让 AI 帮你生成 Mod 代
 
 | 层             | 技术                                                               |
 | -------------- | ------------------------------------------------------------------ |
-| 桌面框架       | Electron 31 + electron-vite 2.3                                    |
+| 桌面框架       | Electron 44 + electron-vite 2.3                                    |
 | 前端           | React 18 + TypeScript 5 + Tailwind CSS 3                           |
 | 节点图编辑器   | React Flow 11                                                      |
 | 状态管理       | Zustand 4                                                          |
@@ -103,7 +105,7 @@ mc-creator/
 │       │   ├── renderer/         # 渲染进程（React UI）
 │       │   │   └── src/
 │       │   │       ├── components/   # AgentPanel / TemplatePicker / SpecFormEditor / PreviewPanel 系列 / BuildPanel / SettingsPanel
-│       │   │       │   ├── lowcode/  # 低代码节点图编辑器（15 节点 + 子图 + 自定义节点 + 编译器）
+│       │   │       │   ├── lowcode/  # 低代码节点图编辑器（19 节点 + 子图 + 自定义节点 + 编译器）
 │       │   │       │   └── middle/   # 各生成器类型预览面板（13 种类型全齐）
 │       │   │       ├── store/        # Zustand stores（mod-store / node-graph-store / drawer-store / debugger-store）
 │       │   │       └── lib/          # compileNodeGraph + 4 编译器 + ipc-client + monaco-theme
@@ -128,7 +130,7 @@ mc-creator/
 │   ├── shared/                   # 共享 schema 与类型
 │   │   └── src/
 │   │       ├── schemas/          # mod-spec / datapack-spec / modpack-spec / server-spec / resource-pack-spec / skin-spec / launcher-spec / kubejs-spec / crafttweaker-spec / behavior-pack-spec / enchantment-spec / behavior-item-spec / behavior-entity-spec / node-graph-spec
-│   │       ├── templates/        # 13 种生成器类型的 Spec 模板库（56 个模板，TEMPLATES_BY_TYPE）
+│   │       ├── templates/        # 13 种生成器类型的 Spec 模板库（45 个模板，TEMPLATES_BY_TYPE）
 │   │       ├── presets/          # 数据包内容模板（矿石 / 食物 / 维度 / 附魔 / 效果 / 结构 / 生物群系）
 │   │       └── types/            # Loader / McVersion
 │   └── core/                     # 核心引擎（独立 TS 库）
@@ -253,7 +255,7 @@ pnpm --filter @mc-creator/desktop build
 ### 3. 选择 Loader 和 MC 版本
 
 - **Loader**：Fabric / NeoForge / Quilt / Legacy Fabric / Vanilla（Mod 类型必选；脚本 / 皮肤 / 行为包等不依赖 loader 但仍需选）
-- **MC 版本**：1.21.11（默认）/ 1.20.1 / 1.20.4 / 1.20.6 / 1.21.1 / 1.21.5 / 26.1 / 26.2
+- **MC 版本**：8 MC 版本（1.21.11 默认 / 1.20.1 / 1.20.4 / 1.20.6 / 1.21.1 / 1.21.5 / 26.1 / 26.2）
 
 ### 4. 生成流程
 
@@ -411,15 +413,15 @@ runGradleBuild
 
 ## 测试覆盖
 
-当前共 **2115 个测试通过**（本地实测 `pnpm -r test`，另有 17 个跳过）：
+当前共 **176 个测试文件、约 2000+ 个测试用例**（本地实测 `pnpm -r test`，数字由 `node scripts/check-docs.mjs` 自动核验）：
 
-| 包                    | 测试文件 | 测试用例        |
-| --------------------- | -------- | --------------- |
-| `@mc-creator/shared`  | 9        | 82              |
-| `@mc-creator/core`    | 36       | 581（+17 跳过） |
-| `@mc-creator/desktop` | 125      | 1452            |
+| 包                    | 测试文件 | 测试用例                     |
+| --------------------- | -------- | ---------------------------- |
+| `@mc-creator/shared`  | 9        | schemas / templates 单元测试 |
+| `@mc-creator/core`    | 38       | 生成器 / 构建器单元测试      |
+| `@mc-creator/desktop` | 129      | 渲染进程 / 主进程单元测试    |
 
-低代码模块测试覆盖：432 个测试（55 个文件），覆盖全部 15 种节点组件、4 个编译器、子图系统、自定义节点系统、过程节点 / PureCode 模式。
+低代码模块测试覆盖：约 830+ 个测试（84 个文件），覆盖全部 19 种节点组件、编译器注册表、子图系统、自定义节点系统、过程节点 / PureCode 模式。
 
 ## 路线图
 
@@ -471,7 +473,7 @@ runGradleBuild
 - ✅ P40：低代码增强（ProcedureNode 过程封装 + PureCode 模式切换 + codeLock 代码锁定 + 条件代码生成）
 - ✅ P41：核心增强（BuildCache 构建缓存 + recipe-adapter 配方适配 + 增量生成测试 + 数据包模板库扩展）
 - ✅ P42：文档同步（README 与实际代码状态对齐，10 种生成器 / 15 种节点 / 实测测试数）
-- ✅ P43：多版本扩展（MC 版本 4→8：新增 1.20.1 / 1.20.4 / 1.20.6 / 1.21.5 / 26.1 / 26.2；资源包 pack_format 自动映射 + 警告；Mod 构建脚本按版本分支适配 Fabric Loom 混淆/非混淆 + NeoForge MDG 1.0/2.0 DSL；各版本 Gradle wrapper 版本映射；8 版本 × 4 Loader 生成矩阵测试）
+- ✅ P43：多版本扩展（MC 版本 4→8：新增 1.20.1 / 1.20.4 / 1.20.6 / 1.21.5 / 26.1 / 26.2；资源包 pack_format 自动映射 + 警告；Mod 构建脚本按版本分支适配 Fabric Loom 混淆/非混淆 + NeoForge MDG 1.0/2.0 DSL；各版本 Gradle wrapper 版本映射；8 版本 × 6 Loader 生成矩阵测试）
 - ✅ P44：编译器架构重构（`loopCompiler.ts` 循环编译分离 + `compilerRegistry.ts` 17 编译器注册表分离，主文件 -973 行）
 - ✅ P45：IndexedDB 编译缓存持久化（`compileCache.ts` 浏览器/Node 同构，`incrementalCompiler.ts` 异步入口自动读写，24h TTL + 50 条上限）
 - ✅ P46：结构化错误码体系（`compileErrors.ts` `CompileErrorCode` 常量 + `CompileError` 接口 + 工厂函数 `CompileErrors.*`，验证层全接入）
@@ -483,6 +485,60 @@ runGradleBuild
 
 - 多 Mod 项目管理增强（依赖图 / 版本对比）
 - 协作编辑（多端同步 Spec / 评论）
+
+## 下载与安装
+
+> 当前处于 **Alpha 阶段**，功能快速迭代中，可能存在 Bug。欢迎试用并反馈。
+
+### 预构建版本
+
+- **GitHub Releases**：[最新版本下载](https://github.com/HAIJAIWE/mc-creator/releases)
+  - Windows：`MC Creator-<version>-win.zip`（解压即用，含 `MC Creator.exe`）
+  - Linux：`MC Creator-<version>-linux.AppImage` 或 `linux-unpacked/`
+  - macOS：暂未提供（本地构建见下文）
+
+### 本地构建
+
+```bash
+# 前置：Node.js ≥ 18、pnpm ≥ 9
+git clone https://github.com/HAIJAIWE/mc-creator.git
+cd mc-creator
+pnpm install
+pnpm --filter @mc-creator/desktop package
+# 产物在 apps/desktop/release/
+```
+
+> 国内网络下载 Electron 二进制可能失败，可设置镜像：
+>
+> ```bash
+> set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
+> pnpm install
+> ```
+
+### 依赖下载机制（Task 1.3）
+
+MC Creator 的 Mod 构建需要特定版本的 Loader/Loom/Gradle。为避免将大二进制文件（.jar/.zip）提交到仓库，项目采用**按需下载 + 缓存**机制：
+
+- **缓存位置**：`~/.cache/mc-creator/` (Linux/macOS) 或 `%USERPROFILE%\.cache\mc-creator\` (Windows)
+- **下载脚本**：`node scripts/fetch-mc-deps.mjs` — 按 `LOADER_VERSIONS` 映射表自动下载对应版本的 Fabric/NeoForge/Quilt Loader、Loom 插件、Gradle Wrapper
+- **镜像支持**：设置环境变量 `MC_CREATOR_MIRROR` 可覆盖下载源（如国内镜像加速）
+- **CI 缓存**：GitHub Actions 使用 `actions/cache` 缓存 `~/.cache/mc-creator`，缓存键基于 `LOADER_VERSIONS` 内容哈希，版本变更自动失效
+
+手动触发下载（可选）：
+
+```bash
+# 下载所有版本依赖
+node scripts/fetch-mc-deps.mjs
+
+# 或仅下载特定版本
+node scripts/fetch-mc-deps.mjs 1.21.11 fabric
+```
+
+## 反馈与贡献
+
+- **Bug 报告 / 功能建议**：[GitHub Issues](https://github.com/HAIJAIWE/mc-creator/issues/new/choose)
+- **使用交流**：欢迎提交 PR 或在 Issues 讨论
+- **贡献指南**：见 [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 许可证
 

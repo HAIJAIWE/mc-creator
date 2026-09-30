@@ -366,8 +366,8 @@ describe('FabricAdapter P1-4 增量构建（translateWithCache）', () => {
     const baseSpec = makeSpec();
     const cache = new BuildCache();
 
-    // 首次构建
-    const first = adapter.translateWithCache(makeCtx(baseSpec), cache);
+    // 首次构建（只为预热缓存，结果无需断言）
+    adapter.translateWithCache(makeCtx(baseSpec), cache);
 
     // 修改一个不影响的字段（比如 description，只影响 fabricModJson）
     const modifiedSpec = makeSpec({ description: 'changed description' });

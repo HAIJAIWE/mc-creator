@@ -23,7 +23,9 @@ type CodeNodeComponentProps = {
 function CodeNodeComponent({ id, data, selected }: CodeNodeComponentProps) {
   const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
   const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n: { id: string; ports: unknown[] }) => n.id === id)?.ports ?? []);
+  const ports = useNodeGraphStore(
+    (s) => s.graph.nodes.find((n: { id: string; ports: unknown[] }) => n.id === id)?.ports ?? [],
+  );
   const debugState = useDebugState(id);
 
   const languageLabel =

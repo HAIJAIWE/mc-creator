@@ -37,7 +37,9 @@ const ACTION_TYPE_LABELS: Record<ActionNodeData['actionType'], string> = {
 function ActionNodeComponent({ id, data, selected }: ActionNodeComponentProps) {
   const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
   const openDrawer = useDrawerStore((s) => s.openDrawer);
-  const ports = useNodeGraphStore((s) => s.graph.nodes.find((n: { id: string; ports: unknown[] }) => n.id === id)?.ports ?? []);
+  const ports = useNodeGraphStore(
+    (s) => s.graph.nodes.find((n: { id: string; ports: unknown[] }) => n.id === id)?.ports ?? [],
+  );
   const debugState = useDebugState(id);
 
   const actionType = data.actionType;

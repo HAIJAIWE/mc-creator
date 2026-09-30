@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { CommandPalette, type Command, MC_COMMAND_TEMPLATES } from './CommandPalette.js';
+import { CommandPalette, type Command } from './CommandPalette.js';
+import { MC_COMMAND_TEMPLATES } from './CommandPalette.utils.js';
 
 // jsdom 未实现 Element.prototype.scrollIntoView，CommandPalette 内部使用它
 beforeEach(() => {

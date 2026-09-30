@@ -33,8 +33,8 @@ export class VercelAiProvider implements ModelProvider {
     const { text } = await generateText({
       model: this.openai(this.id),
       prompt,
-      system: opts?.system,
-      maxTokens: opts?.maxTokens,
+      ...(opts?.system !== undefined ? { system: opts.system } : {}),
+      ...(opts?.maxTokens !== undefined ? { maxTokens: opts.maxTokens } : {}),
     });
     return text;
   }
@@ -43,8 +43,8 @@ export class VercelAiProvider implements ModelProvider {
     const result = streamText({
       model: this.openai(this.id),
       prompt,
-      system: opts?.system,
-      maxTokens: opts?.maxTokens,
+      ...(opts?.system !== undefined ? { system: opts.system } : {}),
+      ...(opts?.maxTokens !== undefined ? { maxTokens: opts.maxTokens } : {}),
     });
     for await (const chunk of (await result).textStream) {
       yield { delta: chunk, done: false };

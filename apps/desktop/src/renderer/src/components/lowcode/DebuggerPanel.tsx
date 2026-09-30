@@ -119,8 +119,7 @@ export function DebuggerPanel({ graph: graphProp, onHighlightNode }: DebuggerPan
 
   // 日志区域自动滚动到底部
   const logRef = useRef<HTMLDivElement>(null);
-  const logs = state?.logs ?? [];
-  const recentLogs = useMemo(() => logs.slice(-MAX_LOG_DISPLAY), [logs]);
+  const recentLogs = useMemo(() => (state?.logs ?? []).slice(-MAX_LOG_DISPLAY), [state?.logs]);
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;

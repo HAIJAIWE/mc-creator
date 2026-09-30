@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { CiCdPanel, suggestJavaVersion } from './CiCdPanel.js';
+import { CiCdPanel } from './CiCdPanel.js';
+import { suggestJavaVersion } from './CiCdPanel.utils.js';
 import { useModStore } from '../store/mod-store.js';
 
 vi.mock('../lib/ipc-client.js', () => ({

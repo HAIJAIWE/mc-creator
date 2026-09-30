@@ -424,7 +424,7 @@ export function CraftTweakerPreviewPanel() {
       setSpec(updated as unknown as typeof spec);
       recipeSelection.clear();
     },
-    [ct, setSpec],
+    [ct, setSpec, recipeSelection],
   );
 
   // ===== Tab 配置（预计算 count）=====

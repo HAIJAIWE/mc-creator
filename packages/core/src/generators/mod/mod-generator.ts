@@ -9,6 +9,11 @@ import { LegacyFabricAdapter } from './legacy-fabric-adapter.js';
 import { NeoForgeAdapter } from './neoforge-adapter.js';
 import { QuiltAdapter } from './quilt-adapter.js';
 import { BuildCache, type IncrementalResult } from '../../builder/BuildCache.js';
+import {
+  collectUnimplemented,
+  unimplementedWarning,
+  type UnsupportedSpecLike,
+} from './unsupported.js';
 
 /**
  * 增量生成结果（P1-4）：在 GenerationResult 基础上增加构建统计与缓存快照。
@@ -40,7 +45,16 @@ export class ModGenerator implements Generator {
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     const { files, warnings } = this.translate(ctx);
-    return { files, warnings, buildCmd: './gradlew build' };
+    const unimplemented = collectUnimplemented(
+      ctx.spec as unknown as UnsupportedSpecLike,
+      ctx.loader,
+    );
+    return {
+      files,
+      warnings: [...warnings, ...unimplemented.map(unimplementedWarning)],
+      buildCmd: './gradlew build',
+      unimplemented,
+    };
   }
 
   /** 翻译并收集警告（generate 与 generateWithCache 共用单一返回路径） */
@@ -136,10 +150,15 @@ export class ModGenerator implements Generator {
     // adapter 支持增量 → 类别级增量；否则全量生成
     if (adapter.translateWithCache) {
       const result = adapter.translateWithCache(ctx, cache);
+      const unimplemented = collectUnimplemented(
+        ctx.spec as unknown as UnsupportedSpecLike,
+        ctx.loader,
+      );
       return {
         files: result.files,
-        warnings: this.validateSpec(ctx),
+        warnings: [...this.validateSpec(ctx), ...unimplemented.map(unimplementedWarning)],
         buildCmd: './gradlew build',
+        unimplemented,
         stats: result.stats,
         cacheSnapshot: result.cacheSnapshot,
       };
@@ -147,10 +166,15 @@ export class ModGenerator implements Generator {
 
     // 回退：全量生成，stats 标记全量重新生成
     const files = adapter.translate(ctx);
+    const unimplemented = collectUnimplemented(
+      ctx.spec as unknown as UnsupportedSpecLike,
+      ctx.loader,
+    );
     return {
       files,
-      warnings: this.validateSpec(ctx),
+      warnings: [...this.validateSpec(ctx), ...unimplemented.map(unimplementedWarning)],
       buildCmd: './gradlew build',
+      unimplemented,
       stats: {
         total: 0,
         cached: 0,

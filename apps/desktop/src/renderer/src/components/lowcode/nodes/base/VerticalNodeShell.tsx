@@ -38,7 +38,7 @@ export interface RowEditSpec {
 }
 
 /** 分类配色（Blockly 式高饱和色块） */
-export const BLOCK_COLORS: Record<NodeCategory, { bg: string; dark: string }> = {
+const BLOCK_COLORS: Record<NodeCategory, { bg: string; dark: string }> = {
   event: { bg: '#d43a3a', dark: '#9c2222' },
   getter: { bg: '#1d9db5', dark: '#126b7c' },
   condition: { bg: '#7c5cd6', dark: '#573da3' },

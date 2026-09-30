@@ -190,7 +190,8 @@ function actionStatements(action: ActionLike): string | null {
 
 /**
  * 生成 check_<id> 方法体。
- * 返回 null 表示该类型未实现（调用方回退到占位 TODO 注释）。
+ * 返回 null 表示该类型未实现（调用方用 formatUnsupportedComment 生成显性占位，
+ * 并由 collectUnimplemented 登记条目，见 unsupported.ts）。
  */
 export function conditionCheckBody(cond: ConditionLike): string | null {
   return conditionExpr(cond);
@@ -198,7 +199,8 @@ export function conditionCheckBody(cond: ConditionLike): string | null {
 
 /**
  * 生成 execute_<id> 方法体。
- * 返回 null 表示该类型未实现（调用方回退到占位 TODO 注释）。
+ * 返回 null 表示该类型未实现（调用方用 formatUnsupportedComment 生成显性占位，
+ * 并由 collectUnimplemented 登记条目，见 unsupported.ts）。
  */
 export function actionExecuteBody(action: ActionLike): string | null {
   return actionStatements(action);

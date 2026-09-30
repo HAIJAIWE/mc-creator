@@ -286,10 +286,7 @@ export function ResourcePackPreviewPanel() {
   }, [pack]);
 
   // ===== ID 重复检测 =====
-  const { totalConflicts, conflictList } = useConflictDetection(
-    pack,
-    RP_CONFLICT_GROUPS,
-  );
+  const { totalConflicts, conflictList } = useConflictDetection(pack, RP_CONFLICT_GROUPS);
 
   // ===== 元数据行（供 MetadataView 使用）=====
   const metadataRows = useMemo(

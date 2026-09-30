@@ -346,10 +346,7 @@ export function ModPreviewPanel() {
   }, [mod]);
 
   // ===== 冲突检测：id 重复 =====
-  const { totalConflicts, conflictList } = useConflictDetection(
-    mod,
-    MOD_CONFLICT_GROUPS,
-  );
+  const { totalConflicts, conflictList } = useConflictDetection(mod, MOD_CONFLICT_GROUPS);
 
   // ===== 物品筛选 =====
   const filteredItems = useMemo(() => {
@@ -424,7 +421,7 @@ export function ModPreviewPanel() {
       setSpec(updated as unknown as typeof spec);
       itemSelection.clear();
     },
-    [mod, setSpec],
+    [mod, setSpec, itemSelection],
   );
 
   const removeBlocks = useCallback(
@@ -435,7 +432,7 @@ export function ModPreviewPanel() {
       setSpec(updated as unknown as typeof spec);
       blockSelection.clear();
     },
-    [mod, setSpec],
+    [mod, setSpec, blockSelection],
   );
 
   // ===== Tab 配置（预计算 count）=====

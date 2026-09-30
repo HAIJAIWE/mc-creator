@@ -14,6 +14,7 @@
 import type { FileNode } from '@mc-creator/shared';
 import { javaEscape, packagePath } from './templates.js';
 import { mojangConditionCheckBody, mojangActionExecuteBody } from './mojang-event-logic.js';
+import { formatUnsupportedComment } from './unsupported.js';
 import {
   defaultValueFor,
   javaTypeForMojang,
@@ -1053,7 +1054,7 @@ ${body}
       const methodName = `check_${sanitizeIdent(c.conditionId)}`;
       const body =
         mojangConditionCheckBody(c) ??
-        `        // TODO: 实现 ${c.conditionType} 检查逻辑
+        `        ${formatUnsupportedComment('condition', c.conditionType, 'UNKNOWN_CONDITION')}
         return true;`;
       return `    // 条件: ${c.conditionId} (invert: ${c.invert})
     // conditionType: ${c.conditionType}
@@ -1067,7 +1068,9 @@ ${body}
   const actionMethods = actions
     .map((a) => {
       const methodName = `execute_${sanitizeIdent(a.actionId)}`;
-      const body = mojangActionExecuteBody(a) ?? `        // TODO: 实现 ${a.actionType} 执行逻辑`;
+      const body =
+        mojangActionExecuteBody(a) ??
+        `        ${formatUnsupportedComment('action', a.actionType, 'UNKNOWN_ACTION')}`;
       return `    // 动作: ${a.actionId}
     // actionType: ${a.actionType}
     // args: ${JSON.stringify(a.args)}

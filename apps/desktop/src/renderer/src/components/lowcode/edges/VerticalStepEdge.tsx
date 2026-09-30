@@ -1,4 +1,15 @@
-import { type EdgeProps, MarkerType } from '@xyflow/react';
+import { type EdgeProps } from '@xyflow/react';
+
+const DEFAULT_ARROW_COLOR = '#6b7280';
+
+/** 从 EdgeMarker/string 解析箭头颜色（字符串 url 形式沿用默认色） */
+function resolveArrowColor(markerEnd: EdgeProps['markerEnd']): string {
+  if (markerEnd !== null && typeof markerEnd === 'object') {
+    const color = (markerEnd as { color?: unknown }).color;
+    if (typeof color === 'string') return color;
+  }
+  return DEFAULT_ARROW_COLOR;
+}
 
 /**
  * 垂直折线边：正交布局（工业风），仅在垂直方向折线。
@@ -6,6 +17,7 @@ import { type EdgeProps, MarkerType } from '@xyflow/react';
  */
 export function VerticalStepEdge(props: EdgeProps) {
   const {
+    id,
     sourceX,
     sourceY,
     targetX,
@@ -27,8 +39,25 @@ export function VerticalStepEdge(props: EdgeProps) {
     targetPosition,
   );
 
+  // SVG marker 需经 <defs> 定义再以 url 引用；id 按边唯一，避免多边复用冲突
+  const arrowColor = resolveArrowColor(markerEnd);
+  const arrowId = `mc-vertical-step-arrow-${id}`;
+
   return (
     <>
+      <defs>
+        <marker
+          id={arrowId}
+          markerWidth="8"
+          markerHeight="8"
+          refX="7"
+          refY="4"
+          orient="auto"
+          markerUnits="strokeWidth"
+        >
+          <path d="M 0 0 L 8 4 L 0 8 z" fill={arrowColor} />
+        </marker>
+      </defs>
       <path
         {...rest}
         d={path}
@@ -39,7 +68,7 @@ export function VerticalStepEdge(props: EdgeProps) {
           pointerEvents: 'stroke',
           ...style,
         }}
-        markerEnd={markerEnd ?? { type: MarkerType.ArrowClosed, color: '#6b7280' } as any}
+        markerEnd={`url(#${arrowId})`}
       />
     </>
   );

@@ -90,7 +90,7 @@ export function generateRecipeJson(spec: ModSpecLike, recipe: RecipeSpec) {
  * Generate recipe JSON files (datapack format)
  * Generate data/${modId}/recipes/${recipeId}.json files for Fabric/NeoForge datapack loading
  */
-export function fabricModRecipeJson(spec: ModSpecLike, pkg: string) {
+export function fabricModRecipeJson(spec: ModSpecLike, _pkg: string) {
   return (spec.recipes ?? []).map((recipe) => {
     const recipeJson = generateRecipeJson(spec, recipe);
     return {

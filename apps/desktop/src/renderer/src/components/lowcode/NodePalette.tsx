@@ -284,7 +284,8 @@ const PaletteItem = memo(function PaletteItem({
   onDragStart,
   onClick,
 }: PaletteItemProps) {
-  const colorClass = COLOR_TEXT_CLASSES[meta.color as keyof typeof COLOR_TEXT_CLASSES] ?? COLOR_TEXT_CLASSES.gray;
+  const colorClass =
+    COLOR_TEXT_CLASSES[meta.color as keyof typeof COLOR_TEXT_CLASSES] ?? COLOR_TEXT_CLASSES.gray;
   const kind = meta.kind as NodeKind;
   return (
     <button

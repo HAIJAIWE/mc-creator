@@ -124,7 +124,7 @@ export function ModpackPreviewPanel() {
       setSpec(updated as unknown as typeof spec);
       selection.clear();
     },
-    [pack, setSpec],
+    [pack, setSpec, selection],
   );
 
   // ===== 覆盖文件操作 =====

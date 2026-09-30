@@ -3,6 +3,7 @@ import { McIcon } from '../assets/mc-ui/McIcon';
 import { Copy, CheckCircle2, Save, Loader2, AlertTriangle } from 'lucide-react';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
+import { suggestJavaVersion } from './CiCdPanel.utils.js';
 
 type CiPlatform = 'github' | 'gitlab' | 'jenkins';
 
@@ -11,18 +12,6 @@ const PLATFORMS: { id: CiPlatform; label: string; icon: string }[] = [
   { id: 'gitlab', label: 'GitLab CI', icon: 'box' },
   { id: 'jenkins', label: 'Jenkins', icon: 'terminal' },
 ];
-
-/** 根据 MC 版本推导建议的 Java 版本（≤1.16.5→8，1.17-1.20.4→17，1.20.5+→21） */
-export function suggestJavaVersion(mcVersion: string): number {
-  const match = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(mcVersion);
-  if (!match) return 21;
-  const major = Number(match[1]);
-  const minor = Number(match[2]);
-  const patch = Number(match[3] ?? 0);
-  if (major < 1 || (major === 1 && minor < 17)) return 8;
-  if (major === 1 && minor >= 17 && (minor < 20 || (minor === 20 && patch <= 4))) return 17;
-  return 21;
-}
 
 /** 生成 GitHub Actions 工作流 YAML */
 function generateGithubWorkflow(opts: {

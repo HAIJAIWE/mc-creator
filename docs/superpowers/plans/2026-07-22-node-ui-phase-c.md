@@ -1778,7 +1778,7 @@ Expected: FAIL — 文件不存在
 
 ```tsx
 import { memo } from 'react';
-import type { NodeProps } from 'reactflow';
+import type { NodeProps } from '@xyflow/react';
 import type { VariableNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
@@ -1909,7 +1909,7 @@ Expected: FAIL — 文件不存在
 
 ```tsx
 import { memo } from 'react';
-import type { NodeProps } from 'reactflow';
+import type { NodeProps } from '@xyflow/react';
 import type { SubgraphNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { CustomNodeContent } from './CustomNode.js';
@@ -2076,7 +2076,7 @@ Expected: FAIL — 文件不存在
 
 ```tsx
 import { memo } from 'react';
-import type { NodeProps } from 'reactflow';
+import type { NodeProps } from '@xyflow/react';
 import type { LoopNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
@@ -2336,7 +2336,7 @@ Expected: FAIL — 文件不存在
 
 ```tsx
 import { memo } from 'react';
-import type { NodeProps } from 'reactflow';
+import type { NodeProps } from '@xyflow/react';
 import type { CommentNodeData, NodePort, PortType } from '@mc-creator/shared';
 import { McNodeShell } from '../nodes/base/McNodeShell.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
@@ -2464,8 +2464,8 @@ Expected: FAIL — 文件不存在
 
 ```tsx
 import { useCallback, useMemo } from 'react';
-import ReactFlow, { Background, BackgroundVariant, Controls, MiniMap, type Node, type Edge } from 'reactflow';
-import 'reactflow/dist/style.css';
+import { ReactFlow, Background, BackgroundVariant, Controls, MiniMap, type Node, type Edge } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import type { SubgraphDefinition, ModNode, ModEdge } from '@mc-creator/shared';
 import { SubgraphBoundaryNode } from './SubgraphBoundaryNode.js';
 

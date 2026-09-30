@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { ShortcutHelpDialog, SHORTCUTS } from './ShortcutHelpDialog.js';
+import { ShortcutHelpDialog } from './ShortcutHelpDialog.js';
+import { SHORTCUTS } from './ShortcutHelpDialog.utils.js';
 
 afterEach(cleanup);
 

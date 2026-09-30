@@ -218,12 +218,12 @@ function actionStatements(action: MojangActionLike): string | null {
   }
 }
 
-/** 生成 check_<id> 方法体（Mojang 版）。null 表示未实现，调用方回退占位 TODO。 */
+/** 生成 check_<id> 方法体（Mojang 版）。null 表示未实现，调用方用 formatUnsupportedComment 生成显性占位。 */
 export function mojangConditionCheckBody(cond: MojangConditionLike): string | null {
   return conditionExpr(cond);
 }
 
-/** 生成 execute_<id> 方法体（Mojang 版）。null 表示未实现，调用方回退占位 TODO。 */
+/** 生成 execute_<id> 方法体（Mojang 版）。null 表示未实现，调用方用 formatUnsupportedComment 生成显性占位。 */
 export function mojangActionExecuteBody(action: MojangActionLike): string | null {
   return actionStatements(action);
 }

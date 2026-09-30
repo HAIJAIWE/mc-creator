@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ErrorRecovery, getErrorSuggestion, getFixLabel } from './ErrorRecovery.js';
+import { ErrorRecovery } from './ErrorRecovery.js';
+import { getErrorSuggestion, getFixLabel } from './ErrorRecovery.utils.js';
 import type { FieldSchema } from './editors/types.js';
 
 describe('ErrorRecovery', () => {

@@ -78,7 +78,7 @@ interface McNodeShellProps {
 **正确模式（对齐现有 ItemNode.tsx）：**
 
 ```tsx
-import type { NodeProps } from 'reactflow';
+import type { NodeProps } from '@xyflow/react';
 import type { VariableNodeData } from '@mc-creator/shared';
 
 function VariableNodeComponent({ data, selected }: NodeProps<VariableNodeData>) {

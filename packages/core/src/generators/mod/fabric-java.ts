@@ -2,6 +2,7 @@
 import type { FileNode } from '@mc-creator/shared';
 import { javaEscape, mainClassName, packagePath } from './templates.js';
 import { conditionCheckBody, actionExecuteBody } from './event-logic.js';
+import { formatUnsupportedComment } from './unsupported.js';
 import {
   defaultValueFor,
   javaTypeFor,
@@ -1002,10 +1003,10 @@ ${itemPickupHandlers.map((h) => `        handle_${sanitizeIdent(h.handlerId)}(ct
   const conditionMethods = conditions
     .map((c) => {
       const methodName = `check_${sanitizeIdent(c.conditionId)}`;
-      // P1-7：常见条件类型生成真实检查逻辑（event-logic.ts），其余保留 TODO
+      // P1-7：常见条件类型生成真实检查逻辑（event-logic.ts），未知类型走显性占位（Task 1.1）
       const body =
         conditionCheckBody(c) ??
-        `        // TODO: 实现 ${c.conditionType} 检查逻辑
+        `        ${formatUnsupportedComment('condition', c.conditionType, 'UNKNOWN_CONDITION')}
         return true;`;
       return `    // 条件: ${c.conditionId} (invert: ${c.invert})
     // conditionType: ${c.conditionType}
@@ -1020,8 +1021,10 @@ ${body}
   const actionMethods = actions
     .map((a) => {
       const methodName = `execute_${sanitizeIdent(a.actionId)}`;
-      // P1-7：常见动作类型生成真实执行逻辑（event-logic.ts），其余保留 TODO
-      const body = actionExecuteBody(a) ?? `        // TODO: 实现 ${a.actionType} 执行逻辑`;
+      // P1-7：常见动作类型生成真实执行逻辑（event-logic.ts），未知类型走显性占位（Task 1.1）
+      const body =
+        actionExecuteBody(a) ??
+        `        ${formatUnsupportedComment('action', a.actionType, 'UNKNOWN_ACTION')}`;
       return `    // 动作: ${a.actionId}
     // actionType: ${a.actionType}
     // args: ${JSON.stringify(a.args)}
@@ -1297,7 +1300,7 @@ export function fabricEventRegistration(eventType: string, handlerMethod: string
       return `        // block_place: Fabric API 无放置事件，由 ModBlockPlaceMixin @Inject 触发
         // ModEvents.notifyBlockPlaced(level, pos, state, player) 已在 Mixin 中调用`;
     default:
-      return `        // TODO: 注册 ${eventType} 事件（Fabric API 未映射）
+      return `        ${formatUnsupportedComment('event', eventType, 'UNKNOWN_EVENT')}
         // ${handlerMethod}(new EventContext());`;
   }
 }

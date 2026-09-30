@@ -18,7 +18,7 @@ type LoopNodeComponentProps = {
  * 颜色：mc-loop
  * 徽章：循环类型（for/forEach/while）
  */
-function LoopNodeComponent({ id, data, selected }: LoopNodeComponentProps) {
+function LoopNodeComponent({ data, selected }: LoopNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
 
   return (

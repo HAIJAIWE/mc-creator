@@ -15,7 +15,8 @@ import { CodeEditor } from './editors/CodeEditor.js';
 import { ListEditor } from './editors/ListEditor.js';
 import { FieldLabel } from './FieldLabel.js';
 import { getTooltip } from './fieldTooltips.js';
-import { ErrorRecovery, getErrorSuggestion, getFixLabel } from './ErrorRecovery.js';
+import { ErrorRecovery } from './ErrorRecovery.js';
+import { getErrorSuggestion, getFixLabel } from './ErrorRecovery.utils.js';
 
 /**
  * 字段级校验：返回错误文字或 undefined。

@@ -485,7 +485,7 @@ export function KubejsPreviewPanel() {
       setSpec(updated as unknown as typeof spec);
       recipeSelection.clear();
     },
-    [kj, setSpec],
+    [kj, setSpec, recipeSelection],
   );
 
   // ===== Tab 配置（预计算 count）=====

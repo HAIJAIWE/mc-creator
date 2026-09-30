@@ -24,7 +24,7 @@ type SubgraphNodeComponentProps = {
  * P2 性能优化：使用 useNodeActions 统一获取 toggleCollapse/openDrawer/node，
  * 使用 useCallback 稳定化 enterSubgraph 回调。
  */
-function SubgraphNodeComponent({ id, data, selected }: SubgraphNodeComponentProps) {
+function SubgraphNodeComponent({ data, selected }: SubgraphNodeComponentProps) {
   const { toggleCollapse, openDrawer, node } = useNodeActions(data.nodeId);
   // 子图节点特有：进入子图编辑 + 子图定义查找，不属于通用 useNodeActions 范畴
   const setEditingSubgraphId = useNodeGraphStore((s) => s.setEditingSubgraphId);

@@ -15,7 +15,39 @@ on:
     - cron: '0 3 * * 1' # 每周一 03:00 UTC：编译矩阵 + LOADER_VERSIONS 过期检测
 
 jobs:
+  # 依赖下载：按 LOADER_VERSIONS 下载 loader/loom/gradle 到缓存
+  fetch-deps:
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.cache.outputs.cache-primary-key }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Compute dependency cache key
+        id: cache
+        run: |
+          # 基于 LOADER_VERSIONS 内容生成缓存键
+          CONTENT=$(cat packages/shared/src/types/loader.ts | sha256sum | cut -d' ' -f1)
+          echo "cache-primary-key=mc-deps-${CONTENT::16}" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v4
+        id: deps-cache
+        with:
+          path: ~/.cache/mc-creator
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+          restore-keys: |
+            mc-deps-
+      - name: Download MC dependencies
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: node scripts/fetch-mc-deps.mjs
+        env:
+          MC_CREATOR_MIRROR: ${{ vars.MC_CREATOR_MIRROR }}
+
   generate:
+    needs: fetch-deps
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +56,13 @@ jobs:
           node-version: 22
       - uses: pnpm/action-setup@v4
       - run: pnpm install --frozen-lockfile
+      - name: Restore dependency cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mc-creator
+          key: ${{ needs.fetch-deps.outputs.cache-key }}
+          restore-keys: |
+            mc-deps-
       - name: Generate mod projects for all MC versions
         run: pnpm --filter @mc-creator/core test src/ci/export-projects
         env:
@@ -35,7 +74,7 @@ jobs:
           retention-days: 3
 
   build:
-    needs: generate
+    needs: [generate, fetch-deps]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -68,6 +107,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ matrix.gradle }}
+      - name: Restore dependency cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mc-creator
+          key: ${{ needs.fetch-deps.outputs.cache-key }}
+          restore-keys: |
+            mc-deps-
       - name: Generate wrapper (gradlew + jar)
         working-directory: gen/${{ matrix.mc }}-${{ matrix.loader }}
         run: gradle wrapper --gradle-version ${{ matrix.gradle }} --no-daemon

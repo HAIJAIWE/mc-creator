@@ -354,14 +354,14 @@ export function GeneratedCodePreview({
               }
             >
               <LazyMonaco
-                // exactOptionalPropertyTypes workaround for @monaco-editor/react EditorProps
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                {...({
+                {...{
                   height: '100%',
                   language: getLanguage(selectedFile.path),
                   value: selectedFile.content,
                   theme: 'vs-dark',
-                  onChange: editing ? handleEditorChange : undefined,
+                  // onChange 仅在编辑态传入：exactOptionalPropertyTypes 下
+                  // `onChange: X | undefined` 与可选属性不兼容，改条件展开
+                  ...(editing ? { onChange: handleEditorChange } : {}),
                   options: {
                     readOnly: !editing,
                     minimap: { enabled: false },
@@ -374,7 +374,7 @@ export function GeneratedCodePreview({
                     renderLineHighlight: 'all',
                     bracketPairColorization: { enabled: true },
                   },
-                } as any)}
+                }}
               />
             </Suspense>
           ) : (

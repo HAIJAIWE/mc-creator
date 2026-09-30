@@ -530,7 +530,7 @@ export const NODE_COLORS: Record<string, string> = {
 
 ```tsx
 import { memo } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position } from '@xyflow/react';
 import type { NodePort } from '@mc-creator/shared';
 import { PORT_COLORS } from './portColors.js';
 
@@ -1505,7 +1505,7 @@ Expected: FAIL — 旧组件不渲染 McNodeShell 元素（无 aria-label="设�
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { ItemNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -1648,7 +1648,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { BlockNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -1758,7 +1758,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { EntityNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -1860,7 +1860,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { RecipeNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -1972,7 +1972,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { MachineNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -2077,7 +2077,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { MultiBlockNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -2176,7 +2176,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { EventNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -2288,7 +2288,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { ConditionNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -2398,7 +2398,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { ActionNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -2509,7 +2509,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { CodeNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -2621,7 +2621,7 @@ Expected: FAIL
 
 ```tsx
 import { memo } from 'react';
-import { type NodeProps } from 'reactflow';
+import { type NodeProps } from '@xyflow/react';
 import type { CommentNodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { useDrawerStore } from '../../../store/drawer-store.js';
@@ -2796,7 +2796,7 @@ export function validateConnection(
 }
 ```
 
-在文件顶部确保已导入 `Edge` 类型（已有 `import type { Edge, Connection } from 'reactflow'`）。
+在文件顶部确保已导入 `Edge` 类型（已有 `import type { Edge, Connection } from '@xyflow/react'`）。
 
 - [ ] **Step 4: 运行确认通过**
 

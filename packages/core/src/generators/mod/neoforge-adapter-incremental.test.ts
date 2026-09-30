@@ -370,8 +370,8 @@ describe('NeoForgeAdapter P1-4 增量构建（translateWithCache）', () => {
     const baseSpec = makeSpec();
     const cache = new BuildCache();
 
-    // 首次构建
-    const first = adapter.translateWithCache(makeCtx(baseSpec), cache);
+    // 首次构建（只为预热缓存，结果无需断言）
+    adapter.translateWithCache(makeCtx(baseSpec), cache);
 
     // 修改一个不影响 items/blocks 的字段（description 只影响 modsToml）
     const modifiedSpec = makeSpec({ description: 'changed description' });

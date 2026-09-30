@@ -1,4 +1,4 @@
-import { DataEnchantmentSpec, getPackFormatForMcVersion, MC_VERSIONS } from '@mc-creator/shared';
+import { DataEnchantmentSpec, getPackFormatForMcVersion } from '@mc-creator/shared';
 import type {
   DataEnchantmentSpec as DataEnchantmentSpecType,
   DataEnchantmentEntrySpec,

@@ -21,7 +21,10 @@ export interface SubgraphBoundaryNodeData extends CommentNodeData {
   portType: PortType;
 }
 
-function SubgraphBoundaryNodeComponent({ data, selected }: NodeProps<Node<Record<string, unknown>, string | undefined>>) {
+function SubgraphBoundaryNodeComponent({
+  data,
+  selected,
+}: NodeProps<Node<Record<string, unknown>, string | undefined>>) {
   const toggleCollapse = useNodeGraphStore((s) => s.toggleCollapse);
   // Type guard: narrow data from unknown via unknown to satisfy exactOptionalPropertyTypes
   const nodeData = data as unknown as SubgraphBoundaryNodeData;

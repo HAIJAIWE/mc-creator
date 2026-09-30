@@ -21,13 +21,7 @@ export function generatePlaceholderTexture(
   type: 'item' | 'block' | 'entity' | 'gui',
   options: TextureOptions = {},
 ): Buffer {
-  const {
-    width = 16,
-    height = 16,
-    backgroundColor = getTypeColor(type),
-    text = name,
-    textColor = [255, 255, 255],
-  } = options;
+  const { width = 16, height = 16, backgroundColor = getTypeColor(type), text = name } = options;
 
   const png = new PNG({ width, height, colorType: 6 }); // RGBA
 
@@ -70,7 +64,7 @@ function getTypeColor(type: string): [number, number, number] {
 /**
  * 简单的文字占位符绘制 (在 PNG 中绘制一个矩形区域代表文字区域)
  */
-function drawTextPlaceholder(png: PNG, width: number, height: number, text: string): void {
+function drawTextPlaceholder(png: PNG, width: number, height: number, _text: string): void {
   // 在底部绘制一个半透明条带作为文字区域
   const textHeight = Math.min(4, Math.floor(height * 0.3));
   const startY = height - textHeight;

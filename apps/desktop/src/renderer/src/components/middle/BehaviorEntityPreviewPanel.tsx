@@ -197,10 +197,7 @@ export function BehaviorEntityPreviewPanel() {
   }, [be]);
 
   // ===== ID 重复检测 =====
-  const { totalConflicts, conflictList } = useConflictDetection(
-    be,
-    ENTITY_CONFLICT_GROUPS,
-  );
+  const { totalConflicts, conflictList } = useConflictDetection(be, ENTITY_CONFLICT_GROUPS);
 
   // ===== 实体筛选 =====
   const filteredEntities = useMemo(() => {

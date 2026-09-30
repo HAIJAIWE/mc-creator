@@ -5,8 +5,29 @@
  * - ModSpecLike：adapter 内部消费的 ModSpec 形状（避免与 shared schema 强耦合/循环导入）
  * - CategoryDescriptor：增量构建的类别描述符（P1-4）
  * - 辅助函数：Java 类型映射、标识符清洗、配方映射等（两 adapter 原为各自私有实现，逻辑相同）
+ *
+ * 使用 shared schema 的推导类型以确保 exactOptionalPropertyTypes 兼容。
  */
 import type { FileNode, LoaderVersionConfig } from '@mc-creator/shared';
+import type {
+  ItemSpec,
+  BlockSpec,
+  ModDependencySpec,
+  ModRecipeSpec,
+  EntitySpec,
+  MachineSpec,
+  CustomCodeSnippetSpec,
+  MultiBlockSpec,
+  FluidSpec,
+  ModBiomeSpec,
+  ModDimensionSpec,
+  GuiSpec,
+  ModStructureSpec,
+  EventHandlerSpec,
+  ConditionSpec,
+  ActionSpec,
+  ProcedureSpec,
+} from '@mc-creator/shared';
 
 /** 内部用的 ModSpec 形状（避免循环导入，从 GeneratorContext 推导） */
 export type ModSpecLike = {
@@ -20,206 +41,25 @@ export type ModSpecLike = {
   authors: string[];
   credits: string;
   website: string;
-  dependencies: Array<{ modId: string; version: string; mandatory: boolean }>;
-  items: Array<{
-    id: string;
-    name: string;
-    maxStackSize: number;
-    rarity: 'common' | 'uncommon' | 'rare' | 'epic';
-    maxDamage: number;
-    fuelTick: number;
-    food?: { hunger: number; saturation: number };
-    lore: string;
-  }>;
-  blocks: Array<{
-    id: string;
-    name: string;
-    material: string;
-    hardness: number;
-    miningLevel: number;
-    lightLevel: number;
-    resistance: number;
-    soundType:
-      | 'wood'
-      | 'stone'
-      | 'metal'
-      | 'grass'
-      | 'sand'
-      | 'glass'
-      | 'cloth'
-      | 'ladder'
-      | 'anvil'
-      | 'slime';
-    dropSelf: boolean;
-    dropItem: string;
-  }>;
+  dependencies: ModDependencySpec[];
+  items: ItemSpec[];
+  blocks: BlockSpec[];
   // === P1.3/P1.4 新增字段（可选，向后兼容） ===
-  recipes?: Array<{
-    recipeId: string;
-    recipeType: string;
-    inputs: Array<{ item: string; count: number; slot: string }>;
-    output: string;
-    outputCount: number;
-    cookTime: number;
-    experience: number;
-    pattern: string[];
-  }>;
-  entities?: Array<{
-    entityId: string;
-    displayName: string;
-    maxHealth: number;
-    attackDamage: number;
-    movementSpeed: number;
-    classification: string;
-    modelType: string;
-    spawnWeight: number;
-    spawnBiomes: string[];
-    texturePath?: string;
-  }>;
-  machines?: Array<{
-    machineId: string;
-    displayName: string;
-    energyCapacity: number;
-    maxEnergyTransfer: number;
-    inputSlots: number;
-    outputSlots: number;
-    defaultProcessTime: number;
-    defaultEnergyPerTick: number;
-    guiWidth: number;
-    guiHeight: number;
-    recipeMap?: Record<string, string>;
-  }>;
-  customCode?: Array<{
-    snippetId: string;
-    language: string;
-    code: string;
-    inputSignature: Record<string, string>;
-    outputSignature: Record<string, string>;
-    methodName: string;
-  }>;
-  multiblocks?: Array<{
-    structureId: string;
-    displayName: string;
-    width: number;
-    height: number;
-    depth: number;
-    hollow: boolean;
-    controllerOffset: { x: number; y: number; z: number };
-  }>;
-  fluids?: Array<{
-    fluidId: string;
-    displayName: string;
-    color: number;
-    temperature: number;
-    viscosity: number;
-    density: number;
-    luminous: boolean;
-    texturePath?: string;
-  }>;
-  biomes?: Array<{
-    biomeId: string;
-    displayName: string;
-    precipitation: 'none' | 'rain' | 'snow';
-    temperature: number;
-    temperatureModifier: 'none' | 'frozen';
-    downfall: number;
-    skyColor: number;
-    waterColor: number;
-    waterFogColor: number;
-    grassColor?: number;
-    foliageColor?: number;
-    fogColor: number;
-    surfaceBuilder: string;
-    category: string;
-    spawnWeight: number;
-    spawnDimensions: string[];
-    texturePath?: string;
-  }>;
-  dimensions?: Array<{
-    dimensionId: string;
-    displayName: string;
-    baseType: 'overworld' | 'nether' | 'end';
-    fixedTime: number | null;
-    hasSkyLight: boolean;
-    hasCeiling: boolean;
-    ultrawarm: boolean;
-    natural: boolean;
-    coordinateScale: number;
-    minY: number;
-    height: number;
-    logicalHeight: number;
-    ambientLight: number;
-    piglinSafe: boolean;
-    bedWorks: boolean;
-    respawnAnchorWorks: boolean;
-    effects: 'overworld' | 'the_nether' | 'the_end' | 'none';
-    seed?: number;
-    texturePath?: string;
-  }>;
-  guis?: Array<{
-    guiId: string;
-    displayName: string;
-    width: number;
-    height: number;
-    slots: Array<{
-      slotId: string;
-      slotType: 'input' | 'output' | 'energy' | 'fuel';
-      x: number;
-      y: number;
-    }>;
-    showEnergyBar: boolean;
-    showProgressBar: boolean;
-  }>;
-  structures?: Array<{
-    structureId: string;
-    displayName: string;
-    startPool: string;
-    size: number;
-    maxDistance: number;
-    biomes: string;
-    terrainAdaptation: string;
-    spacing: number;
-    separation: number;
-    salt: number;
-  }>;
-  eventHandlers?: Array<{
-    handlerId: string;
-    eventType: string;
-    eventArgs: Record<string, unknown>;
-    /** P1.5：关联的 condition 节点 id 列表（替代旧 conditions 字段） */
-    conditionIds?: string[];
-    /** P1.5：关联的 action 节点 id 列表（替代旧 actions 字段） */
-    actionIds?: string[];
-    /** P1-3：关联的 procedure 节点 id 列表（事件调用过程） */
-    procedureCallIds?: string[];
-    /** P40：过程调用参数（procedureId → 表达式数组，与被调过程 inputs 顺序对应） */
-    procedureCallArgs?: Record<string, string[]>;
-  }>;
-  conditions?: Array<{
-    conditionId: string;
-    conditionType: string;
-    args: Record<string, unknown>;
-    invert: boolean;
-  }>;
-  actions?: Array<{
-    actionId: string;
-    actionType: string;
-    args: Record<string, unknown>;
-  }>;
+  recipes?: ModRecipeSpec[];
+  entities?: EntitySpec[];
+  machines?: MachineSpec[];
+  customCode?: CustomCodeSnippetSpec[];
+  multiblocks?: MultiBlockSpec[];
+  fluids?: FluidSpec[];
+  biomes?: ModBiomeSpec[];
+  dimensions?: ModDimensionSpec[];
+  guis?: GuiSpec[];
+  structures?: ModStructureSpec[];
+  eventHandlers?: EventHandlerSpec[];
+  conditions?: ConditionSpec[];
+  actions?: ActionSpec[];
   /** P1-3：过程（命名可复用逻辑单元，编译为独立 Java 方法） */
-  procedures?: Array<{
-    procedureId: string;
-    procedureName: string;
-    displayName: string;
-    /** P40：输入参数定义（name + Java 类型） */
-    inputs?: Array<{ name: string; type: string }>;
-    conditionIds: string[];
-    actionIds: string[];
-    /** 嵌套调用的过程节点 id 列表 */
-    procedureCallIds: string[];
-    /** P40：嵌套过程调用参数（procedureId → 表达式数组） */
-    procedureCallArgs?: Record<string, string[]>;
-  }>;
+  procedures?: ProcedureSpec[];
 };
 
 /**

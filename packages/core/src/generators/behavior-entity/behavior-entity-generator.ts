@@ -41,18 +41,6 @@ const GOAL_COMPONENT: Record<BpGoalSpec['type'], string> = {
   panic: 'minecraft:behavior.panic',
 };
 
-/** 行为类型显示标签 */
-const GOAL_LABEL: Record<BpGoalSpec['type'], string> = {
-  melee: '近战',
-  ranged: '远程',
-  idle_wander: '游荡',
-  look_at_player: '注视',
-  flee_sun: '避日',
-  swim: '游泳',
-  follow_owner: '跟随',
-  panic: '恐慌',
-};
-
 /**
  * BehaviorEntityGenerator：基岩版自定义实体（怪物 AI）生成器。
  *

@@ -22,7 +22,7 @@ pnpm --filter @mc-creator/desktop dev   # 启动开发服务器
 ```
 mc-creator/
 ├── apps/desktop/         # Electron 桌面应用（main + preload + renderer）
-│   └── renderer/src/components/lowcode/  # 低代码节点图编辑器（14 节点 + 子图 + 编译器）
+│   └── renderer/src/components/lowcode/  # 低代码节点图编辑器（19 节点 + 子图 + 编译器）
 ├── packages/shared/      # 共享 Zod schema 与类型（node-graph-spec / mod-spec）
 ├── packages/core/        # 核心引擎（生成器 + 构建器 + AI 编排）
 └── docs/superpowers/     # 设计规格与实现计划（含低代码 Phase A/B/C 计划）
@@ -111,7 +111,7 @@ CI 会自动跑 lint + typecheck + test（三平台矩阵）+ build（双平台�
 - **TDD 优先**：新功能先写测试 → 确认 FAIL → 写实现 → 确认 PASS → commit
 - **单元测试**：每个 Generator / Builder / Provider 都有独立测试
 - **mock 策略**：AI 调用用 `MockProvider`，文件系统用 `memfs`，进程执行用函数注入
-- **测试覆盖**：当前 250+ 测试用例，新增功能必须附带测试
+- **测试覆盖**：当前约 2000+ 测试用例（176 个测试文件，数字由 `node scripts/check-docs.mjs` 自动核验），新增功能必须附带测试
 
 ## 添加新生成器
 

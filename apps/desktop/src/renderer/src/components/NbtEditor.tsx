@@ -118,7 +118,7 @@ function defaultValue(type: NbtType): NbtTag['value'] {
 }
 
 /** 从 SNBT（字符串化 NBT，简化版 JSON）解析为 NbtRoot */
-export function parseSnbt(input: string): NbtRoot | null {
+function parseSnbt(input: string): NbtRoot | null {
   try {
     // SNBT 类似 JSON 但键无引号、数值有类型后缀（b/s/l/f/d）
     // 简化：先尝试 JSON.parse，再推断类型
@@ -168,7 +168,7 @@ function valueToTag(val: unknown): NbtTag {
 }
 
 /** NbtRoot → SNBT（JSON 格式） */
-export function toSnbt(root: NbtRoot): string {
+function toSnbt(root: NbtRoot): string {
   return JSON.stringify(entriesToObject(root.entries), null, 2);
 }
 

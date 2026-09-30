@@ -197,10 +197,7 @@ export function BehaviorItemPreviewPanel() {
   }, [bp]);
 
   // ===== ID 重复检测 =====
-  const { totalConflicts, conflictList } = useConflictDetection(
-    bp,
-    ITEM_CONFLICT_GROUPS,
-  );
+  const { totalConflicts, conflictList } = useConflictDetection(bp, ITEM_CONFLICT_GROUPS);
 
   // ===== 物品筛选 =====
   const filteredItems = useMemo(() => {

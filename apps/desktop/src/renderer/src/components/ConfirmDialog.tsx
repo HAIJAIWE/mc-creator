@@ -132,13 +132,3 @@ export function ConfirmDialog({
     </div>
   );
 }
-
-/**
- * 简易 confirm 替代函数（非 React 组件环境使用）
- * 注意：这是同步阻塞的，仅用于无法使用组件的场景
- */
-export function confirmI18n(message: string, _title?: string): boolean {
-  if (typeof window === 'undefined') return true;
-  // 简单的 fallback，实际项目中建议始终使用 ConfirmDialog 组件
-  return window.confirm(message);
-}

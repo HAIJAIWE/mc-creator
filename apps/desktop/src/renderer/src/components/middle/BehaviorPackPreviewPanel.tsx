@@ -312,7 +312,7 @@ export function BehaviorPackPreviewPanel() {
       setSpec(updated as unknown as typeof spec);
       entitySelection.clear();
     },
-    [bp, setSpec],
+    [bp, setSpec, entitySelection],
   );
 
   const removeRecipes = useCallback(
@@ -326,7 +326,7 @@ export function BehaviorPackPreviewPanel() {
       setSpec(updated as unknown as typeof spec);
       recipeSelection.clear();
     },
-    [bp, setSpec],
+    [bp, setSpec, recipeSelection],
   );
 
   // ===== Tab 配置（预计算 count）=====

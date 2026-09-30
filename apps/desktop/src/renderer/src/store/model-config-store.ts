@@ -18,7 +18,7 @@ interface ModelConfigState {
   setProfiles: (profiles: ModelProfile[], activeId: string | null) => void;
 }
 
-export const useModelConfigStore = createWithEqualityFn<ModelConfigState>((set, get) => ({
+export const useModelConfigStore = createWithEqualityFn<ModelConfigState>((set) => ({
   name: '',
   modelId: '',
   baseURL: '',
