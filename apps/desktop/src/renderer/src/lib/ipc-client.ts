@@ -268,6 +268,8 @@ export const ipcClient = {
     mcVersion: string;
     spec: unknown;
     generatorType: GeneratorType;
+    /** 当前项目 id（可选）：主进程据此隔离并持久化增量构建缓存 */
+    projectId?: string;
   }): Promise<GenerateFilesRes> => {
     if (isWebPreview()) {
       // 预览模式：渲染进程内直接跑 core 生成器（与主进程 GENERATE_FILES 逻辑一致）

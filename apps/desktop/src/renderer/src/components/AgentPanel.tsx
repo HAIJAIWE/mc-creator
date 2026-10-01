@@ -16,6 +16,7 @@ import type { ModEntry, ModSpec } from '@mc-creator/shared';
 import { GENERATOR_DESCRIPTORS, pickLocalized } from '../../../shared/generator-descriptors.js';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
+import { useProjectStore } from '../store/project-store.js';
 import { useSpecHistoryStore } from '../store/spec-history-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
@@ -74,6 +75,8 @@ export function AgentPanel() {
   );
   const { apiKey } = useModelConfigStore();
   const historyCount = useSpecHistoryStore((s) => s.versions.length);
+  // 增量构建缓存按项目隔离：把当前项目 id 透传给主进程
+  const currentProjectId = useProjectStore((s) => s.currentProjectId);
   const { locale } = useTranslation();
 
   const [editorText, setEditorText] = useState('');
@@ -150,6 +153,8 @@ export function AgentPanel() {
         mcVersion,
         spec: parsedSpec,
         generatorType,
+        // exactOptionalPropertyTypes：仅在有项目时带上该字段
+        ...(currentProjectId ? { projectId: currentProjectId } : {}),
       });
       setFiles(res.files);
       setWarnings(res.warnings ?? []);

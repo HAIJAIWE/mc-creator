@@ -87,6 +87,8 @@ const api = {
     mcVersion: string;
     spec: unknown;
     generatorType: GeneratorType;
+    /** 当前项目 id（可选）：主进程据此隔离并持久化增量构建缓存 */
+    projectId?: string;
   }) => ipcRenderer.invoke(IPC.GENERATE_FILES, req),
   build: (projectPath: string) => ipcRenderer.invoke(IPC.BUILD, { projectPath }),
   loadModelConfig: () => ipcRenderer.invoke(LOAD_MODEL_CONFIG),

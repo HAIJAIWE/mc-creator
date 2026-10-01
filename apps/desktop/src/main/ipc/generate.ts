@@ -1,5 +1,6 @@
 /* Phase 3.1 拆分：由 ../ipc.ts 纯搬运，零行为变更。通道名与逻辑保持原样。*/
-import { ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
+import { join } from 'node:path';
 import { z } from 'zod';
 import {
   Orchestrator,
@@ -8,7 +9,6 @@ import {
   ModGenerator,
   SPEC_CONFIGS,
   formatSpecIssues,
-  type BuildCacheSnapshot,
   type SpecType,
 } from '@mc-creator/core';
 import type { ModSpec } from '@mc-creator/shared';
@@ -22,6 +22,7 @@ import {
   type ModelProfile,
 } from '../model-config.js';
 import { buildChatSystemMessage, type ChatStreamContext } from '../chat-system-message.js';
+import { loadBuildCacheSnapshot, saveBuildCacheSnapshot } from '../build-cache-store.js';
 import {
   IPC,
   GenerateSpecRequest,
@@ -59,9 +60,8 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
   // 生成器注册表（P1：替代 switch/case，新增生成器只需在 createDefaultRegistry 注册）
   const generatorRegistry = createDefaultRegistry();
 
-  // P1-4：增量构建缓存快照（跨请求保持，按 modId::loader::category 隔离）。
-  // 首次构建为 undefined → 全量生成；后续构建传入上次快照 → 类别级增量。
-  let modBuildCacheSnapshot: BuildCacheSnapshot | undefined;
+  // 增量构建缓存根目录：按项目 id 分文件存放，跨会话复用。
+  const buildCacheDir = () => join(app.getPath('userData'), 'build-cache');
 
   ipcMain.handle(IPC.GENERATE_SPEC, async (_e, raw: unknown): Promise<GenerateSpecRes> => {
     const req = GenerateSpecRequest.parse(raw);
@@ -99,9 +99,12 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
 
     // P1-4：ModGenerator 走增量构建（类别级缓存），其他生成器走全量 generate
     if (gen instanceof ModGenerator) {
-      const incResult = await gen.generateWithCache(genCtx, modBuildCacheSnapshot);
-      // 更新缓存快照，供下次构建复用
-      modBuildCacheSnapshot = incResult.cacheSnapshot;
+      const cacheDir = buildCacheDir();
+      // 按项目读回上次快照：命中 → 类别级增量；读不到（首次/损坏）→ 全量生成
+      const prevSnapshot = await loadBuildCacheSnapshot(cacheDir, req.projectId);
+      const incResult = await gen.generateWithCache(genCtx, prevSnapshot);
+      // 落盘供下次（含下次启动）复用；写失败不影响本次构建结果
+      await saveBuildCacheSnapshot(cacheDir, req.projectId, incResult.cacheSnapshot);
       return {
         files: incResult.files,
         warnings: incResult.warnings,

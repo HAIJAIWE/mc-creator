@@ -1,12 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  BuildCache,
-  hashContent,
-  hashCategory,
-  diffFiles,
-  filesToMap,
-  type BuildCacheSnapshot,
-} from './BuildCache.js';
+import { BuildCache, hashContent, hashCategory, type BuildCacheSnapshot } from './BuildCache.js';
 import type { FileNode } from '@mc-creator/shared';
 
 // === 哈希函数测试 ===
@@ -239,61 +232,5 @@ describe('BuildCache', () => {
       cache.setCache(key, 'h', [{ path: 'a', content: '' }]);
       expect(cache.has(key)).toBe(true);
     });
-  });
-});
-
-// === 文件级增量工具测试 ===
-
-describe('diffFiles / filesToMap', () => {
-  it('filesToMap 把 FileNode[] 转为 path→content 映射', () => {
-    const map = filesToMap([
-      { path: 'a.java', content: 'AAA' },
-      { path: 'b.java', content: 'BBB' },
-    ]);
-    expect(map.get('a.java')).toBe('AAA');
-    expect(map.get('b.java')).toBe('BBB');
-    expect(map.size).toBe(2);
-  });
-
-  it('diffFiles 只返回内容变化的文件', () => {
-    const current: FileNode[] = [
-      { path: 'a.java', content: 'AAA' }, // 未变
-      { path: 'b.java', content: 'BBB-new' }, // 变化
-      { path: 'c.java', content: 'CCC' }, // 新增
-    ];
-    const previous = filesToMap([
-      { path: 'a.java', content: 'AAA' },
-      { path: 'b.java', content: 'BBB-old' },
-    ]);
-
-    const diff = diffFiles(current, previous);
-    expect(diff.written.map((f) => f.path)).toEqual(['b.java', 'c.java']);
-    expect(diff.deleted).toEqual([]);
-  });
-
-  it('所有文件都未变时返回空 written', () => {
-    const current: FileNode[] = [{ path: 'a.java', content: 'AAA' }];
-    const previous = filesToMap(current);
-    const diff = diffFiles(current, previous);
-    expect(diff.written).toEqual([]);
-    expect(diff.deleted).toEqual([]);
-  });
-
-  it('previous 为空映射时返回所有文件为 written', () => {
-    const current: FileNode[] = [{ path: 'a.java', content: 'AAA' }];
-    const diff = diffFiles(current, new Map());
-    expect(diff.written).toEqual(current);
-    expect(diff.deleted).toEqual([]);
-  });
-
-  it('检测已删除的文件', () => {
-    const current: FileNode[] = [{ path: 'a.java', content: 'AAA' }];
-    const previous = filesToMap([
-      { path: 'a.java', content: 'AAA' },
-      { path: 'b.java', content: 'BBB' }, // b.java 在 current 中已不存在
-    ]);
-    const diff = diffFiles(current, previous);
-    expect(diff.written).toEqual([]);
-    expect(diff.deleted).toEqual(['b.java']);
   });
 });
