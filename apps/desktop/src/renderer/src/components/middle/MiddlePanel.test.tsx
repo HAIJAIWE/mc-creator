@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MiddlePanel } from './MiddlePanel.js';
 import { ToastProvider } from '../ToastProvider.js';
 import { useModStore } from '../../store/mod-store.js';
@@ -155,11 +155,14 @@ describe('MiddlePanel', () => {
     expect(screen.getByRole('tab', { name: /NBT/ }).getAttribute('aria-selected')).toBe('true');
   });
 
-  it('默认预览 tab 渲染 EmptyState（spec=null 时 ModPreviewPanel 兜底）', () => {
+  it('默认预览 tab 渲染 EmptyState（spec=null 时 ModPreviewPanel 兜底）', async () => {
     renderMiddlePanel(<MiddlePanel />);
     // generatorType=mod 时 renderPreviewPanel 返回 <ModPreviewPanel />，
-    // spec=null 时 ModPreviewPanel 渲染 EmptyState 标题
-    expect(screen.getByText('尚未生成 Mod Spec')).toBeTruthy();
+    // spec=null 时 ModPreviewPanel 渲染 EmptyState 标题。
+    // 预览面板已改为 React.lazy 按需加载，需等待 chunk 解析完成。
+    await waitFor(() => {
+      expect(screen.getByText('尚未生成 Mod Spec')).toBeTruthy();
+    });
   });
 
   it('渲染命令面板入口按钮（含 F1 提示）', () => {

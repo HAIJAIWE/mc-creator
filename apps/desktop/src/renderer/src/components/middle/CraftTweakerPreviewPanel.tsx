@@ -13,259 +13,38 @@ import {
   FilterBar,
   IconTabBar,
   BatchSelectToolbar,
-  findDuplicates,
   downloadBlob,
   countLangEntries,
   useBatchSelection,
   useTabCounts,
   useConflictDetection,
   buildExport,
-  toMdTable,
-  toMdOverview,
 } from './shared/index.js';
-import type {
-  Column,
-  ConflictGroup,
-  ExportFormat,
-  ExportHandler,
-  BaseTab,
-} from './shared/index.js';
-import type {
-  CraftTweakerSpec,
-  CraftTweakerRecipeSpec,
-  CraftTweakerTagSpec,
-  CraftTweakerEventSpec,
-  CraftTweakerTooltipSpec,
-} from '@mc-creator/shared';
+import type { ExportFormat } from './shared/index.js';
+import type { CraftTweakerSpec } from '@mc-creator/shared';
+import { FileText, Boxes, Tag, Flag, Languages, BookOpen } from 'lucide-react';
 import {
-  Download,
-  Trash2,
-  CheckSquare,
-  Square,
-  FileText,
-  Boxes,
-  Tag,
-  Flag,
-  Languages,
-  BookOpen,
-} from 'lucide-react';
-
-type CraftTweakerTab = 'recipes' | 'tags' | 'events' | 'tooltips' | 'lang' | 'metadata' | 'export';
-
-type RecipeTypeFilter = 'all' | 'shaped' | 'shapeless' | 'smelting' | 'stonecutting' | 'custom';
-type TagTypeFilter = 'all' | 'item' | 'block' | 'entity_type' | 'fluid';
-
-const TABS: BaseTab<CraftTweakerTab>[] = [
-  { key: 'recipes', label: '配方', icon: Boxes },
-  { key: 'tags', label: '标签', icon: Tag },
-  { key: 'events', label: '事件', icon: Flag },
-  { key: 'tooltips', label: '工具提示', icon: BookOpen },
-  { key: 'lang', label: '语言', icon: Languages },
-  { key: 'metadata', label: '元数据', icon: FileText },
-  { key: 'export', label: '导出', icon: Download },
-];
-
-const HIDE_COUNT_TABS = new Set<CraftTweakerTab>(['metadata', 'export']);
-
-const CT_CONFLICT_GROUPS: ConflictGroup<CraftTweakerSpec>[] = [
-  {
-    key: 'duplicateRecipeIds',
-    label: '配方 ID 重复',
-    detect: (ct) => findDuplicates(ct.recipes, (r) => r.id),
-  },
-  {
-    key: 'duplicateTagIds',
-    label: '标签 ID 重复',
-    detect: (ct) => findDuplicates(ct.tags, (t) => t.id),
-  },
-  {
-    key: 'duplicateEventIds',
-    label: '事件 ID 重复',
-    detect: (ct) => findDuplicates(ct.events, (e) => e.id),
-  },
-  {
-    key: 'duplicateTooltipIds',
-    label: '工具提示 ID 重复',
-    detect: (ct) => findDuplicates(ct.tooltips, (t) => t.itemId),
-  },
-];
-
-const CT_EXPORT: ExportHandler<CraftTweakerSpec> = {
-  prefix: (ct) => ct.packId,
-  scopes: {
-    all: {
-      data: (ct) => ct,
-      toMd: (ct) =>
-        toMdOverview(
-          `# ${ct.packName || ct.packId}`,
-          [
-            `- **Pack ID**: ${ct.packId}`,
-            `- **Format**: ${ct.packFormat}`,
-            `- **MC 版本**: ${ct.mcVersion}`,
-            `- **描述**: ${ct.description || '—'}`,
-          ],
-          [
-            {
-              heading: '配方列表',
-              lines: ct.recipes.map(
-                (r) =>
-                  `- \`${r.id}\` — ${RECIPE_TYPE_LABEL[r.type] ?? r.type} → ${r.result} x${r.count}`,
-              ),
-            },
-            {
-              heading: '标签列表',
-              lines: ct.tags.map(
-                (t) =>
-                  `- \`${t.id}\` — ${TAG_TYPE_LABEL[t.type] ?? t.type} (${t.values.length} 条目)`,
-              ),
-            },
-            {
-              heading: '事件列表',
-              lines: ct.events.map((e) => `- \`${e.id}\` — ${e.type} (${e.target || '—'})`),
-            },
-            {
-              heading: '工具提示',
-              lines: ct.tooltips.map(
-                (t) => `- \`${t.itemId}\` — ${t.lines.length} 行${t.advanced ? ' (高级)' : ''}`,
-              ),
-            },
-          ],
-        ),
-    },
-    recipes: {
-      data: (ct) => ct.recipes,
-      toCsv: (ct) =>
-        [
-          'ID,Type,Result,Count',
-          ...ct.recipes.map((r) => `"${r.id}","${r.type}","${r.result}",${r.count}`),
-        ].join('\n'),
-      toMd: (ct) =>
-        toMdTable(
-          `# ${ct.packName || ct.packId} - 配方列表`,
-          `共 ${ct.recipes.length} 个配方`,
-          ['ID', '类型', '产物', '数量'],
-          ct.recipes.map((r) => [
-            `\`${r.id}\``,
-            RECIPE_TYPE_LABEL[r.type] ?? r.type,
-            r.result,
-            String(r.count),
-          ]),
-        ),
-    },
-    tags: {
-      data: (ct) => ct.tags,
-      toCsv: (ct) =>
-        [
-          'ID,Type,Values,Replace',
-          ...ct.tags.map(
-            (t) => `"${t.id}","${t.type}","${t.values.join(';')}",${t.replace ? 'Yes' : 'No'}`,
-          ),
-        ].join('\n'),
-      toMd: (ct) =>
-        toMdTable(
-          `# ${ct.packName || ct.packId} - 标签列表`,
-          `共 ${ct.tags.length} 个标签`,
-          ['ID', '类型', '条目数', '替换'],
-          ct.tags.map((t) => [
-            `\`${t.id}\``,
-            TAG_TYPE_LABEL[t.type] ?? t.type,
-            String(t.values.length),
-            t.replace ? '是' : '否',
-          ]),
-        ),
-    },
-    events: {
-      data: (ct) => ct.events,
-      toCsv: (ct) =>
-        ['ID,Type,Target', ...ct.events.map((e) => `"${e.id}","${e.type}","${e.target}"`)].join(
-          '\n',
-        ),
-      toMd: (ct) =>
-        toMdTable(
-          `# ${ct.packName || ct.packId} - 事件列表`,
-          `共 ${ct.events.length} 个事件`,
-          ['ID', '类型', '目标'],
-          ct.events.map((e) => [`\`${e.id}\``, e.type, e.target || '—']),
-        ),
-    },
-    tooltips: {
-      data: (ct) => ct.tooltips,
-      toCsv: (ct) =>
-        [
-          'ItemID,Lines,Advanced',
-          ...ct.tooltips.map((t) => `"${t.itemId}",${t.lines.length},${t.advanced ? 'Yes' : 'No'}`),
-        ].join('\n'),
-      toMd: (ct) =>
-        toMdTable(
-          `# ${ct.packName || ct.packId} - 工具提示`,
-          `共 ${ct.tooltips.length} 个工具提示`,
-          ['物品 ID', '行数', '高级'],
-          ct.tooltips.map((t) => [
-            `\`${t.itemId}\``,
-            String(t.lines.length),
-            t.advanced ? '是' : '否',
-          ]),
-        ),
-    },
-    lang: {
-      data: (ct) => ct.lang,
-      toCsv: (ct) =>
-        [
-          'Lang,Key,Value',
-          ...Object.entries(ct.lang ?? {}).flatMap(([langCode, dict]) =>
-            Object.entries(dict).map(([k, v]) => `"${langCode}","${k}","${v.replace(/"/g, '""')}"`),
-          ),
-        ].join('\n'),
-      toMd: (ct) => {
-        const { entries: langEntries, languages: langCount } = countLangEntries(ct.lang);
-        return toMdTable(
-          `# ${ct.packName || ct.packId} - 语言条目`,
-          `共 ${langEntries} 条翻译，覆盖 ${langCount} 种语言`,
-          ['语言', '键', '值'],
-          Object.entries(ct.lang ?? {}).flatMap(([langCode, dict]) =>
-            Object.entries(dict).map(([k, v]) => [langCode, `\`${k}\``, v]),
-          ),
-        );
-      },
-    },
-  },
-};
-
-const RECIPE_TYPE_LABEL: Record<string, string> = {
-  shaped: '有序合成',
-  shapeless: '无序合成',
-  smelting: '熔炼',
-  stonecutting: '切石',
-  custom: '自定义',
-};
-
-const RECIPE_TYPE_COLOR: Record<string, string> = {
-  shaped: 'bg-blue-500/20 text-blue-400',
-  shapeless: 'bg-green-500/20 text-green-400',
-  smelting: 'bg-orange-500/20 text-orange-400',
-  stonecutting: 'bg-yellow-500/20 text-yellow-400',
-  custom: 'bg-purple-500/20 text-purple-400',
-};
-
-const TAG_TYPE_LABEL: Record<string, string> = {
-  item: '物品',
-  block: '方块',
-  entity_type: '实体',
-  fluid: '流体',
-};
-
-const TAG_TYPE_COLOR: Record<string, string> = {
-  item: 'bg-blue-500/20 text-blue-400',
-  block: 'bg-green-500/20 text-green-400',
-  entity_type: 'bg-orange-500/20 text-orange-400',
-  fluid: 'bg-cyan-500/20 text-cyan-400',
-};
-
-interface LangRow {
-  lang: string;
-  key: string;
-  value: string;
-}
+  TABS,
+  HIDE_COUNT_TABS,
+  countByTab,
+  countTagType,
+  tabLabel,
+} from './preview/crafttweaker/constants.js';
+import type {
+  CraftTweakerTab,
+  RecipeTypeFilter,
+  TagTypeFilter,
+  LangRow,
+} from './preview/crafttweaker/constants.js';
+import { CT_CONFLICT_GROUPS } from './preview/crafttweaker/conflict.js';
+import { CT_EXPORT } from './preview/crafttweaker/export.js';
+import {
+  createRecipeColumns,
+  createTagColumns,
+  createEventColumns,
+  createTooltipColumns,
+  createLangColumns,
+} from './preview/crafttweaker/columns.js';
 
 /** CraftTweaker 预览面板：7 Tab + 统计卡片 + 高级筛选 + 批量管理 + 导出 + ID 重复检测 */
 export function CraftTweakerPreviewPanel() {
@@ -457,256 +236,12 @@ export function CraftTweakerPreviewPanel() {
     return <EmptySpecState label="CraftTweaker" describe="ZenScript 脚本" />;
   }
 
-  // ===== 配方列定义 =====
-  const recipeColumns: Column<CraftTweakerRecipeSpec>[] = [
-    {
-      key: 'select',
-      header: '',
-      width: '4%',
-      render: (r) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            recipeSelection.toggle(r.id);
-          }}
-          className="text-mc-mute hover:text-mc-accent"
-        >
-          {recipeSelection.isSelected(r.id) ? (
-            <CheckSquare className="h-3 w-3" />
-          ) : (
-            <Square className="h-3 w-3" />
-          )}
-        </button>
-      ),
-    },
-    {
-      key: 'id',
-      header: 'ID',
-      width: '18%',
-      sortValue: (r) => r.id,
-      render: (r) => <span className="font-mono text-[11px] text-mc-text">{r.id}</span>,
-    },
-    {
-      key: 'type',
-      header: '类型',
-      width: '12%',
-      sortValue: (r) => r.type,
-      render: (r) => (
-        <span
-          className={`rounded-mc px-1.5 py-0.5 text-[10px] ${RECIPE_TYPE_COLOR[r.type] ?? 'bg-mc-surface-3 text-mc-dim'}`}
-        >
-          {RECIPE_TYPE_LABEL[r.type] ?? r.type}
-        </span>
-      ),
-    },
-    { key: 'result', header: '产物', width: '28%', sortValue: (r) => r.result },
-    {
-      key: 'count',
-      header: '数量',
-      width: '8%',
-      sortValue: (r) => r.count,
-      render: (r) => String(r.count),
-    },
-    {
-      key: 'pattern',
-      header: '形状/材料',
-      width: '20%',
-      render: (r) =>
-        r.pattern
-          ? `${r.pattern.length} 行`
-          : r.ingredients
-            ? `${r.ingredients.length} 材料`
-            : r.customCode
-              ? '自定义代码'
-              : '—',
-    },
-    {
-      key: 'actions',
-      header: '',
-      width: '4%',
-      render: (r) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            removeRecipes([r.id]);
-          }}
-          className="text-mc-mute hover:text-red-400"
-          title="移除"
-        >
-          <Trash2 className="h-3 w-3" />
-        </button>
-      ),
-    },
-  ];
-
-  // ===== 标签列定义 =====
-  const tagColumns: Column<CraftTweakerTagSpec>[] = [
-    {
-      key: 'id',
-      header: '标签 ID',
-      width: '28%',
-      sortValue: (r) => r.id,
-      render: (r) => <span className="font-mono text-[11px] text-mc-text">{r.id}</span>,
-    },
-    {
-      key: 'type',
-      header: '类型',
-      width: '12%',
-      sortValue: (r) => r.type,
-      render: (r) => (
-        <span
-          className={`rounded-mc px-1.5 py-0.5 text-[10px] ${TAG_TYPE_COLOR[r.type] ?? 'bg-mc-surface-3 text-mc-dim'}`}
-        >
-          {TAG_TYPE_LABEL[r.type] ?? r.type}
-        </span>
-      ),
-    },
-    {
-      key: 'values',
-      header: '条目数',
-      width: '12%',
-      sortValue: (r) => r.values.length,
-      render: (r) => (
-        <span className="rounded-mc bg-mc-surface-3 px-1.5 py-0.5 text-[10px] text-mc-dim">
-          {r.values.length}
-        </span>
-      ),
-    },
-    {
-      key: 'replace',
-      header: '替换模式',
-      width: '14%',
-      render: (r) =>
-        r.replace ? (
-          <span className="rounded-mc bg-orange-500/20 px-1.5 py-0.5 text-[10px] text-orange-400">
-            替换
-          </span>
-        ) : (
-          <span className="rounded-mc bg-blue-500/20 px-1.5 py-0.5 text-[10px] text-blue-400">
-            追加
-          </span>
-        ),
-    },
-    {
-      key: 'preview',
-      header: '前 3 个条目',
-      width: '34%',
-      render: (r) => (r.values.length > 0 ? r.values.slice(0, 3).join(', ') : '—'),
-    },
-  ];
-
-  // ===== 事件列定义 =====
-  const eventColumns: Column<CraftTweakerEventSpec>[] = [
-    {
-      key: 'id',
-      header: '事件 ID',
-      width: '18%',
-      sortValue: (r) => r.id,
-      render: (r) => <span className="font-mono text-[11px] text-mc-text">{r.id}</span>,
-    },
-    {
-      key: 'type',
-      header: '事件类型',
-      width: '22%',
-      sortValue: (r) => r.type,
-      render: (r) => (
-        <span className="rounded-mc bg-purple-500/20 px-1.5 py-0.5 text-[10px] text-purple-400">
-          {r.type}
-        </span>
-      ),
-    },
-    {
-      key: 'target',
-      header: '目标',
-      width: '20%',
-      sortValue: (r) => r.target,
-      render: (r) => r.target || '—',
-    },
-    {
-      key: 'handler',
-      header: 'handler 预览',
-      width: '40%',
-      render: (r) => {
-        const firstLine = r.handler.split('\n')[0] ?? '';
-        return (
-          <span className="font-mono text-[10px] text-mc-dim">
-            {firstLine.length > 50 ? firstLine.slice(0, 50) + '…' : firstLine || '—'}
-          </span>
-        );
-      },
-    },
-  ];
-
-  // ===== 工具提示列定义 =====
-  const tooltipColumns: Column<CraftTweakerTooltipSpec>[] = [
-    {
-      key: 'itemId',
-      header: '物品 ID',
-      width: '32%',
-      sortValue: (r) => r.itemId,
-      render: (r) => <span className="font-mono text-[11px] text-mc-text">{r.itemId}</span>,
-    },
-    {
-      key: 'lines',
-      header: '行数',
-      width: '10%',
-      sortValue: (r) => r.lines.length,
-      render: (r) => (
-        <span className="rounded-mc bg-mc-surface-3 px-1.5 py-0.5 text-[10px] text-mc-dim">
-          {r.lines.length}
-        </span>
-      ),
-    },
-    {
-      key: 'advanced',
-      header: '高级',
-      width: '10%',
-      render: (r) =>
-        r.advanced ? (
-          <span className="rounded-mc bg-yellow-500/20 px-1.5 py-0.5 text-[10px] text-yellow-400">
-            高级
-          </span>
-        ) : (
-          <span className="text-[10px] text-mc-mute">普通</span>
-        ),
-    },
-    {
-      key: 'preview',
-      header: '首行预览',
-      width: '48%',
-      render: (r) => (
-        <span className="text-[11px] text-mc-dim">{r.lines[0]?.slice(0, 50) ?? '—'}</span>
-      ),
-    },
-  ];
-
-  // ===== 语言列定义 =====
-  const langColumns: Column<LangRow>[] = [
-    {
-      key: 'lang',
-      header: '语言',
-      width: '12%',
-      sortValue: (r) => r.lang,
-      render: (r) => (
-        <span className="rounded-mc bg-cyan-500/20 px-1.5 py-0.5 text-[10px] text-cyan-400">
-          {r.lang}
-        </span>
-      ),
-    },
-    {
-      key: 'key',
-      header: '键',
-      width: '38%',
-      sortValue: (r) => r.key,
-      render: (r) => <span className="font-mono text-[11px] text-mc-text">{r.key}</span>,
-    },
-    {
-      key: 'value',
-      header: '值',
-      width: '50%',
-      render: (r) => <span className="text-[11px] text-mc-dim">{r.value}</span>,
-    },
-  ];
+  // ===== 列表列定义 =====
+  const recipeColumns = createRecipeColumns(recipeSelection, removeRecipes);
+  const tagColumns = createTagColumns();
+  const eventColumns = createEventColumns();
+  const tooltipColumns = createTooltipColumns();
+  const langColumns = createLangColumns();
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-mc-surface">
@@ -921,21 +456,4 @@ export function CraftTweakerPreviewPanel() {
       </div>
     </div>
   );
-}
-
-function countByTab(ct: CraftTweakerSpec, tab: CraftTweakerTab, langEntries: number): number {
-  if (tab === 'recipes') return ct.recipes.length;
-  if (tab === 'tags') return ct.tags.length;
-  if (tab === 'events') return ct.events.length;
-  if (tab === 'tooltips') return ct.tooltips.length;
-  if (tab === 'lang') return langEntries;
-  return 0;
-}
-
-function countTagType(ct: CraftTweakerSpec, type: string): number {
-  return ct.tags.filter((t) => t.type === type).length;
-}
-
-function tabLabel(tab: CraftTweakerTab): string {
-  return TABS.find((t) => t.key === tab)?.label ?? '';
 }

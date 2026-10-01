@@ -1,23 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import type { ComponentType } from 'react';
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { TabBar } from '../TabBar.js';
 import { CodePreview } from '../CodePreview.js';
 import { SplitCodeEditor } from '../SplitCodeEditor.js';
 import { ShortcutHelpDialog } from '../ShortcutHelpDialog.js';
-import { ServerPreviewPanel } from './ServerPreviewPanel.js';
-import { ModPreviewPanel } from './ModPreviewPanel.js';
-import { DatapackPreviewPanel } from './DatapackPreviewPanel.js';
-import { ModpackPreviewPanel } from './ModpackPreviewPanel.js';
-import { LauncherPreviewPanel } from './LauncherPreviewPanel.js';
-import { ResourcePackPreviewPanel } from './ResourcePackPreviewPanel.js';
-import { SkinPreviewPanel } from './SkinPreviewPanel.js';
-import { KubejsPreviewPanel } from './KubejsPreviewPanel.js';
-import { CraftTweakerPreviewPanel } from './CraftTweakerPreviewPanel.js';
-import { BehaviorPackPreviewPanel } from './BehaviorPackPreviewPanel.js';
-import { EnchantmentPreviewPanel } from './EnchantmentPreviewPanel.js';
-import { BehaviorItemPreviewPanel } from './BehaviorItemPreviewPanel.js';
-import { BehaviorEntityPreviewPanel } from './BehaviorEntityPreviewPanel.js';
 import { ResourcePackPreview } from '../ResourcePackPreview.js';
 import { NbtEditor } from '../NbtEditor.js';
 import { CommandPalette, type Command } from '../CommandPalette.js';
@@ -31,6 +19,59 @@ import type { GeneratorType } from '@mc-creator/shared';
 import { GENERATOR_DESCRIPTORS } from '../../../../shared/generator-descriptors.js';
 
 type MiddleTab = 'preview' | 'lowcode' | 'resources' | 'nbt' | 'code';
+
+/** 把 `<XxxPreviewPanel />` 形式的命名导出包成 `React.lazy` 可用的默认导出 */
+function lazyNamed<M extends Record<string, unknown>>(
+  loader: () => Promise<M>,
+  name: keyof M & string,
+) {
+  return lazy(async () => ({ default: (await loader())[name] as ComponentType }));
+}
+
+/**
+ * 预览面板按需加载（首屏性能）：13 个面板各自拆成独立 chunk，
+ * 只有切换到「预览」tab 时才拉取当前类型对应的那一个。
+ */
+const ServerPreviewPanel = lazyNamed(() => import('./ServerPreviewPanel.js'), 'ServerPreviewPanel');
+const ModPreviewPanel = lazyNamed(() => import('./ModPreviewPanel.js'), 'ModPreviewPanel');
+const DatapackPreviewPanel = lazyNamed(
+  () => import('./DatapackPreviewPanel.js'),
+  'DatapackPreviewPanel',
+);
+const ModpackPreviewPanel = lazyNamed(
+  () => import('./ModpackPreviewPanel.js'),
+  'ModpackPreviewPanel',
+);
+const LauncherPreviewPanel = lazyNamed(
+  () => import('./LauncherPreviewPanel.js'),
+  'LauncherPreviewPanel',
+);
+const ResourcePackPreviewPanel = lazyNamed(
+  () => import('./ResourcePackPreviewPanel.js'),
+  'ResourcePackPreviewPanel',
+);
+const SkinPreviewPanel = lazyNamed(() => import('./SkinPreviewPanel.js'), 'SkinPreviewPanel');
+const KubejsPreviewPanel = lazyNamed(() => import('./KubejsPreviewPanel.js'), 'KubejsPreviewPanel');
+const CraftTweakerPreviewPanel = lazyNamed(
+  () => import('./CraftTweakerPreviewPanel.js'),
+  'CraftTweakerPreviewPanel',
+);
+const BehaviorPackPreviewPanel = lazyNamed(
+  () => import('./BehaviorPackPreviewPanel.js'),
+  'BehaviorPackPreviewPanel',
+);
+const EnchantmentPreviewPanel = lazyNamed(
+  () => import('./EnchantmentPreviewPanel.js'),
+  'EnchantmentPreviewPanel',
+);
+const BehaviorItemPreviewPanel = lazyNamed(
+  () => import('./BehaviorItemPreviewPanel.js'),
+  'BehaviorItemPreviewPanel',
+);
+const BehaviorEntityPreviewPanel = lazyNamed(
+  () => import('./BehaviorEntityPreviewPanel.js'),
+  'BehaviorEntityPreviewPanel',
+);
 
 /**
  * 中间面板调度器：顶部 tab 切换（预览/资源/NBT/代码），预览 tab 按 generatorType 分发到对应面板。
@@ -373,7 +414,7 @@ export function MiddlePanel() {
         tabIndex={0}
       >
         {activeTab === 'preview' ? (
-          renderPreviewPanel()
+          <Suspense fallback={<PreviewPanelFallback />}>{renderPreviewPanel()}</Suspense>
         ) : activeTab === 'lowcode' ? (
           editorMode === 'purecode' ? (
             <PurecodeWorkspace />
@@ -413,6 +454,15 @@ export function MiddlePanel() {
 
       {/* 快捷键帮助对话框 */}
       <ShortcutHelpDialog open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+    </div>
+  );
+}
+
+/** 预览面板 chunk 加载中的占位（React.lazy 的 fallback） */
+function PreviewPanelFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center bg-mc-bg text-sm text-mc-mute">
+      加载预览…
     </div>
   );
 }
