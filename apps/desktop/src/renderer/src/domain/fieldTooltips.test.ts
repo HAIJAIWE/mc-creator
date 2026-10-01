@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { FIELD_TOOLTIPS, getTooltip } from './fieldTooltips.js';
 
 describe('fieldTooltips', () => {
-  it('item.itemId 有解释且包含 modid:path', () => {
-    expect(getTooltip('item', 'itemId')).toContain('modid:path');
+  it('item.itemId 说明只需本地名（不含命名空间）', () => {
+    const tip = getTooltip('item', 'itemId');
+    expect(tip).toContain('本地名');
+    // 定义型 ID 不应再提示用户手写 modid:path
+    expect(tip).not.toContain('modid:path');
   });
 
   it('item.maxDamage 有解释', () => {

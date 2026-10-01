@@ -12,13 +12,22 @@ function makeSpec(itemOverrides: Partial<Parameters<typeof ModSpec.parse>[0]> = 
   });
 }
 
+/**
+ * 过滤掉「画布无法承载的内容」告警。
+ * makeSpec 的 name（测试模组）与 modId（test_mod）不同，必然命中该告警，
+ * 与被测行为无关，故在断言「无内容告警」时先剔除。
+ */
+function contentWarnings(warnings: string[]): string[] {
+  return warnings.filter((w) => !w.includes('没有对应的画布节点'));
+}
+
 describe('specToNodeGraph（A 桥：spec → 节点图）', () => {
   it('空 spec → 空画布，modId 正确', () => {
     const { graph, warnings } = specToNodeGraph(makeSpec());
     expect(graph.modId).toBe('test_mod');
     expect(graph.nodes).toHaveLength(0);
     expect(graph.edges).toHaveLength(0);
-    expect(warnings).toHaveLength(0);
+    expect(contentWarnings(warnings)).toHaveLength(0);
   });
 
   it('items → item 节点（字段映射 + 端口）', () => {
@@ -101,7 +110,7 @@ describe('specToNodeGraph（A 桥：spec → 节点图）', () => {
     expect(
       edges.some((e) => e.source === 'recipe_0' && e.target === 'item_0' && e.kind === 'craft'),
     ).toBe(true);
-    expect(warnings).toHaveLength(0);
+    expect(contentWarnings(warnings)).toHaveLength(0);
   });
 
   it('recipe 引用 vanilla 材料：生成引用节点（itemId 保留前缀）并提示 warning', () => {
@@ -195,7 +204,7 @@ describe('specToNodeGraph（A 桥：spec → 节点图）', () => {
     expect(controlEdges.some((e) => e.source === 'proc_log' && e.target === 'cond_has_item')).toBe(
       true,
     );
-    expect(warnings).toHaveLength(0);
+    expect(contentWarnings(warnings)).toHaveLength(0);
   });
 
   it('customCode → code 节点（snippetId 即 nodeId，编译往返稳定）', () => {

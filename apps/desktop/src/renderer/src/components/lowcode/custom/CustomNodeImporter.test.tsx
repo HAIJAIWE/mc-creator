@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CustomNodeImporter } from './CustomNodeImporter.js';
-import { customNodeRegistry } from './customNodeRegistry.js';
+import { customNodeRegistry } from '../../../domain/customNodeRegistry.js';
 
 describe('CustomNodeImporter', () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeGraphStore } from './node-graph-store.js';
-import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
+import { customNodeRegistry } from '../domain/customNodeRegistry.js';
 import type { NodeGraph, NodeKind, NodeData } from '@mc-creator/shared';
 
 // 重置用的初始空图（与 store 内 EMPTY_GRAPH 结构一致）

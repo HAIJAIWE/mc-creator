@@ -5,7 +5,7 @@ import type {
   CustomNodeTemplatePart,
   TemplatePartCondition,
 } from '@mc-creator/shared';
-import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
+import { customNodeRegistry } from '../domain/customNodeRegistry.js';
 import { renderMustache } from '../components/lowcode/custom/mustacheRender.js';
 
 /**

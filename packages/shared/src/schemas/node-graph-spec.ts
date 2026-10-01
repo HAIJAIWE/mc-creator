@@ -137,8 +137,14 @@ export type BaseNodeData = z.infer<typeof BaseNodeData>;
 
 export const ItemNodeData = BaseNodeData.extend({
   kind: z.literal('item'),
-  /** 物品 ID（小写下划线） */
-  itemId: z.string().regex(/^[a-z0-9_]+$/),
+  /**
+   * 物品 ID：`id`（本 mod 自定义物品）或 `namespace:path`（引用外部 mod 的物品）。
+   *
+   * 允许带命名空间的两个原因：
+   * 1. 引用型节点（isReference）需要保存外部物品的完整 ID（如 minecraft:diamond）
+   * 2. 抽屉里的 ID 字段用 ResourceIdEditor 编辑，该编辑器固定输出 `modid:path`
+   */
+  itemId: z.string().regex(/^[a-z0-9_]+(?::[a-z0-9_/]+)?$/),
   /** 显示名 */
   displayName: z.string(),
   /** 物品分类 */
@@ -175,6 +181,14 @@ export const ItemNodeData = BaseNodeData.extend({
   glow: z.boolean().default(false),
   /** 贴图路径（相对 resources/） */
   texturePath: z.string().optional(),
+  /**
+   * 引用型节点：代表本 mod 之外的物品（如 minecraft:diamond），仅用于画布连线定位。
+   *
+   * 由 specToNodeGraph 在 spec 的配方引用了非本项目物品时创建。
+   * 编译时必须跳过它，否则会把外部物品「凭空」注册成本 mod 的自定义物品。
+   * 可选：仅生产者会置 true，未标记即普通自定义物品节点。
+   */
+  isReference: z.boolean().optional(),
 });
 export type ItemNodeData = z.infer<typeof ItemNodeData>;
 
@@ -487,8 +501,11 @@ export type LoopNodeData = z.infer<typeof LoopNodeData>;
 /** 生物群系节点 */
 export const BiomeNodeData = BaseNodeData.extend({
   kind: z.literal('biome'),
-  /** 生物群系 id（小写下划线） */
-  biomeId: z.string().default('my_biome'),
+  /** 生物群系 id（小写下划线，定义型 ID，不含命名空间） */
+  biomeId: z
+    .string()
+    .regex(/^[a-z0-9_]+$/)
+    .default('my_biome'),
   /** 显示名 */
   displayName: z.string().default('新生物群系'),
   /** 降水 */
@@ -519,8 +536,11 @@ export type BiomeNodeData = z.infer<typeof BiomeNodeData>;
 /** 维度节点 */
 export const DimensionNodeData = BaseNodeData.extend({
   kind: z.literal('dimension'),
-  /** 维度 id（小写下划线） */
-  dimensionId: z.string().default('my_dimension'),
+  /** 维度 id（小写下划线，定义型 ID，不含命名空间） */
+  dimensionId: z
+    .string()
+    .regex(/^[a-z0-9_]+$/)
+    .default('my_dimension'),
   /** 显示名 */
   displayName: z.string().default('新维度'),
   /** 维度类型模板 */
@@ -547,8 +567,11 @@ export type DimensionNodeData = z.infer<typeof DimensionNodeData>;
 /** 流体节点 */
 export const FluidNodeData = BaseNodeData.extend({
   kind: z.literal('fluid'),
-  /** 流体 id（小写下划线） */
-  fluidId: z.string().default('my_fluid'),
+  /** 流体 id（小写下划线，定义型 ID，不含命名空间） */
+  fluidId: z
+    .string()
+    .regex(/^[a-z0-9_]+$/)
+    .default('my_fluid'),
   /** 显示名 */
   displayName: z.string().default('新流体'),
   /** 颜色（0xRRGGBB） */
@@ -567,8 +590,11 @@ export type FluidNodeData = z.infer<typeof FluidNodeData>;
 /** GUI 节点 */
 export const GuiNodeData = BaseNodeData.extend({
   kind: z.literal('gui'),
-  /** GUI id（小写下划线） */
-  guiId: z.string().default('my_gui'),
+  /** GUI id（小写下划线，定义型 ID，不含命名空间） */
+  guiId: z
+    .string()
+    .regex(/^[a-z0-9_]+$/)
+    .default('my_gui'),
   /** 显示名 */
   displayName: z.string().default('新 GUI'),
   /** GUI 宽度 */

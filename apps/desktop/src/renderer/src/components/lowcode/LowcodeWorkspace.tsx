@@ -21,6 +21,7 @@ import { useModStore } from '../../store/mod-store.js';
 import { useDebuggerStore } from '../../store/debugger-store.js';
 import { specToNodeGraph } from '../../lib/specToNodeGraph.js';
 import { applyGraphToProject } from '../../lib/applyGraphToProject.js';
+import { useToast } from '../useToast.js';
 
 /**
  * P1 dogfood 修复：从 compileResult 中提取编译消息（替代硬编码空数组）。
@@ -131,6 +132,23 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   const { recent, refresh: refreshRecent } = useRecentGraphs();
   /** 屏幕阅读器动态通知（保存/加载/导入/导出状态） */
   const { announce, LiveRegion } = useLiveRegion({ clearAfterMs: 3000 });
+  const { warning: toastWarning } = useToast();
+
+  /**
+   * 把 specToNodeGraph 的有损告警显式暴露给用户。
+   *
+   * 这些告警意味着「spec 里有内容画布表达不了」，用户若在画布上「编译并应用」，
+   * 这些内容会从产物中消失。仅用 announce（屏幕阅读器）不够，必须视觉可见。
+   */
+  const reportSpecLoss = useCallback(
+    (warnings: string[]) => {
+      if (warnings.length === 0) return;
+      const preview = warnings.slice(0, 3).join('；');
+      const more = warnings.length > 3 ? `；等共 ${warnings.length} 条` : '';
+      toastWarning(`画布无法完整表达该项目：${preview}${more}`);
+    },
+    [toastWarning],
+  );
 
   const mode = useEditorModeStore((s) => s.mode);
   // 单一真相源接入：只有 mod 类型支持节点图 ↔ spec 双向同步
@@ -229,7 +247,13 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   // 编译并应用节点图：compileNodeGraph → setSpec → 生成文件 → applyGeneratedFiles（保护手改）
   const handleApply = useCallback(async () => {
     const graph = useNodeGraphStore.getState().graph;
-    const result = await applyGraphToProject(graph, { generatorType, loader, mcVersion });
+    const result = await applyGraphToProject(graph, {
+      generatorType,
+      loader,
+      mcVersion,
+      // 传当前 spec：画布无法表达的内容（模组元信息 / 数据包类内容）保留而不被删除
+      baseSpec: useModStore.getState().spec,
+    });
     // 无论成败都把编译结果喂给错误高亮 / 编译徽章
     setCompileResult({ spec: result.spec, warnings: result.warnings, errors: result.errors });
     if (result.errors.length > 0) {
@@ -248,7 +272,13 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   /** 启动调试器：在编译错误节点设置断点并启动调试器 */
   const handleDebug = useCallback(async () => {
     const graph = useNodeGraphStore.getState().graph;
-    const result = await applyGraphToProject(graph, { generatorType, loader, mcVersion });
+    const result = await applyGraphToProject(graph, {
+      generatorType,
+      loader,
+      mcVersion,
+      // 传当前 spec：画布无法表达的内容（模组元信息 / 数据包类内容）保留而不被删除
+      baseSpec: useModStore.getState().spec,
+    });
     setCompileResult({ spec: result.spec, warnings: result.warnings, errors: result.errors });
 
     // 在错误节点设置断点（优先使用带定位的结构化错误）
@@ -280,12 +310,13 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
     const { graph, warnings } = specToNodeGraph(spec);
     useNodeGraphStore.getState().commit();
     useNodeGraphStore.getState().loadGraph(graph);
+    reportSpecLoss(warnings);
     announce(
       warnings.length > 0
         ? `已从 Spec 导入画布；${warnings.length} 条提示（含未渲染类型说明）`
         : '已从 Spec 导入画布',
     );
-  }, [spec, isModSupported, announce]);
+  }, [spec, isModSupported, announce, reportSpecLoss]);
 
   // 自动导入：整 session 仅一次（空画布 + mod + 有 spec），避免覆盖用户手工搭的图
   const autoImportRef = useRef(false);
@@ -296,6 +327,7 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
     if (useNodeGraphStore.getState().graph.nodes.length > 0) return;
     const { graph, warnings } = specToNodeGraph(spec);
     useNodeGraphStore.getState().loadGraph(graph);
+    reportSpecLoss(warnings);
     if (warnings.length > 0) {
       announce(`已从 Spec 自动导入画布；${warnings.length} 条提示（未渲染类型仅可表单编辑）`);
     }

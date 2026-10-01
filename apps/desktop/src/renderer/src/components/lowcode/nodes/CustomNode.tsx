@@ -2,7 +2,7 @@ import { memo } from 'react';
 import type { NodePort, SubgraphNodeData } from '@mc-creator/shared';
 import { McNodeShell } from './base/McNodeShell.js';
 import { useNodeActions } from './hooks/useNodeActions.js';
-import { customNodeRegistry } from '../custom/customNodeRegistry.js';
+import { customNodeRegistry } from '../../../domain/customNodeRegistry.js';
 
 /**
  * 自定义节点内容组件（由 SubgraphNode 在 data.customTypeId 非空时委托渲染）。

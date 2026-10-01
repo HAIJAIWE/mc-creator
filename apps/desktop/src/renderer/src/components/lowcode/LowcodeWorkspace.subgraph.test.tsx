@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { LowcodeWorkspace } from './LowcodeWorkspace.js';
+import { ToastProvider } from '../ToastProvider.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 
 /**
@@ -83,14 +84,14 @@ describe('LowcodeWorkspace SubgraphWorkspace 集成', () => {
 
   it('editingSubgraphId 为 null 时显示主编辑器', () => {
     useNodeGraphStore.setState({ editingSubgraphId: null });
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(screen.getByTestId('main-editor')).toBeTruthy();
     expect(screen.queryByTestId('subgraph-workspace')).toBeNull();
   });
 
   it('editingSubgraphId 非 null 时显示 SubgraphWorkspace', () => {
     useNodeGraphStore.setState({ editingSubgraphId: 'sg_1' });
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(screen.getByTestId('subgraph-workspace')).toBeTruthy();
     expect(screen.queryByTestId('main-editor')).toBeNull();
   });

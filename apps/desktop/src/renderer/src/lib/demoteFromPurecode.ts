@@ -1,13 +1,6 @@
-import type {
-  NodeGraph,
-  ModNode,
-  ModEdge,
-  NodeData,
-  NodeKind,
-  NodePort,
-  FileNode,
-} from '@mc-creator/shared';
+import type { NodeGraph, ModNode, ModEdge, NodeData, NodeKind, FileNode } from '@mc-creator/shared';
 import { LATEST_FORMAT_VERSION } from '@mc-creator/shared';
+import { getPorts } from '../domain/portSchemas.js';
 
 /**
  * L3 → L2 反向降级路径：从 PurecodeWorkspace 中的 Java/JSON 文件反向提取信息，
@@ -310,88 +303,6 @@ function createDefaultNodeData(kind: NodeKind, id: string): NodeData {
   }
 }
 
-function createDefaultPorts(kind: NodeKind): NodePort[] {
-  switch (kind) {
-    case 'item':
-      return [
-        {
-          id: 'out',
-          label: '物品',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'block':
-      return [
-        {
-          id: 'out',
-          label: '方块',
-          type: 'block_state',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'entity':
-      return [
-        {
-          id: 'out',
-          label: '实体',
-          type: 'entity',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'recipe':
-      return [
-        {
-          id: 'in',
-          label: '材料',
-          type: 'item_stack',
-          direction: 'in',
-          required: true,
-          multiple: true,
-        },
-        {
-          id: 'out',
-          label: '产物',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'event':
-      return [
-        {
-          id: 'trigger',
-          label: '触发',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'code':
-      return [
-        { id: 'in', label: '输入', type: 'any', direction: 'in', required: false, multiple: false },
-        {
-          id: 'out',
-          label: '输出',
-          type: 'any',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    default:
-      return [];
-  }
-}
-
 /** 构造一个完整节点（自动填默认字段 + 端口，位置由布局算法统一设置） */
 function makeNode(id: string, kind: NodeKind, overrides: Record<string, unknown> = {}): ModNode {
   const baseData = createDefaultNodeData(kind, id);
@@ -401,7 +312,7 @@ function makeNode(id: string, kind: NodeKind, overrides: Record<string, unknown>
     type: kind,
     position: { x: 0, y: 0 },
     data: merged,
-    ports: createDefaultPorts(kind),
+    ports: getPorts(merged),
     selected: false,
   };
 }

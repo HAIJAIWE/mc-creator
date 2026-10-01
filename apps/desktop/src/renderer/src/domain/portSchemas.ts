@@ -15,7 +15,8 @@ import type {
  * - 动态端口节点（Plan C 的 variable/loop）：端口标签随 data 字段变化
  * - subgraph 节点：端口来自 graph.subgraphs[portMappings]，需传入 graph 参数
  *
- * createDefaultPorts(kind) 在 store 中保留（向后兼容），内部改为调用 getPorts。
+ * 这是端口定义的唯一来源：store 的 addNode/updateNode、模板（nodeGraphTemplates）
+ * 与反解析（demoteFromPurecode）都由此派生，不再各自维护一份端口表。
  * 所有节点组件渲染端口时用 node.ports（已由 store 初始化），不运行时调 getPorts。
  *
  * @param data 节点数据

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { compileCustomNode } from './compileCustomNode.js';
-import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
+import { customNodeRegistry } from '../domain/customNodeRegistry.js';
 import type { SubgraphNodeData, CustomCodeSnippetSpec } from '@mc-creator/shared';
 
 describe('compileCustomNode', () => {

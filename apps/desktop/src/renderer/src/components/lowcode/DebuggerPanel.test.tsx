@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, within, act } from '@testing-library/react';
 import type { NodeGraph, ModNode, ModEdge, NodeData, NodeKind, NodePort } from '@mc-creator/shared';
 import { DebuggerPanel } from './DebuggerPanel.js';
+import { getPorts } from '../../domain/portSchemas.js';
 import { useDebuggerStore } from '../../store/debugger-store.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 
@@ -68,68 +69,9 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
   }
 }
 
+/** 端口统一由领域层派生（避免测试夹具与实现漂移） */
 function createDefaultPorts(kind: NodeKind): NodePort[] {
-  switch (kind) {
-    case 'event':
-      return [
-        {
-          id: 'trigger',
-          label: '触发',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'condition':
-      return [
-        {
-          id: 'in',
-          label: '输入',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'true',
-          label: '真',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'false',
-          label: '假',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'action':
-      return [
-        {
-          id: 'in',
-          label: '执行',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '完成',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    default:
-      return [];
-  }
+  return getPorts(createDefaultNodeData(kind));
 }
 
 function makeNode(id: string, kind: NodeKind, overrides?: Record<string, unknown>): ModNode {

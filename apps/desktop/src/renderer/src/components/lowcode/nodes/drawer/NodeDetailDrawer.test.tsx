@@ -39,8 +39,8 @@ describe('NodeDetailDrawer', () => {
   it('点击保存触发 saveDraft', async () => {
     const id = useNodeGraphStore.getState().addNode('item', { x: 0, y: 0 });
     useDrawerStore.getState().openDrawer(id);
-    // P2 修复：设置合法的 itemId（modid:path 格式），通过 resourceId 校验
-    useDrawerStore.getState().updateField('itemId', 'mc:new_item');
+    // itemId 是定义型 ID（localId）：设置合法本地名通过校验
+    useDrawerStore.getState().updateField('itemId', 'new_item');
     // 设置 label 通过 required 校验
     useDrawerStore.getState().updateField('label', '测试物品');
 

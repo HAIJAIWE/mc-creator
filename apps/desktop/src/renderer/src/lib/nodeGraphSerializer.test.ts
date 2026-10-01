@@ -12,10 +12,11 @@ import {
 } from './nodeGraphSerializer.js';
 import type { NodeGraph, ModNode, ModEdge, NodeData, NodeKind, NodePort } from '@mc-creator/shared';
 import { LATEST_FORMAT_VERSION } from '@mc-creator/shared';
+import { getPorts } from '../domain/portSchemas.js';
 
 // === 测试辅助函数 ===
-// 复刻 node-graph-store.ts 中的 createDefaultNodeData / createDefaultPorts 逻辑，
-// 用于构造合法测试节点（任务约束不允许修改 store 文件）。
+// 复刻 node-graph-store.ts 的 createDefaultNodeData 逻辑用于构造合法测试节点；
+// 端口统一走领域层 getPorts，不再在测试里维护第二份端口表。
 
 function createDefaultNodeData(kind: NodeKind): NodeData {
   const base = {
@@ -253,180 +254,9 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
   }
 }
 
+/** 端口统一由领域层派生（避免测试夹具与实现漂移） */
 function createDefaultPorts(kind: NodeKind): NodePort[] {
-  switch (kind) {
-    case 'item':
-      return [
-        {
-          id: 'out',
-          label: '物品',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'block':
-      return [
-        {
-          id: 'out',
-          label: '方块',
-          type: 'block_state',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'entity':
-      return [
-        {
-          id: 'out',
-          label: '实体',
-          type: 'entity',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'recipe':
-      return [
-        {
-          id: 'in',
-          label: '材料',
-          type: 'item_stack',
-          direction: 'in',
-          required: true,
-          multiple: true,
-        },
-        {
-          id: 'out',
-          label: '产物',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'machine':
-      return [
-        {
-          id: 'in_item',
-          label: '输入物品',
-          type: 'item_stack',
-          direction: 'in',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'in_energy',
-          label: '能源输入',
-          type: 'energy',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out_item',
-          label: '输出物品',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'multiblock':
-      return [
-        {
-          id: 'controller',
-          label: '控制器',
-          type: 'block_state',
-          direction: 'in',
-          required: true,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '结构',
-          type: 'block_state',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'event':
-      return [
-        {
-          id: 'trigger',
-          label: '触发',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'condition':
-      return [
-        {
-          id: 'in',
-          label: '输入',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'true',
-          label: '真',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'false',
-          label: '假',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'action':
-      return [
-        {
-          id: 'in',
-          label: '执行',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '完成',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'code':
-      return [
-        { id: 'in', label: '输入', type: 'any', direction: 'in', required: false, multiple: false },
-        {
-          id: 'out',
-          label: '输出',
-          type: 'any',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'comment':
-      return [];
-    default:
-      return [];
-  }
+  return getPorts(createDefaultNodeData(kind));
 }
 
 /** 构造测试用节点，覆盖默认 data 字段，可通过 overrides 覆盖 */

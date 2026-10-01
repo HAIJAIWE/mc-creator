@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { compileNodeGraph, preloadExternalMods } from './compileNodeGraph.js';
 import { useNodeGraphStore } from '../store/node-graph-store.js';
 import { subgraphManager } from '../components/lowcode/subgraph/subgraphManager.js';
-import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
+import { customNodeRegistry } from '../domain/customNodeRegistry.js';
 import type { ModNode } from '@mc-creator/shared';
 
 /**

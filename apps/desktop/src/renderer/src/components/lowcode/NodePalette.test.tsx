@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { NodePalette } from './NodePalette.js';
-import { customNodeRegistry } from './custom/customNodeRegistry.js';
+import { customNodeRegistry } from '../../domain/customNodeRegistry.js';
 
 vi.mock('../../store/node-graph-store.js', () => ({
   useNodeGraphStore: (sel: (s: unknown) => unknown) => {

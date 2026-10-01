@@ -1,7 +1,8 @@
 import { createWithEqualityFn } from 'zustand/traditional';
 import type { NodeData } from '@mc-creator/shared';
 import { useNodeGraphStore } from './node-graph-store.js';
-import { getFieldSchemas } from '../components/lowcode/nodes/drawer/fieldSchemas.js';
+import { getFieldSchemas } from '../domain/fieldSchemas.js';
+import { validateIdField } from '../domain/idRules.js';
 
 /**
  * 抽屉状态管理（草稿模式，契约 §4）。
@@ -57,8 +58,10 @@ function validateDraft(draft: NodeData): Record<string, string> {
       if (f.min !== undefined && v < f.min) errors[f.key] = `值 ${v} 小于最小值 ${f.min}`;
       if (f.max !== undefined && v > f.max) errors[f.key] = `值 ${v} 大于最大值 ${f.max}`;
     }
-    if (f.type === 'resourceId' && typeof v === 'string' && v.length > 0) {
-      if (!/^[a-z0-9_]+:[a-z0-9_/]+$/.test(v)) errors[f.key] = `格式错误，应为 modid:path`;
+    // ID 类字段格式校验（localId / resourceId），规则见 domain/idRules.ts
+    if (typeof v === 'string') {
+      const idError = validateIdField(f.type, v);
+      if (idError) errors[f.key] = idError;
     }
     if (f.pattern && typeof v === 'string' && v.length > 0) {
       if (!new RegExp(f.pattern).test(v))

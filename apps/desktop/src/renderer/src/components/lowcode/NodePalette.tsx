@@ -8,7 +8,7 @@ import {
   type NodeGraphTemplate,
 } from '../../lib/nodeGraphTemplates.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
-import { customNodeRegistry } from './custom/customNodeRegistry.js';
+import { customNodeRegistry } from '../../domain/customNodeRegistry.js';
 import { CustomNodeImporter } from './custom/CustomNodeImporter.js';
 
 const COLOR_TEXT_CLASSES: Record<string, string> = {

@@ -2,19 +2,21 @@ import { memo, useMemo, useCallback } from 'react';
 import type { NodeData, NodeGraph } from '@mc-creator/shared';
 import { useDrawerStore } from '../../../../store/drawer-store.js';
 import { useNodeGraphStore } from '../../../../store/node-graph-store.js';
-import { getFieldSchemas } from './fieldSchemas.js';
+import { getFieldSchemas } from '../../../../domain/fieldSchemas.js';
 import type { FieldSchema } from './editors/types.js';
 import { NumberStepperEditor } from './editors/NumberStepperEditor.js';
 import { DropdownEditor } from './editors/DropdownEditor.js';
 import { SegmentedEditor } from './editors/SegmentedEditor.js';
 import { ColorEditor } from './editors/ColorEditor.js';
+import { LocalIdEditor } from './editors/LocalIdEditor.js';
 import { ResourceIdEditor } from './editors/ResourceIdEditor.js';
+import { validateIdField } from '../../../../domain/idRules.js';
 import { NbtEditor } from './editors/NbtEditor.js';
 import { NodeRefEditor } from './editors/NodeRefEditor.js';
 import { CodeEditor } from './editors/CodeEditor.js';
 import { ListEditor } from './editors/ListEditor.js';
 import { FieldLabel } from './FieldLabel.js';
-import { getTooltip } from './fieldTooltips.js';
+import { getTooltip } from '../../../../domain/fieldTooltips.js';
 import { ErrorRecovery } from './ErrorRecovery.js';
 import { getErrorSuggestion, getFixLabel } from './ErrorRecovery.utils.js';
 
@@ -36,10 +38,10 @@ function validateField(field: FieldSchema, value: unknown): string | undefined {
       return `值 ${value} 大于最大值 ${field.max}`;
     }
   }
-  if (field.type === 'resourceId' && typeof value === 'string' && value.length > 0) {
-    if (!/^[a-z0-9_]+:[a-z0-9_/]+$/.test(value)) {
-      return `格式错误，应为 modid:path（全小写+下划线）`;
-    }
+  // ID 类字段格式校验（localId / resourceId），规则见 domain/idRules.ts
+  if (typeof value === 'string') {
+    const idError = validateIdField(field.type, value);
+    if (idError) return idError;
   }
   // P1-4 dogfood：pattern 正则校验（如 Java 标识符合法性）
   if (field.pattern && typeof value === 'string' && value.length > 0) {
@@ -89,6 +91,15 @@ function renderEditor(
       return (
         <ColorEditor
           value={String(value ?? '#FFFFFF')}
+          onChange={onChange}
+          schema={field}
+          graph={graph}
+        />
+      );
+    case 'localId':
+      return (
+        <LocalIdEditor
+          value={String(value ?? '')}
           onChange={onChange}
           schema={field}
           graph={graph}

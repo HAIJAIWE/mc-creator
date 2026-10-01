@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { LowcodeWorkspace } from './LowcodeWorkspace.js';
+import { ToastProvider } from '../ToastProvider.js';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 import { useEditorModeStore } from '../../store/editor-mode-store.js';
 
@@ -99,7 +100,7 @@ afterEach(() => {
 
 describe('LowcodeWorkspace', () => {
   it('渲染冒烟：包含 NodePalette / NodeGraphEditor / 右侧工具栏', () => {
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     // NodePalette 有 role="search" + aria-label "节点库面板"
     expect(screen.getByRole('search', { name: /节点库面板/ })).toBeTruthy();
     // NodeGraphEditor 有 role="application" + aria-label "节点图画布"
@@ -118,7 +119,7 @@ describe('LowcodeWorkspace', () => {
     const { addNode, commit } = useNodeGraphStore.getState();
     commit();
     addNode('item', { x: 100, y: 100 });
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(useNodeGraphStore.getState().undoStack.length).toBe(1);
     expect(useNodeGraphStore.getState().graph.nodes.length).toBe(1);
 
@@ -138,7 +139,7 @@ describe('LowcodeWorkspace', () => {
     commit();
     addNode('item', { x: 100, y: 100 });
     undo();
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(useNodeGraphStore.getState().redoStack.length).toBe(1);
     expect(useNodeGraphStore.getState().graph.nodes.length).toBe(0);
 
@@ -157,7 +158,7 @@ describe('LowcodeWorkspace', () => {
     commit();
     addNode('block', { x: 50, y: 50 });
     undo();
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(useNodeGraphStore.getState().redoStack.length).toBe(1);
     expect(useNodeGraphStore.getState().graph.nodes.length).toBe(0);
 
@@ -174,7 +175,7 @@ describe('LowcodeWorkspace', () => {
     // 准备：addNode 会自动选中
     const { addNode } = useNodeGraphStore.getState();
     addNode('item', { x: 100, y: 100 });
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(useNodeGraphStore.getState().graph.nodes.length).toBe(1);
     expect(useNodeGraphStore.getState().selectedNodeId).not.toBeNull();
 
@@ -195,7 +196,7 @@ describe('LowcodeWorkspace', () => {
     // 准备：addNode 自动选中
     const { addNode } = useNodeGraphStore.getState();
     addNode('item', { x: 100, y: 100 });
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(useNodeGraphStore.getState().selectedNodeId).not.toBeNull();
 
     // 触发 Escape
@@ -210,7 +211,7 @@ describe('LowcodeWorkspace', () => {
     const { addNode, commit } = useNodeGraphStore.getState();
     addNode('item', { x: 100, y: 100 });
     commit();
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(useNodeGraphStore.getState().undoStack.length).toBe(1);
 
     // 模拟 Monaco 编辑器容器：创建带 .monaco-editor 类的元素并聚焦其内部 input
@@ -238,7 +239,7 @@ describe('LowcodeWorkspace', () => {
     const { addNode, commit } = useNodeGraphStore.getState();
     addNode('item', { x: 100, y: 100 });
     commit();
-    render(<LowcodeWorkspace readOnly />);
+    render(<LowcodeWorkspace readOnly />, { wrapper: ToastProvider });
     expect(screen.getByText('只读预览模式')).toBeTruthy();
     expect(useNodeGraphStore.getState().undoStack.length).toBe(1);
 
@@ -250,7 +251,7 @@ describe('LowcodeWorkspace', () => {
   });
 
   it('撤销/重做按钮 title 含快捷键提示', () => {
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(screen.getByTitle('撤销 (Ctrl+Z)')).toBeTruthy();
     expect(screen.getByTitle('重做 (Ctrl+Y)')).toBeTruthy();
   });
@@ -265,14 +266,14 @@ describe('LowcodeWorkspace SubgraphWorkspace 集成', () => {
 
   it('editingSubgraphId 为 null 时显示主编辑器', () => {
     useNodeGraphStore.setState({ editingSubgraphId: null });
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(screen.getByTestId('main-editor')).toBeTruthy();
     expect(screen.queryByTestId('subgraph-workspace')).toBeNull();
   });
 
   it('editingSubgraphId 非 null 时显示 SubgraphWorkspace', () => {
     useNodeGraphStore.setState({ editingSubgraphId: 'sg_1' });
-    render(<LowcodeWorkspace />);
+    render(<LowcodeWorkspace />, { wrapper: ToastProvider });
     expect(screen.getByTestId('subgraph-workspace')).toBeTruthy();
     expect(screen.queryByTestId('main-editor')).toBeNull();
   });

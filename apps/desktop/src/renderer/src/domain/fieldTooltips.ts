@@ -15,7 +15,7 @@ export const FIELD_TOOLTIPS: Record<string, string> = {
 
   // === item ===
   'item.itemId':
-    '资源 ID，格式 modid:path。modid 是你的 mod 标识（如 mymod），path 是物品标识（如 iron_sword）。最终游戏内为 mymod:iron_sword',
+    '物品标识的本地名，只填小写字母/数字/下划线（如 iron_sword）。命名空间固定为当前 mod，无需手写；游戏内完整 ID 为「当前mod:iron_sword」',
   'item.displayName': '游戏中显示的名称（支持中文，如「红宝石剑」）',
   'item.category':
     '物品分类，决定行为模式：sword/pickaxe/axe 等工具武器、food 食物、material 材料、misc 杂项',

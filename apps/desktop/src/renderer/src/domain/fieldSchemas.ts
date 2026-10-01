@@ -1,5 +1,5 @@
 import type { NodeData, NodeKind } from '@mc-creator/shared';
-import type { FieldSchema } from './editors/types.js';
+import type { FieldSchema } from './field-types.js';
 
 /**
  * 公共字段：所有节点都有 label/note。
@@ -33,7 +33,7 @@ const COMMON_FIELDS: FieldSchema[] = [
 
 /** item 节点字段 */
 const ITEM_FIELDS: FieldSchema[] = [
-  { key: 'itemId', label: '物品 ID', type: 'resourceId', required: true },
+  { key: 'itemId', label: '物品 ID', type: 'localId', required: true },
   { key: 'displayName', label: '显示名', type: 'text', required: true },
   {
     key: 'rarity',
@@ -54,7 +54,7 @@ const ITEM_FIELDS: FieldSchema[] = [
 
 /** block 节点字段 */
 const BLOCK_FIELDS: FieldSchema[] = [
-  { key: 'blockId', label: '方块 ID', type: 'resourceId', required: true },
+  { key: 'blockId', label: '方块 ID', type: 'localId', required: true },
   { key: 'displayName', label: '显示名', type: 'text', required: true },
   { key: 'hardness', label: '硬度', type: 'number', min: 0, max: 999, step: 0.5 },
   { key: 'blastResistance', label: '抗爆性', type: 'number', min: 0, max: 9999, step: 0.5 },
@@ -72,7 +72,7 @@ const BLOCK_FIELDS: FieldSchema[] = [
 
 /** entity 节点字段 */
 const ENTITY_FIELDS: FieldSchema[] = [
-  { key: 'entityId', label: '实体 ID', type: 'resourceId', required: true },
+  { key: 'entityId', label: '实体 ID', type: 'localId', required: true },
   { key: 'displayName', label: '显示名', type: 'text', required: true },
   {
     key: 'classification',
@@ -88,7 +88,7 @@ const ENTITY_FIELDS: FieldSchema[] = [
 
 /** recipe 节点字段 */
 const RECIPE_FIELDS: FieldSchema[] = [
-  { key: 'recipeId', label: '配方 ID', type: 'resourceId', required: true },
+  { key: 'recipeId', label: '配方 ID', type: 'localId', required: true },
   {
     key: 'recipeType',
     label: '配方类型',
@@ -167,7 +167,7 @@ const RECIPE_FIELDS: FieldSchema[] = [
 
 /** machine 节点字段 */
 const MACHINE_FIELDS: FieldSchema[] = [
-  { key: 'machineId', label: '机器 ID', type: 'resourceId', required: true },
+  { key: 'machineId', label: '机器 ID', type: 'localId', required: true },
   { key: 'displayName', label: '显示名', type: 'text', required: true },
   { key: 'energyCapacity', label: '能源容量', type: 'number', min: 0, max: 999999, step: 100 },
   { key: 'inputSlots', label: '输入槽位数', type: 'number', min: 0, max: 27, step: 1 },
@@ -191,7 +191,7 @@ const MACHINE_FIELDS: FieldSchema[] = [
 
 /** multiblock 节点字段 */
 const MULTIBLOCK_FIELDS: FieldSchema[] = [
-  { key: 'structureId', label: '结构 ID', type: 'resourceId', required: true },
+  { key: 'structureId', label: '结构 ID', type: 'localId', required: true },
   { key: 'displayName', label: '显示名', type: 'text', required: true },
   { key: 'width', label: '宽', type: 'number', min: 1, max: 16, step: 1 },
   { key: 'height', label: '高', type: 'number', min: 1, max: 16, step: 1 },
@@ -421,7 +421,7 @@ const PROCEDURE_FIELDS: FieldSchema[] = [
 
 /** biome 节点字段（世界生成） */
 const BIOME_FIELDS: FieldSchema[] = [
-  { key: 'biomeId', label: '生物群系 ID', type: 'resourceId', required: true },
+  { key: 'biomeId', label: '生物群系 ID', type: 'localId', required: true },
   { key: 'displayName', label: '显示名', type: 'text', required: true },
   {
     key: 'precipitation',
@@ -446,7 +446,7 @@ const BIOME_FIELDS: FieldSchema[] = [
 
 /** dimension 节点字段（世界生成） */
 const DIMENSION_FIELDS: FieldSchema[] = [
-  { key: 'dimensionId', label: '维度 ID', type: 'resourceId', required: true },
+  { key: 'dimensionId', label: '维度 ID', type: 'localId', required: true },
   { key: 'displayName', label: '显示名', type: 'text', required: true },
   {
     key: 'baseType',
@@ -485,7 +485,7 @@ const DIMENSION_FIELDS: FieldSchema[] = [
 
 /** fluid 节点字段（流体） */
 const FLUID_FIELDS: FieldSchema[] = [
-  { key: 'fluidId', label: '流体 ID', type: 'resourceId', required: true },
+  { key: 'fluidId', label: '流体 ID', type: 'localId', required: true },
   { key: 'displayName', label: '显示名', type: 'text', required: true },
   { key: 'color', label: '颜色', type: 'color' },
   { key: 'temperature', label: '温度 (K)', type: 'number', min: 0, max: 2000, step: 10 },
@@ -501,7 +501,7 @@ const FLUID_FIELDS: FieldSchema[] = [
 
 /** gui 节点字段（容器界面） */
 const GUI_FIELDS: FieldSchema[] = [
-  { key: 'guiId', label: 'GUI ID', type: 'resourceId', required: true },
+  { key: 'guiId', label: 'GUI ID', type: 'localId', required: true },
   { key: 'displayName', label: '显示名', type: 'text', required: true },
   { key: 'width', label: '宽度', type: 'number', min: 176, max: 256, step: 1 },
   { key: 'height', label: '高度', type: 'number', min: 166, max: 256, step: 1 },

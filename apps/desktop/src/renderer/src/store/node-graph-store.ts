@@ -10,8 +10,8 @@ import type {
 import { LATEST_FORMAT_VERSION } from '@mc-creator/shared';
 import type { CompileResult } from '../lib/compileNodeGraph.js';
 import { serializeGraph, safeDeserializeGraph } from '../lib/nodeGraphSerializer.js';
-import { getPorts } from '../components/lowcode/nodes/portSchemas.js';
-import { customNodeRegistry } from '../components/lowcode/custom/customNodeRegistry.js';
+import { getPorts } from '../domain/portSchemas.js';
+import { customNodeRegistry } from '../domain/customNodeRegistry.js';
 
 /**
  * 为 procedure 节点生成不冲突的 procedureName（Java 方法名需唯一）。
@@ -384,67 +384,6 @@ export function createDefaultNodeData(kind: NodeKind, _modId: string): NodeData 
   }
 }
 
-/** 根据节点类型返回默认端口（委托给 portSchemas.getPorts） */
-function createDefaultPorts(kind: NodeKind): NodeGraphState['graph']['nodes'][number]['ports'] {
-  // 阶段 C 新节点：variable/subgraph/loop 的端口直接生成（Task 9 会同步到 getPorts）
-  switch (kind) {
-    case 'variable':
-      return [
-        {
-          id: 'value',
-          label: '变量',
-          type: 'integer',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'subgraph':
-      // 子图节点端口由 portMappings 动态生成，默认空（getPorts 在 Task 9 处理）
-      return [];
-    case 'loop':
-      return [
-        {
-          id: 'input',
-          label: '输入',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'loop_var',
-          label: '循环变量',
-          type: 'integer',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'body',
-          label: '循环体',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'done',
-          label: '完成',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    default: {
-      // 原 11 种节点：构造最小默认 data 以调用 getPorts
-      const data = createDefaultNodeData(kind, '');
-      return getPorts(data);
-    }
-  }
-}
-
 const EMPTY_GRAPH: NodeGraph = {
   version: 1,
   modId: '',
@@ -484,7 +423,8 @@ export const useNodeGraphStore = createWithEqualityFn<NodeGraphState>((set, get)
       type: kind,
       position,
       data,
-      ports: createDefaultPorts(kind),
+      // 端口统一由 domain/portSchemas.getPorts 派生（与 updateNode 同一来源，避免双份端口定义）
+      ports: getPorts(data, get().graph),
       selected: false,
     };
     set((state) => ({

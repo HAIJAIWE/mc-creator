@@ -10,6 +10,7 @@ import {
   getNextNodes,
   evaluateNode,
 } from './nodeGraphDebugger.js';
+import { getPorts } from '../domain/portSchemas.js';
 
 /**
  * 节点图调试器引擎测试
@@ -262,80 +263,9 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
   }
 }
 
+/** 端口统一由领域层派生（避免测试夹具与实现漂移） */
 function createDefaultPorts(kind: NodeKind): NodePort[] {
-  switch (kind) {
-    case 'event':
-      return [
-        {
-          id: 'trigger',
-          label: '触发',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'condition':
-      return [
-        {
-          id: 'in',
-          label: '输入',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'true',
-          label: '真',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'false',
-          label: '假',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'action':
-      return [
-        {
-          id: 'in',
-          label: '执行',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '完成',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'code':
-      return [
-        { id: 'in', label: '输入', type: 'any', direction: 'in', required: false, multiple: false },
-        {
-          id: 'out',
-          label: '输出',
-          type: 'any',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    default:
-      return [];
-  }
+  return getPorts(createDefaultNodeData(kind));
 }
 
 /** 构造测试用节点，覆盖默认 data 字段 */

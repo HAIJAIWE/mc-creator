@@ -24,6 +24,9 @@ export function getErrorSuggestion(
   if (field.type === 'resourceId' && /格式错误/.test(error)) {
     return `示例：mymod:iron_sword（modid:path，全小写+下划线）`;
   }
+  if (field.type === 'localId' && /格式错误/.test(error)) {
+    return `示例：ruby_sword（全小写字母+下划线，命名空间由当前 mod 自动决定）`;
+  }
   return undefined;
 }
 

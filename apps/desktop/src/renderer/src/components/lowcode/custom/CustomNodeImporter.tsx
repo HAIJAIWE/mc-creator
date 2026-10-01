@@ -1,5 +1,5 @@
 import { useState, useCallback, type ChangeEvent } from 'react';
-import { customNodeRegistry } from './customNodeRegistry.js';
+import { customNodeRegistry } from '../../../domain/customNodeRegistry.js';
 
 interface CustomNodeImporterProps {
   onClose: () => void;

@@ -1,5 +1,6 @@
 import type { NodeGraph, ModNode, ModEdge, NodeData, NodeKind, NodePort } from '@mc-creator/shared';
 import { LATEST_FORMAT_VERSION } from '@mc-creator/shared';
+import { getPorts } from '../domain/portSchemas.js';
 
 /**
  * 节点图模板
@@ -288,190 +289,13 @@ function createDefaultNodeData(kind: NodeKind): NodeData {
   }
 }
 
-/** 根据节点类型返回默认端口（与 node-graph-store.ts 保持一致） */
-function createDefaultPorts(kind: NodeKind): NodePort[] {
-  switch (kind) {
-    case 'item':
-      return [
-        {
-          id: 'out',
-          label: '物品',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'block':
-      return [
-        {
-          id: 'out',
-          label: '方块',
-          type: 'block_state',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'entity':
-      return [
-        {
-          id: 'out',
-          label: '实体',
-          type: 'entity',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'recipe':
-      return [
-        {
-          id: 'in',
-          label: '材料',
-          type: 'item_stack',
-          direction: 'in',
-          required: true,
-          multiple: true,
-        },
-        {
-          id: 'out',
-          label: '产物',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'machine':
-      return [
-        {
-          id: 'in_item',
-          label: '输入物品',
-          type: 'item_stack',
-          direction: 'in',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'in_energy',
-          label: '能源输入',
-          type: 'energy',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out_item',
-          label: '输出物品',
-          type: 'item_stack',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'multiblock':
-      return [
-        {
-          id: 'controller',
-          label: '控制器',
-          type: 'block_state',
-          direction: 'in',
-          required: true,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '结构',
-          type: 'block_state',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'event':
-      return [
-        {
-          id: 'trigger',
-          label: '触发',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'condition':
-      return [
-        {
-          id: 'in',
-          label: '输入',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'true',
-          label: '真',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-        {
-          id: 'false',
-          label: '假',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'action':
-      return [
-        {
-          id: 'in',
-          label: '执行',
-          type: 'void',
-          direction: 'in',
-          required: false,
-          multiple: false,
-        },
-        {
-          id: 'out',
-          label: '完成',
-          type: 'void',
-          direction: 'out',
-          required: false,
-          multiple: true,
-        },
-      ];
-    case 'code':
-      return [
-        { id: 'in', label: '输入', type: 'any', direction: 'in', required: false, multiple: false },
-        {
-          id: 'out',
-          label: '输出',
-          type: 'any',
-          direction: 'out',
-          required: false,
-          multiple: false,
-        },
-      ];
-    case 'comment':
-      return [];
-    default:
-      return [];
-  }
-}
-
 /**
  * 构造模板用节点
  * @param id 节点 id（如 'item_1'）
  * @param kind 节点类型
  * @param position 节点位置
  * @param dataOverrides data 字段覆盖（如 { itemId: 'ruby', displayName: '红宝石' }）
- * @param ports 自定义端口（不传则使用 createDefaultPorts）
+ * @param ports 自定义端口（不传则由 data 经 getPorts 派生）
  */
 function makeNode(
   id: string,
@@ -487,7 +311,7 @@ function makeNode(
     type: kind,
     position,
     data: merged,
-    ports: ports ?? createDefaultPorts(kind),
+    ports: ports ?? getPorts(merged),
     selected: false,
   };
 }

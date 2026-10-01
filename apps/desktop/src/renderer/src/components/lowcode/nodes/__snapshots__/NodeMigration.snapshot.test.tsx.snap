@@ -2896,7 +2896,7 @@ exports[`节点迁移快照测试 > loop 节点展开状态快照 1`] = `
         <span
           class="select-none"
         >
-          循环变量
+          i
         </span>
         <div
           class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
@@ -3018,7 +3018,7 @@ exports[`节点迁移快照测试 > loop 节点折叠状态快照 1`] = `
         <span
           class="select-none"
         >
-          循环变量
+          i
         </span>
         <div
           class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
@@ -3159,7 +3159,7 @@ exports[`节点迁移快照测试 > loop 节点选中状态快照 1`] = `
         <span
           class="select-none"
         >
-          循环变量
+          i
         </span>
         <div
           class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
@@ -4831,7 +4831,7 @@ exports[`节点迁移快照测试 > variable 节点展开状态快照 1`] = `
         <span
           class="select-none"
         >
-          变量
+          var1
         </span>
         <div
           class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
@@ -4896,7 +4896,7 @@ exports[`节点迁移快照测试 > variable 节点折叠状态快照 1`] = `
         <span
           class="select-none"
         >
-          变量
+          var1
         </span>
         <div
           class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"
@@ -4986,7 +4986,7 @@ exports[`节点迁移快照测试 > variable 节点选中状态快照 1`] = `
         <span
           class="select-none"
         >
-          变量
+          var1
         </span>
         <div
           class="react-flow__handle react-flow__handle-right nodrag nopan source connectable connectablestart connectableend connectionindicator"

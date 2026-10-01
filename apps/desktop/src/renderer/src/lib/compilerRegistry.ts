@@ -31,9 +31,12 @@ import {
  */
 
 // --- item ---
+// 引用型 item 节点（isReference）只用于画布连线定位，代表本 mod 之外的物品
+// （如 minecraft:diamond）。编译时跳过，否则会把外部物品"凭空"注册成本 mod 的物品。
 registerCompiler({
   kind: 'item',
-  compile: (node) => ({ items: [compileItemNode(node)] }),
+  compile: (node) =>
+    node.data.kind === 'item' && node.data.isReference ? {} : { items: [compileItemNode(node)] },
 });
 
 // --- block ---

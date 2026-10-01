@@ -1,7 +1,7 @@
 import type { NodeGraph, ModNode, ModEdge, NodeData } from '@mc-creator/shared';
 import type { ModSpec, BlockSpec } from '@mc-creator/shared';
 import { createDefaultNodeData } from '../store/node-graph-store.js';
-import { getPorts } from '../components/lowcode/nodes/portSchemas.js';
+import { getPorts } from '../domain/portSchemas.js';
 
 /**
  * A 桥：ModSpec → NodeGraph
@@ -207,7 +207,8 @@ export function specToNodeGraph(spec: ModSpec): SpecToNodeGraphResult {
     nodes.push(
       makeNode(
         'item',
-        { nodeId, itemId, displayName: itemId },
+        // isReference：标记为「引用型」——仅用于连线定位，编译时不生成为本 mod 的物品
+        { nodeId, itemId, displayName: itemId, isReference: true },
         { x: 1140 + (refCounter % 2) * 280, y: Math.floor(refCounter / 2) * 170 + 40 },
       ),
     );
@@ -505,6 +506,58 @@ export function specToNodeGraph(spec: ModSpec): SpecToNodeGraphResult {
     );
     nodes.push(node);
   });
+
+  // === 画布无法承载的内容：显式告知用户 ===
+  // 这些内容没有对应的节点类型或节点数据字段，不会被渲染到画布；
+  // 用户一旦在画布上「编译并应用」，compileNodeGraph 产出的 spec 就不再包含它们。
+  // 不在此处告警就会退化成静默的数据丢失。
+  const missingCategories: string[] = [];
+  if (spec.name !== spec.modId || spec.description !== '') missingCategories.push('模组名称/描述');
+  if (spec.version !== '1.0.0') missingCategories.push('版本号');
+  if (spec.license !== 'MIT') missingCategories.push('许可证');
+  if (spec.authors.length > 0) missingCategories.push('作者');
+  if (spec.credits !== '') missingCategories.push('致谢');
+  if (spec.dependencies.length > 0) missingCategories.push('模组依赖');
+  if (spec.website !== '') missingCategories.push('主页');
+  if (spec.lootTables.length > 0) missingCategories.push('战利品表');
+  if (spec.advancements.length > 0) missingCategories.push('进度');
+  if (spec.tags.length > 0) missingCategories.push('标签');
+  if (spec.functions.length > 0) missingCategories.push('函数');
+  if (spec.structures.length > 0) missingCategories.push('结构');
+  if (missingCategories.length > 0) {
+    warnings.push(
+      `以下内容没有对应的画布节点，在画布「编译并应用」后会从产物中移除：${missingCategories.join('、')}`,
+    );
+  }
+
+  // 物品/方块上画布不承载的字段（回编时同样会丢失）
+  const itemsWithHiddenFields = spec.items.filter(
+    (it) =>
+      it.fuelTick > 0 ||
+      it.lore !== '' ||
+      it.attributes.length > 0 ||
+      it.defaultEnchantments.length > 0 ||
+      it.food !== undefined ||
+      it.creativeTab !== 'inventory',
+  );
+  if (itemsWithHiddenFields.length > 0) {
+    warnings.push(
+      `物品 ${itemsWithHiddenFields.map((i) => i.id).join('、')} 的燃料/说明/属性修饰符/默认附魔/食物/创造标签页字段不会出现在画布上`,
+    );
+  }
+  const blocksWithHiddenFields = spec.blocks.filter(
+    (b) =>
+      b.miningLevel > 0 ||
+      !b.dropSelf ||
+      b.dropItem !== '' ||
+      b.stateProperties.length > 0 ||
+      b.collisionShapes.length > 0,
+  );
+  if (blocksWithHiddenFields.length > 0) {
+    warnings.push(
+      `方块 ${blocksWithHiddenFields.map((b) => b.id).join('、')} 的挖掘等级/掉落设置/方块状态/碰撞体积不会出现在画布上`,
+    );
+  }
 
   const graph: NodeGraph = {
     version: 1,
