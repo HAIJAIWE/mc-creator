@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { StreamRequestId } from './stream.js';
 
 export const BuildRequest = z.object({
   projectPath: z.string().min(1),
@@ -14,12 +15,18 @@ export const BuildResponse = z.object({
 // === 流式构建（P20） ===
 export const BUILD_STREAM = 'mod:buildStream';
 export const BUILD_STREAM_CHUNK = 'mod:buildStream:chunk';
-export const BuildStreamRequest = z.object({ projectPath: z.string().min(1) });
+export const BuildStreamRequest = z.object({
+  projectPath: z.string().min(1),
+  /** 并发流隔离：主进程每个 chunk 原样回传，接收方按此过滤 */
+  requestId: StreamRequestId,
+});
 export const BuildStreamChunk = z.object({
   type: z.enum(['stdout', 'stderr', 'exit']),
   text: z.string(),
   done: z.boolean(),
   exitCode: z.number().nullable().optional(),
+  /** 该分片所属的流 id（见 stream.ts） */
+  requestId: StreamRequestId,
 });
 export type BuildStreamReq = z.infer<typeof BuildStreamRequest>;
 export type BuildStreamChunkT = z.infer<typeof BuildStreamChunk>;

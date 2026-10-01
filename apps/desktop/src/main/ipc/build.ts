@@ -96,7 +96,11 @@ export function registerBuildHandlers(): void {
     const req = AiFixSuggestRequest.parse(raw);
     const config = loadModelConfig();
     if (!config.apiKey) {
-      e.sender.send(AI_FIX_SUGGEST_CHUNK, { delta: '请先在设置中配置 API Key。', done: true });
+      e.sender.send(AI_FIX_SUGGEST_CHUNK, {
+        delta: '请先在设置中配置 API Key。',
+        done: true,
+        requestId: req.requestId,
+      });
       return;
     }
 
@@ -131,10 +135,18 @@ ${req.buildLog}
         system:
           '你是 Minecraft 模组开发专家，擅长诊断构建错误并提供修复方案。回答使用中文，简洁清晰，重点突出。',
       })) {
-        e.sender.send(AI_FIX_SUGGEST_CHUNK, { delta: chunk.delta, done: chunk.done });
+        e.sender.send(AI_FIX_SUGGEST_CHUNK, {
+          delta: chunk.delta,
+          done: chunk.done,
+          requestId: req.requestId,
+        });
       }
     } catch (err) {
-      e.sender.send(AI_FIX_SUGGEST_CHUNK, { delta: `错误：${(err as Error).message}`, done: true });
+      e.sender.send(AI_FIX_SUGGEST_CHUNK, {
+        delta: `错误：${(err as Error).message}`,
+        done: true,
+        requestId: req.requestId,
+      });
     }
   });
 
@@ -149,10 +161,20 @@ ${req.buildLog}
     activeBuildProcesses.add(child);
 
     child.stdout?.on('data', (data) => {
-      e.sender.send(BUILD_STREAM_CHUNK, { type: 'stdout', text: data.toString(), done: false });
+      e.sender.send(BUILD_STREAM_CHUNK, {
+        type: 'stdout',
+        text: data.toString(),
+        done: false,
+        requestId: req.requestId,
+      });
     });
     child.stderr?.on('data', (data) => {
-      e.sender.send(BUILD_STREAM_CHUNK, { type: 'stderr', text: data.toString(), done: false });
+      e.sender.send(BUILD_STREAM_CHUNK, {
+        type: 'stderr',
+        text: data.toString(),
+        done: false,
+        requestId: req.requestId,
+      });
     });
     child.on('close', (code) => {
       activeBuildProcesses.delete(child);
@@ -161,6 +183,7 @@ ${req.buildLog}
         text: `进程退出，code=${code}`,
         done: true,
         exitCode: code,
+        requestId: req.requestId,
       });
     });
     child.on('error', (err) => {
@@ -170,6 +193,7 @@ ${req.buildLog}
         text: `进程启动失败：${err.message}`,
         done: true,
         exitCode: -1,
+        requestId: req.requestId,
       });
     });
   });

@@ -78,6 +78,18 @@ import {
   type BuildStreamChunkT,
 } from '../shared/ipc-channels.js';
 
+/**
+ * 流式请求的并发隔离 id（见 shared/ipc/stream.ts）。
+ *
+ * 分片发在共享通道上，同一时刻若有两个流，双方监听器都会收到彼此的分片。
+ * 这里为每个流生成唯一 id 随请求下发，主进程原样回传，接收方据此过滤。
+ */
+let streamRequestSeq = 0;
+function nextStreamRequestId(): string {
+  streamRequestSeq += 1;
+  return `${Date.now().toString(36)}-${streamRequestSeq.toString(36)}`;
+}
+
 const api = {
   sandboxedMustache: sandboxedMustacheApi,
   generateSpec: (description: string, generatorType: GeneratorType) =>
@@ -107,14 +119,17 @@ const api = {
     onChunk: (delta: string, done: boolean) => void,
     context?: { generatorType?: string; description?: string; specSummary?: string },
   ) => {
-    const handler = (_e: unknown, data: { delta: string; done: boolean }) => {
+    const requestId = nextStreamRequestId();
+    const handler = (_e: unknown, data: { delta: string; done: boolean; requestId?: string }) => {
+      // 只处理本次流的分片；无 requestId 的分片放行（兼容旧主进程）
+      if (data.requestId && data.requestId !== requestId) return;
       onChunk(data.delta, data.done);
       // 收到 done 后立即移除监听，避免残留监听器接收后续流的 chunk
       if (data.done) ipcRenderer.removeListener(CHAT_STREAM_CHUNK, handler);
     };
     ipcRenderer.on(CHAT_STREAM_CHUNK, handler);
     // P0 修复：invoke 失败时也要移除监听，否则内存泄漏
-    ipcRenderer.invoke(CHAT_STREAM, { message, context }).finally(() => {
+    ipcRenderer.invoke(CHAT_STREAM, { message, context, requestId }).finally(() => {
       ipcRenderer.removeListener(CHAT_STREAM_CHUNK, handler);
     });
   },
@@ -124,12 +139,14 @@ const api = {
     generatorType: string | undefined,
     onChunk: (delta: string, done: boolean) => void,
   ) => {
-    const handler = (_e: unknown, data: { delta: string; done: boolean }) => {
+    const requestId = nextStreamRequestId();
+    const handler = (_e: unknown, data: { delta: string; done: boolean; requestId?: string }) => {
+      if (data.requestId && data.requestId !== requestId) return;
       onChunk(data.delta, data.done);
       if (data.done) ipcRenderer.removeListener(EXPLAIN_CODE_CHUNK, handler);
     };
     ipcRenderer.on(EXPLAIN_CODE_CHUNK, handler);
-    ipcRenderer.invoke(EXPLAIN_CODE, { fileName, code, generatorType }).finally(() => {
+    ipcRenderer.invoke(EXPLAIN_CODE, { fileName, code, generatorType, requestId }).finally(() => {
       ipcRenderer.removeListener(EXPLAIN_CODE_CHUNK, handler);
     });
   },
@@ -141,12 +158,17 @@ const api = {
     },
     onChunk: (data: { modelName: string; delta: string; done: boolean }) => void,
   ) => {
-    const handler = (_e: unknown, data: { modelName: string; delta: string; done: boolean }) => {
+    const requestId = nextStreamRequestId();
+    const handler = (
+      _e: unknown,
+      data: { modelName: string; delta: string; done: boolean; requestId?: string },
+    ) => {
+      if (data.requestId && data.requestId !== requestId) return;
       onChunk(data);
       if (data.done) ipcRenderer.removeListener(COMPARE_MODELS_CHUNK, handler);
     };
     ipcRenderer.on(COMPARE_MODELS_CHUNK, handler);
-    ipcRenderer.invoke(COMPARE_MODELS, req).finally(() => {
+    ipcRenderer.invoke(COMPARE_MODELS, { ...req, requestId }).finally(() => {
       ipcRenderer.removeListener(COMPARE_MODELS_CHUNK, handler);
     });
   },
@@ -155,12 +177,14 @@ const api = {
     files: { path: string; content: string }[],
     onChunk: (delta: string, done: boolean) => void,
   ) => {
-    const handler = (_e: unknown, data: { delta: string; done: boolean }) => {
+    const requestId = nextStreamRequestId();
+    const handler = (_e: unknown, data: { delta: string; done: boolean; requestId?: string }) => {
+      if (data.requestId && data.requestId !== requestId) return;
       onChunk(data.delta, data.done);
       if (data.done) ipcRenderer.removeListener(AI_FIX_SUGGEST_CHUNK, handler);
     };
     ipcRenderer.on(AI_FIX_SUGGEST_CHUNK, handler);
-    ipcRenderer.invoke(AI_FIX_SUGGEST, { buildLog, files }).finally(() => {
+    ipcRenderer.invoke(AI_FIX_SUGGEST, { buildLog, files, requestId }).finally(() => {
       ipcRenderer.removeListener(AI_FIX_SUGGEST_CHUNK, handler);
     });
   },
@@ -169,13 +193,15 @@ const api = {
   abortBuild: () => ipcRenderer.invoke(BUILD_ABORT),
   checkJava: (mcVersion?: string) => ipcRenderer.invoke(BUILD_CHECK_JAVA, { mcVersion }),
   buildStream: (projectPath: string, onChunk: (chunk: BuildStreamChunkT) => void) => {
+    const requestId = nextStreamRequestId();
     const handler = (_e: unknown, data: BuildStreamChunkT) => {
+      if (data.requestId && data.requestId !== requestId) return;
       onChunk(data);
       if (data.done) ipcRenderer.removeListener(BUILD_STREAM_CHUNK, handler);
     };
     ipcRenderer.on(BUILD_STREAM_CHUNK, handler);
     // P0 修复：invoke 失败时也要移除监听，否则内存泄漏
-    ipcRenderer.invoke(BUILD_STREAM, { projectPath }).finally(() => {
+    ipcRenderer.invoke(BUILD_STREAM, { projectPath, requestId }).finally(() => {
       ipcRenderer.removeListener(BUILD_STREAM_CHUNK, handler);
     });
   },

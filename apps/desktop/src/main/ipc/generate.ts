@@ -174,7 +174,11 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
     const req = ChatStreamRequest.parse(raw);
     const config = loadModelConfig();
     if (!config.apiKey) {
-      e.sender.send(CHAT_STREAM_CHUNK, { delta: '请先在设置中配置 API Key。', done: true });
+      e.sender.send(CHAT_STREAM_CHUNK, {
+        delta: '请先在设置中配置 API Key。',
+        done: true,
+        requestId: req.requestId,
+      });
       return;
     }
 
@@ -194,10 +198,18 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
       for await (const chunk of provider.stream(req.message, {
         system: systemMessage,
       })) {
-        e.sender.send(CHAT_STREAM_CHUNK, { delta: chunk.delta, done: chunk.done });
+        e.sender.send(CHAT_STREAM_CHUNK, {
+          delta: chunk.delta,
+          done: chunk.done,
+          requestId: req.requestId,
+        });
       }
     } catch (err) {
-      e.sender.send(CHAT_STREAM_CHUNK, { delta: `错误：${(err as Error).message}`, done: true });
+      e.sender.send(CHAT_STREAM_CHUNK, {
+        delta: `错误：${(err as Error).message}`,
+        done: true,
+        requestId: req.requestId,
+      });
     }
   });
 
@@ -206,7 +218,11 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
     const req = ExplainCodeRequest.parse(raw);
     const config = loadModelConfig();
     if (!config.apiKey) {
-      e.sender.send(EXPLAIN_CODE_CHUNK, { delta: '请先在设置中配置 API Key。', done: true });
+      e.sender.send(EXPLAIN_CODE_CHUNK, {
+        delta: '请先在设置中配置 API Key。',
+        done: true,
+        requestId: req.requestId,
+      });
       return;
     }
 
@@ -230,10 +246,18 @@ ${req.code}
       for await (const chunk of provider.stream(prompt, {
         system: '你是 Minecraft 模组开发专家，擅长解释代码并教学。回答使用中文。',
       })) {
-        e.sender.send(EXPLAIN_CODE_CHUNK, { delta: chunk.delta, done: chunk.done });
+        e.sender.send(EXPLAIN_CODE_CHUNK, {
+          delta: chunk.delta,
+          done: chunk.done,
+          requestId: req.requestId,
+        });
       }
     } catch (err) {
-      e.sender.send(EXPLAIN_CODE_CHUNK, { delta: `错误：${(err as Error).message}`, done: true });
+      e.sender.send(EXPLAIN_CODE_CHUNK, {
+        delta: `错误：${(err as Error).message}`,
+        done: true,
+        requestId: req.requestId,
+      });
     }
   });
 
@@ -254,12 +278,14 @@ ${req.code}
           modelName: modelConfig.name,
           delta: JSON.stringify(spec, null, 2),
           done: true,
+          requestId: req.requestId,
         });
       } catch (err) {
         e.sender.send(COMPARE_MODELS_CHUNK, {
           modelName: modelConfig.name,
           delta: `错误：${(err as Error).message}`,
           done: true,
+          requestId: req.requestId,
         });
       }
     });

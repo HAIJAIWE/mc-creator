@@ -12,6 +12,12 @@ import {
   CurseForgeFilesRequest,
   CurseForgeFilesResponse,
   CurseForgeConfigSchema,
+  ChatStreamRequest,
+  ExplainCodeRequest,
+  CompareModelsRequest,
+  AiFixSuggestRequest,
+  BuildStreamRequest,
+  BuildStreamChunk,
 } from './ipc-channels.js';
 
 /** 构造一个最小有效 Project（ProjectSchema 已有完整字段） */
@@ -198,6 +204,31 @@ describe('IPC schema 校验', () => {
     ).toBe(true);
     // files 缺失拒绝
     expect(CurseForgeFilesResponse.safeParse({}).success).toBe(false);
+  });
+
+  // === 流式通道并发隔离（requestId）===
+  it('流式请求与分片都带 requestId 字段，缺省为空串', () => {
+    // 请求侧：不传 requestId 时默认空串（向后兼容旧调用方）
+    expect(ChatStreamRequest.parse({ message: 'hi' }).requestId).toBe('');
+    expect(ExplainCodeRequest.parse({ fileName: 'a.java', code: 'x' }).requestId).toBe('');
+    expect(
+      CompareModelsRequest.parse({
+        description: 'd',
+        generatorType: 'mod',
+        models: [
+          { name: 'a', modelId: 'm1', baseURL: 'http://x', apiKey: 'k' },
+          { name: 'b', modelId: 'm2', baseURL: 'http://x', apiKey: 'k' },
+        ],
+      }).requestId,
+    ).toBe('');
+    expect(AiFixSuggestRequest.parse({ buildLog: 'err' }).requestId).toBe('');
+    expect(BuildStreamRequest.parse({ projectPath: '/p' }).requestId).toBe('');
+    // 分片侧：主进程回传同一个 id
+    expect(BuildStreamChunk.parse({ type: 'stdout', text: 'x', done: false }).requestId).toBe('');
+    expect(
+      BuildStreamChunk.parse({ type: 'stdout', text: 'x', done: false, requestId: 'r-1' })
+        .requestId,
+    ).toBe('r-1');
   });
 
   it('CurseForgeConfigSchema 校验 apiKey 字符串', () => {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { StreamRequestId } from './stream.js';
 
 // === AI 聊天 ===
 export const CHAT = 'ai:chat';
@@ -20,6 +21,8 @@ export const CHAT_STREAM_CHUNK = 'ai:chatStream:chunk'; // 主进程→渲染进
  */
 export const ChatStreamRequest = z.object({
   message: z.string().min(1),
+  /** 并发流隔离：主进程每个 chunk 原样回传，接收方按此过滤 */
+  requestId: StreamRequestId,
   context: z
     .object({
       generatorType: z.string().optional(),
@@ -39,6 +42,7 @@ export const ExplainCodeRequest = z.object({
   fileName: z.string().min(1),
   code: z.string().min(1),
   generatorType: z.string().optional(),
+  requestId: StreamRequestId,
 });
 export type ExplainCodeReq = z.infer<typeof ExplainCodeRequest>;
 // === 多模型对比（流式） ===
@@ -48,6 +52,7 @@ export const COMPARE_MODELS_CHUNK = 'ai:compareModels:chunk';
 export const CompareModelsRequest = z.object({
   description: z.string().min(1),
   generatorType: z.string(),
+  requestId: StreamRequestId,
   models: z
     .array(
       z.object({
@@ -68,6 +73,7 @@ export const AI_FIX_SUGGEST_CHUNK = 'ai:fixSuggest:chunk';
 
 export const AiFixSuggestRequest = z.object({
   buildLog: z.string().min(1),
+  requestId: StreamRequestId,
   files: z
     .array(
       z.object({

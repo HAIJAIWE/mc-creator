@@ -1,4 +1,5 @@
 export * from './ipc/generator-types.js';
+export * from './ipc/stream.js';
 export * from './ipc/channels.js';
 export * from './ipc/generate.js';
 export * from './ipc/build.js';
