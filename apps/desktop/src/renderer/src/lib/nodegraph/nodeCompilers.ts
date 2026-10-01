@@ -65,6 +65,8 @@ export function compileBlockNode(node: ModNode): BlockSpec {
     stateProperties: [],
     collisionShapes: [],
     blockType: data.isBlockEntity ? 'custom' : 'full_block',
+    // 渲染模型类型与 blockType 正交，必须原样带过去，否则往返后坍缩成 cube_all
+    modelType: data.modelType,
     transparent: data.transparent,
     noCollision: !data.solid,
     texturePath: data.texturePathTop,

@@ -206,8 +206,15 @@ export const BlockNodeData = BaseNodeData.extend({
   transparent: z.boolean().default(false),
   /** 固体（可碰撞） */
   solid: z.boolean().default(true),
-  /** 模型类型 */
-  modelType: z.enum(['cube_all', 'cube_column', 'cross', 'custom']).default('cube_all'),
+  /**
+   * 模型类型（渲染维度，与 BlockSpec.blockType 表示的「行为维度」正交）。
+   *
+   * 取值集合必须覆盖画布字段下拉的全部选项（见 renderer 的 domain/fieldSchemas.ts
+   * 的 BLOCK_FIELDS），否则用户在下拉里选中 door/fence/stairs 会让节点数据无法通过校验、图存不下来。
+   */
+  modelType: z
+    .enum(['cube_all', 'cube_column', 'cross', 'door', 'fence', 'stairs', 'custom'])
+    .default('cube_all'),
   /** 是否为方块实体（如箱子、机器） */
   isBlockEntity: z.boolean().default(false),
   texturePathTop: z.string().optional(),

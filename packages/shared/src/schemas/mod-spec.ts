@@ -183,6 +183,18 @@ export const BlockSpec = z.object({
       'custom',
     ])
     .default('full_block'),
+  /**
+   * 渲染模型类型（画布专有维度，与上面表示「摆放/交互行为」的 blockType 正交）。
+   *
+   * 刻意用 `.optional()` 而不是 `.default()`：旧 spec 里没有这个字段时，反向还原
+   * 仍按 blockType 推导模型（见 specToNodeGraph 的 mapBlockModel），避免把历史数据的
+   * 模型语义悄悄改成 cube_all。
+   *
+   * 取值集合与 NodeGraph 的 BlockNodeData.modelType 保持一致。
+   */
+  modelType: z
+    .enum(['cube_all', 'cube_column', 'cross', 'door', 'fence', 'stairs', 'custom'])
+    .optional(),
   // 新增：是否透明/可穿越
   transparent: z.boolean().default(false),
   noCollision: z.boolean().default(false),

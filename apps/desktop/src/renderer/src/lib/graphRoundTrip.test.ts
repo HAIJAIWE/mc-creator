@@ -80,6 +80,11 @@ const KNOWN_LOSSY: Array<{ path: string; reason: string }> = [
   { path: 'blocks.0.dropItem', reason: 'BlockNodeData 无掉落物品字段' },
   { path: 'blocks.0.stateProperties', reason: 'BlockNodeData 无方块状态字段' },
   { path: 'blocks.0.collisionShapes', reason: 'BlockNodeData 无碰撞体积字段' },
+  {
+    path: 'blocks.0.modelType',
+    reason:
+      '原 spec 未显式记录模型类型（依赖生成器默认值），编译后按画布补齐为 cube_all，语义等价，非遗失',
+  },
   // —— recipe：输入数量/格子位在画布上只由连边表达 ——
   { path: 'recipes.0.inputs.0.count', reason: '画布 recipe 输入只存 item id，数量恒为 1' },
   { path: 'recipes.0.inputs.0.slot', reason: '画布 recipe 输入无 shaped 格子位字段' },

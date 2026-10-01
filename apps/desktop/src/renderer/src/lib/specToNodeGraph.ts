@@ -134,7 +134,8 @@ export function specToNodeGraph(spec: ModSpec): SpecToNodeGraphResult {
           luminance: b.lightLevel,
           transparent: b.transparent,
           solid: !b.noCollision,
-          modelType: mapBlockModel(b.blockType),
+          // 优先取 spec 里显式记录的模型类型；旧 spec 无此字段时按 blockType 推导
+          modelType: b.modelType ?? mapBlockModel(b.blockType),
           isBlockEntity: b.blockType !== 'full_block',
           ...(b.texturePaths?.top
             ? { texturePathTop: b.texturePaths.top }
