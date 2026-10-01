@@ -480,7 +480,7 @@ runGradleBuild
 - ✅ P42：文档同步（README 与实际代码状态对齐，10 种生成器 / 15 种节点 / 实测测试数）
 - ✅ P43：多版本扩展（MC 版本 4→8：新增 1.20.1 / 1.20.4 / 1.20.6 / 1.21.5 / 26.1 / 26.2；资源包 pack_format 自动映射 + 警告；Mod 构建脚本按版本分支适配 Fabric Loom 混淆/非混淆 + NeoForge MDG 1.0/2.0 DSL；各版本 Gradle wrapper 版本映射；8 版本 × 6 Loader 生成矩阵测试）
 - ✅ P44：编译器架构重构（`loopCompiler.ts` 循环编译分离 + `compilerRegistry.ts` 17 编译器注册表分离，主文件 -973 行）
-- ✅ P45：IndexedDB 编译缓存持久化（`compileCache.ts` 浏览器/Node 同构，`incrementalCompiler.ts` 异步入口自动读写，24h TTL + 50 条上限）
+- ✅ P45：IndexedDB 编译缓存持久化（`compileCache.ts` 浏览器/Node 同构，`incrementalCompiler.ts` 异步入口自动读写，24h TTL）
 - ✅ P46：结构化错误码体系（`compileErrors.ts` `CompileErrorCode` 常量 + `CompileError` 接口 + 工厂函数 `CompileErrors.*`，验证层全接入）
 - ✅ P47：验证层错误码接入（`connectionRules.ts` `validateConnection` + `portValidation.ts` 全分支带错误码，`ValidationError` 新增 `code` 字段）
 - ✅ P48：现代化代码重写（`fabric-assets.ts` / `recipe-json-generator.ts` / `texture-generator.ts` 从 `var`/C循环 → `const`/`let`/`for..of` + `.map`/`.filter`）
