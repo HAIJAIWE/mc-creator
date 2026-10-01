@@ -7,33 +7,17 @@ import {
   setCachedCompileResult,
 } from './compileCache.js';
 
-/**
- * 增量编译器：简化版，专注于 IndexedDB 缓存
- */
-export class IncrementalCompiler {
-  /**
-   * 执行编译（带 IndexedDB 缓存）
-   */
-  async compile(graph: NodeGraph): Promise<CompileResult> {
-    return compileGraph(graph);
-  }
-
-  getCacheInfo(): { hasCache: boolean; cacheAge: number } {
-    return { hasCache: false, cacheAge: 0 };
-  }
-
-  clearCache(): void {
-    // no-op for now
-  }
-}
-
-// 单例实例
-export const incrementalCompiler = new IncrementalCompiler();
-
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 
 /**
- * 编译入口：按图内容哈希读写 IndexedDB 缓存
+ * 编译入口：按图内容哈希读写 IndexedDB 缓存（24h TTL），未命中则走 compileNodeGraph。
+ *
+ * 之所以不需要「标脏」接口：缓存键已包含整图内容哈希，图一改哈希即变化、旧条目自动失效。
+ *
+ * 注：历史上此文件还有 `IncrementalCompiler` 类、`incrementalCompiler` 单例以及
+ * `markGraphDirty` / `getIncrementalCompilerStatus` / `clearIncrementalCache` /
+ * `initCompileCache` 等导出，但它们全仓零引用且多为返回假状态或空的桩实现
+ * （例如 `getCacheInfo()` 恒返回 `hasCache: false`），已按「增量编译器死代码」清理。
  */
 export async function compileGraph(graph: NodeGraph): Promise<CompileResult> {
   const graphHash = await computeGraphHash(graph);
@@ -46,41 +30,4 @@ export async function compileGraph(graph: NodeGraph): Promise<CompileResult> {
   const result = await compileNodeGraph(graph);
   await setCachedCompileResult(graphHash, graph.modId, result);
   return result;
-}
-
-/**
- * 标记节点/边/子图为脏（供 UI 调用）
- * 当前按内容哈希缓存，图变更后哈希自动失效，无需手动标脏。
- */
-export function markGraphDirty(
-  _nodeIds?: string[],
-  _edgeIds?: string[],
-  _subgraphIds?: string[],
-): void {
-  // no-op：缓存键已包含图内容哈希
-}
-
-/**
- * 获取增量编译器状态
- */
-export function getIncrementalCompilerStatus() {
-  return { hasCache: false, cacheAge: 0 };
-}
-
-/**
- * 清除增量编译缓存
- */
-export function clearIncrementalCache(): void {
-  // no-op：可后续接入 clearAllCache
-}
-
-/**
- * 初始化缓存系统（应用启动时调用）
- */
-export async function initCompileCache(): Promise<void> {
-  try {
-    await import('./compileCache.js').then((m) => m.preloadCache?.());
-  } catch {
-    // 静默失败
-  }
 }

@@ -159,10 +159,14 @@ describe('MiddlePanel', () => {
     renderMiddlePanel(<MiddlePanel />);
     // generatorType=mod 时 renderPreviewPanel 返回 <ModPreviewPanel />，
     // spec=null 时 ModPreviewPanel 渲染 EmptyState 标题。
-    // 预览面板已改为 React.lazy 按需加载，需等待 chunk 解析完成。
-    await waitFor(() => {
-      expect(screen.getByText('尚未生成 Mod Spec')).toBeTruthy();
-    });
+    // 预览面板已改为 React.lazy 按需加载：需等待 chunk 解析完成，
+    // 全量测试并行跑时这一跳可能超过 waitFor 默认的 1s，故显式放宽上限。
+    await waitFor(
+      () => {
+        expect(screen.getByText('尚未生成 Mod Spec')).toBeTruthy();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it('渲染命令面板入口按钮（含 F1 提示）', () => {
