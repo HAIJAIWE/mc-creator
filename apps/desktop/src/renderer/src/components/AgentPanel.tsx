@@ -13,6 +13,7 @@ import {
   Share2,
 } from 'lucide-react';
 import type { ModEntry, ModSpec } from '@mc-creator/shared';
+import { GENERATOR_DESCRIPTORS, pickLocalized } from '../../../shared/generator-descriptors.js';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
 import { useSpecHistoryStore } from '../store/spec-history-store.js';
@@ -28,6 +29,7 @@ import { ModelComparePanel } from './ModelComparePanel.js';
 import { SpecFormEditor } from './SpecFormEditor.js';
 import { AgentSessionPanel } from './AgentSessionPanel.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
+import { useTranslation } from '../hooks/useTranslation.js';
 
 interface Msg {
   role: 'user' | 'assistant';
@@ -72,6 +74,7 @@ export function AgentPanel() {
   );
   const { apiKey } = useModelConfigStore();
   const historyCount = useSpecHistoryStore((s) => s.versions.length);
+  const { locale } = useTranslation();
 
   const [editorText, setEditorText] = useState('');
   const [originalSpec, setOriginalSpec] = useState('');
@@ -269,22 +272,7 @@ export function AgentPanel() {
     }
   };
 
-  const PLACEHOLDERS: Record<string, string> = {
-    mod: '描述你想要的 mod…',
-    datapack: '描述你想要的数据包…',
-    modpack: '描述你想要的整合包…',
-    server: '描述你想要的服务器配置…',
-    resource_pack: '描述你想要的资源包…',
-    skin: '描述你想要的皮肤…',
-    launcher: '描述你想要的启动器配置…',
-    kubejs: '描述你想要的 KubeJS 脚本…',
-    crafttweaker: '描述你想要的 CraftTweaker 脚本…',
-    behavior_pack: '描述你想要的行为包…',
-    enchantment: '描述你想要的附魔…',
-    behavior_item: '描述你想要的自定义物品…',
-    behavior_entity: '描述你想要的自定义怪物…',
-  };
-  const placeholder = PLACEHOLDERS[generatorType] ?? '描述你想要的内容…';
+  const placeholder = pickLocalized(GENERATOR_DESCRIPTORS[generatorType].promptPlaceholder, locale);
 
   return (
     <div className="relative flex h-full flex-col bg-mc-surface">

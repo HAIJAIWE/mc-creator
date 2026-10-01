@@ -65,8 +65,8 @@ describe('Dashboard', () => {
     await waitFor(() => {
       expect(screen.getByText('选择你要创建的内容类型')).toBeTruthy();
     });
-    // 10 种生成器类型卡片
-    expect(screen.getByText('Mod')).toBeTruthy();
+    // 13 种生成器类型卡片（文案统一取自 generator-descriptors）
+    expect(screen.getByText('模组')).toBeTruthy();
     expect(screen.getByText('数据包')).toBeTruthy();
     expect(screen.getByText('KubeJS')).toBeTruthy();
     expect(screen.getByText('行为包')).toBeTruthy();
@@ -89,8 +89,8 @@ describe('Dashboard', () => {
     // 项目数 3、文件数 5
     expect(screen.getByText('3')).toBeTruthy();
     expect(screen.getByText('5')).toBeTruthy();
-    // 类型统计标签：Mod: 2、KubeJS: 1
-    expect(screen.getByText('Mod: 2')).toBeTruthy();
+    // 类型统计标签：模组: 2、KubeJS: 1
+    expect(screen.getByText('模组: 2')).toBeTruthy();
     expect(screen.getByText('KubeJS: 1')).toBeTruthy();
   });
 

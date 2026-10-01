@@ -55,7 +55,7 @@ describe('IPC 处理逻辑（不经过 ipcMain）', () => {
 describe('P12 buildChatSystemMessage', () => {
   it('无 context 时返回默认 system message', () => {
     expect(buildChatSystemMessage(undefined)).toBe(
-      '你是 Minecraft mod 专家助手，帮助用户设计 mod。简洁回答。',
+      '你是 Minecraft 内容创作专家助手，帮助用户创作 Minecraft 内容。简洁回答。',
     );
   });
 
@@ -66,7 +66,7 @@ describe('P12 buildChatSystemMessage', () => {
       description: undefined,
       specSummary: undefined,
     });
-    expect(msg).toContain('你是 Minecraft mod 专家助手');
+    expect(msg).toContain('你是 Minecraft 内容创作专家助手');
     expect(msg).toContain('请基于用户当前项目上下文回答');
   });
 

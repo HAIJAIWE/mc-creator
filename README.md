@@ -390,13 +390,18 @@ runGradleBuild
 1. **定义 Schema**：在 `packages/shared/src/schemas/` 新建 `<type>-spec.ts`，用 zod 定义规格
 2. **实现 Generator**：在 `packages/core/src/generators/<type>/` 新建 `<type>-generator.ts`，实现 `Generator` 接口
 3. **注册**：在 `packages/core/src/generators/index.ts` 的 registry 注册，并导出
-4. **配置 Prompt**：在 `packages/core/src/orchestrator/orchestrator.ts` 的 PROMPTS 映射加类型专属 prompt
+4. **配置 Prompt**：在 `packages/core/src/orchestrator/orchestrator.ts` 的 `SPEC_CONFIGS` 映射加类型专属 prompt（schema + prompt）
 5. **模板**：在 `packages/shared/src/templates/` 新建 `<type>-templates.ts` 并挂到 `TEMPLATES_BY_TYPE`
 6. **测试**：编写 `<type>-generator.test.ts`（TDD：先写测试 → 实现 → 通过）
 7. **接入 UI**：
-   - `apps/desktop/src/shared/ipc-channels.ts`：`GENERATOR_TYPES` 数组追加新类型
-   - `apps/desktop/src/main/ipc.ts`：`GENERATE_FILES` handler 加 case 分支
-   - `apps/desktop/src/renderer/src/components/AgentPanel.tsx`：placeholder 映射表补新类型
+   - `apps/desktop/src/shared/ipc-channels.ts`：`GENERATOR_TYPES` 数组追加新类型（类型联合的唯一来源）
+   - `apps/desktop/src/shared/generator-descriptors.ts`：补一条 `GENERATOR_DESCRIPTORS` 描述符（名称 / 说明 / 图标 / 占位文案），漏写会编译失败
+   - `apps/desktop/src/renderer/src/components/middle/MiddlePanel.tsx`：`renderPreviewPanel` 加 case，指向该类型的预览面板
+   - `apps/desktop/src/renderer/src/lib/ipc-client.ts`：`buildPreviewSpec` 加 case（web-preview 规则式模板），漏写会编译失败
+   - `apps/desktop/src/main/ipc/generate.ts`：无需改动，`GENERATE_FILES` 走 `GeneratorRegistry` 按类型路由
+
+> 生成器类型的展示文案（Dashboard 卡片、工具栏下拉、描述输入框占位、chat system message）统一由
+> `generator-descriptors.ts` 提供，不再各处维护平行映射表。
 
 ### 内部命名规范
 

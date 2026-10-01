@@ -220,9 +220,11 @@ function buildPreviewSpec(description: string, type: GeneratorType): Record<stri
         ],
         ...base,
       };
-    default:
-      return { packId: materialId, packName: packName, ...base };
   }
+  // 穷尽性检查：13 种 GeneratorType 已在上方 switch 全覆盖，
+  // 新增类型时此处编译失败（避免预览模板静默漏掉新类型）。
+  const _exhaustive: never = type;
+  return _exhaustive;
 }
 function isWebPreview(): boolean {
   return (

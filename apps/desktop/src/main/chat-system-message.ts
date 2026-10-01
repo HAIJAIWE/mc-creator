@@ -8,22 +8,16 @@
  *   让 chat 模式能感知项目上下文，提供更精准的建议。
  *
  * 注意：specSummary 是渲染进程预生成的简短摘要，避免传完整 JSON 消耗 token。
+ *
+ * 项目类型文案统一取自 `shared/generator-descriptors.ts`（WP5 单一数据源），
+ * 不再维护独立的标签表。
  */
 
-/** 项目类型 → 中文标签映射（与 ChatPanel 的 GENERATOR_LABELS 一致） */
-const GENERATOR_LABELS: Record<string, string> = {
-  mod: '模组',
-  datapack: '数据包',
-  modpack: '整合包',
-  server: '服务器',
-  resource_pack: '资源包',
-  skin: '皮肤',
-  launcher: '启动器',
-};
+import { getGeneratorDescriptor } from '../shared/generator-descriptors.js';
 
 /** 默认 system message（无 context 时使用） */
 export const DEFAULT_CHAT_SYSTEM_MESSAGE =
-  '你是 Minecraft mod 专家助手，帮助用户设计 mod。简洁回答。';
+  '你是 Minecraft 内容创作专家助手，帮助用户创作 Minecraft 内容。简洁回答。';
 
 /** ChatStreamRequest 的 context 字段类型 */
 export interface ChatStreamContext {
@@ -42,13 +36,17 @@ export function buildChatSystemMessage(context?: ChatStreamContext): string {
   if (!context) return DEFAULT_CHAT_SYSTEM_MESSAGE;
 
   const parts: string[] = [
-    '你是 Minecraft mod 专家助手，帮助用户设计 mod。',
+    '你是 Minecraft 内容创作专家助手，帮助用户创作 Minecraft 内容。',
     '请基于用户当前项目上下文回答，简洁清晰，使用中文。',
   ];
 
   if (context.generatorType) {
-    const label = GENERATOR_LABELS[context.generatorType] || context.generatorType;
-    parts.push(`当前项目类型：${label}。`);
+    const descriptor = getGeneratorDescriptor(context.generatorType);
+    parts.push(
+      descriptor
+        ? `当前项目类型：${descriptor.label.zh}（${descriptor.description.zh}）。`
+        : `当前项目类型：${context.generatorType}。`,
+    );
   }
 
   if (context.description) {

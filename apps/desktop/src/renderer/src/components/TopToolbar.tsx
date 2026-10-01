@@ -3,7 +3,8 @@ import { shallow } from 'zustand/shallow';
 import { Loader2 } from 'lucide-react';
 import type { Loader, McVersion } from '@mc-creator/shared';
 import { MC_VERSIONS } from '@mc-creator/shared';
-import type { GeneratorType } from '../../../shared/ipc-channels.js';
+import { GENERATOR_TYPES, type GeneratorType } from '../../../shared/ipc-channels.js';
+import { GENERATOR_DESCRIPTORS, pickLocalized } from '../../../shared/generator-descriptors.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
@@ -16,24 +17,8 @@ interface TopToolbarProps {
   onOpenSettings: () => void;
 }
 
-const TYPE_LABELS: Record<GeneratorType, string> = {
-  mod: 'Mod',
-  datapack: '数据包',
-  modpack: '整合包',
-  server: '服务器',
-  resource_pack: '资源包',
-  skin: '皮肤',
-  launcher: '启动器',
-  kubejs: 'KubeJS',
-  crafttweaker: 'CraftTweaker',
-  behavior_pack: '行为包',
-  enchantment: '附魔',
-  behavior_item: '行为包物品',
-  behavior_entity: '行为包实体',
-};
-
 export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
-  const { t, tCommon } = useTranslation();
+  const { t, tCommon, locale } = useTranslation();
   // 全局设置：类型 / Loader / 版本
   const { generatorType, loader, mcVersion, loading, setGeneratorType, setLoader, setMcVersion } =
     useModStore(
@@ -222,9 +207,9 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
           disabled={loading}
           className="mc-select"
         >
-          {Object.entries(TYPE_LABELS).map(([value, label]) => (
+          {GENERATOR_TYPES.map((value) => (
             <option key={value} value={value}>
-              {label}
+              {pickLocalized(GENERATOR_DESCRIPTORS[value].label, locale)}
             </option>
           ))}
         </select>

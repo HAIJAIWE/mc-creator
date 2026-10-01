@@ -4,57 +4,10 @@ import { useModStore } from '../store/mod-store.js';
 import { useToast } from './useToast.js';
 import { useTranslation } from '../hooks/useTranslation.js';
 import type { Project, GeneratorType } from '../../../shared/ipc-channels.js';
+import { GENERATOR_DESCRIPTORS, pickLocalized } from '../../../shared/generator-descriptors.js';
 import { FolderInput, FolderOutput } from 'lucide-react';
 import { McMark } from './McMark.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
-
-const TYPE_ICON: Record<GeneratorType, { scope: 'pixel'; name: string }> = {
-  mod: { scope: 'pixel', name: 'gen-mod' },
-  datapack: { scope: 'pixel', name: 'gen-datapack' },
-  modpack: { scope: 'pixel', name: 'gen-modpack' },
-  server: { scope: 'pixel', name: 'gen-server' },
-  resource_pack: { scope: 'pixel', name: 'gen-resource' },
-  skin: { scope: 'pixel', name: 'gen-skin' },
-  launcher: { scope: 'pixel', name: 'gen-launcher' },
-  kubejs: { scope: 'pixel', name: 'gen-kubejs' },
-  crafttweaker: { scope: 'pixel', name: 'gen-crafttweaker' },
-  behavior_pack: { scope: 'pixel', name: 'gen-behaviorpack' },
-  enchantment: { scope: 'pixel', name: 'gen-enchantment' },
-  behavior_item: { scope: 'pixel', name: 'gen-behavioritem' },
-  behavior_entity: { scope: 'pixel', name: 'gen-behaviorentity' },
-};
-
-const TYPE_LABEL: Record<GeneratorType, string> = {
-  mod: 'Mod',
-  datapack: '数据包',
-  modpack: '整合包',
-  server: '服务器',
-  resource_pack: '资源包',
-  skin: '皮肤',
-  launcher: '启动器',
-  kubejs: 'KubeJS',
-  crafttweaker: 'CraftTweaker',
-  behavior_pack: '行为包',
-  enchantment: '附魔',
-  behavior_item: '行为包物品',
-  behavior_entity: '行为包实体',
-};
-
-const TYPE_DESC: Record<GeneratorType, string> = {
-  mod: '创建 Fabric/NeoForge 模组',
-  datapack: '创建自定义数据包',
-  modpack: '创建整合包配置',
-  server: '创建服务器配置',
-  resource_pack: '创建资源包',
-  skin: '创建玩家皮肤',
-  launcher: '创建启动器配置',
-  kubejs: '创建 KubeJS 脚本',
-  crafttweaker: '创建 ZenScript 脚本',
-  behavior_pack: '创建基岩版行为包',
-  enchantment: '创建数据驱动附魔（1.21+）',
-  behavior_item: '创建基岩版自定义物品',
-  behavior_entity: '创建基岩版自定义实体',
-};
 
 const LOADER_LABEL: Record<string, string> = {
   fabric: 'Fabric',
@@ -97,7 +50,7 @@ export function Dashboard() {
   const importProject = useProjectStore((s) => s.importProject);
   const setView = useProjectStore((s) => s.setView);
   const toast = useToast();
-  const { t, tCommon } = useTranslation();
+  const { t, tCommon, locale } = useTranslation();
   const [importing, setImporting] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
 
@@ -213,11 +166,11 @@ export function Dashboard() {
           <div className="h-6 w-px bg-mc-border" />
           <div className="flex flex-wrap gap-1.5">
             {typeStats.map(({ type, count }) => {
-              const icon = TYPE_ICON[type];
+              const descriptor = GENERATOR_DESCRIPTORS[type];
               return (
                 <span key={type} className="mc-tag">
-                  <McIcon scope={icon.scope} name={icon.name} size={12} />
-                  {TYPE_LABEL[type]}: {count}
+                  <McIcon scope={descriptor.icon.scope} name={descriptor.icon.name} size={12} />
+                  {pickLocalized(descriptor.label, locale)}: {count}
                 </span>
               );
             })}
@@ -254,7 +207,7 @@ export function Dashboard() {
                   </header>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                     {group.types.map((type) => {
-                      const icon = TYPE_ICON[type];
+                      const descriptor = GENERATOR_DESCRIPTORS[type];
                       return (
                         <button
                           key={type}
@@ -267,13 +220,17 @@ export function Dashboard() {
                             className="absolute inset-x-1.5 top-1.5 h-[3px] rounded-full bg-mc-accent opacity-0 transition-opacity group-hover:opacity-100"
                           />
                           <div className="flex h-12 w-12 items-center justify-center rounded-mc-lg bg-mc-surface-3 shadow-[var(--mc-sheen)] transition-all group-hover:scale-110 group-hover:bg-mc-accent/15">
-                            <McIcon scope={icon.scope} name={icon.name} size={26} />
+                            <McIcon
+                              scope={descriptor.icon.scope}
+                              name={descriptor.icon.name}
+                              size={26}
+                            />
                           </div>
                           <div className="text-sm font-semibold text-mc-text">
-                            {TYPE_LABEL[type]}
+                            {pickLocalized(descriptor.label, locale)}
                           </div>
                           <div className="text-center text-xs leading-relaxed text-mc-mute">
-                            {TYPE_DESC[type]}
+                            {pickLocalized(descriptor.description, locale)}
                           </div>
                           <span
                             aria-hidden="true"
@@ -296,7 +253,7 @@ export function Dashboard() {
               <h2 className="mb-2 font-display text-lg font-bold">{t('dashboard.myProjects')}</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {projects.map((p) => {
-                  const icon = TYPE_ICON[p.generatorType];
+                  const descriptor = GENERATOR_DESCRIPTORS[p.generatorType];
                   return (
                     <div
                       key={p.id}
@@ -304,13 +261,19 @@ export function Dashboard() {
                     >
                       <div className="mb-3 flex items-start gap-3">
                         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-mc-lg bg-mc-surface-3">
-                          <McIcon scope={icon.scope} name={icon.name} size={20} />
+                          <McIcon
+                            scope={descriptor.icon.scope}
+                            name={descriptor.icon.name}
+                            size={20}
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-base font-semibold text-mc-text">
                             {p.name}
                           </div>
-                          <div className="text-xs text-mc-mute">{TYPE_LABEL[p.generatorType]}</div>
+                          <div className="text-xs text-mc-mute">
+                            {pickLocalized(descriptor.label, locale)}
+                          </div>
                         </div>
                       </div>
                       {p.description && (

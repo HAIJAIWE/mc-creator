@@ -28,6 +28,7 @@ import { useEditorModeStore } from '../../store/editor-mode-store.js';
 import { ipcClient } from '../../lib/ipc-client.js';
 import { withUnimplementedMd } from '../../lib/unimplemented-md.js';
 import type { GeneratorType } from '@mc-creator/shared';
+import { GENERATOR_DESCRIPTORS } from '../../../../shared/generator-descriptors.js';
 
 type MiddleTab = 'preview' | 'lowcode' | 'resources' | 'nbt' | 'code';
 
@@ -423,7 +424,9 @@ function PlaceholderPanel({ type }: { type: GeneratorType }) {
       <div className="flex h-16 w-16 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
         <McIcon scope="pixel" name="box" size={32} className="text-mc-mute" />
       </div>
-      <div className="text-sm font-medium text-mc-dim">{type} 预览面板开发中</div>
+      <div className="text-sm font-medium text-mc-dim">
+        {GENERATOR_DESCRIPTORS[type].label.zh} 预览面板开发中
+      </div>
       <div className="text-xs text-mc-mute">
         阶段 2-4 实现该类型，当前可切换到「代码」tab 查看文件
       </div>
