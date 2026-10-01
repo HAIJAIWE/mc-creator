@@ -172,6 +172,7 @@
     "experimental": "实验性",
     "experimentalTooltip": "26.2 的 NeoForge 版本为 beta，构建配置可能需手动调整",
     "apiKeyConfigured": "API Key 已配置",
-    "apiKeyNotConfigured": "未配置 API Key，点击设置"
+    "apiKeyNotConfigured": "未配置 API Key，点击设置",
+    "loaderNotApplicable": "当前内容类型不使用 loader，无需选择"
   }
 }

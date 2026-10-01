@@ -40,8 +40,15 @@ export interface GeneratorDescriptor {
   /** 描述输入框占位文案 */
   promptPlaceholder: LocalizedText;
   /**
-   * 该类型是否依赖 loader（fabric/neoforge/…）。
-   * 供 UI 判断是否需要展示 loader 选择，目前作为元数据保留。
+   * 该类型是否用得上工具栏的 loader 选择。
+   *
+   * 判定依据是可验证的事实 —— 只有 `ModGenerator` 读取 `ctx.loader`
+   * （见 packages/core/src/generators/mod/mod-generator.ts）：ModGenerator 按它路由
+   * LoaderAdapter，直接决定产物。其余类型要么用 spec 自带的 `loader` 字段
+   * （ModpackSpec / LauncherSpec），要么完全不涉及 loader（数据包/资源包/皮肤/
+   * 基岩版/附魔/服务器/KubeJS/CraftTweaker）。
+   *
+   * 因此 UI 只需为 `mod` 开放 loader 下拉，其余类型下拉置灰。
    */
   needsLoader: boolean;
 }
@@ -75,7 +82,7 @@ export const GENERATOR_DESCRIPTORS = {
     description: { zh: '创建整合包配置', en: 'Create modpack configuration' },
     icon: { scope: 'pixel', name: 'gen-modpack' },
     promptPlaceholder: { zh: '描述你想要的整合包…', en: 'Describe the modpack you want…' },
-    needsLoader: true,
+    needsLoader: false,
   },
   server: {
     type: 'server',
@@ -113,7 +120,7 @@ export const GENERATOR_DESCRIPTORS = {
       zh: '描述你想要的启动器配置…',
       en: 'Describe the launcher profile you want…',
     },
-    needsLoader: true,
+    needsLoader: false,
   },
   kubejs: {
     type: 'kubejs',
@@ -124,7 +131,7 @@ export const GENERATOR_DESCRIPTORS = {
       zh: '描述你想要的 KubeJS 脚本…',
       en: 'Describe the KubeJS script you want…',
     },
-    needsLoader: true,
+    needsLoader: false,
   },
   crafttweaker: {
     type: 'crafttweaker',
@@ -135,7 +142,7 @@ export const GENERATOR_DESCRIPTORS = {
       zh: '描述你想要的 CraftTweaker 脚本…',
       en: 'Describe the CraftTweaker script you want…',
     },
-    needsLoader: true,
+    needsLoader: false,
   },
   behavior_pack: {
     type: 'behavior_pack',

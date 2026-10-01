@@ -34,6 +34,9 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
       shallow,
     );
 
+  // 仅 mod 的产物由 loader 决定，其余类型下拉置灰（见 generator-descriptors）
+  const needsLoader = GENERATOR_DESCRIPTORS[generatorType].needsLoader;
+
   // 项目菜单
   const {
     projects,
@@ -216,7 +219,8 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
         <select
           value={loader}
           onChange={(e) => setLoader(e.target.value as Loader)}
-          disabled={loading}
+          disabled={loading || !needsLoader}
+          title={needsLoader ? undefined : t('topToolbar.loaderNotApplicable')}
           className="mc-select"
         >
           <option value="fabric">Fabric</option>

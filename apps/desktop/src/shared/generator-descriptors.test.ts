@@ -49,6 +49,11 @@ describe('generator-descriptors：单一数据源', () => {
     }
   });
 
+  it('needsLoader 仅 mod 为 true（只有 ModGenerator 读取 ctx.loader）', () => {
+    const withLoader = GENERATOR_TYPES.filter((type) => GENERATOR_DESCRIPTORS[type].needsLoader);
+    expect(withLoader).toEqual(['mod']);
+  });
+
   it('getGeneratorDescriptor：已知类型返回描述符，未知类型返回 undefined', () => {
     expect(getGeneratorDescriptor('mod')?.label.zh).toBe('模组');
     expect(getGeneratorDescriptor('behavior_entity')?.label.zh).toBe('行为包实体');

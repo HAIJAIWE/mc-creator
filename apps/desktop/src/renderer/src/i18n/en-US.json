@@ -172,6 +172,7 @@
     "experimental": "Experimental",
     "experimentalTooltip": "26.2 NeoForge version is beta, build config may need manual adjustment",
     "apiKeyConfigured": "API Key Configured",
-    "apiKeyNotConfigured": "API Key Not Configured, Click Settings"
+    "apiKeyNotConfigured": "API Key Not Configured, Click Settings",
+    "loaderNotApplicable": "This content type does not use a loader"
   }
 }
