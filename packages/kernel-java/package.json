@@ -1,0 +1,31 @@
+{
+  "name": "@mc-creator/kernel-java",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MC 全链路 AI 工作台 · Java 内核（客户端实例，§5）。实现 KernelContract；外壳只依赖 @mc-creator/contract，不 import 内核实现（§2.2）。",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@mc-creator/contract": "workspace:*",
+    "@mc-creator/devkit": "workspace:*",
+    "@mc-creator/engine": "workspace:*",
+    "@mc-creator/shared": "workspace:*",
+    "@mc-creator/shell": "workspace:*",
+    "pako": "^2.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/pako": "^2.0.3",
+    "vitest": "^2.0.0"
+  }
+}

@@ -14,27 +14,70 @@ import { ActivityBar } from './ActivityBar.js';
  * 5. tooltip role="tooltip"
  * 6. 品牌标按钮 onHome 回调
  * 7. type="button" 防止表单提交
+ *
+ * 注意：新架构下 shell 面板仅包含 5 个基础设施面板：
+ * explorer, search, git, packages, settings
+ * 领域编辑器面板已迁移到中部编辑器标签页
  */
 
-const ACTIVITY_IDS = [
+// Shell 面板 ID（基础设施面板）
+const SHELL_PANEL_IDS = [
   'explorer',
   'search',
   'git',
   'packages',
-  'items',
-  'blocks',
-  'entity',
-  'audio',
-  'cicd',
+  'settings',
 ] as const;
 
+// 中文标签映射
+const LABEL_MAP: Record<string, string> = {
+  explorer: '资源管理器',
+  search: '搜索',
+  git: '源代码管理',
+  packages: '包管理',
+  settings: '设置',
+  backToDashboard: '返回项目仪表盘',
+};
+
+// Mock useTranslation hook BEFORE importing ActivityBar
+vi.mock('../hooks/useTranslation.js', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      if (key.startsWith('activityBar.')) {
+        const id = key.replace('activityBar.', '');
+        return LABEL_MAP[id] || key;
+      }
+      if (key.startsWith('settings.')) {
+        return key;
+      }
+      return key;
+    },
+    tCommon: (key: string) => LABEL_MAP[key] || key,
+    locale: 'zh',
+  }),
+}));
+
+// Mock the panel registry to return shell panels
+vi.mock('../shell/panels.js', async (importOriginal) => {
+  const original = await importOriginal() as typeof import('../shell/panels.js');
+  const React = await import('react');
+  const MockIcon = () => React.createElement('span', { 'data-testid': 'mock-icon' });
+  return {
+    ...original,
+    getShellPanels: () => [
+      { id: 'explorer', icon: React.createElement(MockIcon), title: LABEL_MAP.explorer, order: 10, kind: 'shell' as const, enabled: true },
+      { id: 'search', icon: React.createElement(MockIcon), title: LABEL_MAP.search, order: 20, kind: 'shell' as const, enabled: true },
+      { id: 'git', icon: React.createElement(MockIcon), title: LABEL_MAP.git, order: 30, kind: 'shell' as const, enabled: true },
+      { id: 'packages', icon: React.createElement(MockIcon), title: LABEL_MAP.packages, order: 40, kind: 'shell' as const, enabled: true },
+      { id: 'settings', icon: React.createElement(MockIcon), title: LABEL_MAP.settings, order: 999, kind: 'shell' as const, enabled: true },
+    ],
+  };
+});
+
 beforeEach(() => {
-  // jsdom polyfill：部分子组件可能调用 scrollIntoView
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = vi.fn();
   }
-  // requestAnimationFrame 在 jsdom 里是同步近似实现，但 ActivityBar 依赖它延迟 focus，
-  // 测试里用 vi.fn 转为同步执行，确保 focus 在 onChange 后立即发生
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
     cb(0);
     return 0;
@@ -54,26 +97,24 @@ describe('ActivityBar 渲染与 ARIA 结构', () => {
     expect(toolbar.getAttribute('aria-orientation')).toBe('vertical');
   });
 
-  it('渲染 10 个活动按钮 + 1 个设置按钮 + 1 个品牌标按钮 = 12 个 button', () => {
+  it('渲染 4 个活动按钮 + 1 个设置按钮 + 1 个品牌标按钮 = 6 个 button', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
     const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(12);
+    expect(buttons.length).toBe(6);
   });
 
-  it('每个活动按钮都有 type="button"（防止表单提交）', () => {
+  it('每个 shell 面板按钮都有 type="button"（防止表单提交）', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    for (const id of [...ACTIVITY_IDS, 'settings']) {
-      const btn = screen.getByLabelText(
-        id === 'settings' ? '设置' : labelFor(id),
-      ) as HTMLButtonElement;
+    for (const id of SHELL_PANEL_IDS) {
+      const btn = screen.getByLabelText(LABEL_MAP[id]) as HTMLButtonElement;
       expect(btn.type).toBe('button');
     }
   });
 
-  it('每个活动按钮都有 aria-label 和 title 属性', () => {
+  it('每个 shell 面板按钮都有 aria-label 和 title 属性', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    for (const id of ACTIVITY_IDS) {
-      const label = labelFor(id);
+    for (const id of SHELL_PANEL_IDS) {
+      const label = LABEL_MAP[id];
       const btn = screen.getByLabelText(label);
       expect(btn.getAttribute('aria-label')).toBe(label);
       expect(btn.title).toBe(label);
@@ -81,17 +122,16 @@ describe('ActivityBar 渲染与 ARIA 结构', () => {
   });
 
   it('激活按钮 aria-pressed=true、tabIndex=0', () => {
-    render(<ActivityBar active="items" onChange={() => {}} />);
-    const itemsBtn = screen.getByLabelText('物品/配方');
-    expect(itemsBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(itemsBtn.tabIndex).toBe(0);
+    render(<ActivityBar active="search" onChange={() => {}} />);
+    const searchBtn = screen.getByLabelText(LABEL_MAP.search);
+    expect(searchBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(searchBtn.tabIndex).toBe(0);
   });
 
   it('非激活按钮 aria-pressed=false、tabIndex=-1（Roving Tabindex）', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    // 抽查 search / items / game 三个非激活按钮
-    for (const id of ['search', 'items', 'game'] as const) {
-      const btn = screen.getByLabelText(labelFor(id));
+    for (const id of ['search', 'git', 'packages'] as const) {
+      const btn = screen.getByLabelText(LABEL_MAP[id]);
       expect(btn.getAttribute('aria-pressed')).toBe('false');
       expect(btn.tabIndex).toBe(-1);
     }
@@ -99,7 +139,7 @@ describe('ActivityBar 渲染与 ARIA 结构', () => {
 
   it('激活按钮含装饰条 .mc-active-bar，且 aria-hidden="true"', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    const explorerBtn = screen.getByLabelText('资源管理器');
+    const explorerBtn = screen.getByLabelText(LABEL_MAP.explorer);
     const activeBar = explorerBtn.querySelector('.mc-active-bar');
     expect(activeBar).toBeTruthy();
     expect(activeBar?.getAttribute('aria-hidden')).toBe('true');
@@ -107,13 +147,13 @@ describe('ActivityBar 渲染与 ARIA 结构', () => {
 
   it('非激活按钮不含 .mc-active-bar', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    const searchBtn = screen.getByLabelText('搜索');
+    const searchBtn = screen.getByLabelText(LABEL_MAP.search);
     expect(searchBtn.querySelector('.mc-active-bar')).toBeNull();
   });
 
-  it('设置按钮（settings）独立渲染在底部，data-activity="settings"', () => {
+  it('设置按钮（settings）data-activity="settings"', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    const settingsBtn = screen.getByLabelText('设置');
+    const settingsBtn = screen.getByLabelText(LABEL_MAP.settings);
     expect(settingsBtn.getAttribute('data-activity')).toBe('settings');
     expect(settingsBtn.getAttribute('aria-pressed')).toBe('false');
     expect(settingsBtn.tabIndex).toBe(-1);
@@ -121,19 +161,18 @@ describe('ActivityBar 渲染与 ARIA 结构', () => {
 
   it('设置按钮激活时 aria-pressed=true、tabIndex=0', () => {
     render(<ActivityBar active="settings" onChange={() => {}} />);
-    const settingsBtn = screen.getByLabelText('设置');
+    const settingsBtn = screen.getByLabelText(LABEL_MAP.settings);
     expect(settingsBtn.getAttribute('aria-pressed')).toBe('true');
     expect(settingsBtn.tabIndex).toBe(0);
-    // 此时 explorer 应是非激活
-    expect(screen.getByLabelText('资源管理器').tabIndex).toBe(-1);
+    expect(screen.getByLabelText(LABEL_MAP.explorer).tabIndex).toBe(-1);
   });
 
   it('品牌标按钮 aria-label="返回项目仪表盘"、type="button"', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    const homeBtn = screen.getByLabelText('返回项目仪表盘') as HTMLButtonElement;
+    const homeBtn = screen.getByLabelText(LABEL_MAP.backToDashboard) as HTMLButtonElement;
     expect(homeBtn).toBeTruthy();
     expect(homeBtn.type).toBe('button');
-    expect(homeBtn.title).toBe('返回项目仪表盘');
+    expect(homeBtn.title).toBe(LABEL_MAP.backToDashboard);
   });
 });
 
@@ -141,29 +180,30 @@ describe('ActivityBar 点击切换（P7.3 回归）', () => {
   it('点击非激活按钮调用 onChange 并切换 active', () => {
     const onChange = vi.fn();
     render(<ActivityBar active="explorer" onChange={onChange} />);
-    fireEvent.click(screen.getByLabelText('物品/配方'));
+    fireEvent.click(screen.getByLabelText(LABEL_MAP.search));
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith('items');
+    expect(onChange).toHaveBeenCalledWith('search');
   });
 
   it('点击设置按钮调用 onChange("settings")', () => {
     const onChange = vi.fn();
     render(<ActivityBar active="explorer" onChange={onChange} />);
-    fireEvent.click(screen.getByLabelText('设置'));
+    // 使用 aria-label 定位设置按钮
+    fireEvent.click(screen.getByLabelText(LABEL_MAP.settings));
     expect(onChange).toHaveBeenCalledWith('settings');
   });
 
   it('点击品牌标按钮调用 onHome 回调', () => {
     const onHome = vi.fn();
     render(<ActivityBar active="explorer" onChange={() => {}} onHome={onHome} />);
-    fireEvent.click(screen.getByLabelText('返回项目仪表盘'));
+    fireEvent.click(screen.getByLabelText(LABEL_MAP.backToDashboard));
     expect(onHome).toHaveBeenCalledTimes(1);
   });
 
   it('未提供 onHome 时点击品牌标不报错', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
     expect(() => {
-      fireEvent.click(screen.getByLabelText('返回项目仪表盘'));
+      fireEvent.click(screen.getByLabelText(LABEL_MAP.backToDashboard));
     }).not.toThrow();
   });
 });
@@ -172,7 +212,7 @@ describe('ActivityBar 键盘导航（WAI-ARIA Toolbar 模式）', () => {
   it('ArrowDown 切换到下一个活动', () => {
     const onChange = vi.fn();
     render(<ActivityBar active="explorer" onChange={onChange} />);
-    const explorerBtn = screen.getByLabelText('资源管理器');
+    const explorerBtn = screen.getByLabelText(LABEL_MAP.explorer);
     fireEvent.keyDown(explorerBtn, { key: 'ArrowDown' });
     expect(onChange).toHaveBeenCalledWith('search');
   });
@@ -180,77 +220,75 @@ describe('ActivityBar 键盘导航（WAI-ARIA Toolbar 模式）', () => {
   it('ArrowUp 切换到上一个活动', () => {
     const onChange = vi.fn();
     render(<ActivityBar active="search" onChange={onChange} />);
-    const searchBtn = screen.getByLabelText('搜索');
+    const searchBtn = screen.getByLabelText(LABEL_MAP.search);
     fireEvent.keyDown(searchBtn, { key: 'ArrowUp' });
     expect(onChange).toHaveBeenCalledWith('explorer');
   });
 
-  it('ArrowUp 在第一个活动时循环到最后一个（game）', () => {
+  it('ArrowUp 在第一个活动时循环到最后一个（settings）', () => {
     const onChange = vi.fn();
     render(<ActivityBar active="explorer" onChange={onChange} />);
-    const explorerBtn = screen.getByLabelText('资源管理器');
+    const explorerBtn = screen.getByLabelText(LABEL_MAP.explorer);
     fireEvent.keyDown(explorerBtn, { key: 'ArrowUp' });
-    expect(onChange).toHaveBeenCalledWith('game');
+    expect(onChange).toHaveBeenCalledWith('settings');
   });
 
   it('ArrowDown 在最后一个活动时循环到第一个（explorer）', () => {
     const onChange = vi.fn();
-    render(<ActivityBar active="game" onChange={onChange} />);
-    const gameBtn = screen.getByLabelText('游戏启动器');
-    fireEvent.keyDown(gameBtn, { key: 'ArrowDown' });
+    render(<ActivityBar active="settings" onChange={onChange} />);
+    const settingsBtn = screen.getByLabelText(LABEL_MAP.settings);
+    fireEvent.keyDown(settingsBtn, { key: 'ArrowDown' });
     expect(onChange).toHaveBeenCalledWith('explorer');
   });
 
   it('Home 键跳到第一个活动（explorer）', () => {
     const onChange = vi.fn();
-    render(<ActivityBar active="items" onChange={onChange} />);
-    const itemsBtn = screen.getByLabelText('物品/配方');
-    fireEvent.keyDown(itemsBtn, { key: 'Home' });
+    render(<ActivityBar active="packages" onChange={onChange} />);
+    const packagesBtn = screen.getByLabelText(LABEL_MAP.packages);
+    fireEvent.keyDown(packagesBtn, { key: 'Home' });
     expect(onChange).toHaveBeenCalledWith('explorer');
   });
 
-  it('End 键跳到最后一个活动（game）', () => {
+  it('End 键跳到最后一个活动（settings）', () => {
     const onChange = vi.fn();
     render(<ActivityBar active="explorer" onChange={onChange} />);
-    const explorerBtn = screen.getByLabelText('资源管理器');
+    const explorerBtn = screen.getByLabelText(LABEL_MAP.explorer);
     fireEvent.keyDown(explorerBtn, { key: 'End' });
-    expect(onChange).toHaveBeenCalledWith('game');
+    expect(onChange).toHaveBeenCalledWith('settings');
   });
 
   it('ArrowDown 切换后焦点移动到新激活按钮（requestAnimationFrame 回调）', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    const explorerBtn = screen.getByLabelText('资源管理器');
+    const explorerBtn = screen.getByLabelText(LABEL_MAP.explorer);
     explorerBtn.focus();
     expect(document.activeElement).toBe(explorerBtn);
-    // 触发 ArrowDown，由于 onChange 是 no-op，active 不会真的切换，
-    // 但 handleKeyDown 会尝试 querySelector('[data-activity="search"]') 并 focus 它
     fireEvent.keyDown(explorerBtn, { key: 'ArrowDown' });
-    const searchBtn = screen.getByLabelText('搜索');
+    const searchBtn = screen.getByLabelText(LABEL_MAP.search);
     expect(document.activeElement).toBe(searchBtn);
   });
 
   it('End 键切换后焦点移动到最后一个按钮', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    const explorerBtn = screen.getByLabelText('资源管理器');
+    const explorerBtn = screen.getByLabelText(LABEL_MAP.explorer);
     explorerBtn.focus();
     fireEvent.keyDown(explorerBtn, { key: 'End' });
-    const gameBtn = screen.getByLabelText('游戏启动器');
-    expect(document.activeElement).toBe(gameBtn);
+    const settingsBtn = screen.getByLabelText(LABEL_MAP.settings);
+    expect(document.activeElement).toBe(settingsBtn);
   });
 
   it('Home 键切换后焦点移动到第一个按钮', () => {
-    render(<ActivityBar active="cicd" onChange={() => {}} />);
-    const cicdBtn = screen.getByLabelText('CI/CD');
-    cicdBtn.focus();
-    fireEvent.keyDown(cicdBtn, { key: 'Home' });
-    const explorerBtn = screen.getByLabelText('资源管理器');
+    render(<ActivityBar active="settings" onChange={() => {}} />);
+    const settingsBtn = screen.getByLabelText(LABEL_MAP.settings);
+    settingsBtn.focus();
+    fireEvent.keyDown(settingsBtn, { key: 'Home' });
+    const explorerBtn = screen.getByLabelText(LABEL_MAP.explorer);
     expect(document.activeElement).toBe(explorerBtn);
   });
 
   it('其它键（如 Tab/Enter/Space）不触发 onChange', () => {
     const onChange = vi.fn();
     render(<ActivityBar active="explorer" onChange={onChange} />);
-    const explorerBtn = screen.getByLabelText('资源管理器');
+    const explorerBtn = screen.getByLabelText(LABEL_MAP.explorer);
     fireEvent.keyDown(explorerBtn, { key: 'Tab' });
     fireEvent.keyDown(explorerBtn, { key: 'Enter' });
     fireEvent.keyDown(explorerBtn, { key: ' ' });
@@ -263,16 +301,16 @@ describe('ActivityBar 键盘导航（WAI-ARIA Toolbar 模式）', () => {
 describe('ActivityBar tooltip', () => {
   it('hover 按钮时显示 role="tooltip" 的浮层', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    const searchBtn = screen.getByLabelText('搜索');
+    const searchBtn = screen.getByLabelText(LABEL_MAP.search);
     fireEvent.mouseEnter(searchBtn);
     const tooltip = searchBtn.querySelector('.mc-pop[role="tooltip"]');
     expect(tooltip).toBeTruthy();
-    expect(tooltip?.textContent).toBe('搜索');
+    expect(tooltip?.textContent).toBe(LABEL_MAP.search);
   });
 
   it('鼠标离开后 tooltip 消失', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    const searchBtn = screen.getByLabelText('搜索');
+    const searchBtn = screen.getByLabelText(LABEL_MAP.search);
     fireEvent.mouseEnter(searchBtn);
     expect(searchBtn.querySelector('.mc-pop[role="tooltip"]')).toBeTruthy();
     fireEvent.mouseLeave(searchBtn);
@@ -281,30 +319,10 @@ describe('ActivityBar tooltip', () => {
 
   it('激活按钮 hover 时也显示 tooltip', () => {
     render(<ActivityBar active="explorer" onChange={() => {}} />);
-    const explorerBtn = screen.getByLabelText('资源管理器');
+    const explorerBtn = screen.getByLabelText(LABEL_MAP.explorer);
     fireEvent.mouseEnter(explorerBtn);
     const tooltip = explorerBtn.querySelector('.mc-pop[role="tooltip"]');
     expect(tooltip).toBeTruthy();
-    expect(tooltip?.textContent).toBe('资源管理器');
+    expect(tooltip?.textContent).toBe(LABEL_MAP.explorer);
   });
 });
-
-// === 工具函数 ===
-
-/** activity id -> 中文 label 映射（与 ActivityBar.tsx 中 activities 数组保持同步） */
-function labelFor(id: string): string {
-  const map: Record<string, string> = {
-    explorer: '资源管理器',
-    search: '搜索',
-    git: '源代码管理',
-    packages: '包管理',
-    items: '物品/配方',
-    blocks: '方块编辑',
-    entity: '实体 AI',
-    audio: '音效事件',
-    cicd: 'CI/CD',
-    game: '游戏启动器',
-    settings: '设置',
-  };
-  return map[id] ?? '';
-}

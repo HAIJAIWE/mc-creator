@@ -36,6 +36,15 @@ export class CustomNodeRegistry {
     return this.map.has(typeId);
   }
 
+  /**
+   * 注销自定义节点类型（供插件注册表桥接清理）。
+   *
+   * @returns true=曾存在并已移除，false=不存在
+   */
+  unregister(typeId: string): boolean {
+    return this.map.delete(typeId);
+  }
+
   list(): CustomNodeSchemaType[] {
     return [...this.map.values()];
   }

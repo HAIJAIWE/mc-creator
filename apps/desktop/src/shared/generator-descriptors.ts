@@ -209,3 +209,6 @@ type _AssertDescriptorKeysMatch =
     : never;
 const _descriptorKeysAligned: _AssertDescriptorKeysMatch = true;
 void _descriptorKeysAligned;
+
+// Re-export GENERATOR_TYPES for consumers
+export { GENERATOR_TYPES } from './ipc-channels.js';

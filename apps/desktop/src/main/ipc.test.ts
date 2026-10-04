@@ -127,4 +127,20 @@ describe('P12 buildChatSystemMessage', () => {
     expect(msg).toContain('整合包描述');
     expect(msg).toContain('modId: pack');
   });
+
+  it('无 context 但有 ragHits 时返回知识库增强消息（注明来源）', () => {
+    const msg = buildChatSystemMessage(undefined, [
+      { title: '有形合成配方 crafting_shaped', snippet: 'pattern 片段', source: 'Minecraft Wiki · Recipe' },
+    ]);
+    expect(msg).toContain('本地知识库参考');
+    expect(msg).toContain('有形合成配方 crafting_shaped');
+    expect(msg).toContain('来源：Minecraft Wiki · Recipe');
+    expect(msg).toContain('不要编造');
+  });
+
+  it('空 ragHits 时行为与原来一致', () => {
+    expect(buildChatSystemMessage(undefined, [])).toBe(
+      '你是 Minecraft 内容创作专家助手，帮助用户创作 Minecraft 内容。简洁回答。',
+    );
+  });
 });

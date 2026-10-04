@@ -70,7 +70,7 @@ import {
   clearRecentGraphs,
   type RecentGraphEntry,
 } from './nodeGraphPersistence.js';
-import { serializeGraph } from './nodeGraphSerializer.js';
+import { serializeGraph, SERIALIZER_VERSION } from './nodeGraphSerializer.js';
 import type { NodeGraph, ModNode, ModEdge, NodeData, NodeKind, NodePort } from '@mc-creator/shared';
 import { LATEST_FORMAT_VERSION } from '@mc-creator/shared';
 
@@ -216,7 +216,9 @@ describe('saveGraphToDisk', () => {
       graph: NodeGraph;
     };
     expect(parsed.format).toBe('mc-creator-node-graph');
-    expect(parsed.version).toBe(1);
+    // 版本号跟序列化器走（当前 v2：新增 pluginIds + v1→v2 包络迁移），
+    // 不要硬编码字面量，否则升级序列化器时本断言必红。
+    expect(parsed.version).toBe(SERIALIZER_VERSION);
     expect(parsed.graph).toEqual(graph);
     // 应写入最近列表
     const recent = await listRecentGraphs();

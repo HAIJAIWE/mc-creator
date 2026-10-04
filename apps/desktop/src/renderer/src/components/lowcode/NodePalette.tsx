@@ -1,4 +1,4 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import type { NodeKind } from '@mc-creator/shared';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { NODE_METADATA, NODE_CATEGORIES, type NodeMeta } from './nodes';
@@ -10,6 +10,13 @@ import {
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 import { customNodeRegistry } from '../../domain/customNodeRegistry.js';
 import { CustomNodeImporter } from './custom/CustomNodeImporter.js';
+import {
+  listNodes as listPluginNodes,
+  listPluginCategories,
+  subscribePluginNodes,
+  isPluginNode,
+  type PluginNodeDef,
+} from './node-registry.js';
 
 const COLOR_TEXT_CLASSES: Record<string, string> = {
   pink: 'text-pink-400 border-pink-400/40 hover:bg-pink-400/10',
@@ -58,6 +65,20 @@ function NodePaletteComponent({
   const [showImporter, setShowImporter] = useState(false);
   /** 自定义节点列表（从注册表读取，渲染时实时获取） */
   const [customNodes, setCustomNodes] = useState(() => customNodeRegistry.list());
+  /** 插件节点注册表版本（变更时触发重渲染；列表读取始终走注册表现值） */
+  const [, setPluginVersion] = useState(0);
+
+  useEffect(
+    () =>
+      subscribePluginNodes(() => {
+        setPluginVersion((v) => v + 1);
+        // 桥接会同步改 customNodeRegistry，一并刷新 JSON 分区
+        setCustomNodes(customNodeRegistry.list());
+      }),
+    [],
+  );
+  // 插件桥接的条目只在「插件节点」分区展示，JSON 分区过滤掉避免重复
+  const jsonCustomNodes = customNodes.filter((s) => !isPluginNode(s.typeId));
 
   const addCustomNode = useNodeGraphStore((s) => s.addCustomNode);
 
@@ -71,6 +92,17 @@ function NodePaletteComponent({
       m.label.toLowerCase().includes(search.toLowerCase()) ||
       m.description.toLowerCase().includes(search.toLowerCase()),
   );
+
+  // 插件节点（代码插件注册表）：共用顶部搜索框，按 category 分组，带「自定义」badge
+  const pluginQuery = search.trim().toLowerCase();
+  const filteredPlugins = listPluginNodes().filter(
+    (d) =>
+      pluginQuery === '' ||
+      d.title.toLowerCase().includes(pluginQuery) ||
+      d.id.toLowerCase().includes(pluginQuery) ||
+      d.description.toLowerCase().includes(pluginQuery),
+  );
+  const pluginCategories = listPluginCategories();
 
   const handleDragStart = useCallback(
     (e: React.DragEvent, kind: NodeKind) => {
@@ -228,11 +260,11 @@ function NodePaletteComponent({
             导入自定义节点
           </button>
         </div>
-        {customNodes.length === 0 ? (
+        {jsonCustomNodes.length === 0 ? (
           <div className="text-[10px] text-mc-dim">未导入自定义节点</div>
         ) : (
           <div className="grid grid-cols-1 gap-1">
-            {customNodes.map((schema) => (
+            {jsonCustomNodes.map((schema) => (
               <button
                 key={schema.typeId}
                 type="button"
@@ -263,6 +295,42 @@ function NodePaletteComponent({
         />
       )}
 
+      {/* 插件节点分区（代码插件系统：node-registry 注册表，按 category 分组 + 自定义 badge） */}
+      <div className="border-t border-mc-border p-2" role="group" aria-label="插件节点">
+        <div className="mb-1 flex items-center justify-between">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-mc-mute">
+            🔌 插件节点
+          </div>
+          <span className="rounded-mc bg-mc-surface-2 px-1.5 py-0.5 text-[10px] text-mc-mute">
+            {filteredPlugins.length} 个
+          </span>
+        </div>
+        {filteredPlugins.length === 0 ? (
+          <div className="text-[10px] text-mc-dim">
+            {pluginQuery === '' ? '未加载插件节点（见 workspaces/<项目>/nodes/）' : '无匹配插件节点'}
+          </div>
+        ) : (
+          pluginCategories.map((cat) => {
+            const items = filteredPlugins.filter((d) => d.category === cat);
+            if (items.length === 0) return null;
+            return (
+              <div key={cat} className="mb-2" role="group" aria-label={pluginCategoryLabel(cat)}>
+                <div className="mb-0.5 text-[10px] text-mc-dim">{pluginCategoryLabel(cat)}</div>
+                <div className="grid grid-cols-1 gap-1">
+                  {items.map((def) => (
+                    <PluginNodeItem
+                      key={def.id}
+                      def={def}
+                      onAdd={() => addCustomNode(def.id, { x: 100, y: 100 })}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
       {/* 提示 */}
       <div className="border-t border-mc-border p-2 text-[10px] text-mc-mute">
         💡 拖拽节点到画布或点击添加
@@ -271,8 +339,43 @@ function NodePaletteComponent({
   );
 }
 
-interface PaletteItemProps {
-  meta: NodeMeta;
+/** 插件分组显示名：内置分组沿用中文标签，插件自定义分组原样显示 */
+function pluginCategoryLabel(cat: string): string {
+  const known = NODE_CATEGORIES.find((c) => c.id === cat);
+  return known ? known.label : cat;
+}
+
+interface PluginNodeItemProps {
+  def: PluginNodeDef;
+  onAdd: () => void;
+}
+
+const PluginNodeItem = memo(function PluginNodeItem({ def, onAdd }: PluginNodeItemProps) {
+  return (
+    <button
+      type="button"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('application/custom-node-typeid', def.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      onClick={onAdd}
+      aria-label={`添加插件节点${def.title}：${def.description || def.id}`}
+      className="flex items-center gap-2 rounded-mc border border-dashed border-mc-accent/50 bg-mc-surface-2 px-2 py-1.5 text-left text-xs text-mc-text transition-colors hover:border-mc-accent cursor-grab active:cursor-grabbing"
+    >
+      <McIcon scope="pixel" name="puzzle" size={14} aria-hidden="true" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <span className="font-medium text-mc-text">{def.title}</span>
+          <span className="rounded-mc bg-mc-accent/20 px-1 text-[9px] text-mc-accent">自定义</span>
+        </div>
+        <div className="truncate font-mono text-[10px] text-mc-mute">{def.id}</div>
+      </div>
+    </button>
+  );
+});
+
+interface PaletteItemProps {  meta: NodeMeta;
   disabled: boolean | undefined;
   onDragStart: (e: React.DragEvent, kind: NodeKind) => void;
   onClick: ((kind: NodeKind) => void) | undefined;

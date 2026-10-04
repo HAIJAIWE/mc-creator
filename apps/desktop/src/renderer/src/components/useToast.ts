@@ -10,12 +10,36 @@ import { createContext, useContext } from 'react';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary' | 'ghost';
+}
+
+export interface ToastItem {
+  id: string;
+  type: ToastType;
+  message: string;
+  actions?: ToastAction[];
+  /** 不自动消失（用于需要用户操作的 toast） */
+  persistent?: boolean;
+}
+
 export interface ToastContextValue {
-  toast: (message: string, type?: ToastType) => void;
+  toast: (message: string, type?: ToastType, options?: { actions?: ToastAction[]; persistent?: boolean }) => void;
   success: (message: string) => void;
   error: (message: string) => void;
   warning: (message: string) => void;
   info: (message: string) => void;
+  /** 显示冲突 toast，包含三个操作按钮 */
+  showConflictToast: (params: {
+    filePath: string;
+    serverMeta: { mtime: number; size: number; hash: string };
+    localMeta: { mtime: number; size: number; hash: string } | null;
+    onAcceptServer: () => void;
+    onKeepLocal: () => void;
+    onViewDiff: () => void;
+  }) => void;
 }
 
 export const ToastContext = createContext<ToastContextValue | null>(null);

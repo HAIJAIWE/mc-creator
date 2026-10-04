@@ -1,0 +1,30 @@
+{
+  "name": "@mc-creator/generator-mod",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MC 全链路 AI 工作台 · 客户端 Mod 生成器实现包（fabric/neoforge/quilt/legacy_fabric/forge）。§18 阶段 9 实现自 @mc-creator/core 迁入，core 仅留 shim（设计文档 §15，§2.1）。",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@mc-creator/contract": "workspace:*",
+    "@mc-creator/shared": "workspace:*",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@mc-creator/core": "workspace:*",
+    "@types/node": "^26.1.1",
+    "@types/pngjs": "^6.0.5",
+    "memfs": "^4.9.0",
+    "vitest": "^2.0.0"
+  }
+}

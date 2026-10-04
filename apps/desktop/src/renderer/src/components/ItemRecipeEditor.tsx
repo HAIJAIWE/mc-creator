@@ -1,9 +1,38 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { McInventory, type McInventoryItem } from './McInventory';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { listAssets, type McAssetScope } from '../assets/mc-ui/mc-ui';
+import { useModStore } from '../store/mod-store.js';
+import type { ItemSpec } from '@mc-creator/shared';
+import {
+  TOOL_TYPES,
+  RARITIES,
+  RARITY_LABELS,
+  CREATIVE_TABS,
+  CREATIVE_TAB_LABELS,
+  ARMOR_SLOTS,
+  ARMOR_SLOT_LABELS,
+  type ToolType,
+  type Rarity,
+  type CreativeTab,
+  type ArmorSlot,
+  toValidId,
+  isValidId,
+  validateId,
+  validateRequired,
+  validateInt,
+  validateNum,
+  parseTexturePath,
+  formatTexturePath,
+  findRecipeRefs,
+  Field,
+  GroupTitle,
+  Toggle,
+  AssetBinder,
+  RecipeRefNote,
+} from './SpecEditorFields';
 
-type Tab = 'inventory' | 'recipe';
+type Tab = 'inventory' | 'recipe' | 'items';
 type GridId = 'main' | 'hotbar' | 'recipe' | 'result';
 
 const SCOPES: { scope: McAssetScope; title: string }[] = [
@@ -124,6 +153,672 @@ const EMPTY_RECIPE = (): (McInventoryItem | null)[] => Array(RECIPE_LEN).fill(nu
 /** 把 item 解析为 "<scope>:<name>" 资产键 */
 function assetKey(item: McInventoryItem): string {
   return `${item.scope ?? 'mob'}:${item.name}`;
+}
+
+// ===== 物品属性面板（可视化表单 ↔ spec.items 双向同步） =====
+
+/** 表单草稿：数字字段保持字符串形态，非法输入只行内报错、不阻断其他字段提交 */
+interface ItemDraft {
+  idText: string;
+  name: string;
+  scope: McAssetScope;
+  assetName: string;
+  maxStack: string;
+  maxDamage: string;
+  rarity: Rarity;
+  creativeTab: CreativeTab;
+  isFood: boolean;
+  hunger: string;
+  saturation: string;
+  hasTool: boolean;
+  toolType: ToolType;
+  miningLevel: string;
+  toolSpeed: string;
+  isArmor: boolean;
+  armorSlot: ArmorSlot;
+  defense: string;
+  toughness: string;
+  enchantability: string;
+  fireResistant: boolean;
+}
+
+function toItemDraft(item: ItemSpec): ItemDraft {
+  const tex = parseTexturePath(item.texturePath);
+  return {
+    idText: item.id,
+    name: item.name,
+    scope: tex?.scope ?? 'mob',
+    assetName: tex?.name ?? '',
+    maxStack: String(item.maxStackSize),
+    maxDamage: String(item.maxDamage),
+    rarity: item.rarity,
+    creativeTab: item.creativeTab,
+    isFood: !!item.food,
+    hunger: String(item.food?.hunger ?? 4),
+    saturation: String(item.food?.saturation ?? 0.6),
+    hasTool: !!item.tool,
+    toolType: item.tool?.type ?? 'none',
+    miningLevel: String(item.tool?.miningLevel ?? 0),
+    toolSpeed: String(item.tool?.speed ?? 1),
+    isArmor: !!item.armor,
+    armorSlot: item.armor?.slot ?? 'chest',
+    defense: String(item.armor?.defense ?? 0),
+    toughness: String(item.armor?.toughness ?? 0),
+    enchantability: String(item.enchantability ?? 0),
+    fireResistant: item.fireResistant ?? false,
+  };
+}
+
+function ItemSpecPanel() {
+  const items = useModStore((s) => s.spec?.items ?? []);
+  const recipes = useModStore((s) => s.spec?.recipes);
+  const addItem = useModStore((s) => s.addItem);
+  const updateItem = useModStore((s) => s.updateItem);
+  const removeItem = useModStore((s) => s.removeItem);
+  const renameItemId = useModStore((s) => s.renameItemId);
+
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const selected = items.find((i) => i.id === selectedItemId) ?? null;
+  const [draft, setDraft] = useState<ItemDraft | null>(null);
+  /** 最近一次写入 store 的选中物品快照：effect 靠它区分"外部变更"与"自身写入" */
+  const lastPushedRef = useRef('');
+
+  const taken = useMemo(() => new Set(items.map((i) => i.id)), [items]);
+
+  // 选择失效（被删除 / 初始）时回退到首个物品
+  useEffect(() => {
+    if ((!selectedItemId || !taken.has(selectedItemId)) && items.length > 0) {
+      const first = items[0].id;
+      if (first !== selectedItemId) setSelectedItemId(first);
+    } else if (items.length === 0 && selectedItemId !== null) {
+      setSelectedItemId(null);
+    }
+  }, [items, selectedItemId, taken]);
+
+  // 双向同步：store 侧被外部改动时用新值回填表单；自身写入的不回填（靠 lastPushedRef 识别）
+  useEffect(() => {
+    const snap = selected ? JSON.stringify(selected) : '';
+    if (snap !== lastPushedRef.current) {
+      lastPushedRef.current = snap;
+      setDraft(selected ? toItemDraft(selected) : null);
+    }
+  }, [selected]);
+
+  const markPushed = (id: string) => {
+    const cur = useModStore.getState().spec?.items.find((i) => i.id === id);
+    lastPushedRef.current = cur ? JSON.stringify(cur) : '';
+  };
+
+  /** 更新草稿 + 可选地提交部分 store 补丁（补丁为 undefined 时只改草稿，多用于非法输入） */
+  const applyDraft = (d: Partial<ItemDraft>, storePatch?: Partial<ItemSpec>) => {
+    setDraft((prev) => (prev ? { ...prev, ...d } : prev));
+    if (storePatch && selected) {
+      updateItem(selected.id, storePatch);
+      markPushed(selected.id);
+    }
+  };
+
+  const createItem = () => {
+    const current = useModStore.getState().spec?.items ?? [];
+    const takenSet = new Set(current.map((i) => i.id));
+    const base = toValidId('new_item');
+    let id = base;
+    let n = 2;
+    while (takenSet.has(id)) id = `${base}_${n++}`;
+    const item: ItemSpec = {
+      id,
+      name: id,
+      maxStackSize: 64,
+      rarity: 'common',
+      maxDamage: 0,
+      fuelTick: 0,
+      lore: '',
+      attributes: [],
+      defaultEnchantments: [],
+      itemCategory: 'misc',
+      creativeTab: 'inventory',
+    };
+    addItem(item);
+    lastPushedRef.current = JSON.stringify(item);
+    setSelectedItemId(id);
+    setDraft(toItemDraft(item));
+  };
+
+  // ---- 校验（渲染期纯计算，只展示、不阻断） ----
+  const idCheck = draft && selected ? validateId(draft.idText, taken, selected.id) : null;
+  const nameError = draft ? validateRequired(draft.name, '显示名称') : null;
+  const maxStackCheck = draft ? validateInt(draft.maxStack, '最大堆叠', 1, 64) : null;
+  const maxDamageCheck = draft ? validateInt(draft.maxDamage, '耐久上限', 0) : null;
+  const hungerCheck = draft ? validateInt(draft.hunger, '饥饿值', 0, 20) : null;
+  const saturationCheck = draft ? validateNum(draft.saturation, '饱和度', 0) : null;
+  const miningLevelCheck = draft ? validateInt(draft.miningLevel, '挖掘等级', 0, 10) : null;
+  const toolSpeedCheck = draft ? validateNum(draft.toolSpeed, '挖掘速度', 0) : null;
+  const defenseCheck = draft ? validateInt(draft.defense, '防御点数', 0) : null;
+  const toughnessCheck = draft ? validateNum(draft.toughness, '盔甲韧性', 0) : null;
+  const enchantCheck = draft ? validateInt(draft.enchantability, '附魔能力', 0) : null;
+
+  const commitId = () => {
+    if (!draft || !selected) return;
+    const raw = draft.idText.trim();
+    if (!raw) {
+      setDraft({ ...draft, idText: selected.id });
+      return;
+    }
+    const target = isValidId(raw) ? raw : toValidId(raw);
+    if (target === selected.id) {
+      setDraft({ ...draft, idText: target });
+      return;
+    }
+    if (taken.has(target)) return; // 重名：错误已行内显示，不提交
+    renameItemId(selected.id, target); // 配方 result/ingredient 引用由 store 同步改名
+    setSelectedItemId(target);
+  };
+
+  const refs = selected ? findRecipeRefs(recipes, selected.id) : null;
+
+  return (
+    <div className="space-y-3">
+      {/* 物品列表 */}
+      <div>
+        <GroupTitle>物品列表（{items.length}）</GroupTitle>
+        <div className="mb-2 flex gap-2">
+          <button className="mc-btn-primary" onClick={createItem}>
+            新建物品
+          </button>
+          {selected && (
+            <button
+              className="mc-btn-ghost"
+              onClick={() => removeItem(selected.id)}
+              title="删除当前物品"
+            >
+              删除当前
+            </button>
+          )}
+        </div>
+        {items.length > 0 ? (
+          <ul className="mc-card max-h-32 space-y-1 overflow-auto p-2">
+            {items.map((it) => (
+              <li key={it.id}>
+                <button
+                  onClick={() => setSelectedItemId(it.id)}
+                  className={`flex w-full items-center justify-between gap-2 rounded-mc px-2 py-1 text-xs transition-colors ${
+                    it.id === selectedItemId
+                      ? 'bg-mc-accent/30 text-mc-text'
+                      : 'text-mc-dim hover:bg-mc-surface-3 hover:text-mc-text'
+                  }`}
+                >
+                  <span className="truncate">
+                    {it.name} <span className="text-mc-mute">({it.id})</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-xs text-mc-mute">暂无物品，点击「新建物品」开始。</div>
+        )}
+      </div>
+
+      {selected && draft && (
+        <>
+          {refs && <RecipeRefNote refs={refs} />}
+
+          {/* 基础属性 */}
+          <div>
+            <GroupTitle>基础属性</GroupTitle>
+            <div className="space-y-2">
+              <Field label="ID（小写字母/数字/下划线，失焦保存；非法自动转合法）" error={idCheck?.error}>
+                <input
+                  className="mc-input w-full font-mono"
+                  value={draft.idText}
+                  onChange={(e) => setDraft({ ...draft, idText: e.target.value })}
+                  onBlur={commitId}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                  }}
+                  placeholder="如 ruby_sword"
+                />
+              </Field>
+              <Field label="显示名称" error={nameError}>
+                <input
+                  className="mc-input w-full"
+                  value={draft.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    applyDraft({ name }, name.trim() ? { name } : undefined);
+                  }}
+                  placeholder="如 红宝石剑"
+                />
+              </Field>
+              <Field label="素材绑定">
+                <AssetBinder
+                  scope={draft.scope}
+                  name={draft.assetName}
+                  onScopeChange={(s) => {
+                    const names = listAssets(s);
+                    const effective = names.includes(draft.assetName) ? draft.assetName : (names[0] ?? '');
+                    applyDraft(
+                      { scope: s, assetName: effective },
+                      effective ? { texturePath: formatTexturePath(s, effective) } : undefined,
+                    );
+                  }}
+                  onNameChange={(n) =>
+                    applyDraft({ assetName: n }, { texturePath: formatTexturePath(draft.scope, n) })
+                  }
+                />
+              </Field>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Field label="最大堆叠（1–64）" error={maxStackCheck?.error}>
+                    <input
+                      type="number"
+                      className="mc-input w-full"
+                      value={draft.maxStack}
+                      min={1}
+                      max={64}
+                      onChange={(e) => {
+                        const v = validateInt(e.target.value, '最大堆叠', 1, 64);
+                        applyDraft({ maxStack: e.target.value }, v.value === null ? undefined : { maxStackSize: v.value });
+                      }}
+                    />
+                  </Field>
+                </div>
+                <div className="flex-1">
+                  <Field label="稀有度" hint="影响悬浮提示颜色">
+                    <select
+                      className="mc-select w-full"
+                      value={draft.rarity}
+                      onChange={(e) => {
+                        const rarity = e.target.value as Rarity;
+                        applyDraft({ rarity }, { rarity });
+                      }}
+                    >
+                      {RARITIES.map((v) => (
+                        <option key={v} value={v}>
+                          {RARITY_LABELS[v]}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Field
+                    label="耐久上限 maxDamage（0=不可损坏）"
+                    error={maxDamageCheck?.error}
+                    hint="即 durability：受击/使用时消耗"
+                  >
+                    <input
+                      type="number"
+                      className="mc-input w-full"
+                      value={draft.maxDamage}
+                      min={0}
+                      onChange={(e) => {
+                        const v = validateInt(e.target.value, '耐久上限', 0);
+                        applyDraft({ maxDamage: e.target.value }, v.value === null ? undefined : { maxDamage: v.value });
+                      }}
+                    />
+                  </Field>
+                </div>
+                <div className="flex-1">
+                  <Field label="附魔能力 enchantability" error={enchantCheck?.error} hint="0=不可附魔，值越高好附魔越好">
+                    <input
+                      type="number"
+                      className="mc-input w-full"
+                      value={draft.enchantability}
+                      min={0}
+                      onChange={(e) => {
+                        const v = validateInt(e.target.value, '附魔能力', 0);
+                        applyDraft(
+                          { enchantability: e.target.value },
+                          v.value === null ? undefined : { enchantability: v.value },
+                        );
+                      }}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Field label="创造模式标签页">
+                  <select
+                    className="mc-select w-full"
+                    value={draft.creativeTab}
+                    onChange={(e) => {
+                      const creativeTab = e.target.value as CreativeTab;
+                      applyDraft({ creativeTab }, { creativeTab });
+                    }}
+                  >
+                    {CREATIVE_TABS.map((t) => (
+                      <option key={t} value={t}>
+                        {CREATIVE_TAB_LABELS[t]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="pt-4">
+                  <Toggle
+                    checked={draft.fireResistant}
+                    onChange={(v) => applyDraft({ fireResistant: v }, { fireResistant: v })}
+                    label="防火（岩浆/火中不烧毁）"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 食物 */}
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <GroupTitle>食物属性</GroupTitle>
+              <div className="ml-auto">
+                <Toggle
+                  checked={draft.isFood}
+                  onChange={(isFood) => {
+                    if (!selected) return;
+                    if (isFood) {
+                      const hunger = hungerCheck?.value ?? 4;
+                      const saturation = saturationCheck?.value ?? 0.6;
+                      const cur = selected.food;
+                      applyDraft(
+                        { isFood, hunger: String(hunger), saturation: String(saturation) },
+                        {
+                          food: {
+                            hunger,
+                            saturation,
+                            effects: cur?.effects ?? [],
+                            canAlwaysEat: cur?.canAlwaysEat ?? false,
+                          },
+                        },
+                      );
+                    } else {
+                      applyDraft({ isFood }, { food: undefined });
+                    }
+                  }}
+                  label="是食物"
+                />
+              </div>
+            </div>
+            {draft.isFood && (
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Field label="饥饿值 hunger（0–20）" error={hungerCheck?.error}>
+                    <input
+                      type="number"
+                      className="mc-input w-full"
+                      value={draft.hunger}
+                      min={0}
+                      max={20}
+                      onChange={(e) => {
+                        const next = { ...draft, hunger: e.target.value };
+                        setDraft(next);
+                        if (!selected) return;
+                        const h = validateInt(next.hunger, '饥饿值', 0, 20);
+                        const s = validateNum(next.saturation, '饱和度', 0);
+                        if (h.value === null || s.value === null) return;
+                        updateItem(selected.id, {
+                          food: {
+                            hunger: h.value,
+                            saturation: s.value,
+                            effects: selected.food?.effects ?? [],
+                            canAlwaysEat: selected.food?.canAlwaysEat ?? false,
+                          },
+                        });
+                        markPushed(selected.id);
+                      }}
+                    />
+                  </Field>
+                </div>
+                <div className="flex-1">
+                  <Field label="饱和度 saturation（≥0）" error={saturationCheck?.error}>
+                    <input
+                      type="number"
+                      className="mc-input w-full"
+                      value={draft.saturation}
+                      min={0}
+                      step={0.1}
+                      onChange={(e) => {
+                        const next = { ...draft, saturation: e.target.value };
+                        setDraft(next);
+                        if (!selected) return;
+                        const h = validateInt(next.hunger, '饥饿值', 0, 20);
+                        const s = validateNum(next.saturation, '饱和度', 0);
+                        if (h.value === null || s.value === null) return;
+                        updateItem(selected.id, {
+                          food: {
+                            hunger: h.value,
+                            saturation: s.value,
+                            effects: selected.food?.effects ?? [],
+                            canAlwaysEat: selected.food?.canAlwaysEat ?? false,
+                          },
+                        });
+                        markPushed(selected.id);
+                      }}
+                    />
+                  </Field>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 工具 */}
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <GroupTitle>工具属性</GroupTitle>
+              <div className="ml-auto">
+                <Toggle
+                  checked={draft.hasTool}
+                  onChange={(hasTool) => {
+                    if (hasTool) {
+                      const miningLevel = miningLevelCheck?.value ?? 0;
+                      const speed = toolSpeedCheck?.value ?? 1;
+                      applyDraft(
+                        {
+                          hasTool,
+                          miningLevel: String(miningLevel),
+                          toolSpeed: String(speed),
+                        },
+                        { tool: { type: draft.toolType, miningLevel, speed } },
+                      );
+                    } else {
+                      applyDraft({ hasTool }, { tool: undefined });
+                    }
+                  }}
+                  label="是工具"
+                />
+              </div>
+            </div>
+            {draft.hasTool && (
+              <div className="space-y-2">
+                <Field label="工具类型">
+                  <select
+                    className="mc-select w-full"
+                    value={draft.toolType}
+                    onChange={(e) => {
+                      const toolType = e.target.value as ToolType;
+                      const next = { ...draft, toolType };
+                      setDraft(next);
+                      if (!selected) return;
+                      const ml = validateInt(next.miningLevel, '挖掘等级', 0, 10);
+                      const sp = validateNum(next.toolSpeed, '挖掘速度', 0);
+                      if (ml.value === null || sp.value === null) return;
+                      updateItem(selected.id, {
+                        tool: { type: toolType, miningLevel: ml.value, speed: sp.value },
+                      });
+                      markPushed(selected.id);
+                    }}
+                  >
+                    {TOOL_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Field label="挖掘等级（0–10）" error={miningLevelCheck?.error} hint="0木 1石 2铁 3钻 4下界合金">
+                      <input
+                        type="number"
+                        className="mc-input w-full"
+                        value={draft.miningLevel}
+                        min={0}
+                        max={10}
+                        onChange={(e) => {
+                          const next = { ...draft, miningLevel: e.target.value };
+                          setDraft(next);
+                          if (!selected) return;
+                          const ml = validateInt(next.miningLevel, '挖掘等级', 0, 10);
+                          const sp = validateNum(next.toolSpeed, '挖掘速度', 0);
+                          if (ml.value === null || sp.value === null) return;
+                          updateItem(selected.id, {
+                            tool: { type: next.toolType, miningLevel: ml.value, speed: sp.value },
+                          });
+                          markPushed(selected.id);
+                        }}
+                      />
+                    </Field>
+                  </div>
+                  <div className="flex-1">
+                    <Field label="挖掘速度（≥0）" error={toolSpeedCheck?.error}>
+                      <input
+                        type="number"
+                        className="mc-input w-full"
+                        value={draft.toolSpeed}
+                        min={0}
+                        step={0.5}
+                        onChange={(e) => {
+                          const next = { ...draft, toolSpeed: e.target.value };
+                          setDraft(next);
+                          if (!selected) return;
+                          const ml = validateInt(next.miningLevel, '挖掘等级', 0, 10);
+                          const sp = validateNum(next.toolSpeed, '挖掘速度', 0);
+                          if (ml.value === null || sp.value === null) return;
+                          updateItem(selected.id, {
+                            tool: { type: next.toolType, miningLevel: ml.value, speed: sp.value },
+                          });
+                          markPushed(selected.id);
+                        }}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 防具 */}
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <GroupTitle>防具属性</GroupTitle>
+              <div className="ml-auto">
+                <Toggle
+                  checked={draft.isArmor}
+                  onChange={(isArmor) => {
+                    if (isArmor) {
+                      const defense = defenseCheck?.value ?? 0;
+                      const toughness = toughnessCheck?.value ?? 0;
+                      applyDraft(
+                        { isArmor, defense: String(defense), toughness: String(toughness) },
+                        { armor: { slot: draft.armorSlot, defense, toughness } },
+                      );
+                    } else {
+                      applyDraft({ isArmor }, { armor: undefined });
+                    }
+                  }}
+                  label="是防具"
+                />
+              </div>
+            </div>
+            {draft.isArmor && (
+              <div className="space-y-2">
+                <Field label="防具槽位">
+                  <select
+                    className="mc-select w-full"
+                    value={draft.armorSlot}
+                    onChange={(e) => {
+                      const armorSlot = e.target.value as ArmorSlot;
+                      const next = { ...draft, armorSlot };
+                      setDraft(next);
+                      if (!selected) return;
+                      const df = validateInt(next.defense, '防御点数', 0);
+                      const tn = validateNum(next.toughness, '盔甲韧性', 0);
+                      if (df.value === null || tn.value === null) return;
+                      updateItem(selected.id, {
+                        armor: { slot: armorSlot, defense: df.value, toughness: tn.value },
+                      });
+                      markPushed(selected.id);
+                    }}
+                  >
+                    {ARMOR_SLOTS.map((s) => (
+                      <option key={s} value={s}>
+                        {ARMOR_SLOT_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Field label="防御点数 defense（≥0）" error={defenseCheck?.error}>
+                      <input
+                        type="number"
+                        className="mc-input w-full"
+                        value={draft.defense}
+                        min={0}
+                        onChange={(e) => {
+                          const next = { ...draft, defense: e.target.value };
+                          setDraft(next);
+                          if (!selected) return;
+                          const df = validateInt(next.defense, '防御点数', 0);
+                          const tn = validateNum(next.toughness, '盔甲韧性', 0);
+                          if (df.value === null || tn.value === null) return;
+                          updateItem(selected.id, {
+                            armor: { slot: next.armorSlot, defense: df.value, toughness: tn.value },
+                          });
+                          markPushed(selected.id);
+                        }}
+                      />
+                    </Field>
+                  </div>
+                  <div className="flex-1">
+                    <Field label="盔甲韧性 toughness（≥0）" error={toughnessCheck?.error}>
+                      <input
+                        type="number"
+                        className="mc-input w-full"
+                        value={draft.toughness}
+                        min={0}
+                        step={0.5}
+                        onChange={(e) => {
+                          const next = { ...draft, toughness: e.target.value };
+                          setDraft(next);
+                          if (!selected) return;
+                          const df = validateInt(next.defense, '防御点数', 0);
+                          const tn = validateNum(next.toughness, '盔甲韧性', 0);
+                          if (df.value === null || tn.value === null) return;
+                          updateItem(selected.id, {
+                            armor: { slot: next.armorSlot, defense: df.value, toughness: tn.value },
+                          });
+                          markPushed(selected.id);
+                        }}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 生成 JSON 预览 */}
+          <div>
+            <GroupTitle>物品 JSON（spec.items 实时值）</GroupTitle>
+            <pre className="mc-card max-h-40 overflow-auto p-2 text-[10px] text-mc-text">
+              {JSON.stringify(selected, null, 2)}
+            </pre>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function ItemRecipeEditor() {
@@ -273,6 +968,12 @@ export function ItemRecipeEditor() {
           onClick={() => setTab('recipe')}
         >
           配方
+        </button>
+        <button
+          className={tab === 'items' ? 'mc-btn-primary' : 'mc-btn-ghost'}
+          onClick={() => setTab('items')}
+        >
+          物品属性
         </button>
       </div>
 
@@ -487,6 +1188,8 @@ export function ItemRecipeEditor() {
             </div>
           </>
         )}
+
+        {tab === 'items' && <ItemSpecPanel />}
       </div>
     </div>
   );

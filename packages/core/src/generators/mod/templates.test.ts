@@ -1,21 +1,2 @@
-import { describe, it, expect } from 'vitest';
-import { pascalCase, packageName, packagePath, mainClassName } from './templates.js';
-
-describe('templates', () => {
-  it('pascalCase：下划线转 PascalCase', () => {
-    expect(pascalCase('ruby_tools')).toBe('RubyTools');
-    expect(pascalCase('demo')).toBe('Demo');
-  });
-
-  it('packageName：默认包名', () => {
-    expect(packageName('ruby_tools')).toBe('com.example.ruby_tools');
-  });
-
-  it('packagePath：包路径', () => {
-    expect(packagePath('ruby_tools')).toBe('com/example/ruby_tools');
-  });
-
-  it('mainClassName：主入口类名', () => {
-    expect(mainClassName('ruby_tools')).toBe('RubyToolsMod');
-  });
-});
+// §18 阶段 9：实现已迁入 @mc-creator/generator-mod，本文件仅作重导出，保持既有深路径 import 不断.
+export * from '@mc-creator/generator-mod/templates.test.js';

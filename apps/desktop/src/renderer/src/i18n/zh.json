@@ -107,7 +107,20 @@
     "new_project": "新建项目",
     "open": "打开",
     "export": "导出",
-    "delete_confirm": "确定删除项目「{name}」？此操作不可撤销。"
+    "delete_confirm": "确定删除项目「{name}」？此操作不可撤销。",
+    "loader": {
+      "fabric": "Fabric",
+      "neoforge": "NeoForge",
+      "quilt": "Quilt",
+      "legacy_fabric": "Legacy Fabric",
+      "forge": "Forge",
+      "vanilla": "Vanilla"
+    },
+    "versionGroup": {
+      "latest": "最新版本",
+      "lts": "长期支持版",
+      "old": "旧版本"
+    }
   },
   "dashboard": {
     "selectContentType": "选择你要创建的内容类型",
@@ -174,5 +187,76 @@
     "apiKeyConfigured": "API Key 已配置",
     "apiKeyNotConfigured": "未配置 API Key，点击设置",
     "loaderNotApplicable": "当前内容类型不使用 loader，无需选择"
+  },
+  "createDialog": {
+    "title": "新建项目",
+    "name": "项目名称",
+    "namePlaceholder": "输入项目名称（如 My Awesome Mod）",
+    "type": "内容类型",
+    "loader": "模组加载器",
+    "mcVersion": "Minecraft 版本",
+    "description": "描述（可选）",
+    "descriptionPlaceholder": "简要描述这个项目...",
+    "advanced": {
+      "title": "进阶设置",
+      "show": "显示进阶选项",
+      "hide": "隐藏进阶选项"
+    },
+    "submit": "创建并打开编辑器",
+    "creating": "创建中…"
+  },
+  "generator": {
+    "mod": {
+      "label": "模组",
+      "description": "创建 Fabric/NeoForge 模组"
+    },
+    "datapack": {
+      "label": "数据包",
+      "description": "创建自定义数据包"
+    },
+    "modpack": {
+      "label": "整合包",
+      "description": "创建整合包配置"
+    },
+    "server": {
+      "label": "服务器",
+      "description": "创建服务器配置"
+    },
+    "resource_pack": {
+      "label": "资源包",
+      "description": "创建资源包"
+    },
+    "skin": {
+      "label": "皮肤",
+      "description": "创建玩家皮肤"
+    },
+    "launcher": {
+      "label": "启动器",
+      "description": "创建启动器配置"
+    },
+    "kubejs": {
+      "label": "KubeJS",
+      "description": "创建 KubeJS 脚本"
+    },
+    "crafttweaker": {
+      "label": "CraftTweaker",
+      "description": "创建 ZenScript 脚本"
+    },
+    "behavior_pack": {
+      "label": "行为包",
+      "description": "创建基岩版行为包"
+    },
+    "enchantment": {
+      "label": "附魔",
+      "description": "创建数据驱动附魔（1.21+）"
+    },
+    "behavior_item": {
+      "label": "行为包物品",
+      "description": "创建基岩版自定义物品"
+    },
+    "behavior_entity": {
+      "label": "行为包实体",
+      "description": "创建基岩版自定义实体"
+    }
   }
 }

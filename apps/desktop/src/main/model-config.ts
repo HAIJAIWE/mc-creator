@@ -1,6 +1,7 @@
 import { app } from 'electron';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { writeFileAtomic } from '@mc-creator/shell';
 import type { AiModelConfig } from '@mc-creator/core';
 import { encryptSecret, decryptSecret } from './secret-storage.js';
 
@@ -79,15 +80,13 @@ export function loadModelProfiles(): ProfilesFile {
   return emptyProfiles();
 }
 
-/** 保存全部模型配置（每个 apiKey 加密落盘） */
-export function saveModelProfiles(profiles: ModelProfile[], activeId: string): void {
-  const dir = app.getPath('userData');
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+/** 保存全部模型配置（每个 apiKey 加密落盘，原子写防半截文件） */
+export async function saveModelProfiles(profiles: ModelProfile[], activeId: string): Promise<void> {
   const persisted: ProfilesFile = {
     profiles: profiles.map((p) => ({ ...p, apiKey: encryptSecret(p.apiKey) })),
     activeId,
   };
-  writeFileSync(configPath(), JSON.stringify(persisted, null, 2), 'utf-8');
+  await writeFileAtomic(configPath(), JSON.stringify(persisted, null, 2));
 }
 
 /** 当前生效配置（activeId 指向的 profile，无则第一个，无则默认） */
@@ -104,7 +103,7 @@ export function loadModelConfig(): ModelConfigFull {
 }
 
 /** 兼容旧调用：把单配置写入（更新 active profile，无则创建 default） */
-export function saveModelConfig(config: ModelConfigFull): void {
+export async function saveModelConfig(config: ModelConfigFull): Promise<void> {
   const { profiles, activeId } = loadModelProfiles();
   const id = profiles.some((p) => p.id === activeId)
     ? (activeId ?? LEGACY_PROFILE_ID)
@@ -113,7 +112,7 @@ export function saveModelConfig(config: ModelConfigFull): void {
   const idx = profiles.findIndex((p) => p.id === id);
   if (idx >= 0) profiles[idx] = next;
   else profiles.push(next);
-  saveModelProfiles(profiles, id);
+  await saveModelProfiles(profiles, id);
 }
 
 /**

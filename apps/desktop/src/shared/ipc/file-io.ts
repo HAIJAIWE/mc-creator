@@ -46,3 +46,64 @@ export const SaveAllFilesResponse = z.object({
 });
 export type SaveAllFilesReq = z.infer<typeof SaveAllFilesRequest>;
 export type SaveAllFilesRes = z.infer<typeof SaveAllFilesResponse>;
+
+// === 大文件流式传输 ===
+
+/** 流式写入请求（发起） */
+export const FileWriteStreamStartRequest = z.object({
+  projectId: z.string().min(1),
+  path: z.string().min(1),
+  totalSize: z.number().int().positive(),
+  chunkSize: z.number().int().positive().optional(),
+  expectedHash: z.string().optional(),
+  requestId: z.string(),
+});
+
+/** 流式写入分片数据 */
+export const FileWriteStreamChunkRequest = z.object({
+  requestId: z.string(),
+  chunkIndex: z.number().int().nonnegative(),
+  data: z.string(), // base64 编码的二进制数据
+  isLast: z.boolean(),
+});
+
+/** 流式写入响应 */
+export const FileWriteStreamResponse = z.object({
+  success: z.boolean(),
+  error: z.string().optional(),
+  meta: z
+    .object({
+      size: z.number(),
+      mtime: z.number(),
+      isDirectory: z.boolean(),
+      hash: z.string(),
+    })
+    .optional(),
+});
+
+/** 流式读取请求（发起） */
+export const FileReadStreamStartRequest = z.object({
+  projectId: z.string().min(1),
+  path: z.string().min(1),
+  chunkSize: z.number().int().positive().optional(),
+  requestId: z.string(),
+});
+
+/** 流式读取分片响应 */
+export const FileReadStreamChunkResponse = z.object({
+  requestId: z.string(),
+  chunkIndex: z.number().int().nonnegative(),
+  data: z.string(), // base64 编码的二进制数据
+  isLast: z.boolean(),
+  progress: z.object({
+    loaded: z.number(),
+    total: z.number(),
+    percentage: z.number(),
+  }).optional(),
+});
+
+export type FileWriteStreamStartReq = z.infer<typeof FileWriteStreamStartRequest>;
+export type FileWriteStreamChunkReq = z.infer<typeof FileWriteStreamChunkRequest>;
+export type FileWriteStreamRes = z.infer<typeof FileWriteStreamResponse>;
+export type FileReadStreamStartReq = z.infer<typeof FileReadStreamStartRequest>;
+export type FileReadStreamChunkRes = z.infer<typeof FileReadStreamChunkResponse>;

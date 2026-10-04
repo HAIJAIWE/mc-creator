@@ -18,6 +18,9 @@ import type {
   CurseForgeSearchRes,
   CurseForgeFilesRes,
   CurseForgeConfig,
+  ModpackResolveRes,
+  ModpackCheckConflictsRes,
+  ModpackExportMrpackRes,
   GitChooseRepoRes,
   GitStatusRes,
   GitLogRes,
@@ -32,6 +35,8 @@ import type {
   InstallModRes,
   LaunchMcRes,
   ImportResourceFilesRes,
+  LargeFileMetaT,
+  RagSearchRes,
 } from '../../../shared/ipc-channels.js';
 
 /**
@@ -302,6 +307,8 @@ export const ipcClient = {
         files: result.files,
         warnings: result.warnings,
         unimplemented: result.unimplemented ?? [],
+        // 与主进程 GENERATE_FILES 保持一致：回传校验并填充默认值后的完整 spec
+        spec: req.spec as Record<string, unknown>,
       };
     }
     return window.mcApi.generateFiles(req);
@@ -318,6 +325,11 @@ export const ipcClient = {
   testModelConnection: (req: { baseURL: string; modelId: string; apiKey: string }) =>
     window.mcApi.testModelConnection(req),
   chat: (message: string) => window.mcApi.chat(message),
+  /**
+   * RAG 知识库检索（主进程 TF-IDF + 内存 LRU，供“引用来源”展示与智能体工具调用）。
+   */
+  ragSearch: (req: { query: string; generatorType?: string; topK?: number }): Promise<RagSearchRes> =>
+    window.mcApi.ragSearch(req),
   /**
    * P12 chat 模式工具调用增强：chatStream 添加可选 context 参数。
    * context 由调用方（如 ChatPanel）从项目 store 提取并传入，
@@ -412,6 +424,26 @@ export const ipcClient = {
   loadCurseForgeConfig: (): Promise<CurseForgeConfig> => window.mcApi.loadCurseForgeConfig(),
   saveCurseForgeConfig: (config: CurseForgeConfig): Promise<{ ok: true }> =>
     window.mcApi.saveCurseForgeConfig(config),
+  // === 整合包：依赖解析 + 冲突检测 + mrpack 导出 ===
+  modpackResolve: (req: {
+    mods: { projectId: string; name?: string }[];
+    mcVersion: string;
+    loader: string;
+    allowCache?: boolean;
+  }): Promise<ModpackResolveRes> => window.mcApi.modpackResolve(req),
+  modpackCheckConflicts: (req: {
+    mods: unknown[];
+    mcVersion: string;
+    loader: string;
+  }): Promise<ModpackCheckConflictsRes> => window.mcApi.modpackCheckConflicts(req),
+  modpackExportMrpack: (
+    req: { spec: unknown; projectId?: string; defaultName?: string },
+    onProgress?: (p: { loaded: number; total: number; percentage: number; currentFile: string; done: boolean }) => void,
+  ): Promise<ModpackExportMrpackRes> => {
+    if (!onProgress) return window.mcApi.modpackExportMrpack(req);
+    const off = window.mcApi.onModpackExportProgress((data) => onProgress(data));
+    return window.mcApi.modpackExportMrpack(req).finally(off);
+  },
   // 源代码管理
   gitChooseRepo: (): Promise<GitChooseRepoRes> => window.mcApi.gitChooseRepo(),
   gitStatus: (repoPath: string): Promise<GitStatusRes> => window.mcApi.gitStatus(repoPath),
@@ -458,4 +490,182 @@ export const ipcClient = {
     extensions?: string[];
     multiSelect?: boolean;
   }): Promise<ImportResourceFilesRes> => window.mcApi.importResourceFiles(req ?? {}),
+
+  // ============================================================
+  // 项目感知文件操作（自动锚定到项目工作区）
+  // ============================================================
+
+  /** 列出项目目录 */
+  fileProjectListDir: (projectId: string, path?: string) =>
+    window.mcApi.fileProjectListDir(projectId, path ?? ''),
+
+  /** 列出项目目录树（递归，支持深度限制） */
+  fileProjectListTree: (projectId: string, path?: string, maxDepth?: number) =>
+    window.mcApi.fileProjectListTree(projectId, path ?? '', maxDepth ?? -1),
+
+  /** 读取项目文件 */
+  fileProjectReadText: (projectId: string, path: string, encoding?: string) =>
+    window.mcApi.fileProjectReadText(projectId, path, encoding),
+
+  /** 写入项目文件 */
+  fileProjectWriteText: (projectId: string, path: string, content: string, encoding?: string) =>
+    window.mcApi.fileProjectWriteText(projectId, path, content, encoding),
+
+  /** 创建项目目录 */
+  fileProjectMakeDir: (projectId: string, path: string) =>
+    window.mcApi.fileProjectMakeDir(projectId, path),
+
+  /** 删除项目文件/目录 */
+  fileProjectDeleteItem: (projectId: string, path: string) =>
+    window.mcApi.fileProjectDeleteItem(projectId, path),
+
+  /** 获取项目工作区根目录 */
+  fileProjectGetWorkspace: (projectId: string) =>
+    window.mcApi.fileProjectGetWorkspace(projectId),
+
+  /** 获取项目输出目录 */
+  fileProjectGetOutputDir: (projectId: string) =>
+    window.mcApi.fileProjectGetOutputDir(projectId),
+
+  /** 获取项目构建缓存目录 */
+  fileProjectGetBuildCacheDir: (projectId: string) =>
+    window.mcApi.fileProjectGetBuildCacheDir(projectId),
+
+  /** 获取项目临时目录 */
+  fileProjectGetTempDir: (projectId: string) =>
+    window.mcApi.fileProjectGetTempDir(projectId),
+
+  /** 获取项目资源包目录 */
+  fileProjectGetResourcePacksDir: (projectId: string) =>
+    window.mcApi.fileProjectGetResourcePacksDir(projectId),
+
+  /** 获取项目 Mod 目录 */
+  fileProjectGetModsDir: (projectId: string) =>
+    window.mcApi.fileProjectGetModsDir(projectId),
+
+  /** 获取项目导出目录 */
+  fileProjectGetExportsDir: (projectId: string) =>
+    window.mcApi.fileProjectGetExportsDir(projectId),
+
+  /** 确保项目标准子目录存在 */
+  fileProjectEnsureDirs: (projectId: string) =>
+    window.mcApi.fileProjectEnsureDirs(projectId),
+
+  // ============================================================
+  // 文件元数据与冲突检测
+  // ============================================================
+
+  /** 获取项目文件元数据（mtime + size + hash） */
+  fileProjectGetFileMeta: (projectId: string, path: string) =>
+    window.mcApi.fileProjectGetFileMeta(projectId, path),
+
+  /** 带元数据校验的项目文件写入 */
+  fileProjectWriteTextWithMeta: (
+    projectId: string,
+    path: string,
+    content: string,
+    expectedMeta?: { mtime: number; size: number; hash: string },
+    encoding?: string
+  ) =>
+    window.mcApi.fileProjectWriteTextWithMeta(projectId, path, content, expectedMeta, encoding),
+
+  // ============================================================
+  // 大文件流式传输
+  // ============================================================
+
+  /**
+   * 流式写入大文件
+   * @param projectId 项目 ID
+   * @param path 相对路径
+   * @param data 文件数据（Uint8Array）
+   * @param options 选项：onProgress 进度回调，expectedHash 预期 MD5
+   * @returns 写入结果，包含元数据
+   */
+  fileProjectWriteStream: async (
+    projectId: string,
+    path: string,
+    data: Uint8Array,
+    options?: { onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void; expectedHash?: string }
+  ): Promise<{ success: boolean; meta?: { size: number; mtime: number; hash: string }; error?: string }> => {
+    return window.mcApi.fileProjectWriteStream(projectId, path, data, options);
+  },
+
+  /**
+   * 流式读取大文件
+   * @param projectId 项目 ID
+   * @param path 相对路径
+   * @param onChunk 分片回调
+   * @param options 选项：onProgress 进度回调，chunkSize 分片大小
+   * @returns 读取结果
+   */
+  fileProjectReadStream: (
+    projectId: string,
+    path: string,
+    onChunk: (chunk: Uint8Array, isLast: boolean, progress: { loaded: number; total: number; percentage: number }) => void,
+    options?: { onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void; chunkSize?: number }
+  ): Promise<{ success: boolean; error?: string }> => {
+    return window.mcApi.fileProjectReadStream(projectId, path, (data) => {
+      onChunk(data.chunk, data.isLast, data.progress);
+      if (options?.onProgress && data.progress) {
+        options.onProgress(data.progress);
+      }
+    }, options);
+  },
+
+  /**
+   * 下载生成器产出的大文件
+   * @param projectId 项目 ID
+   * @param largeFiles 大文件元数据列表
+   * @param onProgress 总体进度回调
+   * @param onFileProgress 单文件进度回调
+   * @returns 下载结果
+   */
+  downloadLargeFiles: async (
+    projectId: string,
+    largeFiles: LargeFileMetaT[],
+    onProgress?: (progress: { loaded: number; total: number; percentage: number; currentFile: string }) => void,
+    onFileProgress?: (filePath: string, progress: { loaded: number; total: number; percentage: number }) => void
+  ): Promise<{ success: boolean; files: Array<{ path: string; content: string }>; error?: string }> => {
+    const results: Array<{ path: string; content: string }> = [];
+    let totalLoaded = 0;
+    const totalSize = largeFiles.reduce((sum, f) => sum + f.size, 0);
+
+    for (const file of largeFiles) {
+      const chunks: Uint8Array[] = [];
+      let fileLoaded = 0;
+
+      await ipcClient.fileProjectReadStream(
+        projectId,
+        file.path,
+        (chunk, isLast, progress) => {
+          chunks.push(chunk);
+          fileLoaded += chunk.byteLength;
+          totalLoaded += chunk.byteLength;
+
+          if (onFileProgress) {
+            onFileProgress(file.path, { loaded: fileLoaded, total: file.size, percentage: progress?.percentage ?? Math.round((fileLoaded / file.size) * 100) });
+          }
+          if (onProgress) {
+            onProgress({ loaded: totalLoaded, total: totalSize, percentage: Math.round((totalLoaded / totalSize) * 100), currentFile: file.path });
+          }
+        },
+        { chunkSize: 1024 * 1024 }
+      );
+
+      // 合并分片
+      const fullBuffer = Buffer.concat(chunks as any);
+      results.push({ path: file.path, content: fullBuffer.toString('utf8') });
+    }
+
+    return { success: true, files: results };
+  },
+
+  /**
+   * 监听项目变更
+   * @param handler 变更回调
+   * @returns 取消订阅函数
+   */
+  onProjectChanged: (handler: (payload: { type: 'created' | 'updated' | 'deleted'; projectId: string }) => void) => {
+    return window.mcApi.onProjectChanged?.(handler) ?? (() => {});
+  },
 };

@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import type { ComponentType } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { TabBar } from '../TabBar.js';
@@ -13,73 +12,70 @@ import { LowcodeWorkspace } from '../lowcode/LowcodeWorkspace.js';
 import { PurecodeWorkspace } from '../purecode/PurecodeWorkspace.js';
 import { useModStore } from '../../store/mod-store.js';
 import { useEditorModeStore } from '../../store/editor-mode-store.js';
+import { useLayoutStore, selectMiddleTab, selectSetMiddleTab } from '../../shell/layout-store.js';
 import { ipcClient } from '../../lib/ipc-client.js';
 import { withUnimplementedMd } from '../../lib/unimplemented-md.js';
+import { getPreviewPanel } from '../../shell/preview-registry.js';
 import type { GeneratorType } from '@mc-creator/shared';
 import { GENERATOR_DESCRIPTORS } from '../../../../shared/generator-descriptors.js';
 
 type MiddleTab = 'preview' | 'lowcode' | 'resources' | 'nbt' | 'code';
 
-/** 把 `<XxxPreviewPanel />` 形式的命名导出包成 `React.lazy` 可用的默认导出 */
-function lazyNamed<M extends Record<string, unknown>>(
-  loader: () => Promise<M>,
-  name: keyof M & string,
-) {
-  return lazy(async () => ({ default: (await loader())[name] as ComponentType }));
+/** tab 顺序即视觉顺序，同时决定左右箭头键的循环顺序 */
+const MIDDLE_TABS: MiddleTab[] = ['preview', 'lowcode', 'resources', 'nbt', 'code'];
+
+function PreviewPanelFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center bg-mc-bg text-sm text-mc-mute">
+      加载预览…
+    </div>
+  );
+}
+
+function PlaceholderPanel({ type }: { type: GeneratorType }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-mc-bg">
+      <div className="flex h-16 w-16 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
+        <McIcon scope="pixel" name="box" size={32} className="text-mc-mute" />
+      </div>
+      <div className="text-sm font-medium text-mc-dim">
+        {GENERATOR_DESCRIPTORS[type]?.label?.zh ?? type} 预览面板开发中
+      </div>
+      <div className="text-xs text-mc-mute">
+        阶段 2-4 实现该类型，当前可切换到「代码」tab 查看文件
+      </div>
+    </div>
+  );
+}
+
+function RenderPreviewPanel({ generatorType }: { generatorType: GeneratorType }) {
+  const registration = getPreviewPanel(generatorType);
+
+  if (!registration) {
+    return <PlaceholderPanel type={generatorType} />;
+  }
+
+  const { component: PreviewComponent } = registration;
+
+  const LazyPreview = lazy(PreviewComponent);
+
+  return (
+    <Suspense fallback={<PreviewPanelFallback />}>
+      <LazyPreview />
+    </Suspense>
+  );
 }
 
 /**
- * 预览面板按需加载（首屏性能）：13 个面板各自拆成独立 chunk，
- * 只有切换到「预览」tab 时才拉取当前类型对应的那一个。
- */
-const ServerPreviewPanel = lazyNamed(() => import('./ServerPreviewPanel.js'), 'ServerPreviewPanel');
-const ModPreviewPanel = lazyNamed(() => import('./ModPreviewPanel.js'), 'ModPreviewPanel');
-const DatapackPreviewPanel = lazyNamed(
-  () => import('./DatapackPreviewPanel.js'),
-  'DatapackPreviewPanel',
-);
-const ModpackPreviewPanel = lazyNamed(
-  () => import('./ModpackPreviewPanel.js'),
-  'ModpackPreviewPanel',
-);
-const LauncherPreviewPanel = lazyNamed(
-  () => import('./LauncherPreviewPanel.js'),
-  'LauncherPreviewPanel',
-);
-const ResourcePackPreviewPanel = lazyNamed(
-  () => import('./ResourcePackPreviewPanel.js'),
-  'ResourcePackPreviewPanel',
-);
-const SkinPreviewPanel = lazyNamed(() => import('./SkinPreviewPanel.js'), 'SkinPreviewPanel');
-const KubejsPreviewPanel = lazyNamed(() => import('./KubejsPreviewPanel.js'), 'KubejsPreviewPanel');
-const CraftTweakerPreviewPanel = lazyNamed(
-  () => import('./CraftTweakerPreviewPanel.js'),
-  'CraftTweakerPreviewPanel',
-);
-const BehaviorPackPreviewPanel = lazyNamed(
-  () => import('./BehaviorPackPreviewPanel.js'),
-  'BehaviorPackPreviewPanel',
-);
-const EnchantmentPreviewPanel = lazyNamed(
-  () => import('./EnchantmentPreviewPanel.js'),
-  'EnchantmentPreviewPanel',
-);
-const BehaviorItemPreviewPanel = lazyNamed(
-  () => import('./BehaviorItemPreviewPanel.js'),
-  'BehaviorItemPreviewPanel',
-);
-const BehaviorEntityPreviewPanel = lazyNamed(
-  () => import('./BehaviorEntityPreviewPanel.js'),
-  'BehaviorEntityPreviewPanel',
-);
-
-/**
- * 中间面板调度器：顶部 tab 切换（预览/资源/NBT/代码），预览 tab 按 generatorType 分发到对应面板。
- * 阶段 4 已实现全部 7 种类型（server/mod/datapack/modpack/resource_pack/skin/launcher）+ KubeJS。
- * 命令面板（F1/Ctrl+P/Ctrl+Shift+P）暴露保存/导出/新建/清空等操作，避免用户在多处工具栏间切换。
+ * 中间面板调度器：顶部 tab 切换（预览/低代码/资源/NBT/代码），
+ * 预览 tab 按 generatorType 从注册表分发到对应面板，
+ * 低代码 tab 按 editorMode（L1/L2/L3）在 LowcodeWorkspace / PurecodeWorkspace 间切换。
  */
 export function MiddlePanel() {
-  const [activeTab, setActiveTab] = useState<MiddleTab>('preview');
+  // 从 layout-store 读取/写入 middleTab（持久化）
+  const middleTab = useLayoutStore(selectMiddleTab);
+  const setMiddleTab = useLayoutStore(selectSetMiddleTab);
+
   const { generatorType, splitFile } = useModStore(
     (s) => ({ generatorType: s.generatorType, splitFile: s.splitFile }),
     shallow,
@@ -92,19 +88,16 @@ export function MiddlePanel() {
   // 全局快捷键：F1 / Ctrl+P / Ctrl+Shift+P 打开命令面板，Ctrl+S 保存当前文件
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // F1：打开命令面板（阻止浏览器默认帮助菜单）
       if (e.key === 'F1') {
         e.preventDefault();
         setPaletteOpen(true);
         return;
       }
-      // Ctrl+P / Ctrl+Shift+P：Quick Open / 命令面板（与 VS Code 一致）
       if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
         e.preventDefault();
         setPaletteOpen(true);
         return;
       }
-      // Ctrl+S：保存当前文件
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         const s = useModStore.getState();
@@ -125,46 +118,11 @@ export function MiddlePanel() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const renderPreviewPanel = () => {
-    switch (generatorType) {
-      case 'server':
-        return <ServerPreviewPanel />;
-      case 'mod':
-        return <ModPreviewPanel />;
-      case 'datapack':
-        return <DatapackPreviewPanel />;
-      case 'modpack':
-        return <ModpackPreviewPanel />;
-      case 'launcher':
-        return <LauncherPreviewPanel />;
-      case 'resource_pack':
-        return <ResourcePackPreviewPanel />;
-      case 'skin':
-        return <SkinPreviewPanel />;
-      case 'kubejs':
-        return <KubejsPreviewPanel />;
-      case 'crafttweaker':
-        return <CraftTweakerPreviewPanel />;
-      case 'behavior_pack':
-        return <BehaviorPackPreviewPanel />;
-      case 'enchantment':
-        return <EnchantmentPreviewPanel />;
-      case 'behavior_item':
-        return <BehaviorItemPreviewPanel />;
-      case 'behavior_entity':
-        return <BehaviorEntityPreviewPanel />;
-      default:
-        return <PlaceholderPanel type={generatorType} />;
-    }
-  };
-
-  // 构建命令列表：通过 useModStore.getState() 在运行时取最新状态，
-  // 避免订阅过多字段触发不必要的重渲染。setActiveTab 由 useState 提供，引用稳定。
+  // 构建命令列表
   const commands = useMemo<Command[]>(
     () => {
       const cmds: Command[] = [];
 
-      // 保存当前文件（仅当存在选中文件时可用）
       cmds.push({
         id: 'save-file',
         label: '保存当前文件',
@@ -183,7 +141,6 @@ export function MiddlePanel() {
         },
       });
 
-      // 保存全部文件到目录
       cmds.push({
         id: 'save-all',
         label: '保存全部文件到目录',
@@ -196,7 +153,6 @@ export function MiddlePanel() {
         },
       });
 
-      // 导出 zip
       cmds.push({
         id: 'export-zip',
         label: '导出为 ZIP',
@@ -211,7 +167,6 @@ export function MiddlePanel() {
         },
       });
 
-      // 新建文件
       cmds.push({
         id: 'new-file',
         label: '新建文件',
@@ -222,47 +177,21 @@ export function MiddlePanel() {
         },
       });
 
-      // 切换到预览 Tab
-      cmds.push({
-        id: 'tab-preview',
-        label: '切换到预览视图',
-        description: '查看生成结果的预览面板',
-        run: () => setActiveTab('preview'),
-      });
+      for (const tab of MIDDLE_TABS) {
+        const labelMap: Record<MiddleTab, string> = {
+          preview: '预览',
+          lowcode: '低代码',
+          resources: '资源',
+          nbt: 'NBT',
+          code: '代码',
+        };
+        cmds.push({
+          id: `tab-${tab}`,
+          label: `切换到${labelMap[tab]}视图`,
+          run: () => setMiddleTab(tab),
+        });
+      }
 
-      // 切换到低代码 Tab
-      cmds.push({
-        id: 'tab-lowcode',
-        label: '切换到低代码视图',
-        description: '打开节点图编辑器（L1 低代码 / L2 混合 / L3 纯代码）',
-        run: () => setActiveTab('lowcode'),
-      });
-
-      // 切换到代码 Tab
-      cmds.push({
-        id: 'tab-code',
-        label: '切换到代码视图',
-        description: '查看 / 编辑生成文件源码',
-        run: () => setActiveTab('code'),
-      });
-
-      // 切换到资源 Tab
-      cmds.push({
-        id: 'tab-resources',
-        label: '切换到资源视图',
-        description: '查看资源包实时预览（贴图/模型/语言/音效）',
-        run: () => setActiveTab('resources'),
-      });
-
-      // 切换到 NBT Tab
-      cmds.push({
-        id: 'tab-nbt',
-        label: '切换到 NBT 编辑器',
-        description: '查看/编辑 NBT 数据（实体/方块实体/物品 NBT）',
-        run: () => setActiveTab('nbt'),
-      });
-
-      // 清空所有文件
       cmds.push({
         id: 'clear-files',
         label: '清空所有文件',
@@ -274,7 +203,6 @@ export function MiddlePanel() {
         },
       });
 
-      // 分栏编辑
       cmds.push({
         id: 'toggle-split',
         label: '切换分栏编辑',
@@ -290,7 +218,6 @@ export function MiddlePanel() {
         },
       });
 
-      // 快捷键帮助
       cmds.push({
         id: 'shortcut-help',
         label: '快捷键帮助',
@@ -300,12 +227,26 @@ export function MiddlePanel() {
 
       return cmds;
     },
-    // setActiveTab 引用稳定（来自 useState），加入 deps 保证闭包正确
-    [setActiveTab, setShortcutHelpOpen],
+    [setMiddleTab, setShortcutHelpOpen],
   );
 
-  // 在 tab 栏点击 F1 提示徽标也能打开命令面板
   const handleOpenPalette = useCallback(() => setPaletteOpen(true), []);
+
+  const handleTabKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const idx = MIDDLE_TABS.indexOf(middleTab as MiddleTab);
+        const next = e.key === 'ArrowRight'
+          ? MIDDLE_TABS[(idx + 1) % MIDDLE_TABS.length]
+          : MIDDLE_TABS[(idx - 1 + MIDDLE_TABS.length) % MIDDLE_TABS.length];
+        setMiddleTab(next);
+        const nextBtn = document.getElementById(`middle-tab-${next}`);
+        nextBtn?.focus();
+      }
+    },
+    [middleTab, setMiddleTab],
+  );
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -314,27 +255,16 @@ export function MiddlePanel() {
         role="tablist"
         aria-label="中间面板视图切换"
         className="flex items-center border-b border-mc-border bg-mc-surface px-2 py-1"
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-            e.preventDefault();
-            const tabs: MiddleTab[] = ['preview', 'lowcode', 'resources', 'nbt', 'code'];
-            const idx = tabs.indexOf(activeTab);
-            const next = e.key === 'ArrowRight' ? tabs[(idx + 1) % 5] : tabs[(idx - 1 + 5) % 5];
-            setActiveTab(next);
-            // 焦点跟随选中项移动（WAI-ARIA Tabs 模式：箭头键切换 + 自动聚焦新 tab）
-            const nextBtn = document.getElementById(`middle-tab-${next}`);
-            nextBtn?.focus();
-          }
-        }}
+        onKeyDown={handleTabKeyDown}
       >
         <button
           id="middle-tab-preview"
           role="tab"
-          aria-selected={activeTab === 'preview'}
+          aria-selected={middleTab === 'preview'}
           aria-controls="middle-tabpanel-preview"
-          tabIndex={activeTab === 'preview' ? 0 : -1}
-          onClick={() => setActiveTab('preview')}
-          className={`mc-tab px-3 py-1 ${activeTab === 'preview' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
+          tabIndex={middleTab === 'preview' ? 0 : -1}
+          onClick={() => setMiddleTab('preview')}
+          className={`mc-tab px-3 py-1 ${middleTab === 'preview' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="star" size={12} />
           预览
@@ -342,11 +272,11 @@ export function MiddlePanel() {
         <button
           id="middle-tab-lowcode"
           role="tab"
-          aria-selected={activeTab === 'lowcode'}
+          aria-selected={middleTab === 'lowcode'}
           aria-controls="middle-tabpanel-lowcode"
-          tabIndex={activeTab === 'lowcode' ? 0 : -1}
-          onClick={() => setActiveTab('lowcode')}
-          className={`mc-tab px-3 py-1 ${activeTab === 'lowcode' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
+          tabIndex={middleTab === 'lowcode' ? 0 : -1}
+          onClick={() => setMiddleTab('lowcode')}
+          className={`mc-tab px-3 py-1 ${middleTab === 'lowcode' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="grid" size={12} />
           低代码
@@ -354,11 +284,11 @@ export function MiddlePanel() {
         <button
           id="middle-tab-resources"
           role="tab"
-          aria-selected={activeTab === 'resources'}
+          aria-selected={middleTab === 'resources'}
           aria-controls="middle-tabpanel-resources"
-          tabIndex={activeTab === 'resources' ? 0 : -1}
-          onClick={() => setActiveTab('resources')}
-          className={`mc-tab px-3 py-1 ${activeTab === 'resources' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
+          tabIndex={middleTab === 'resources' ? 0 : -1}
+          onClick={() => setMiddleTab('resources')}
+          className={`mc-tab px-3 py-1 ${middleTab === 'resources' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="image" size={12} />
           资源
@@ -366,11 +296,11 @@ export function MiddlePanel() {
         <button
           id="middle-tab-nbt"
           role="tab"
-          aria-selected={activeTab === 'nbt'}
+          aria-selected={middleTab === 'nbt'}
           aria-controls="middle-tabpanel-nbt"
-          tabIndex={activeTab === 'nbt' ? 0 : -1}
-          onClick={() => setActiveTab('nbt')}
-          className={`mc-tab px-3 py-1 ${activeTab === 'nbt' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
+          tabIndex={middleTab === 'nbt' ? 0 : -1}
+          onClick={() => setMiddleTab('nbt')}
+          className={`mc-tab px-3 py-1 ${middleTab === 'nbt' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="box" size={12} />
           NBT
@@ -378,11 +308,11 @@ export function MiddlePanel() {
         <button
           id="middle-tab-code"
           role="tab"
-          aria-selected={activeTab === 'code'}
+          aria-selected={middleTab === 'code'}
           aria-controls="middle-tabpanel-code"
-          tabIndex={activeTab === 'code' ? 0 : -1}
-          onClick={() => setActiveTab('code')}
-          className={`mc-tab px-3 py-1 ${activeTab === 'code' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
+          tabIndex={middleTab === 'code' ? 0 : -1}
+          onClick={() => setMiddleTab('code')}
+          className={`mc-tab px-3 py-1 ${middleTab === 'code' ? 'mc-tab-selected' : 'mc-tab-idle'}`}
         >
           <McIcon scope="pixel" name="terminal" size={12} />
           代码
@@ -405,25 +335,25 @@ export function MiddlePanel() {
         </button>
       </div>
 
-      {/* Tab 内容（WAI-ARIA Tabpanel：role="tabpanel" + aria-labelledby 关联 tab） */}
+      {/* Tab 内容 */}
       <div
         className="flex flex-1 flex-col overflow-hidden"
         role="tabpanel"
-        id={`middle-tabpanel-${activeTab}`}
-        aria-labelledby={`middle-tab-${activeTab}`}
+        id={`middle-tabpanel-${middleTab}`}
+        aria-labelledby={`middle-tab-${middleTab}`}
         tabIndex={0}
       >
-        {activeTab === 'preview' ? (
-          <Suspense fallback={<PreviewPanelFallback />}>{renderPreviewPanel()}</Suspense>
-        ) : activeTab === 'lowcode' ? (
+        {middleTab === 'preview' ? (
+          <RenderPreviewPanel generatorType={generatorType} />
+        ) : middleTab === 'lowcode' ? (
           editorMode === 'purecode' ? (
             <PurecodeWorkspace />
           ) : (
             <LowcodeWorkspace />
           )
-        ) : activeTab === 'resources' ? (
+        ) : middleTab === 'resources' ? (
           <ResourcePackPreview />
-        ) : activeTab === 'nbt' ? (
+        ) : middleTab === 'nbt' ? (
           <NbtEditor
             initialValue={(() => {
               const s = useModStore.getState();
@@ -454,32 +384,6 @@ export function MiddlePanel() {
 
       {/* 快捷键帮助对话框 */}
       <ShortcutHelpDialog open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
-    </div>
-  );
-}
-
-/** 预览面板 chunk 加载中的占位（React.lazy 的 fallback） */
-function PreviewPanelFallback() {
-  return (
-    <div className="flex flex-1 items-center justify-center bg-mc-bg text-sm text-mc-mute">
-      加载预览…
-    </div>
-  );
-}
-
-/** 占位面板：default 分支兜底，正常不会触发 */
-function PlaceholderPanel({ type }: { type: GeneratorType }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-mc-bg">
-      <div className="flex h-16 w-16 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
-        <McIcon scope="pixel" name="box" size={32} className="text-mc-mute" />
-      </div>
-      <div className="text-sm font-medium text-mc-dim">
-        {GENERATOR_DESCRIPTORS[type].label.zh} 预览面板开发中
-      </div>
-      <div className="text-xs text-mc-mute">
-        阶段 2-4 实现该类型，当前可切换到「代码」tab 查看文件
-      </div>
     </div>
   );
 }

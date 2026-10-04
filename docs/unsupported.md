@@ -8,13 +8,14 @@
 
 ## 原因表
 
-| 锚点                | 含义                                                                         | 你该怎么做                                                                                      |
-| ------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `unknown-condition` | 条件类型不在支持枚举中（多为手改 Spec JSON 或旧 Spec 迁移残留）              | 改用 11 种已知 `conditionType`（见 `mod-spec.ts:623-635`），或改用 `custom` 并填写 `customCode` |
-| `unknown-action`    | 动作类型不在支持枚举中                                                       | 改用 13 种已知 `actionType`（见 `mod-spec.ts:649-663`），或改用 `custom` 并填写 `customCode`    |
-| `unknown-event`     | 事件类型不在支持枚举中，该处理器未注册                                       | 改用 13 种已知 `eventType`（见 `mod-spec.ts:583-597`）                                          |
-| `custom-empty`      | `custom` 条件/动作未填写 `customCode`，已生成安全默认（条件恒真/动作空操作） | 在节点表单或 Spec JSON 中填写 Java 代码片段后重新生成                                           |
-| `custom-event`      | `custom` 事件无内置映射，需手写 Mixin 或事件注册                             | 参考已生成的 `ModEvents.java` 结构手写注册，或改用内置事件类型                                  |
+| 锚点                      | 含义                                                                               | 你该怎么做                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `unknown-condition`       | 条件类型不在支持枚举中（多为手改 Spec JSON 或旧 Spec 迁移残留）                    | 改用 11 种已知 `conditionType`（见 `mod-spec.ts:623-635`），或改用 `custom` 并填写 `customCode` |
+| `unknown-action`          | 动作类型不在支持枚举中                                                             | 改用 13 种已知 `actionType`（见 `mod-spec.ts:649-663`），或改用 `custom` 并填写 `customCode`    |
+| `unknown-event`           | 事件类型不在支持枚举中，该处理器未注册                                             | 改用 13 种已知 `eventType`（见 `mod-spec.ts:583-597`）                                          |
+| `custom-empty`            | `custom` 条件/动作未填写 `customCode`，已生成安全默认（条件恒真/动作空操作）       | 在节点表单或 Spec JSON 中填写 Java 代码片段后重新生成                                           |
+| `custom-event`            | `custom` 事件无内置映射，需手写 Mixin 或事件注册                                   | 参考已生成的 `ModEvents.java` 结构手写注册，或改用内置事件类型                                  |
+| `unsupported-block-model` | 方块 `modelType`（或按 `blockType` 推导的结果）不在支持集合中，已回退为 `cube_all` | 改用 `cube_all`/`cube_column`/`cross`，或补全模型类型后重新生成                                 |
 
 ## 已覆盖范围（无需担心）
 

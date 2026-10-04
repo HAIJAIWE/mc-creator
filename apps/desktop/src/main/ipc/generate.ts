@@ -1,7 +1,7 @@
-/* Phase 3.1 拆分：由 ../ipc.ts 纯搬运，零行为变更。通道名与逻辑保持原样。*/
 import { app, ipcMain } from 'electron';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
 import {
   Orchestrator,
   VercelAiProvider,
@@ -9,6 +9,8 @@ import {
   ModGenerator,
   SPEC_CONFIGS,
   formatSpecIssues,
+  searchKnowledge,
+  formatRagSection,
   type SpecType,
 } from '@mc-creator/core';
 import type { ModSpec } from '@mc-creator/shared';
@@ -55,6 +57,49 @@ import {
   type GenerateSpecRes,
   type GenerateFilesRes,
 } from '../../shared/ipc-channels.js';
+import { FileManager } from '../file-manager.js';
+
+/** RAG 检索条数（需求：topK=5） */
+const RAG_TOP_K = 5;
+
+/**
+ * 从 GenerateFiles 的 spec 中抽取检索 query（spec 无 description 字段时用）。
+ * 收集顶层 id/name/描述类字符串 + 数组元素的 id/name（截断防 token 爆炸）。
+ */
+function describeSpecForRag(spec: unknown, generatorType: string): string {
+  const parts: string[] = [generatorType];
+  const pushStr = (v: unknown) => {
+    if (typeof v === 'string' && v.trim()) parts.push(v.trim().slice(0, 120));
+  };
+  if (spec !== null && typeof spec === 'object') {
+    const obj = spec as Record<string, unknown>;
+    for (const key of ['modId', 'packId', 'packName', 'name', 'description', 'serverName', 'launcherName', 'playerName']) {
+      pushStr(obj[key]);
+    }
+    for (const value of Object.values(obj)) {
+      if (Array.isArray(value)) {
+        for (const item of value.slice(0, 8)) {
+          if (item !== null && typeof item === 'object') {
+            const entry = item as Record<string, unknown>;
+            pushStr(entry.id);
+            pushStr(entry.name);
+            pushStr(entry.type);
+          }
+        }
+      }
+    }
+  }
+  return parts.join(' ').slice(0, 500);
+}
+
+/** RAG 检索永不抛错：失败返回空命中，保证不影响主流程 */
+function safeRagSearch(query: string, generatorType?: string): { hits: Array<{ title: string; snippet: string; source: string; url?: string; score: number }>; cached: boolean } {
+  try {
+    return searchKnowledge(query, { topK: RAG_TOP_K, generatorType });
+  } catch {
+    return { hits: [], cached: false };
+  }
+}
 
 export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): void {
   // 生成器注册表（P1：替代 switch/case，新增生成器只需在 createDefaultRegistry 注册）
@@ -66,9 +111,22 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
   ipcMain.handle(IPC.GENERATE_SPEC, async (_e, raw: unknown): Promise<GenerateSpecRes> => {
     const req = GenerateSpecRequest.parse(raw);
     const orchestrator = getOrchestrator();
+    // RAG：按 description 关键词检索（topK=5，可按 generatorType 过滤），片段注入 LLM prompt
+    const rag = safeRagSearch(req.description, req.generatorType);
+    const ragSection = formatRagSection(rag.hits);
     // P16：按 generatorType 调用对应 prompt + schema 校验
-    const spec = await orchestrator.generateSpecByType(req.description, req.generatorType);
-    return { ok: true, spec: spec as Record<string, unknown>, raw: JSON.stringify(spec, null, 2) };
+    const spec = await orchestrator.generateSpecByType(
+      req.description,
+      req.generatorType,
+      ragSection || undefined,
+    );
+    const res: GenerateSpecRes = {
+      ok: true,
+      spec: spec as Record<string, unknown>,
+      raw: JSON.stringify(spec, null, 2),
+    };
+    if (rag.hits.length > 0) res.ragSources = rag.hits;
+    return res;
   });
 
   ipcMain.handle(IPC.GENERATE_FILES, async (_e, raw: unknown): Promise<GenerateFilesRes> => {
@@ -98,6 +156,12 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
     };
 
     // P1-4：ModGenerator 走增量构建（类别级缓存），其他生成器走全量 generate
+    let result: {
+      files: Array<{ path: string; content: string }>;
+      warnings: string[];
+      unimplemented?: any[];
+      buildStats?: { total: number; cached: number; regenerated: number; filesTotal: number; filesUnchanged: number };
+    };
     if (gen instanceof ModGenerator) {
       const cacheDir = buildCacheDir();
       // 按项目读回上次快照：命中 → 类别级增量；读不到（首次/损坏）→ 全量生成
@@ -105,20 +169,76 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
       const incResult = await gen.generateWithCache(genCtx, prevSnapshot);
       // 落盘供下次（含下次启动）复用；写失败不影响本次构建结果
       await saveBuildCacheSnapshot(cacheDir, req.projectId, incResult.cacheSnapshot);
-      return {
+      result = {
         files: incResult.files,
         warnings: incResult.warnings,
-        buildStats: incResult.stats,
         unimplemented: incResult.unimplemented ?? [],
+        buildStats: incResult.stats,
+      };
+    } else {
+      const genResult = await gen.generate(genCtx);
+      result = {
+        files: genResult.files,
+        warnings: genResult.warnings,
+        unimplemented: genResult.unimplemented ?? [],
       };
     }
 
-    const result = await gen.generate(genCtx);
-    return {
-      files: result.files,
+    // 检测大文件（> 10MB），分离为流式传输元数据
+    const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024; // 10MB
+    const CHUNK_SIZE = 1024 * 1024; // 1MB
+    const normalFiles: Array<{ path: string; content: string }> = [];
+    const largeFiles: Array<{ path: string; size: number; chunks: number; hash: string }> = [];
+
+    // 如果有 projectId，将大文件写入项目工作区以便流式下载
+    const fm = FileManager.getInstance();
+    const projectWorkspace = req.projectId ? fm.getProjectWorkspace(req.projectId) : null;
+
+    for (const file of result.files) {
+      const buffer = Buffer.from(file.content, 'utf8');
+      if (buffer.length > LARGE_FILE_THRESHOLD) {
+        // 计算 MD5
+        const hash = createHash('md5').update(buffer).digest('hex');
+        const chunks = Math.ceil(buffer.length / CHUNK_SIZE);
+        largeFiles.push({
+          path: file.path,
+          size: buffer.length,
+          chunks,
+          hash,
+        });
+
+        // 将大文件写入项目工作区（如果有 projectId）
+        if (projectWorkspace) {
+          const fullPath = require('node:path').resolve(projectWorkspace, file.path);
+          await fm.writeBinary(fullPath, buffer);
+        }
+        // 大文件不包含在普通 files 中，渲染侧需流式下载
+      } else {
+        normalFiles.push(file);
+      }
+    }
+
+    const response: GenerateFilesRes = {
+      files: normalFiles,
       warnings: result.warnings,
-      unimplemented: result.unimplemented ?? [],
+      spec: req.spec,
     };
+
+    // RAG：按 spec 内容自动检索（确定性生成器不用 LLM，但来源供 UI 展示；同时预热 LRU）
+    const filesRag = safeRagSearch(describeSpecForRag(req.spec, req.generatorType), req.generatorType);
+    if (filesRag.hits.length > 0) response.ragSources = filesRag.hits;
+
+    if (result.buildStats) {
+      response.buildStats = result.buildStats;
+    }
+    if (result.unimplemented && result.unimplemented.length > 0) {
+      response.unimplemented = result.unimplemented;
+    }
+    if (largeFiles.length > 0) {
+      response.largeFiles = largeFiles;
+    }
+
+    return response;
   });
 
   // 模型配置
@@ -129,7 +249,7 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
 
   ipcMain.handle(SAVE_MODEL_CONFIG, async (_e, raw: unknown) => {
     const req = SaveModelConfigRequest.parse(raw);
-    saveModelConfig(req as ModelConfigFull);
+    await saveModelConfig(req as ModelConfigFull);
     return { ok: true };
   });
 
@@ -141,7 +261,7 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
 
   ipcMain.handle(MODEL_SAVE_PROFILES, async (_e, raw: unknown) => {
     const req = ModelSaveProfilesRequest.parse(raw);
-    saveModelProfiles(req.profiles as ModelProfile[], req.activeId);
+    await saveModelProfiles(req.profiles as ModelProfile[], req.activeId);
     return { ok: true };
   });
 
@@ -183,6 +303,9 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
     }
 
     // P12 chat 模式工具调用增强：根据 context 构建增强 system message
+    // RAG：按 description（无则回退 message 全文）关键词检索，片段拼入 system message
+    const ragQuery = req.context?.description || req.message;
+    const chatRag = safeRagSearch(ragQuery, req.context?.generatorType);
     const systemMessage = buildChatSystemMessage(
       req.context
         ? ({
@@ -191,6 +314,7 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
             specSummary: req.context.specSummary,
           } satisfies ChatStreamContext)
         : undefined,
+      chatRag.hits,
     );
 
     const provider = new VercelAiProvider(config);

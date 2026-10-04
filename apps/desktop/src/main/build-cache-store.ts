@@ -9,8 +9,9 @@
  * 传入，模块本身可脱离 Electron 单元测试。
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { writeFileAtomic } from '@mc-creator/shell';
 import type { BuildCacheSnapshot } from '@mc-creator/core';
 
 /** 未保存项目共用的缓存桶名 */
@@ -64,8 +65,8 @@ export async function saveBuildCacheSnapshot(
   snapshot: BuildCacheSnapshot,
 ): Promise<void> {
   try {
-    await mkdir(dir, { recursive: true });
-    await writeFile(resolveBuildCacheFile(dir, projectId), JSON.stringify(snapshot), 'utf8');
+    // 原子写（同目录 tmp + rename）：父目录自动创建，崩溃不留半截缓存
+    await writeFileAtomic(resolveBuildCacheFile(dir, projectId), JSON.stringify(snapshot));
   } catch {
     // 见上：静默降级
   }

@@ -1,0 +1,26 @@
+{
+  "name": "@mc-creator/generator-datapack",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MC 全链路 AI 工作台 · 数据驱动生成器包（datapack/kubejs/crafttweaker/enchantment）。四者实现均已自 @mc-creator/core 迁入本包（设计文档 §18 阶段 8；§15，§2.1）。",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@mc-creator/contract": "workspace:*",
+    "@mc-creator/core": "workspace:*",
+    "@mc-creator/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  }
+}

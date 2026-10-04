@@ -14,6 +14,7 @@
  */
 
 import { getGeneratorDescriptor } from '../shared/generator-descriptors.js';
+import { formatRagSection } from '@mc-creator/core';
 
 /** 默认 system message（无 context 时使用） */
 export const DEFAULT_CHAT_SYSTEM_MESSAGE =
@@ -27,20 +28,31 @@ export interface ChatStreamContext {
 }
 
 /**
+ * RAG 引用（buildChatSystemMessage 的第二个参数形态）。
+ * 与 core RagHit 结构兼容（title/snippet/source），score/url 可有可无。
+ */
+export interface RagCitation {
+  title: string;
+  snippet: string;
+  source: string;
+}
+
+/**
  * 根据 context 构建增强 system message。
  *
  * - 无 context 时返回默认 system message。
  * - 有 context 时拼接项目类型 / 用户描述 / spec 摘要。
+ * - 有 ragHits 时追加本地知识库片段（注明来源，要求模型引用时标注出处）。
  */
-export function buildChatSystemMessage(context?: ChatStreamContext): string {
-  if (!context) return DEFAULT_CHAT_SYSTEM_MESSAGE;
+export function buildChatSystemMessage(context?: ChatStreamContext, ragHits?: RagCitation[]): string {
+  if (!context && (!ragHits || ragHits.length === 0)) return DEFAULT_CHAT_SYSTEM_MESSAGE;
 
   const parts: string[] = [
     '你是 Minecraft 内容创作专家助手，帮助用户创作 Minecraft 内容。',
     '请基于用户当前项目上下文回答，简洁清晰，使用中文。',
   ];
 
-  if (context.generatorType) {
+  if (context?.generatorType) {
     const descriptor = getGeneratorDescriptor(context.generatorType);
     parts.push(
       descriptor
@@ -49,12 +61,16 @@ export function buildChatSystemMessage(context?: ChatStreamContext): string {
     );
   }
 
-  if (context.description) {
+  if (context?.description) {
     parts.push(`用户对项目的描述：${context.description}`);
   }
 
-  if (context.specSummary) {
+  if (context?.specSummary) {
     parts.push(`当前 spec 摘要：\n${context.specSummary}`);
+  }
+
+  if (ragHits && ragHits.length > 0) {
+    parts.push(formatRagSection(ragHits));
   }
 
   return parts.join('\n\n');

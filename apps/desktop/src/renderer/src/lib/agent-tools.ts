@@ -210,6 +210,43 @@ const searchCodeTool: ToolDefinition = {
 };
 
 /**
+ * 检索本地知识库（RAG：Minecraft Wiki 常用配方 / Fabric-NeoForge API 示例 / 内置生成器模板）。
+ * 智能体在生成配方、附魔、注册代码前应先检索，用可靠片段替代凭记忆拼写；引用时注明来源标题。
+ */
+const searchKnowledgeTool: ToolDefinition = {
+  name: 'search_knowledge',
+  description:
+    '检索本地 Minecraft 知识库（Wiki 配方、Fabric/NeoForge API 示例、内置生成器模板）。生成配方/附魔/效果/结构/注册代码前先检索，返回标题+片段+来源；回答中引用时必须注明来源。',
+  parameters: [
+    { name: 'query', type: 'string', description: '检索关键词（中文或英文，如 “下界合金锻造台升级”“附魔 supported_items”）', required: true },
+    {
+      name: 'generator_type',
+      type: 'string',
+      description: '按生成器类型过滤（可选，如 datapack、mod、kubejs）',
+      required: false,
+    },
+  ],
+  category: 'search',
+  requiresApproval: false,
+  execute: async (args) => {
+    const query = String(args.query);
+    const generatorType = args.generator_type ? String(args.generator_type) : undefined;
+    try {
+      const res = await ipcClient.ragSearch(
+        generatorType ? { query, generatorType, topK: 5 } : { query, topK: 5 },
+      );
+      if (res.hits.length === 0) return `知识库中没有命中 "${query}" 的内容，请换关键词重试。`;
+      const lines = res.hits.map(
+        (h, i) => `--- [${i + 1}] ${h.title}（来源：${h.source}）\n${h.snippet}`,
+      );
+      return `命中 ${res.hits.length} 条${res.cached ? '（缓存命中）' : ''}：\n${lines.join('\n\n')}\n\n注意：引用上述知识时注明来源标题，不要编造来源中没有的字段。`;
+    } catch {
+      return `知识库检索暂不可用（query="${query}"），请凭已有规范继续。`;
+    }
+  },
+};
+
+/**
  * 写入/创建文件
  */
 const writeFileTool: ToolDefinition = {
@@ -691,52 +728,41 @@ const generateModTool: ToolDefinition = {
     }
 
     try {
-      const { ModGenerator } = await import('@mc-creator/core/generators/mod/mod-generator.js');
-      const { ModSpec: ModSpecSchema } = await import('@mc-creator/shared');
-
-      // 用 Zod 校验+填充默认值
-      const parsed = ModSpecSchema.safeParse(specObj);
-      if (!parsed.success) {
-        return `错误：ModSpec 校验失败:\n${parsed.error.issues.map((issue) => `  ${issue.path.join('.')}: ${issue.message}`).join('\n')}`;
-      }
-
-      const gen = new ModGenerator();
-      const ctx: GeneratorContext = {
+      // 生成走主进程 IPC：core 的 mod 生成器依赖 pngjs 等 Node-only 包，
+      // 渲染进程内跑不通。spec 的校验与默认值填充由主进程完成并回传。
+      const store = useModStore.getState();
+      const outcome = await generateFilesForType('mod', specObj, {
         loader,
         // 使用当前项目选择的 MC 版本（而非硬编码 1.21.11）
-        mcVersion: useModStore.getState().mcVersion,
-        modId: parsed.data.modId,
-        spec: parsed.data,
-        projectPath: '',
-      };
-
-      const result = await gen.generate(ctx);
+        mcVersion: store.mcVersion,
+      });
 
       // 将生成的文件写入 store
-      mergeFilesIntoStore(result.files);
+      mergeFilesIntoStore(outcome.files);
 
-      useModStore.getState().setSpec(parsed.data);
+      const spec = outcome.spec as ModSpec;
+      useModStore.getState().setSpec(spec);
 
       const summary = [
         `✅ Mod 生成成功！`,
-        `modId: ${parsed.data.modId} | loader: ${loader}`,
-        `生成文件: ${result.files.length} 个`,
+        `modId: ${spec.modId} | loader: ${loader}`,
+        `生成文件: ${outcome.files.length} 个`,
         ...Object.entries({
-          items: parsed.data.items.length,
-          blocks: parsed.data.blocks.length,
-          recipes: parsed.data.recipes.length,
-          entities: parsed.data.entities.length,
-          machines: parsed.data.machines.length,
-          multiblocks: parsed.data.multiblocks.length,
-          eventHandlers: parsed.data.eventHandlers.length,
-          procedures: parsed.data.procedures.length,
-          customCode: parsed.data.customCode.length,
+          items: spec.items.length,
+          blocks: spec.blocks.length,
+          recipes: spec.recipes.length,
+          entities: spec.entities.length,
+          machines: spec.machines.length,
+          multiblocks: spec.multiblocks.length,
+          eventHandlers: spec.eventHandlers.length,
+          procedures: spec.procedures.length,
+          customCode: spec.customCode.length,
         })
           .filter(([, count]) => count > 0)
           .map(([key, count]) => `  ${key}: ${count}`),
       ];
-      if (result.warnings.length > 0) {
-        summary.push(`警告: ${result.warnings.join(', ')}`);
+      if (outcome.warnings.length > 0) {
+        summary.push(`警告: ${outcome.warnings.join(', ')}`);
       }
       return summary.join('\n');
     } catch (e) {
@@ -910,6 +936,7 @@ export const agentTools: ToolDefinition[] = [
   readFileTool,
   listFilesTool,
   searchCodeTool,
+  searchKnowledgeTool,
   writeFileTool,
   editFileTool,
   deleteFileTool,

@@ -1,0 +1,23 @@
+{
+  "name": "@mc-creator/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MC 全链路 AI 工作台 · shell/agent/引擎层操作与错误文案中英映射（设计文档 §15 monorepo 结构；§4.5 错误文案映射层）。运行时代码零依赖，仅测试比对用到 contract/shell。",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@mc-creator/contract": "workspace:*",
+    "@mc-creator/shell": "workspace:*",
+    "vitest": "^2.0.0"
+  }
+}

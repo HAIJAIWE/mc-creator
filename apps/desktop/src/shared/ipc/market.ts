@@ -36,12 +36,24 @@ export const ModrinthVersionsResponse = z.object({
       project_id: z.string(),
       version_number: z.string(),
       name: z.string(),
+      game_versions: z.array(z.string()).optional(),
+      loaders: z.array(z.string()).optional(),
+      dependencies: z
+        .array(
+          z.object({
+            project_id: z.string(),
+            version_id: z.string().nullable().optional(),
+            dependency_type: z.enum(['required', 'optional', 'incompatible', 'embedded']),
+          }),
+        )
+        .optional(),
       files: z.array(
         z.object({
           url: z.string(),
           filename: z.string(),
           primary: z.boolean(),
           size: z.number(),
+          hashes: z.object({ sha512: z.string().optional(), sha1: z.string().optional() }).optional(),
         }),
       ),
     }),
@@ -92,6 +104,8 @@ export const CurseForgeFilesResponse = z.object({
       downloadUrl: z.string().nullable(),
       gameVersions: z.array(z.string()),
       modLoaderNames: z.array(z.string()),
+      hashes: z.array(z.object({ value: z.string(), algo: z.number() })).optional(),
+      dependencies: z.array(z.number()).optional(),
     }),
   ),
 });

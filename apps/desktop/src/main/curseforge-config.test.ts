@@ -39,30 +39,30 @@ describe('curseforge-config', () => {
     expect(loadCurseForgeConfig()).toEqual({ apiKey: '' });
   });
 
-  it('save → load round-trip', () => {
-    saveCurseForgeConfig({ apiKey: 'my-curseforge-key-123' });
+  it('save → load round-trip', async () => {
+    await saveCurseForgeConfig({ apiKey: 'my-curseforge-key-123' });
     expect(loadCurseForgeConfig()).toEqual({ apiKey: 'my-curseforge-key-123' });
   });
 
-  it('落盘文件 apiKey 以 enc: 前缀存储（密文不可读出明文）', () => {
-    saveCurseForgeConfig({ apiKey: 'plaintext-secret' });
+  it('落盘文件 apiKey 以 enc: 前缀存储（密文不可读出明文）', async () => {
+    await saveCurseForgeConfig({ apiKey: 'plaintext-secret' });
     const raw = readFileSync(join(tmpDir, 'curseforge-config.json'), 'utf-8');
     const parsed = JSON.parse(raw);
     expect(parsed.apiKey).toMatch(/^enc:/);
     expect(parsed.apiKey).not.toContain('plaintext-secret');
   });
 
-  it('encryptionAvailable=false 时降级为明文存储', () => {
+  it('encryptionAvailable=false 时降级为明文存储', async () => {
     encryptionAvailable = false;
-    saveCurseForgeConfig({ apiKey: 'plain-key' });
+    await saveCurseForgeConfig({ apiKey: 'plain-key' });
     const raw = readFileSync(join(tmpDir, 'curseforge-config.json'), 'utf-8');
     const parsed = JSON.parse(raw);
     expect(parsed.apiKey).toBe('plain-key');
     expect(loadCurseForgeConfig()).toEqual({ apiKey: 'plain-key' });
   });
 
-  it('空 apiKey 不加密（落盘为空串）', () => {
-    saveCurseForgeConfig({ apiKey: '' });
+  it('空 apiKey 不加密（落盘为空串）', async () => {
+    await saveCurseForgeConfig({ apiKey: '' });
     const raw = readFileSync(join(tmpDir, 'curseforge-config.json'), 'utf-8');
     const parsed = JSON.parse(raw);
     expect(parsed.apiKey).toBe('');
@@ -87,11 +87,11 @@ describe('curseforge-config', () => {
     expect(loadCurseForgeConfig()).toEqual({ apiKey: '' });
   });
 
-  it('save 创建 userData 目录（若不存在）', () => {
+  it('save 创建 userData 目录（若不存在）', async () => {
     // tmpDir 已存在，删除后测试 save 能否重建
     rmSync(tmpDir, { recursive: true, force: true });
     expect(existsSync(tmpDir)).toBe(false);
-    saveCurseForgeConfig({ apiKey: 'after-recreate' });
+    await saveCurseForgeConfig({ apiKey: 'after-recreate' });
     expect(existsSync(tmpDir)).toBe(true);
     expect(loadCurseForgeConfig()).toEqual({ apiKey: 'after-recreate' });
   });

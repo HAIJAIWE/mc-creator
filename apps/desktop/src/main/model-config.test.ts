@@ -48,8 +48,8 @@ describe('model-config（多套配置 + safeStorage 加密）', () => {
     expect(cfg.apiKey).toBe('');
   });
 
-  it('saveModelConfig → loadModelConfig round-trip 保留所有字段（apiKey 明文还原）', () => {
-    saveModelConfig({
+  it('saveModelConfig → loadModelConfig round-trip 保留所有字段（apiKey 明文还原）', async () => {
+    await saveModelConfig({
       name: 'DeepSeek',
       modelId: 'deepseek-chat',
       baseURL: 'https://api.deepseek.com/v1',
@@ -63,8 +63,8 @@ describe('model-config（多套配置 + safeStorage 加密）', () => {
     expect(loadModelProfiles().activeId).toBe('default');
   });
 
-  it('落盘文件为 profiles 结构，apiKey 以 enc: 前缀存储（非明文）', () => {
-    saveModelConfig({ name: 'x', modelId: 'm', baseURL: 'u', apiKey: 'sk-plain' });
+  it('落盘文件为 profiles 结构，apiKey 以 enc: 前缀存储（非明文）', async () => {
+    await saveModelConfig({ name: 'x', modelId: 'm', baseURL: 'u', apiKey: 'sk-plain' });
     const raw = readFileSync(join(tmpDir, 'model-config.json'), 'utf-8');
     const stored = JSON.parse(raw);
     expect(Array.isArray(stored.profiles)).toBe(true);
@@ -73,8 +73,8 @@ describe('model-config（多套配置 + safeStorage 加密）', () => {
     expect(stored.activeId).toBe('default');
   });
 
-  it('多套配置并存：saveModelProfiles 保留多套，按 activeId 切换生效', () => {
-    saveModelProfiles(
+  it('多套配置并存：saveModelProfiles 保留多套，按 activeId 切换生效', async () => {
+    await saveModelProfiles(
       [
         {
           id: 'p1',
@@ -96,7 +96,7 @@ describe('model-config（多套配置 + safeStorage 加密）', () => {
     expect(loadModelProfiles().profiles).toHaveLength(2);
     expect(loadModelConfig().modelId).toBe('deepseek-chat');
 
-    saveModelProfiles(loadModelProfiles().profiles, 'p2');
+    await saveModelProfiles(loadModelProfiles().profiles, 'p2');
     expect(loadModelConfig().modelId).toBe('qwen-plus');
     // 多套的 key 均加密存储
     const raw = JSON.parse(readFileSync(join(tmpDir, 'model-config.json'), 'utf-8'));
@@ -105,9 +105,9 @@ describe('model-config（多套配置 + safeStorage 加密）', () => {
     }
   });
 
-  it('saveModelConfig 更新已有 active profile（不新增重复项）', () => {
-    saveModelConfig({ name: 'DeepSeek', modelId: 'deepseek-chat', baseURL: 'u', apiKey: 'k1' });
-    saveModelConfig({ name: 'DeepSeek', modelId: 'deepseek-reasoner', baseURL: 'u', apiKey: 'k2' });
+  it('saveModelConfig 更新已有 active profile（不新增重复项）', async () => {
+    await saveModelConfig({ name: 'DeepSeek', modelId: 'deepseek-chat', baseURL: 'u', apiKey: 'k1' });
+    await saveModelConfig({ name: 'DeepSeek', modelId: 'deepseek-reasoner', baseURL: 'u', apiKey: 'k2' });
     const { profiles } = loadModelProfiles();
     expect(profiles).toHaveLength(1);
     expect(profiles[0].modelId).toBe('deepseek-reasoner');
@@ -131,9 +131,9 @@ describe('model-config（多套配置 + safeStorage 加密）', () => {
     expect(activeId).toBe('default');
   });
 
-  it('encryptionAvailable=false 时退化为明文存储', () => {
+  it('encryptionAvailable=false 时退化为明文存储', async () => {
     encryptionAvailable = false;
-    saveModelProfiles(
+    await saveModelProfiles(
       [{ id: 'x', name: 'x', modelId: 'm', baseURL: 'u', apiKey: 'sk-plain' }],
       'x',
     );
@@ -142,8 +142,8 @@ describe('model-config（多套配置 + safeStorage 加密）', () => {
     expect(loadModelConfig().apiKey).toBe('sk-plain');
   });
 
-  it('空 apiKey 不加密（保持空串）', () => {
-    saveModelConfig({ name: 'x', modelId: 'm', baseURL: 'u', apiKey: '' });
+  it('空 apiKey 不加密（保持空串）', async () => {
+    await saveModelConfig({ name: 'x', modelId: 'm', baseURL: 'u', apiKey: '' });
     const raw = JSON.parse(readFileSync(join(tmpDir, 'model-config.json'), 'utf-8'));
     expect(raw.profiles[0].apiKey).toBe('');
   });
@@ -169,10 +169,10 @@ describe('model-config（多套配置 + safeStorage 加密）', () => {
     expect(loadModelConfig().name).toBe('x');
   });
 
-  it('save 创建 userData 目录（如不存在）', () => {
-    expect(() =>
+  it('save 创建 userData 目录（如不存在）', async () => {
+    await expect(
       saveModelConfig({ name: 'a', modelId: 'b', baseURL: 'c', apiKey: 'd' }),
-    ).not.toThrow();
+    ).resolves.not.toThrow();
     expect(existsSync(join(tmpDir, 'model-config.json'))).toBe(true);
   });
 

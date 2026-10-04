@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
 /** Mod 条目（整合包中的单个 mod） */
+export const ModDependencyRef = z.object({
+  projectId: z.string(),
+  versionId: z.string().optional(),
+  dependencyType: z.enum(['required', 'optional', 'incompatible', 'embedded']).default('required'),
+});
+
 export const ModEntry = z.object({
   name: z.string(),
   projectId: z.string(), // Modrinth project ID 或 CurseForge project ID
@@ -8,7 +14,26 @@ export const ModEntry = z.object({
   fileName: z.string(), // 下载后的文件名
   fileSize: z.number().optional(), // 文件大小（字节）
   downloadUrl: z.string().optional(), // 直接下载 URL（可选）
+  // === mrpack 依赖解析新增（全部可选，向后兼容） ===
+  /** 人类可读版本号（如 0.5.8），锁定后由 resolver 填充 */
+  versionNumber: z.string().optional(),
+  /** 该版本支持的 MC 版本列表（resolver 从版本元数据填充，用于冲突检测） */
+  gameVersions: z.array(z.string()).optional(),
+  /** 该版本支持的 loader 列表（小写，如 fabric/neoforge/quilt/forge） */
+  loaders: z.array(z.string()).optional(),
+  /** 文件哈希（mrpack 必需；缺失时导出用占位并告警） */
+  sha512: z.string().optional(),
+  sha1: z.string().optional(),
+  /** 运行侧声明（mrpack env.client/env.server） */
+  envClient: z.enum(['required', 'optional', 'unsupported']).optional(),
+  envServer: z.enum(['required', 'optional', 'unsupported']).optional(),
+  /** 依赖声明（resolver 从版本元数据填充，用于依赖图） */
+  dependencies: z.array(ModDependencyRef).optional(),
+  /** mod 来源（resolver 填充，便于 UI 区分） */
+  source: z.enum(['modrinth', 'curseforge']).optional(),
 });
+
+export type ModDependencyRef = z.infer<typeof ModDependencyRef>;
 
 /** 整合包覆盖文件条目（P10 新增） */
 export const OverrideFileSpec = z.object({

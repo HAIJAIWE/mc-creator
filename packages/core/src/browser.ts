@@ -7,3 +7,5 @@
  */
 export * from './generators/index.js';
 export * from './orchestrator/index.js';
+export * from './rag/index.js';
+export * from './modpack/index.js';

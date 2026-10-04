@@ -22,7 +22,23 @@ export interface ModrinthVersion {
   project_id: string;
   version_number: string;
   name: string;
-  files: Array<{ url: string; filename: string; primary: boolean; size: number }>;
+  /** 支持的 MC 版本（API game_versions） */
+  game_versions?: string[];
+  /** 支持的 loader（API loaders） */
+  loaders?: string[];
+  /** 依赖声明（API dependencies） */
+  dependencies?: Array<{
+    project_id: string;
+    version_id?: string | null;
+    dependency_type: 'required' | 'optional' | 'incompatible' | 'embedded';
+  }>;
+  files: Array<{
+    url: string;
+    filename: string;
+    primary: boolean;
+    size: number;
+    hashes?: { sha512?: string; sha1?: string };
+  }>;
 }
 
 export class ModrinthApiClient {

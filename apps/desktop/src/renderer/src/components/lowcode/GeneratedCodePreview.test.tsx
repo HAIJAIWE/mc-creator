@@ -9,7 +9,8 @@ import { useModStore } from '../../store/mod-store.js';
  * GeneratedCodePreview 测试
  *
  * mock 策略：
- * - @mc-creator/core：替换 FabricAdapter，让 translate 返回固定 FileNode[]
+ * - ../../lib/generate-files.js：替换生成入口，返回固定 FileNode[]
+ *   （真实实现走主进程 IPC，jsdom 下无法执行）
  * - ../../lib/compileNodeGraph.js：替换 compileNodeGraph，便于控制 spec/warnings/errors
  * - @monaco-editor/react：用占位 div 显示 value（避免 jsdom 加载真实 Monaco）
  *
@@ -19,15 +20,12 @@ import { useModStore } from '../../store/mod-store.js';
 // 在 vi.mock 工厂外创建 spy 句柄（hoist 到文件顶部，工厂内可安全引用）
 const hoisted = vi.hoisted(() => ({
   compileNodeGraphMock: vi.fn(),
-  fabricAdapterTranslateMock: vi.fn(),
+  generateFilesMock: vi.fn(),
 }));
 
-// mock @mc-creator/core：替换 FabricAdapter
-vi.mock('@mc-creator/core/generators/mod/fabric-adapter.js', () => ({
-  FabricAdapter: class MockFabricAdapter {
-    // 实例属性：new FabricAdapter().translate === hoisted.fabricAdapterTranslateMock
-    translate = hoisted.fabricAdapterTranslateMock;
-  },
+// mock 生成入口：替换 generateFilesForType（返回 { files, warnings, spec }）
+vi.mock('../../lib/generate-files.js', () => ({
+  generateFilesForType: hoisted.generateFilesMock,
 }));
 
 // mock compileNodeGraph：从测试路径相对（useDebouncedCompile.ts 的 ./compileNodeGraph.js
@@ -167,7 +165,7 @@ beforeEach(() => {
 
   // 重置 spy
   hoisted.compileNodeGraphMock.mockReset();
-  hoisted.fabricAdapterTranslateMock.mockReset();
+  hoisted.generateFilesMock.mockReset();
 
   // 重置 store 到空图
   useNodeGraphStore.setState({
@@ -237,14 +235,14 @@ describe('GeneratedCodePreview', () => {
       warnings: [],
       errors: [],
     });
-    hoisted.fabricAdapterTranslateMock.mockReturnValue(DEMO_FILES);
+    hoisted.generateFilesMock.mockReturnValue({ files: DEMO_FILES, warnings: [], spec: {} });
     useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
 
     render(<GeneratedCodePreview />);
     await flushDebounce();
 
     // FabricAdapter.translate 被调用一次
-    expect(hoisted.fabricAdapterTranslateMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.generateFilesMock).toHaveBeenCalledTimes(1);
     // 工具栏显示 3 文件
     expect(screen.getByLabelText('生成文件数').textContent).toContain('3 文件');
   });
@@ -255,7 +253,7 @@ describe('GeneratedCodePreview', () => {
       warnings: [],
       errors: [],
     });
-    hoisted.fabricAdapterTranslateMock.mockReturnValue(DEMO_FILES);
+    hoisted.generateFilesMock.mockReturnValue({ files: DEMO_FILES, warnings: [], spec: {} });
     useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
 
     render(<GeneratedCodePreview />);
@@ -274,7 +272,7 @@ describe('GeneratedCodePreview', () => {
       warnings: [],
       errors: [],
     });
-    hoisted.fabricAdapterTranslateMock.mockReturnValue(DEMO_FILES);
+    hoisted.generateFilesMock.mockReturnValue({ files: DEMO_FILES, warnings: [], spec: {} });
     useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
 
     render(<GeneratedCodePreview />);
@@ -299,7 +297,7 @@ describe('GeneratedCodePreview', () => {
       warnings: [],
       errors: [],
     });
-    hoisted.fabricAdapterTranslateMock.mockReturnValue(DEMO_FILES);
+    hoisted.generateFilesMock.mockReturnValue({ files: DEMO_FILES, warnings: [], spec: {} });
     useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
 
     render(<GeneratedCodePreview />);
@@ -362,7 +360,7 @@ describe('GeneratedCodePreview', () => {
       warnings: [],
       errors: [],
     });
-    hoisted.fabricAdapterTranslateMock.mockReturnValueOnce(DEMO_FILES);
+    hoisted.generateFilesMock.mockReturnValueOnce({ files: DEMO_FILES, warnings: [], spec: {} });
     useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
     const { unmount: unmount1 } = render(<GeneratedCodePreview />);
     await flushDebounce();
@@ -375,7 +373,7 @@ describe('GeneratedCodePreview', () => {
       warnings: ['警告1：物品缺少纹理'],
       errors: [],
     });
-    hoisted.fabricAdapterTranslateMock.mockReturnValueOnce(DEMO_FILES);
+    hoisted.generateFilesMock.mockReturnValueOnce({ files: DEMO_FILES, warnings: [], spec: {} });
     const { unmount: unmount2 } = render(<GeneratedCodePreview />);
     await flushDebounce();
     expect(screen.getByRole('status', { name: '编译通过，但有 1 个警告' })).toBeTruthy();
@@ -383,7 +381,7 @@ describe('GeneratedCodePreview', () => {
 
     // 7c. 错误（有错误，FabricAdapter 不应被调用）
     // 清空调用历史：前面的 7a/7b 已调用过 FabricAdapter，这里要验证"本次未调用"
-    hoisted.fabricAdapterTranslateMock.mockClear();
+    hoisted.generateFilesMock.mockClear();
     hoisted.compileNodeGraphMock.mockReturnValueOnce({
       spec: DEMO_SPEC,
       warnings: [],
@@ -393,7 +391,7 @@ describe('GeneratedCodePreview', () => {
     await flushDebounce();
     expect(screen.getByRole('status', { name: '编译失败：1 个错误' })).toBeTruthy();
     // 出错时不应调用 FabricAdapter
-    expect(hoisted.fabricAdapterTranslateMock).not.toHaveBeenCalled();
+    expect(hoisted.generateFilesMock).not.toHaveBeenCalled();
     unmount3();
   });
 
@@ -403,7 +401,7 @@ describe('GeneratedCodePreview', () => {
       warnings: [],
       errors: [],
     });
-    hoisted.fabricAdapterTranslateMock.mockReturnValue(DEMO_FILES);
+    hoisted.generateFilesMock.mockReturnValue({ files: DEMO_FILES, warnings: [], spec: {} });
     useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
 
     render(<GeneratedCodePreview />);
@@ -431,7 +429,7 @@ describe('GeneratedCodePreview', () => {
       warnings: [],
       errors: [],
     });
-    hoisted.fabricAdapterTranslateMock.mockReturnValue(DEMO_FILES);
+    hoisted.generateFilesMock.mockReturnValue({ files: DEMO_FILES, warnings: [], spec: {} });
     useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
 
     render(<GeneratedCodePreview readOnly={false} />);
@@ -463,7 +461,7 @@ describe('GeneratedCodePreview', () => {
       warnings: [],
       errors: [],
     });
-    hoisted.fabricAdapterTranslateMock.mockReturnValue(DEMO_FILES);
+    hoisted.generateFilesMock.mockReturnValue({ files: DEMO_FILES, warnings: [], spec: {} });
     useNodeGraphStore.setState({ graph: SIMPLE_GRAPH });
 
     render(<GeneratedCodePreview />);

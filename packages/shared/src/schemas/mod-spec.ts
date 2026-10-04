@@ -48,6 +48,22 @@ export const EnchantmentSpec = z.object({
   level: z.number().int().min(1),
 });
 
+/** 物品工具属性（可挖掘方块类型 / 挖掘等级 / 挖掘速度） */
+export const ToolSpec = z.object({
+  type: z
+    .enum(['none', 'pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'shears'])
+    .default('none'),
+  miningLevel: z.number().int().min(0).max(10).default(0), // 0=木 1=石 2=铁 3=钻 4=下界合金
+  speed: z.number().min(0).default(1), // 挖掘速度倍率
+});
+
+/** 物品防具属性 */
+export const ArmorSpec = z.object({
+  slot: z.enum(['head', 'chest', 'legs', 'feet']).default('chest'),
+  defense: z.number().int().min(0).default(0), // 防御点数
+  toughness: z.number().min(0).default(0), // 盔甲韧性
+});
+
 /** 物品条目（loader 无关） */
 export const ItemSpec = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/), // 小写下划线
@@ -104,6 +120,14 @@ export const ItemSpec = z.object({
   customModelData: z.number().int().optional(),
   // 新增：纹理路径覆盖
   texturePath: z.string().optional(),
+  // 新增：工具属性（不填表示普通物品）
+  tool: ToolSpec.optional(),
+  // 新增：防具属性（不填表示非防具）
+  armor: ArmorSpec.optional(),
+  // 新增：附魔能力（附魔台权重；undefined 视为 0 = 不可附魔）
+  enchantability: z.number().int().min(0).optional(),
+  // 新增：火焰中不被烧毁（如poc下界合金制品）；undefined 视为 false
+  fireResistant: z.boolean().optional(),
 });
 
 // === 方块相关 ===
@@ -152,6 +176,31 @@ export const BlockSpec = z.object({
   miningLevel: z.number().int().min(0).max(10).default(0), // 挖掘等级
   lightLevel: z.number().int().min(0).max(15).default(0), // 发光等级
   resistance: z.number().min(0).default(6.0), // 爆炸抗性
+  // 新增：偏好挖掘工具（none = 手/任意工具；undefined 视为 none）
+  toolType: z.enum(['none', 'pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'shears']).optional(),
+  // 新增：true 时无正确工具挖掘不掉落；undefined 视为 false
+  toolRequired: z.boolean().optional(),
+  // 新增：滑行摩擦（默认 0.6，冰约 0.98）；undefined 视为 0.6
+  friction: z.number().min(0).optional(),
+  // 新增：地图颜色名（如 'stone' / 'grass' / 'water'）；undefined 视为 'stone'
+  mapColor: z.string().optional(),
+  // 新增：创造模式标签页（与 ItemSpec.creativeTab 同集合）；undefined 视为 'building_blocks'
+  creativeTab: z
+    .enum([
+      'building_blocks',
+      'colored_blocks',
+      'natural_blocks',
+      'functional_blocks',
+      'redstone_blocks',
+      'tools',
+      'combat',
+      'food_and_drinks',
+      'ingredients',
+      'spawn_eggs',
+      'op',
+      'inventory',
+    ])
+    .optional(),
   soundType: z
     .enum(['wood', 'stone', 'metal', 'grass', 'sand', 'glass', 'cloth', 'ladder', 'anvil', 'slime'])
     .default('stone'),
@@ -788,6 +837,8 @@ export type FoodSpec = z.infer<typeof FoodSpec>;
 export type ModDependencySpec = z.infer<typeof ModDependencySpec>;
 export type AttributeModifierSpec = z.infer<typeof AttributeModifierSpec>;
 export type EnchantmentSpec = z.infer<typeof EnchantmentSpec>;
+export type ToolSpec = z.infer<typeof ToolSpec>;
+export type ArmorSpec = z.infer<typeof ArmorSpec>;
 export type BlockStatePropertySpec = z.infer<typeof BlockStatePropertySpec>;
 export type AABBShapeSpec = z.infer<typeof AABBShapeSpec>;
 export type ModLootTableSpec = z.infer<typeof ModLootTableSpec>;

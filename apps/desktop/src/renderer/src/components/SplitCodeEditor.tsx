@@ -8,6 +8,7 @@ import { ipcClient } from '../lib/ipc-client.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
 import { getFileIconName, getLang } from '../lib/file-utils.js';
 import { Breadcrumb } from './Breadcrumb.js';
+import { useToast } from './useToast.js';
 import type { FileNode } from '@mc-creator/shared';
 
 /**
@@ -31,6 +32,7 @@ export function SplitCodeEditor() {
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [dragging, setDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
   const leftFile = useMemo(() => files.find((f) => f.path === selectedFile), [files, selectedFile]);
   const rightFile = useMemo(() => files.find((f) => f.path === splitFile), [files, splitFile]);
@@ -90,9 +92,33 @@ export function SplitCodeEditor() {
             });
           }}
           value={file.content}
-          onChange={(value) => {
+          onChange={async (value) => {
             if (value !== undefined && value !== file.content) {
-              updateFileContent(file.path, value);
+              const result = await updateFileContent(file.path, value);
+              if (!result.success && result.conflict) {
+                const conflict = result.conflict;
+                toast.showConflictToast({
+                  filePath: conflict.path,
+                  serverMeta: conflict.serverMeta,
+                  localMeta: conflict.localMeta,
+                  onAcceptServer: async () => {
+                    await useModStore.getState().forceWriteFile(conflict.path, conflict.serverMeta.hash);
+                    toast.success('已接受服务器版本');
+                  },
+                  onKeepLocal: async () => {
+                    await useModStore.getState().forceWriteFile(conflict.path, file.content);
+                    toast.success('已保留本地版本');
+                  },
+                  onViewDiff: async () => {
+                    const serverContent = await useModStore.getState().readServerFileContent(conflict.path);
+                    if (serverContent !== null) {
+                      useModStore.getState().openConflictDiff(conflict.path, serverContent, file.content);
+                    } else {
+                      toast.error('无法读取服务器版本内容');
+                    }
+                  },
+                });
+              }
             }
           }}
           options={{ ...mcEditorOptions, readOnly: false }}

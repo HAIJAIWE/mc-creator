@@ -1,12 +1,13 @@
 /* Phase 3.1 拆分：由 ../ipc.ts 纯搬运，零行为变更。通道名与逻辑保持原样。*/
-import { ipcMain, dialog } from 'electron';
+import { ipcMain, dialog, webContents } from 'electron';
 import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import JSZip from 'jszip';
+import { assertSafeEntry } from '@mc-creator/shell';
 import { assertWithin } from '../ipc-utils.js';
-import { loadProjects, saveProject, deleteProject, getProject } from '../project-store.js';
+import { loadProjects, saveProject, deleteProject, getProject, startProjectWatcher, projectEvents } from '../project-store.js';
 import {
   EXPORT_ZIP,
   ExportZipRequest,
@@ -29,6 +30,8 @@ import {
   ProjectSchema,
   IMPORT_RESOURCE_FILES,
   ImportResourceFilesRequest,
+  PROJECT_WATCH,
+  PROJECT_CHANGED,
   type ExportZipRes,
   type SaveFileRes,
   type SaveAllFilesRes,
@@ -37,6 +40,9 @@ import {
   type Project,
   type ImportResourceFilesRes,
 } from '../../shared/ipc-channels.js';
+
+/** 项目导入包解压后总大小上限（200MB，防压缩炸弹） */
+const IMPORT_PROJECT_MAX_TOTAL_BYTES = 200 * 1024 * 1024;
 
 export function registerProjectHandlers(): void {
   // 导出 zip
@@ -244,6 +250,25 @@ export function registerProjectHandlers(): void {
       }
       const buf = await readFile(openResult.filePaths[0]);
       const zip = await JSZip.loadAsync(buf);
+      // zip-safety 门（设计文档 §13.1）：读 project.json 前先全量校验——
+      // 逐条目拒绝绝对路径 / ../ 逃逸 / 符号链接，总解压大小超 200MB 直接拒绝（防压缩炸弹）
+      let totalUncompressed = 0;
+      for (const name of Object.keys(zip.files)) {
+        assertSafeEntry(name);
+        const entry = zip.files[name] as unknown as {
+          dir?: boolean;
+          _data?: { uncompressedSize?: unknown };
+        };
+        if (entry.dir !== true) {
+          const size = entry._data?.uncompressedSize;
+          if (typeof size === 'number' && Number.isFinite(size) && size > 0) {
+            totalUncompressed += size;
+          }
+        }
+      }
+      if (totalUncompressed > IMPORT_PROJECT_MAX_TOTAL_BYTES) {
+        return { project: null, error: '压缩包解压后总大小超过上限（200MB），已拒绝导入' };
+      }
       const projectFile = zip.file('project.json');
       if (!projectFile) {
         return { project: null, error: 'zip 内未找到 project.json' };
@@ -262,6 +287,24 @@ export function registerProjectHandlers(): void {
       return { project: newProject, error: null };
     } catch (e) {
       return { project: null, error: (e as Error).message };
+    }
+  });
+
+  // === 项目监听：监听项目目录变化并推送到渲染进程 ===
+  ipcMain.handle(PROJECT_WATCH, async () => {
+    // 启动监视器（单例模式）
+    startProjectWatcher();
+
+    return { ok: true };
+  });
+
+  // 内部：监听项目变更并推送到所有渲染进程
+  projectEvents.on('changed', (type: 'created' | 'updated' | 'deleted', projectId: string) => {
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed()) {
+        wc.send(PROJECT_CHANGED, { type, projectId });
+      }
     }
   });
 }

@@ -12,6 +12,7 @@ import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/mo
 import { registerJsonSchemaSupport } from '../lib/mc-json-schemas.js';
 import { getFileIconName, getLang } from '../lib/file-utils.js';
 import { Breadcrumb } from './Breadcrumb.js';
+import { useToast } from './useToast.js';
 
 function parsePngSize(content: string): { width: number; height: number } | null {
   try {
@@ -128,6 +129,9 @@ export function CodePreview() {
   const originalContent = previousFiles.find((f) => f.path === selectedFile)?.content ?? '';
   const isDirty = file ? dirtyFiles.has(file.path) : false;
   const lang = file && !isPng ? getLang(file.path) : 'plaintext';
+
+  // Toast for conflict handling
+  const toast = useToast();
 
   const handleExport = async () => {
     if (files.length === 0) return;
@@ -363,9 +367,35 @@ export function CodePreview() {
                   });
                 }}
                 value={file.content}
-                onChange={(value) => {
+                onChange={async (value) => {
                   if (value !== undefined && value !== file.content) {
-                    updateFileContent(file.path, value);
+                    const result = await updateFileContent(file.path, value);
+                    if (!result.success && result.conflict) {
+                      // 显示冲突 toast
+                      const conflict = result.conflict;
+                      toast.showConflictToast({
+                        filePath: conflict.path,
+                        serverMeta: conflict.serverMeta,
+                        localMeta: conflict.localMeta,
+                        onAcceptServer: async () => {
+                          await useModStore.getState().forceWriteFile(conflict.path, conflict.serverMeta.hash);
+                          toast.success('已接受服务器版本');
+                        },
+                        onKeepLocal: async () => {
+                          await useModStore.getState().forceWriteFile(conflict.path, file.content);
+                          toast.success('已保留本地版本');
+                        },
+                        onViewDiff: async () => {
+                          // 读取服务器版本内容并打开差异对话框
+                          const serverContent = await useModStore.getState().readServerFileContent(conflict.path);
+                          if (serverContent !== null) {
+                            useModStore.getState().openConflictDiff(conflict.path, serverContent, file.content);
+                          } else {
+                            toast.error('无法读取服务器版本内容');
+                          }
+                        },
+                      });
+                    }
                   }
                 }}
                 options={{ ...mcEditorOptions, readOnly: false }}

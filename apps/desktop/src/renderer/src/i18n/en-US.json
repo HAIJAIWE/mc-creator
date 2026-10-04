@@ -107,7 +107,20 @@
     "new_project": "New Project",
     "open": "Open",
     "export": "Export",
-    "delete_confirm": "Delete project \"{name}\"? This action cannot be undone."
+    "delete_confirm": "Delete project \"{name}\"? This action cannot be undone.",
+    "loader": {
+      "fabric": "Fabric",
+      "neoforge": "NeoForge",
+      "quilt": "Quilt",
+      "legacy_fabric": "Legacy Fabric",
+      "forge": "Forge",
+      "vanilla": "Vanilla"
+    },
+    "versionGroup": {
+      "latest": "Latest Versions",
+      "lts": "Long Term Support",
+      "old": "Old Versions"
+    }
   },
   "dashboard": {
     "selectContentType": "Select the content type to create",
@@ -174,5 +187,76 @@
     "apiKeyConfigured": "API Key Configured",
     "apiKeyNotConfigured": "API Key Not Configured, Click Settings",
     "loaderNotApplicable": "This content type does not use a loader"
+  },
+  "createDialog": {
+    "title": "New Project",
+    "name": "Project Name",
+    "namePlaceholder": "Enter project name (e.g. My Awesome Mod)",
+    "type": "Content Type",
+    "loader": "Mod Loader",
+    "mcVersion": "Minecraft Version",
+    "description": "Description (optional)",
+    "descriptionPlaceholder": "Brief description of the project...",
+    "advanced": {
+      "title": "Advanced Settings",
+      "show": "Show Advanced Options",
+      "hide": "Hide Advanced Options"
+    },
+    "submit": "Create & Open Editor",
+    "creating": "Creating…"
+  },
+  "generator": {
+    "mod": {
+      "label": "Mod",
+      "description": "Create Fabric/NeoForge mods"
+    },
+    "datapack": {
+      "label": "Datapack",
+      "description": "Create custom datapacks"
+    },
+    "modpack": {
+      "label": "Modpack",
+      "description": "Create modpack configuration"
+    },
+    "server": {
+      "label": "Server",
+      "description": "Create server configuration"
+    },
+    "resource_pack": {
+      "label": "Resource Pack",
+      "description": "Create resource packs"
+    },
+    "skin": {
+      "label": "Skin",
+      "description": "Create player skins"
+    },
+    "launcher": {
+      "label": "Launcher",
+      "description": "Create launcher profiles"
+    },
+    "kubejs": {
+      "label": "KubeJS",
+      "description": "Create KubeJS scripts"
+    },
+    "crafttweaker": {
+      "label": "CraftTweaker",
+      "description": "Create ZenScript scripts"
+    },
+    "behavior_pack": {
+      "label": "Behavior Pack",
+      "description": "Create Bedrock behavior packs"
+    },
+    "enchantment": {
+      "label": "Enchantment",
+      "description": "Create data-driven enchantments (1.21+)"
+    },
+    "behavior_item": {
+      "label": "Behavior Item",
+      "description": "Create Bedrock custom items"
+    },
+    "behavior_entity": {
+      "label": "Behavior Entity",
+      "description": "Create Bedrock custom entities"
+    }
   }
 }

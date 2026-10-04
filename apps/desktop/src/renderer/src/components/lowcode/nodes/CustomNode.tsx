@@ -25,11 +25,13 @@ function CustomNodeContentComponent({ data, selected, ports }: CustomNodeContent
   const schema = data.customTypeId ? customNodeRegistry.get(data.customTypeId) : undefined;
 
   if (!schema) {
+    // 未知节点：灰显占位，不抛错不崩（反序列化缺插件/类型被删时落到此分支）
     return (
       <McNodeShell
         icon="custom"
-        title={data.label || '自定义节点'}
+        title={data.label || '未知节点'}
         colorClass="mc-code"
+        badge="未知"
         ports={ports}
         collapsed={data.collapsed}
         selected={selected ?? false}
@@ -38,7 +40,8 @@ function CustomNodeContentComponent({ data, selected, ports }: CustomNodeContent
         onToggleCollapse={toggleCollapse}
         onOpenDrawer={openDrawer}
       >
-        <div className="text-[10px] text-yellow-400">自定义类型未注册：{data.customTypeId}</div>
+        <div className="text-[10px] text-mc-mute">未知节点类型（灰显占位，不参与编译）</div>
+        <div className="font-mono text-[10px] text-yellow-400">自定义类型未注册：{data.customTypeId}</div>
       </McNodeShell>
     );
   }
@@ -48,7 +51,7 @@ function CustomNodeContentComponent({ data, selected, ports }: CustomNodeContent
       icon={schema.icon || 'custom'}
       title={data.label || schema.label}
       colorClass={schema.color || 'mc-code'}
-      badge="custom"
+      badge="自定义"
       ports={ports.length > 0 ? ports : schema.ports}
       collapsed={data.collapsed}
       selected={selected ?? false}

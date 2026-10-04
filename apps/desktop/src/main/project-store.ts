@@ -7,6 +7,8 @@ import {
   renameSync,
   readdirSync,
   unlinkSync,
+  watch,
+  FSWatcher,
 } from 'fs';
 import { join } from 'path';
 import { ProjectSchema, type Project } from '../shared/ipc-channels.js';
@@ -55,12 +57,93 @@ function legacyMigratedPath(): string {
   return join(app.getPath('userData'), LEGACY_MIGRATED);
 }
 
+/** 项目变更事件类型 */
+export type ProjectChangeEvent = 'created' | 'updated' | 'deleted';
+
+/** 简单的事件发射器 */
+class ProjectEventEmitter {
+  private listeners: Map<string, Set<Function>> = new Map();
+
+  on(event: string, listener: Function): () => void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event)!.add(listener);
+    return () => this.off(event, listener);
+  }
+
+  off(event: string, listener: Function): void {
+    this.listeners.get(event)?.delete(listener);
+  }
+
+  emit(event: string, ...args: unknown[]): void {
+    this.listeners.get(event)?.forEach((listener) => {
+      try {
+        listener(...args);
+      } catch (e) {
+        console.error(`[ProjectEventEmitter] Listener error for ${event}:`, e);
+      }
+    });
+  }
+}
+
+/** 全局项目事件发射器 */
+export const projectEvents = new ProjectEventEmitter();
+
+/** 文件监视器实例 */
+let projectWatcher: FSWatcher | null = null;
+
+/** 启动项目目录监视 */
+export function startProjectWatcher(): void {
+  if (projectWatcher) return;
+
+  const dir = projectsDir();
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+
+  projectWatcher = watch(dir, { recursive: false }, (eventType, filename) => {
+    if (!filename || !filename.endsWith('.json')) return;
+    if (filename.endsWith('.tmp')) return;
+
+    const id = filename.slice(0, -5);
+    if (!ID_RE.test(id)) return;
+
+    if (eventType === 'rename') {
+      // rename 可能是创建或删除，需配合 exists 判断
+      const filepath = join(projectsDir(), filename);
+      if (existsSync(filepath)) {
+        projectEvents.emit('changed', 'created', id);
+      } else {
+        projectEvents.emit('changed', 'deleted', id);
+      }
+    } else if (eventType === 'change') {
+      projectEvents.emit('changed', 'updated', filename.slice(0, -5));
+    }
+  });
+
+  projectWatcher.on('error', (err) => {
+    console.error('[ProjectWatcher] Error:', err);
+  });
+
+  console.log('[ProjectWatcher] Started watching:', projectsDir());
+}
+
+/** 停止项目目录监视 */
+export function stopProjectWatcher(): void {
+  if (projectWatcher) {
+    projectWatcher.close();
+    projectWatcher = null;
+  }
+}
+
 /** 原子写单个项目文件 */
 function writeProjectFile(project: Project): void {
   const path = projectFile(project.id);
   const tmpPath = path + '.tmp';
   writeFileSync(tmpPath, JSON.stringify(project, null, 2), 'utf-8');
   renameSync(tmpPath, path);
+  projectEvents.emit('changed', 'updated', project.id);
 }
 
 /** 一次性从旧 projects.json 迁移到分文件存储 */
@@ -108,7 +191,11 @@ export function loadProjects(): Project[] {
 export function saveProject(project: Project): void {
   const parsed = ProjectSchema.parse(project);
   if (!existsSync(projectsDir())) mkdirSync(projectsDir(), { recursive: true });
+  const isNew = !existsSync(projectFile(parsed.id));
   writeProjectFile(parsed);
+  if (isNew) {
+    projectEvents.emit('changed', 'created', parsed.id);
+  }
 }
 
 /** 删除项目（删除对应文件） */
@@ -116,7 +203,10 @@ export function deleteProject(id: string): void {
   assertValidId(id);
   try {
     const path = projectFile(id);
-    if (existsSync(path)) unlinkSync(path);
+    if (existsSync(path)) {
+      unlinkSync(path);
+      projectEvents.emit('changed', 'deleted', id);
+    }
   } catch {
     // 删除失败不抛，调用方按 ok 处理
   }

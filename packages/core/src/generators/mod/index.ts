@@ -1,9 +1,2 @@
-export * from './templates.js';
-export * from './adapter.js';
-export * from './unsupported.js';
-export * from './fabric-adapter.js';
-export * from './neoforge-adapter.js';
-export * from './forge-adapter.js';
-export * from './mod-generator.js';
-export * from './fabric-assets.js';
-export * from './recipe-json-generator.js';
+// §18 阶段 9：实现已迁入 @mc-creator/generator-mod，本文件仅作重导出，保持既有深路径 import 不断.
+export * from '@mc-creator/generator-mod/index.js';

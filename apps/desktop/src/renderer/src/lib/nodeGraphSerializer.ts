@@ -22,7 +22,10 @@ import { migrateGraph } from '@mc-creator/shared';
 export const SERIALIZER_FORMAT = 'mc-creator-node-graph' as const;
 
 /** 序列化版本号（前向兼容：将来升级时递增，反序列化时拒绝高于当前版本的输入） */
-export const SERIALIZER_VERSION = 1 as const;
+export const SERIALIZER_VERSION = 2 as const;
+
+/** v1 旧包络版本号（仍可加载，自动迁移到 v2）。 */
+export const SERIALIZER_VERSION_V1 = 1 as const;
 
 // === 类型 ===
 
@@ -31,11 +34,66 @@ export interface SerializedNodeGraph {
   /** 魔数，便于识别文件来源 */
   format: typeof SERIALIZER_FORMAT;
   /** 序列化版本号 */
-  version: typeof SERIALIZER_VERSION;
+  version: typeof SERIALIZER_VERSION | typeof SERIALIZER_VERSION_V1;
   /** 导出时间（ISO 8601 字符串） */
   exportedAt: string;
   /** 原始节点图数据 */
   graph: NodeGraph;
+  /**
+   * v2 新增：图中引用的插件/自定义节点 typeId 列表（`customTypeId` 去重）。
+   *
+   * 仅作依赖提示（加载时可据此预加载插件），不参与图结构校验；
+   * v1 旧包络无此字段，加载时按空数组处理。
+   */
+  pluginIds: string[];
+}
+
+// === 迁移 ===
+
+/**
+ * 收集图中引用的插件/自定义节点 typeId（主图 + 子图，去重排序）。
+ */
+export function collectPluginIds(graph: NodeGraph): string[] {
+  const ids = new Set<string>();
+  const allNodes = [
+    ...(graph.nodes ?? []),
+    ...Object.values(graph.subgraphs ?? {}).flatMap((sg) => sg.nodes ?? []),
+  ];
+  for (const node of allNodes) {
+    const data = node?.data as { customTypeId?: unknown } | undefined;
+    const typeId = data?.customTypeId;
+    if (typeof typeId === 'string' && typeId !== '') ids.add(typeId);
+  }
+  return [...ids].sort();
+}
+
+/**
+ * v1 包络 → v2 迁移（纯函数，不抛错）。
+ *
+ * - 补 `pluginIds`（从 graph 收集）与 `subgraphs`/`edges` 缺省值；
+ * - 图级 `version` 缺失时补 1（图级版本仍由 shared schema 保底默认，不在此强改）。
+ */
+export function migrateV1EnvelopeToV2(obj: Record<string, unknown>): {
+  graph: NodeGraph;
+  pluginIds: string[];
+  migrated: boolean;
+} {
+  const rawGraph = obj.graph as NodeGraph;
+  const graphObj = rawGraph as unknown as Record<string, unknown>;
+  let migrated = false;
+  if (!('edges' in graphObj) || !Array.isArray(graphObj.edges)) {
+    graphObj.edges = [];
+    migrated = true;
+  }
+  if (!('subgraphs' in graphObj) || typeof graphObj.subgraphs !== 'object' || graphObj.subgraphs === null) {
+    (graphObj as Record<string, unknown>).subgraphs = {};
+    migrated = true;
+  }
+  const pluginIds = Array.isArray(obj.pluginIds)
+    ? (obj.pluginIds as unknown[]).filter((v): v is string => typeof v === 'string')
+    : collectPluginIds(rawGraph);
+  if (!Array.isArray(obj.pluginIds)) migrated = true;
+  return { graph: rawGraph, pluginIds, migrated };
 }
 
 // === 序列化 ===
@@ -61,6 +119,7 @@ export function serializeGraph(graph: NodeGraph): string {
     version: SERIALIZER_VERSION,
     exportedAt: new Date().toISOString(),
     graph,
+    pluginIds: collectPluginIds(graph),
   };
   // 使用 2 空格缩进，便于 git diff 与人工审阅
   return JSON.stringify(payload, null, 2);
@@ -139,7 +198,12 @@ export function deserializeGraph(json: string): NodeGraph {
     throw new Error(`反序列化失败：graph 字段必须是对象，实际为 ${actualType}`);
   }
 
-  // 5.5. graph 内部结构校验：nodes/edges 必须是数组（migrateGraph 依赖 graph.nodes.map）
+  // 5.5. v1→v2 包络迁移：v1 旧图无 pluginIds/subgraphs 字段，补缺省值后继续加载
+  if (version === SERIALIZER_VERSION_V1) {
+    migrateV1EnvelopeToV2(obj);
+  }
+
+  // 5.6. graph 内部结构校验：nodes/edges 必须是数组（migrateGraph 依赖 graph.nodes.map）
   // P0 dogfood 修复：缺少此校验会导致 migrateGraph 内部崩溃（TypeError: .map of undefined）
   const graphObj = graph as Record<string, unknown>;
   if (!('nodes' in graphObj)) {

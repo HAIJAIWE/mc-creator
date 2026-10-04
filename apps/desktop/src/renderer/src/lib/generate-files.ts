@@ -1,13 +1,14 @@
 /**
- * 浏览器端生成器调用的统一入口。
+ * 渲染进程生成文件的统一入口。
  *
- * 结构与主进程 GENERATE_FILES 一致：按 generatorType 取 schema 校验 spec → 通过
- * createDefaultRegistry 取生成器 → 生成文件。供 ipc-client（web-preview）与
- * agent-tools 共用，避免两处重复的"校验 + 生成"逻辑。
- *
- * 通过 `@mc-creator/core/browser.js` 只导入浏览器安全模块，避免把 Node-only
- * 的 builder 模块拖进浏览器 bundle。
+ * 走主进程 IPC（GENERATE_FILES）：core 的生成器（如 mod 生成器的贴图产出）依赖
+ * pngjs 这类 Node-only 包，在渲染进程里跑不通，也没必要为此在渲染层背一整套 Node
+ * polyfill。web-preview（无 Electron 主进程）时的本地回退逻辑在 ipc-client 内。
  */
+
+import type { GeneratorType } from '@mc-creator/shared';
+import { GENERATOR_TYPES } from '../../../shared/ipc-channels.js';
+import { ipcClient } from './ipc-client.js';
 
 export interface GenerateFilesOutcome {
   files: { path: string; content: string }[];
@@ -26,44 +27,24 @@ export async function generateFilesForType(
   spec: unknown,
   opts: { loader: string; mcVersion: string },
 ): Promise<GenerateFilesOutcome> {
-  const { createDefaultRegistry, SPEC_CONFIGS } = await import('@mc-creator/core/browser.js');
-
-  const config = SPEC_CONFIGS[generatorType as keyof typeof SPEC_CONFIGS];
-  if (!config) {
-    throw new Error(
-      `未知生成器类型 "${generatorType}"。可用类型：${Object.keys(SPEC_CONFIGS).join(', ')}`,
-    );
+  // 类型前置校验：未知类型直接给出可用列表（与改动前渲染层本地生成的行为一致），
+  // 避免无意义的 IPC 往返，也避免把"未知类型"当成生成成功返回
+  if (!(GENERATOR_TYPES as readonly string[]).includes(generatorType)) {
+    throw new Error(`未知生成器类型 "${generatorType}"。可用类型：${GENERATOR_TYPES.join(', ')}`);
   }
 
-  // 与主进程 GENERATE_FILES 一致：校验通过后使用 parse 后的完整 spec（default 字段已填充）
-  const parsed = config.schema.safeParse(spec);
-  if (!parsed.success) {
-    const issues = parsed.error.issues
-      .slice(0, 5)
-      .map((i) => `  ${i.path.join('.') || '(根)'}: ${i.message}`)
-      .join('\n');
-    const more = parsed.error.issues.length > 5 ? `\n  ...等 ${parsed.error.issues.length} 处` : '';
-    throw new Error(`${generatorType} Spec 校验失败:\n${issues}${more}`);
-  }
-
-  const gen = createDefaultRegistry().get(generatorType as never);
-  if (!gen) throw new Error(`生成器 "${generatorType}" 未注册`);
-
-  const data = parsed.data as Record<string, unknown>;
-  const modId = (data.modId as string) || (data.packId as string) || 'mc_creator';
-
-  const result = await gen.generate({
+  const res = await ipcClient.generateFiles({
     loader: opts.loader,
     mcVersion: opts.mcVersion,
-    modId,
-    spec: parsed.data,
-    projectPath: '',
-  } as never);
+    spec,
+    generatorType: generatorType as GeneratorType,
+  });
 
   return {
-    files: result.files,
-    warnings: result.warnings,
-    unimplemented: result.unimplemented ?? [],
-    spec: parsed.data,
+    files: res.files,
+    warnings: res.warnings,
+    // 主进程返回校验后的完整 spec；回退到入参，保证 web-preview 等场景也有值
+    spec: res.spec ?? spec,
+    ...(res.unimplemented !== undefined ? { unimplemented: res.unimplemented } : {}),
   };
 }

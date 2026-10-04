@@ -11,10 +11,13 @@ import { registerGenerateHandlers, registerSandboxedMustacheHandler } from './ip
 import { registerBuildHandlers } from './ipc/build.js';
 import { registerProjectHandlers } from './ipc/project.js';
 import { registerMarketHandlers } from './ipc/market.js';
+import { registerModpackHandlers } from './ipc/modpack.js';
 import { registerGitHandlers } from './ipc/git.js';
 import { registerTerminalHandlers } from './ipc/terminal.js';
 import { registerLauncherHandlers } from './ipc/launcher.js';
 import { registerNodeGraphHandlers } from './ipc/node-graph.js';
+import { registerFileManagerHandlers } from './ipc/file-manager.js';
+import { registerRagHandlers } from './ipc/rag.js';
 
 /**
  * 注册 IPC 处理器（规格 §4 端到端数据流）。
@@ -25,10 +28,13 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
   registerBuildHandlers();
   registerProjectHandlers();
   registerMarketHandlers();
+  registerModpackHandlers();
   registerGitHandlers();
   registerTerminalHandlers();
   registerLauncherHandlers();
   registerNodeGraphHandlers();
+  registerFileManagerHandlers();
+  registerRagHandlers();
 }
 
 // 原模块级注册时序保持：import 本模块时即注册沙箱 Mustache 渲染通道（此前在旧 ipc.ts 尾部模块级注册）。

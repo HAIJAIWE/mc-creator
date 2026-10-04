@@ -22,7 +22,7 @@ interface ProjectState {
   currentProjectId: string | null;
 
   loadProjects: () => Promise<void>;
-  saveCurrentAsProject: (name: string, data: SaveProjectData) => Promise<void>;
+  saveCurrentAsProject: (name: string, data: SaveProjectData) => Promise<string>;
   loadProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   exportProject: (
@@ -74,7 +74,7 @@ export const useProjectStore = createWithEqualityFn<ProjectState>((set, get) => 
         loader: data.loader,
         mcVersion: data.mcVersion,
         description: data.description,
-        spec: data.spec as Record<string, unknown>,
+        spec: data.spec as Record<string, unknown> | null,
         files: data.files,
         createdAt: now,
         updatedAt: now,
@@ -82,6 +82,7 @@ export const useProjectStore = createWithEqualityFn<ProjectState>((set, get) => 
       await ipcClient.saveProject(project);
       await get().loadProjects();
       set({ loading: false });
+      return project.id; // 返回新项目的 ID
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
       // P23-2：re-throw 让调用方（ProjectSaveDialog）能感知错误并显示给用户
@@ -96,6 +97,14 @@ export const useProjectStore = createWithEqualityFn<ProjectState>((set, get) => 
       if (!project) {
         set({ error: '项目不存在', loading: false });
         return;
+      }
+      // 确保项目工作区目录存在。
+      // 这是加载后的「善后」步骤而非前置条件：目录创建失败不应阻断项目打开
+      // （后续写文件时会各自报错，用户仍能看到项目内容），故单独 try/catch 降级。
+      try {
+        await ipcClient.fileProjectEnsureDirs(id);
+      } catch (dirErr) {
+        console.warn('[projectStore] 确保项目工作区目录失败（不阻断加载）:', dirErr);
       }
       // 把项目数据填入 mod-store
       const mod = useModStore.getState();

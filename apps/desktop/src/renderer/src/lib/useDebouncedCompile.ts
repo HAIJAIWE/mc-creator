@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { NodeGraph, FileNode } from '@mc-creator/shared';
 import { compileNodeGraph, type CompileResult } from './compileNodeGraph.js';
-import { FabricAdapter } from '@mc-creator/core/generators/mod/fabric-adapter.js';
+import { generateFilesForType } from './generate-files.js';
+import { useModStore } from '../store/mod-store.js';
 
 export interface DebouncedCompileResult {
   /** 编译结果（含 spec/warnings/errors） */
@@ -13,13 +14,14 @@ export interface DebouncedCompileResult {
 }
 
 /**
- * 防抖编译 hook：graph 变化后等待 delay ms 再编译，并自动用 FabricAdapter 生成文件。
+ * 防抖编译 hook：graph 变化后等待 delay ms 再编译，并在无错误时生成文件。
  *
  * 实现要点：
  * - 使用 JSON.stringify(graph) 作为依赖键，避免深比较开销的同时保证内容变化才触发重编译
  * - isCompiling 在 graph 变化时立即变 true，编译完成时变 false
- * - 编译出错（errors 非空）时不调用 FabricAdapter，generatedFiles 清空
+ * - 编译出错（errors 非空）时不生成文件，generatedFiles 清空
  * - enabled === false 时返回空闲结果（null/[]/false），不调度任何定时器
+ * - 生成走 generateFilesForType（主进程 IPC），loader / mcVersion 取当前项目选择
  *
  * @param graph 节点图
  * @param delay 防抖延迟，默认 500ms
@@ -33,6 +35,8 @@ export function useDebouncedCompile(
   // 用 JSON.stringify 作为依赖键：内容相同时字符串相同（primitive Object.is 比较），
   // effect 不会重跑；只有内容真正变化时才重编译。比深比较便宜，比引用比较准确。
   const graphKey = useMemo(() => JSON.stringify(graph), [graph]);
+  const loader = useModStore((s) => s.loader);
+  const mcVersion = useModStore((s) => s.mcVersion);
 
   const [compileResult, setCompileResult] = useState<CompileResult | null>(null);
   const [generatedFiles, setGeneratedFiles] = useState<FileNode[]>([]);
@@ -57,17 +61,11 @@ export function useDebouncedCompile(
         const result = await compileNodeGraph(graph);
         setCompileResult(result);
 
-        // 仅当编译通过（无 errors）时才用 FabricAdapter 生成文件
+        // 仅当编译通过（无 errors）时才生成文件
         if (result.errors.length === 0) {
           try {
-            const files = new FabricAdapter().translate({
-              spec: result.spec,
-              mcVersion: '1.21.11',
-              modId: result.spec.modId,
-              loader: 'fabric',
-              projectPath: '/preview',
-            });
-            setGeneratedFiles(files);
+            const outcome = await generateFilesForType('mod', result.spec, { loader, mcVersion });
+            setGeneratedFiles(outcome.files);
           } catch {
             // 生成失败时清空文件列表，避免显示陈旧数据
             setGeneratedFiles([]);
@@ -89,7 +87,7 @@ export function useDebouncedCompile(
     return () => clearTimeout(timer);
     // 依赖 graphKey（内容键）而非 graph 引用，避免引用变内容不变时重复编译
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graphKey, delay, enabled]);
+  }, [graphKey, delay, enabled, loader, mcVersion]);
 
   // 未启用时统一返回空闲结果，避免暴露内部状态
   if (!enabled) {

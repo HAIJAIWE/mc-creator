@@ -15,7 +15,7 @@ export const ProjectSchema = z.object({
   loader: z.enum(LOADERS),
   mcVersion: z.string(),
   description: z.string(),
-  spec: z.record(z.unknown()),
+  spec: z.record(z.unknown()).nullable(),
   files: z.array(z.object({ path: z.string(), content: z.string() })),
   createdAt: z.string(),
   updatedAt: z.string(),

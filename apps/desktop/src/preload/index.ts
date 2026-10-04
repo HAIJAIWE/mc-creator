@@ -47,6 +47,10 @@ import {
   CURSEFORGE_FILES,
   LOAD_CURSEFORGE_CONFIG,
   SAVE_CURSEFORGE_CONFIG,
+  MODPACK_RESOLVE,
+  MODPACK_CHECK_CONFLICTS,
+  MODPACK_EXPORT_MRPACK,
+  MODPACK_EXPORT_PROGRESS,
   GIT_CHOOSE_REPO,
   GIT_STATUS,
   GIT_LOG,
@@ -70,12 +74,15 @@ import {
   INSTALL_MOD,
   LAUNCH_MC,
   IMPORT_RESOURCE_FILES,
+  RAG_SEARCH,
+  type GeneratorType,
+  type BuildStreamChunkT,
+  type RagSearchRes,
   NODE_GRAPH_SAVE,
   NODE_GRAPH_LOAD,
   NODE_GRAPH_SHOW_SAVE_DIALOG,
   NODE_GRAPH_SHOW_OPEN_DIALOG,
-  type GeneratorType,
-  type BuildStreamChunkT,
+  PROJECT_CHANGED,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -109,6 +116,12 @@ const api = {
   saveModelProfiles: (req: unknown) => ipcRenderer.invoke(MODEL_SAVE_PROFILES, req),
   testModelConnection: (req: unknown) => ipcRenderer.invoke(MODEL_TEST_CONNECTION, req),
   chat: (message: string) => ipcRenderer.invoke(CHAT, { message }),
+  /**
+   * RAG 知识库检索（主进程 TF-IDF + 内存 LRU）。
+   * UI“引用来源”与智能体 search_knowledge 工具经此查询。
+   */
+  ragSearch: (req: { query: string; generatorType?: string; topK?: number }) =>
+    ipcRenderer.invoke(RAG_SEARCH, req) as Promise<RagSearchRes>,
   /**
    * P12 chat 模式工具调用增强：chatStream 添加可选 context 参数。
    * context 包含项目类型/用户描述/spec 摘要，由 main 进程拼接到 system message。
@@ -246,6 +259,18 @@ const api = {
   loadCurseForgeConfig: () => ipcRenderer.invoke(LOAD_CURSEFORGE_CONFIG),
   saveCurseForgeConfig: (config: { apiKey: string }) =>
     ipcRenderer.invoke(SAVE_CURSEFORGE_CONFIG, config),
+  // === 整合包：依赖解析 + 冲突检测 + mrpack 导出 ===
+  modpackResolve: (req: { mods: { projectId: string; name?: string }[]; mcVersion: string; loader: string; allowCache?: boolean }) =>
+    ipcRenderer.invoke(MODPACK_RESOLVE, req),
+  modpackCheckConflicts: (req: { mods: unknown[]; mcVersion: string; loader: string }) =>
+    ipcRenderer.invoke(MODPACK_CHECK_CONFLICTS, req),
+  modpackExportMrpack: (req: { spec: unknown; projectId?: string; defaultName?: string }) =>
+    ipcRenderer.invoke(MODPACK_EXPORT_MRPACK, req),
+  onModpackExportProgress: (handler: (data: { requestId: string; loaded: number; total: number; percentage: number; currentFile: string; done: boolean }) => void) => {
+    const wrapped = (_e: unknown, data: { requestId: string; loaded: number; total: number; percentage: number; currentFile: string; done: boolean }) => handler(data);
+    ipcRenderer.on(MODPACK_EXPORT_PROGRESS, wrapped);
+    return () => ipcRenderer.removeListener(MODPACK_EXPORT_PROGRESS, wrapped);
+  },
   // 源代码管理
   gitChooseRepo: () => ipcRenderer.invoke(GIT_CHOOSE_REPO),
   gitStatus: (repoPath: string) => ipcRenderer.invoke(GIT_STATUS, { repoPath }),
@@ -289,6 +314,158 @@ const api = {
   // 资源文件导入
   importResourceFiles: (req: { title?: string; extensions?: string[]; multiSelect?: boolean }) =>
     ipcRenderer.invoke(IMPORT_RESOURCE_FILES, req),
+
+  // === 项目感知文件操作 ===
+  fileProjectListDir: (projectId: string, path?: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_LIST_DIR, { projectId, path: path ?? '' }),
+  fileProjectListTree: (projectId: string, path?: string, maxDepth?: number) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_LIST_TREE, { projectId, path: path ?? '', maxDepth: maxDepth ?? -1 }),
+  fileProjectReadText: (projectId: string, path: string, encoding?: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_READ_TEXT, { projectId, path, encoding }),
+  fileProjectWriteText: (projectId: string, path: string, content: string, encoding?: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_WRITE_TEXT, { projectId, path, content, encoding }),
+  fileProjectMakeDir: (projectId: string, path: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_MAKE_DIR, { projectId, path }),
+  fileProjectDeleteItem: (projectId: string, path: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_DELETE_ITEM, { projectId, path }),
+  fileProjectGetWorkspace: (projectId: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_GET_WORKSPACE, { projectId }),
+  fileProjectGetOutputDir: (projectId: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_GET_OUTPUT_DIR, { projectId }),
+  fileProjectGetBuildCacheDir: (projectId: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_GET_BUILD_CACHE_DIR, { projectId }),
+  fileProjectGetTempDir: (projectId: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_GET_TEMP_DIR, { projectId }),
+  fileProjectGetResourcePacksDir: (projectId: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_GET_RESOURCE_PACKS_DIR, { projectId }),
+  fileProjectGetModsDir: (projectId: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_GET_MODS_DIR, { projectId }),
+  fileProjectGetExportsDir: (projectId: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_GET_EXPORTS_DIR, { projectId }),
+  fileProjectEnsureDirs: (projectId: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_ENSURE_DIRS, { projectId }),
+  // 文件元数据与冲突检测
+  fileProjectGetFileMeta: (projectId: string, path: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_GET_FILE_META, { projectId, path }),
+  fileProjectWriteTextWithMeta: (projectId: string, path: string, content: string, expectedMeta?: { mtime: number; size: number; hash: string }, encoding?: string) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_WRITE_TEXT_WITH_META, { projectId, path, content, expectedMeta, encoding }),
+
+  // === 项目变更监听 ===
+  onProjectChanged: (handler: (payload: { type: 'created' | 'updated' | 'deleted'; projectId: string }) => void) => {
+    const handlerWrapper = (_e: unknown, payload: { type: 'created' | 'updated' | 'deleted'; projectId: string }) => handler(payload);
+    ipcRenderer.on(PROJECT_CHANGED, handlerWrapper);
+    return () => ipcRenderer.removeListener(PROJECT_CHANGED, handlerWrapper);
+  },
+
+  // === 大文件流式传输 ===
+
+  /**
+   * 流式写入大文件（分片上传）
+   * 使用模式：调用方分片发送，主进程流式写入磁盘
+   * @param projectId 项目 ID
+   * @param path 相对路径
+   * @param data Uint8Array 或 AsyncIterable<Uint8Array>
+   * @param options onProgress 进度回调，expectedHash 预期 MD5
+   * @returns 写入结果
+   */
+  fileProjectWriteStream: async (
+    projectId: string,
+    path: string,
+    data: Uint8Array | AsyncIterable<Uint8Array>,
+    options?: { onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void; expectedHash?: string }
+  ): Promise<{ success: boolean; meta?: { size: number; mtime: number; hash: string }; error?: string }> => {
+    const requestId = nextStreamRequestId();
+    let totalSize = 0;
+
+    // 计算总大小（如果是 Uint8Array 直接获取；如果是迭代器需要预计算或由调用方传入）
+    if (data instanceof Uint8Array) {
+      totalSize = data.byteLength;
+    } else {
+      // 对于迭代器，要求调用方传入 totalSize（通过 options 隐式传递，这里简化处理）
+      // 实际使用时建议显式传入 totalSize
+      throw new Error('AsyncIterable 模式暂不支持，请传入 Uint8Array 或显式提供 totalSize');
+    }
+
+    // 发起流式写入会话
+    const startResult = await ipcRenderer.invoke(IPC.FILE_PROJECT_WRITE_STREAM, {
+      projectId,
+      path,
+      totalSize,
+      expectedHash: options?.expectedHash,
+      requestId,
+    });
+
+    if (!startResult.success) {
+      return { success: false, error: startResult.error };
+    }
+
+    let loaded = 0;
+    let chunkIndex = 0;
+
+    try {
+      if (data instanceof Uint8Array) {
+        // 分片发送
+        const chunkSize = 1024 * 1024; // 1MB
+        for (let offset = 0; offset < data.byteLength; offset += chunkSize) {
+          const chunk = data.slice(offset, offset + chunkSize);
+          const isLast = offset + chunkSize >= data.byteLength;
+          
+          const chunkResult = await ipcRenderer.invoke(IPC.FILE_PROJECT_WRITE_STREAM_CHUNK, {
+            requestId,
+            chunkIndex: chunkIndex++,
+            data: Buffer.from(chunk).toString('base64'),
+            isLast,
+          });
+
+          if (!chunkResult.success) {
+            return { success: false, error: chunkResult.error };
+          }
+
+          loaded += chunk.byteLength;
+          if (options?.onProgress) {
+            options.onProgress({ loaded, total: totalSize, percentage: Math.round((loaded / totalSize) * 100) });
+          }
+        }
+      }
+
+      return startResult.meta ? { success: true, meta: startResult.meta } : { success: true };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+
+  /**
+   * 流式读取大文件（分片下载）
+   * 使用模式：主进程分片发送，渲染侧接收拼装
+   * @param projectId 项目 ID
+   * @param path 相对路径
+   * @param onChunk 分片回调
+   * @param options chunkSize 分片大小
+   * @returns 读取结果
+   */
+  fileProjectReadStream: (
+    projectId: string,
+    path: string,
+    onChunk: (data: { chunk: Uint8Array; isLast: boolean; progress: { loaded: number; total: number; percentage: number } }) => void,
+    options?: { chunkSize?: number }
+  ): Promise<{ success: boolean; error?: string }> => {
+    const requestId = nextStreamRequestId();
+    const handler = (_e: unknown, data: { requestId: string; chunkIndex: number; data: string; isLast: boolean; progress: { loaded: number; total: number; percentage: number } }) => {
+      if (data.requestId !== requestId) return;
+      onChunk({
+        chunk: Buffer.from(data.data, 'base64'),
+        isLast: data.isLast,
+        progress: data.progress,
+      });
+      if (data.isLast) {
+        ipcRenderer.removeListener(IPC.FILE_PROJECT_READ_STREAM_CHUNK, handler);
+      }
+    };
+    ipcRenderer.on(IPC.FILE_PROJECT_READ_STREAM_CHUNK, handler);
+    return ipcRenderer.invoke(IPC.FILE_PROJECT_READ_STREAM, { projectId, path, chunkSize: options?.chunkSize, requestId }).finally(() => {
+      ipcRenderer.removeListener(IPC.FILE_PROJECT_READ_STREAM_CHUNK, handler);
+    });
+  },
 };
 
 /**

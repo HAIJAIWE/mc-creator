@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useProjectStore } from '../store/project-store.js';
-import { useModStore } from '../store/mod-store.js';
 import { useToast } from './useToast.js';
 import { useTranslation } from '../hooks/useTranslation.js';
 import type { Project, GeneratorType } from '../../../shared/ipc-channels.js';
@@ -8,6 +7,8 @@ import { GENERATOR_DESCRIPTORS, pickLocalized } from '../../../shared/generator-
 import { FolderInput, FolderOutput } from 'lucide-react';
 import { McMark } from './McMark.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
+import { ipcClient } from '../lib/ipc-client.js';
+import { ProjectCreateDialog } from './ProjectCreateDialog.js';
 
 const LOADER_LABEL: Record<string, string> = {
   fabric: 'Fabric',
@@ -48,7 +49,7 @@ export function Dashboard() {
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const exportProject = useProjectStore((s) => s.exportProject);
   const importProject = useProjectStore((s) => s.importProject);
-  const setView = useProjectStore((s) => s.setView);
+  const saveCurrentAsProject = useProjectStore((s) => s.saveCurrentAsProject);
   const toast = useToast();
   const { t, tCommon, locale } = useTranslation();
   const [importing, setImporting] = useState(false);
@@ -56,6 +57,15 @@ export function Dashboard() {
 
   useEffect(() => {
     loadProjects();
+  }, [loadProjects]);
+
+  // 监听项目变更，自动刷新列表
+  useEffect(() => {
+    const unsubscribe = ipcClient.onProjectChanged?.((payload) => {
+      console.log('[Dashboard] Project changed:', payload);
+      loadProjects();
+    });
+    return () => { unsubscribe?.(); };
   }, [loadProjects]);
 
   const typeStats = useMemo(() => {
@@ -73,22 +83,22 @@ export function Dashboard() {
     [projects],
   );
 
-  const handleNew = (type?: GeneratorType) => {
-    useModStore.setState({
-      description: '',
+  const handleCreateProject = async (data: { name: string; generatorType: string; loader: string; mcVersion: string; description: string }) => {
+    // 先保存项目到项目存储
+    const projectId = await saveCurrentAsProject(data.name.trim(), {
+      generatorType: data.generatorType as any,
+      loader: data.loader as any,
+      mcVersion: data.mcVersion as any,
+      description: data.description,
       spec: null,
       files: [],
-      selectedFile: null,
-      buildLog: '',
-      buildSuccess: null,
-      jarPath: null,
-      fixLog: [],
-      error: null,
-      loading: false,
-      generatorType: type ?? 'mod',
     });
-    setView('editor');
+    
+    // 保存成功后加载项目
+    await loadProject(projectId);
   };
+
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const handleImport = async () => {
     setImporting(true);
@@ -137,7 +147,7 @@ export function Dashboard() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => handleNew()} className="mc-btn-primary">
+          <button onClick={() => setShowCreateDialog(true)} className="mc-btn-primary">
             <McIcon scope="pixel" name="plus" size={16} /> {tCommon('new_project')}
           </button>
           <button onClick={handleImport} disabled={importing} className="mc-btn-ghost">
@@ -211,7 +221,7 @@ export function Dashboard() {
                       return (
                         <button
                           key={type}
-                          onClick={() => handleNew(type)}
+                          onClick={() => setShowCreateDialog(true)}
                           className="mc-card group relative flex min-h-[150px] flex-col items-center gap-2.5 p-5 transition-all hover:-translate-y-0.5 hover:border-mc-accent hover:shadow-[var(--mc-shadow-block)]"
                         >
                           {/* hover 顶部草绿高光线 */}
@@ -351,6 +361,12 @@ export function Dashboard() {
           </div>
         )}
       </main>
+    {showCreateDialog && (
+      <ProjectCreateDialog
+        onClose={() => setShowCreateDialog(false)}
+        onCreate={handleCreateProject}
+      />
+    )}
     </div>
   );
 }

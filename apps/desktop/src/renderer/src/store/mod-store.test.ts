@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ModSpec } from '@mc-creator/shared';
 import { useModStore } from './mod-store.js';
 
 // 在 import mod-store 之前注入 localStorage，让 persist 走真实 storage 路径
@@ -155,5 +156,136 @@ describe('mod-store', () => {
     const s = useModStore.getState();
     expect(s.openTabs).toEqual(['a.java', 'b.java']);
     expect(s.selectedFile).toBe('b.java');
+  });
+
+  it('updateItem 合并补丁且锁定 id（改 id 必须走 renameItemId）', () => {
+    const store = useModStore.getState();
+    store.setSpec(
+      ModSpec.parse({ modId: 't', name: 'T', items: [{ id: 'ruby', name: 'Ruby' }] }),
+    );
+    store.updateItem('ruby', { maxStackSize: 16, id: 'hacked' } as never);
+    const item = useModStore.getState().spec?.items[0];
+    expect(item?.maxStackSize).toBe(16);
+    expect(item?.id).toBe('ruby'); // id 未被补丁改写
+  });
+
+  it('updateItem 可设置/清空可选字段（food/tool/armor）', () => {
+    const store = useModStore.getState();
+    store.setSpec(
+      ModSpec.parse({ modId: 't', name: 'T', items: [{ id: 'apple', name: 'Apple' }] }),
+    );
+    store.updateItem('apple', {
+      food: { hunger: 5, saturation: 0.8, effects: [], canAlwaysEat: false },
+    });
+    expect(useModStore.getState().spec?.items[0].food?.hunger).toBe(5);
+    store.updateItem('apple', { food: undefined });
+    expect(useModStore.getState().spec?.items[0].food).toBeUndefined();
+  });
+
+  it('renameItemId 改 id 并同步配方 output/inputs 引用与 blocks.dropItem', () => {
+    const store = useModStore.getState();
+    store.setSpec(
+      ModSpec.parse({
+        modId: 't',
+        name: 'T',
+        items: [{ id: 'ruby', name: 'Ruby' }],
+        blocks: [{ id: 'ruby_block', name: 'RB', dropSelf: false, dropItem: 'ruby' }],
+        recipes: [
+          {
+            recipeId: 'r1',
+            recipeType: 'crafting_shaped',
+            inputs: [{ item: 'ruby', count: 1, slot: '' }],
+            output: 'ruby_block',
+            outputCount: 1,
+          },
+        ],
+      }),
+    );
+    store.renameItemId('ruby', 'ruby_gem');
+    const s = useModStore.getState();
+    expect(s.spec?.items[0].id).toBe('ruby_gem');
+    expect(s.spec?.recipes[0].inputs[0].item).toBe('ruby_gem');
+    expect(s.spec?.blocks[0].dropItem).toBe('ruby_gem');
+  });
+
+  it('renameItemId 目标已存在时拒绝改名（配方引用保持不动）', () => {
+    const store = useModStore.getState();
+    store.setSpec(
+      ModSpec.parse({
+        modId: 't',
+        name: 'T',
+        items: [
+          { id: 'a', name: 'A' },
+          { id: 'b', name: 'B' },
+        ],
+        recipes: [
+          {
+            recipeId: 'r1',
+            recipeType: 'crafting_shapeless',
+            inputs: [{ item: 'a', count: 1, slot: '' }],
+            output: 'b',
+            outputCount: 1,
+          },
+        ],
+      }),
+    );
+    store.renameItemId('a', 'b');
+    const s = useModStore.getState();
+    expect(s.spec?.items.map((i) => i.id)).toEqual(['a', 'b']);
+    expect(s.spec?.recipes[0].inputs[0].item).toBe('a');
+  });
+
+  it('addBlock/updateBlock/removeBlock 管理方块', () => {
+    const store = useModStore.getState();
+    store.setSpec(ModSpec.parse({ modId: 't', name: 'T' }));
+    store.addBlock({
+      id: 'ruby_block',
+      name: 'Ruby Block',
+      material: 'metal',
+      hardness: 5,
+      miningLevel: 2,
+      lightLevel: 0,
+      resistance: 30,
+      soundType: 'metal',
+      dropSelf: true,
+      dropItem: '',
+      stateProperties: [],
+      collisionShapes: [],
+      blockType: 'full_block',
+      transparent: false,
+      noCollision: false,
+    });
+    expect(useModStore.getState().spec?.blocks).toHaveLength(1);
+    store.updateBlock('ruby_block', { hardness: 8, friction: 0.9, toolRequired: true });
+    const b = useModStore.getState().spec?.blocks[0];
+    expect(b?.hardness).toBe(8);
+    expect(b?.friction).toBe(0.9);
+    expect(b?.toolRequired).toBe(true);
+    store.removeBlock('ruby_block');
+    expect(useModStore.getState().spec?.blocks).toEqual([]);
+  });
+
+  it('renameBlockId 改方块 id 并同步配方 output 引用', () => {
+    const store = useModStore.getState();
+    store.setSpec(
+      ModSpec.parse({
+        modId: 't',
+        name: 'T',
+        blocks: [{ id: 'old_block', name: 'Old' }],
+        recipes: [
+          {
+            recipeId: 'r1',
+            recipeType: 'crafting_shaped',
+            inputs: [{ item: 'minecraft:stone', count: 1, slot: '' }],
+            output: 'old_block',
+            outputCount: 1,
+          },
+        ],
+      }),
+    );
+    store.renameBlockId('old_block', 'new_block');
+    const s = useModStore.getState();
+    expect(s.spec?.blocks[0].id).toBe('new_block');
+    expect(s.spec?.recipes[0].output).toBe('new_block');
   });
 });

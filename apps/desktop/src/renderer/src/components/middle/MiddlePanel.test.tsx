@@ -6,6 +6,8 @@ import { ToastProvider } from '../ToastProvider.js';
 import { useModStore } from '../../store/mod-store.js';
 import { useSpecHistoryStore } from '../../store/spec-history-store.js';
 import { useEditorModeStore } from '../../store/editor-mode-store.js';
+import { useLayoutStore } from '../../shell/layout-store.js';
+import { initPanelRegistries } from '../../shell/index.js';
 
 /** 包 ToastProvider 渲染（purecode 模式渲染 PurecodeWorkspace，其保存依赖 useToast context） */
 function renderMiddlePanel(ui: React.ReactElement) {
@@ -58,6 +60,12 @@ vi.mock('../../lib/useRecentGraphs.js', () => ({
 let mcApiMock: Record<string, ReturnType<typeof vi.fn>>;
 
 beforeEach(() => {
+  // 初始化面板注册表（预览面板、shell 面板、domain 面板）
+  initPanelRegistries();
+
+  // 重置 layout-store 的 middleTab 到默认值
+  useLayoutStore.setState({ middleTab: 'preview' });
+
   // 重置 store
   useModStore.setState({
     loader: 'fabric',
@@ -216,7 +224,7 @@ describe('MiddlePanel', () => {
     expect(screen.getByText('切换到低代码视图')).toBeTruthy();
     expect(screen.getByText('切换到代码视图')).toBeTruthy();
     expect(screen.getByText('切换到资源视图')).toBeTruthy();
-    expect(screen.getByText('切换到 NBT 编辑器')).toBeTruthy();
+    expect(screen.getByText('切换到NBT视图')).toBeTruthy();
     expect(screen.getByText('快捷键帮助')).toBeTruthy();
   });
 

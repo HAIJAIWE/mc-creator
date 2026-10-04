@@ -52,7 +52,7 @@ export function registerMarketHandlers(): void {
 
   ipcMain.handle(SAVE_CURSEFORGE_CONFIG, async (_e, raw: unknown) => {
     const req = CurseForgeConfigSchema.parse(raw);
-    saveCurseForgeConfig(req);
+    await saveCurseForgeConfig(req);
     return { ok: true };
   });
 

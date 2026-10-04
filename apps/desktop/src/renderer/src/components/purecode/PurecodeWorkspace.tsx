@@ -492,7 +492,32 @@ export function PurecodeWorkspace({ readOnly = false }: PurecodeWorkspaceProps) 
   const handleSave = useCallback(async () => {
     if (!selectedFile) return;
     const content = fileContents[selectedFile.path] ?? '';
-    useModStore.getState().updateFileContent(selectedFile.path, content);
+    const result = await useModStore.getState().updateFileContent(selectedFile.path, content);
+    if (!result.success && result.conflict) {
+      const conflict = result.conflict;
+      toast.showConflictToast({
+        filePath: conflict.path,
+        serverMeta: conflict.serverMeta,
+        localMeta: conflict.localMeta,
+        onAcceptServer: async () => {
+          await useModStore.getState().forceWriteFile(conflict.path, conflict.serverMeta.hash);
+          toast.success('已接受服务器版本');
+        },
+        onKeepLocal: async () => {
+          await useModStore.getState().forceWriteFile(conflict.path, content);
+          toast.success('已保留本地版本');
+        },
+        onViewDiff: async () => {
+          const serverContent = await useModStore.getState().readServerFileContent(conflict.path);
+          if (serverContent !== null) {
+            useModStore.getState().openConflictDiff(conflict.path, serverContent, content);
+          } else {
+            toast.error('无法读取服务器版本内容');
+          }
+        },
+      });
+      return;
+    }
     const res = await ipcClient.saveFile({
       path: selectedFile.path,
       content,

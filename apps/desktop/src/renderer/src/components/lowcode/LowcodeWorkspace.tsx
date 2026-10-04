@@ -21,6 +21,9 @@ import { useModStore } from '../../store/mod-store.js';
 import { useDebuggerStore } from '../../store/debugger-store.js';
 import { specToNodeGraph } from '../../lib/specToNodeGraph.js';
 import { applyGraphToProject } from '../../lib/applyGraphToProject.js';
+import { compilePluginFiles } from './node-registry.js';
+import { loadPluginNodes } from './plugin-node-loader.js';
+import { useProjectStore } from '../../store/project-store.js';
 import { useToast } from '../useToast.js';
 
 /**
@@ -128,6 +131,26 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   const handleOnboardingRestart = useCallback(() => {
     setOnboardingStep(0);
   }, []);
+  // 插件节点：随项目切换加载 `nodes/*.js` + `mods/nodes/*.js`（沙箱求值，仅 mcApi 白名单）
+  const projectId = useProjectStore((s) => s.currentProjectId);
+  const [pluginErrors, setPluginErrors] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadPluginNodes({ projectId: projectId ?? undefined })
+      .then((res) => {
+        if (cancelled) return;
+        setPluginErrors(res.errors);
+        if (res.errors.length > 0) {
+          console.warn('[LowcodeWorkspace] 插件节点加载警告：\n' + res.errors.join('\n'));
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setPluginErrors([(e as Error).message]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
   /** 最近打开的节点图列表 + 刷新操作 */
   const { recent, refresh: refreshRecent } = useRecentGraphs();
   /** 屏幕阅读器动态通知（保存/加载/导入/导出状态） */
@@ -245,6 +268,7 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   );
 
   // 编译并应用节点图：compileNodeGraph → setSpec → 生成文件 → applyGeneratedFiles（保护手改）
+  // 插件节点：遍历注册表 toSpec 产出 FileNode[]，同样经 applyGeneratedFiles 合并
   const handleApply = useCallback(async () => {
     const graph = useNodeGraphStore.getState().graph;
     const result = await applyGraphToProject(graph, {
@@ -254,20 +278,26 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
       // 传当前 spec：画布无法表达的内容（模组元信息 / 数据包类内容）保留而不被删除
       baseSpec: useModStore.getState().spec,
     });
+    const plugin = await compilePluginFiles(graph);
+    const errors = [...result.errors, ...plugin.errors];
+    const warnings = [...result.warnings, ...plugin.warnings, ...pluginErrors];
     // 无论成败都把编译结果喂给错误高亮 / 编译徽章
-    setCompileResult({ spec: result.spec, warnings: result.warnings, errors: result.errors });
-    if (result.errors.length > 0) {
-      announce(`编译失败：${result.errors.length} 个错误，未应用到项目`);
+    setCompileResult({ spec: result.spec, warnings, errors });
+    if (errors.length > 0) {
+      announce(`编译失败：${errors.length} 个错误，未应用到项目`);
       return;
     }
     setSpec(result.spec);
     const preserved = useModStore.getState().applyGeneratedFiles(result.files);
+    const preservedPlugin =
+      plugin.files.length > 0 ? useModStore.getState().applyGeneratedFiles(plugin.files) : [];
+    const allPreserved = [...new Set([...preserved, ...preservedPlugin])];
     announce(
-      preserved.length > 0
-        ? `已应用节点图到项目；${preserved.length} 个手改文件已保留`
+      allPreserved.length > 0
+        ? `已应用节点图到项目；${allPreserved.length} 个手改文件已保留`
         : '已应用节点图到项目',
     );
-  }, [generatorType, loader, mcVersion, setSpec, setCompileResult, announce]);
+  }, [generatorType, loader, mcVersion, setSpec, setCompileResult, announce, pluginErrors]);
 
   /** 启动调试器：在编译错误节点设置断点并启动调试器 */
   const handleDebug = useCallback(async () => {

@@ -1,6 +1,7 @@
 import { app } from 'electron';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { writeFileAtomic } from '@mc-creator/shell';
 import { encryptSecret, decryptSecret } from './secret-storage.js';
 
 /**
@@ -32,9 +33,7 @@ export function loadCurseForgeConfig(): CurseForgeConfig {
   return { ...DEFAULT_CONFIG };
 }
 
-export function saveCurseForgeConfig(config: CurseForgeConfig): void {
-  const dir = app.getPath('userData');
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+export async function saveCurseForgeConfig(config: CurseForgeConfig): Promise<void> {
   const persisted = { ...config, apiKey: encryptSecret(config.apiKey) };
-  writeFileSync(configPath(), JSON.stringify(persisted, null, 2), 'utf-8');
+  await writeFileAtomic(configPath(), JSON.stringify(persisted, null, 2));
 }

@@ -15,6 +15,7 @@ import {
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
+  type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { NodeKind, EdgeKind, ModNode, ModEdge } from '@mc-creator/shared';
@@ -42,10 +43,38 @@ import { CANVAS_GRID_SIZE, snapPosition, snapDragEndPosition } from '../../lib/s
 
 // === 类型适配 ===
 
+/**
+ * 未知节点灰显占位：旧图/插件缺失导致 `type` 不在 `nodeTypes` 中时，
+ * 用灰色占位渲染，保证画布不崩（数据保留，可删可等插件加载）。
+ */
+function UnknownNodeFallback({ data }: NodeProps) {
+  const label =
+    data !== null && typeof data === 'object' && 'label' in data
+      ? String((data as Record<string, unknown>).label ?? '未知节点')
+      : '未知节点';
+  return (
+    <div
+      role="group"
+      aria-label={`${label}（未知节点类型，已灰显占位）`}
+      className="min-w-[180px] max-w-[280px] border-2 border-dashed border-gray-500 bg-mc-surface px-3 py-2 opacity-60"
+    >
+      <div className="text-[11px] font-medium text-gray-400">❔ {label}</div>
+      <div className="mt-0.5 text-[10px] text-mc-mute">未知节点类型（灰显占位，不参与编译）</div>
+    </div>
+  );
+}
+
+/** 已知节点类型集合（运行时判定，避免未知 type 让 React Flow 崩溃） */
+const KNOWN_NODE_TYPES = new Set(Object.keys(nodeTypes));
+
+/** 含 unknown 回退的 nodeTypes（未知 type 统一映射到灰显占位）。 */
+const flowNodeTypes = { ...nodeTypes, unknown: UnknownNodeFallback };
+
 function toFlowNode(n: ModNode): Node {
+  const type = KNOWN_NODE_TYPES.has(n.type as string) ? n.type : 'unknown';
   return {
     id: n.id,
-    type: n.type,
+    type,
     position: n.position,
     data: n.data,
     selected: n.selected,
@@ -435,7 +464,7 @@ export function NodeGraphEditor({
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
-        nodeTypes={nodeTypes}
+        nodeTypes={flowNodeTypes}
         edgeTypes={{ default: VerticalStepEdge }}
         onInit={(inst: ReactFlowInstance) => {
           rfInstanceRef.current = inst;

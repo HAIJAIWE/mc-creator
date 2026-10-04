@@ -18,13 +18,22 @@ export default defineConfig({
     },
   },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: workspacePkgs })],
+    plugins: [
+      externalizeDepsPlugin({
+        exclude: [...workspacePkgs, 'zod'],
+      }),
+    ],
     resolve: {
       alias: {
         '@mc-creator/shared': resolve(__dirname, '../../packages/shared/src'),
       },
     },
-    build: { rollupOptions: { input: { index: resolve(__dirname, 'src/preload/index.ts') } } },
+    build: {
+      rollupOptions: {
+        input: { index: resolve(__dirname, 'src/preload/index.ts') },
+        external: ['electron'],
+      },
+    },
   },
   renderer: {
     root: 'src/renderer',

@@ -6,6 +6,7 @@ vi.mock('../lib/ipc-client.js', () => ({
     getProject: vi.fn(),
     saveProject: vi.fn(),
     deleteProject: vi.fn(),
+    fileProjectEnsureDirs: vi.fn(),
   },
 }));
 
@@ -18,6 +19,7 @@ const mockIpc = ipcClient as unknown as {
   getProject: ReturnType<typeof vi.fn>;
   saveProject: ReturnType<typeof vi.fn>;
   deleteProject: ReturnType<typeof vi.fn>;
+  fileProjectEnsureDirs: ReturnType<typeof vi.fn>;
 };
 
 describe('project-store', () => {
@@ -36,7 +38,14 @@ describe('project-store', () => {
       generatorType: 'mod',
       spec: null,
       files: [],
+      previousFiles: [],
       selectedFile: null,
+      unimplemented: [],
+      buildStats: null,
+      openTabs: [],
+      splitFile: null,
+      dirtyFiles: new Set<string>(),
+      lastKnownMeta: {},
       buildLog: '',
       buildSuccess: null,
       jarPath: null,
@@ -48,6 +57,7 @@ describe('project-store', () => {
     mockIpc.getProject.mockReset();
     mockIpc.saveProject.mockReset();
     mockIpc.deleteProject.mockReset();
+    mockIpc.fileProjectEnsureDirs.mockReset();
   });
 
   it('loadProjects 从 ipcClient 读取并设置 projects', async () => {
@@ -137,6 +147,7 @@ describe('project-store', () => {
       updatedAt: '',
     };
     mockIpc.getProject.mockResolvedValue(fake);
+    mockIpc.fileProjectEnsureDirs.mockResolvedValue(undefined);
 
     await useProjectStore.getState().loadProject('p2');
 

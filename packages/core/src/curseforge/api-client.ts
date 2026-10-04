@@ -24,11 +24,17 @@ export interface CurseForgeFile {
   downloadUrl: string | null;
   gameVersions: string[];
   modLoaderNames: string[];
+  /** 文件哈希（API hashes；可能缺失） */
+  hashes?: Array<{ value: string; algo: number }>;
+  /** 依赖的 modId 列表（API dependencies；可能为空） */
+  dependencies?: number[];
 }
 
 export class CurseForgeApiClient {
   private readonly baseUrl = 'https://api.curseforge.com/v1';
   private readonly apiKey: string;
+  /** 单次请求超时（毫秒，与 Modrinth 客户端对齐） */
+  private readonly timeoutMs = 10_000;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -51,6 +57,42 @@ export class CurseForgeApiClient {
     }
   }
 
+  /** 4xx（非限流）等不应重试的 API 错误标记 */
+  private static readonly NonRetryableError = class NonRetryableError extends Error {};
+
+  /**
+   * 带超时 + 重试的 fetch（网络错误 / 5xx / 429 重试，最多 2 次；4xx 直接抛错）。
+   * 与 ModrinthApiClient.fetchJson 同形，注意：4xx 错误用 NonRetryableError 包装并立刻抛出，
+   * 避免被外层 catch 捕获后误判为可重试。
+   */
+  private async fetchJson<T>(url: string): Promise<T> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= 2; attempt++) {
+      try {
+        const res = await fetch(url, {
+          headers: { 'x-api-key': this.apiKey },
+          signal: AbortSignal.timeout(this.timeoutMs),
+        });
+        if (res.ok) return (await res.json()) as T;
+        if (res.status < 500 && res.status !== 429) {
+          throw new CurseForgeApiClient.NonRetryableError(
+            `CurseForge API ${res.status} ${res.statusText}: ${url}`,
+          );
+        }
+        lastErr = new Error(`CurseForge API ${res.status} ${res.statusText}: ${url}`);
+      } catch (err) {
+        if (err instanceof CurseForgeApiClient.NonRetryableError) throw err; // 4xx 直接抛错，不重试
+        if (err instanceof Error && err.name === 'AbortError') {
+          lastErr = new Error(`CurseForge API 请求超时（${this.timeoutMs}ms）: ${url}`);
+        } else {
+          lastErr = err;
+        }
+      }
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+    }
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  }
+
   /**
    * 搜索 CurseForge 项目。
    * gameId=432 是 Minecraft；modLoaderType 数字见 loaderToType。
@@ -70,11 +112,7 @@ export class CurseForgeApiClient {
     params.set('pageSize', String(opts.limit ?? 20));
 
     const url = `${this.baseUrl}/mods/search?${params.toString()}`;
-    const res = await fetch(url, { headers: { 'x-api-key': this.apiKey } });
-    if (!res.ok) {
-      throw new Error(`CurseForge search failed: ${res.status} ${res.statusText}`);
-    }
-    const data = (await res.json()) as {
+    const data = await this.fetchJson<{
       data: Array<{
         id: number;
         name: string;
@@ -83,7 +121,7 @@ export class CurseForgeApiClient {
         downloadCount: number;
         categories: Array<{ name: string }>;
       }>;
-    };
+    }>(url);
     return data.data.map((d) => ({
       id: d.id,
       name: d.name,
@@ -110,11 +148,7 @@ export class CurseForgeApiClient {
     params.set('pageSize', '20');
 
     const url = `${this.baseUrl}/mods/${modId}/files?${params.toString()}`;
-    const res = await fetch(url, { headers: { 'x-api-key': this.apiKey } });
-    if (!res.ok) {
-      throw new Error(`CurseForge getFiles failed: ${res.status} ${res.statusText}`);
-    }
-    const data = (await res.json()) as {
+    const data = await this.fetchJson<{
       data: Array<{
         id: number;
         displayName: string;
@@ -123,8 +157,10 @@ export class CurseForgeApiClient {
         downloadUrl: string | null;
         gameVersions: string[];
         modLoaders: Array<{ name: string }>;
+        hashes?: Array<{ value: string; algo: number }>;
+        dependencies?: Array<{ modId: number }>;
       }>;
-    };
+    }>(url);
     return data.data.map((f) => ({
       id: f.id,
       displayName: f.displayName,
@@ -133,6 +169,8 @@ export class CurseForgeApiClient {
       downloadUrl: f.downloadUrl,
       gameVersions: f.gameVersions,
       modLoaderNames: f.modLoaders.map((m) => m.name),
+      ...(f.hashes ? { hashes: f.hashes } : {}),
+      ...(f.dependencies ? { dependencies: f.dependencies.map((d) => d.modId) } : {}),
     }));
   }
 }

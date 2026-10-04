@@ -293,12 +293,16 @@ export class Orchestrator {
   }
 
   /** 按 generatorType 生成对应 Spec（P16：优化 prompt，按类型注入 schema 约束） */
-  async generateSpecByType(description: string, generatorType: SpecType): Promise<unknown> {
+  async generateSpecByType(
+    description: string,
+    generatorType: SpecType,
+    extraContext?: string,
+  ): Promise<unknown> {
     const config = SPEC_CONFIGS[generatorType];
     if (!config) throw new Error(`不支持的生成器类型：${generatorType}`);
     let lastError = '';
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      const prompt = this.buildTypedPrompt(description, config.prompt, lastError);
+      const prompt = this.buildTypedPrompt(description, config.prompt, lastError, extraContext);
       const raw = await this.provider.complete(prompt);
       const parsed = this.tryParse(raw);
       if (parsed.ok) {
@@ -319,13 +323,19 @@ export class Orchestrator {
     return err ? `${base}\n上次错误：${err}\n请修正。` : base;
   }
 
-  private buildTypedPrompt(desc: string, schemaPrompt: string, err: string): string {
+  private buildTypedPrompt(
+    desc: string,
+    schemaPrompt: string,
+    err: string,
+    extraContext?: string,
+  ): string {
     const base = `${schemaPrompt}
 
 用户描述：${desc}
 
 只输出合法 JSON，不要 markdown 代码块，不要解释。`;
-    return err ? `${base}\n\n上次错误：${err}\n请修正后重新输出完整 JSON。` : base;
+    const withRag = extraContext ? `${base}\n\n${extraContext}` : base;
+    return err ? `${withRag}\n\n上次错误：${err}\n请修正后重新输出完整 JSON。` : withRag;
   }
 
   private tryParse(raw: string): { ok: true; value: unknown } | { ok: false; error: string } {

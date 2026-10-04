@@ -8,17 +8,27 @@ import { useModStore } from '../store/mod-store.js';
  * 文件操作走真实 useModStore；run_command 需 mock terminal IPC。
  */
 
-vi.mock('./ipc-client.js', () => ({
-  ipcClient: {
-    terminalSpawn: vi.fn(),
-    terminalWrite: vi.fn(),
-    terminalKill: vi.fn(),
-  },
-}));
+// 只替换终端相关方法；generateFiles 保留真实实现——openai 工具测试需要真实的
+// 生成结果，而真实 generateFiles 走主进程 IPC，jsdom 下不可用，
+// 故在 resetStore 中打开 __MC_PREVIEW__ 走 ipc-client 的进程内回退分支。
+vi.mock('./ipc-client.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./ipc-client.js')>();
+  return {
+    ipcClient: {
+      ...actual.ipcClient,
+      terminalSpawn: vi.fn(),
+      terminalWrite: vi.fn(),
+      terminalKill: vi.fn(),
+      ragSearch: vi.fn(),
+    },
+  };
+});
 
 import { ipcClient } from './ipc-client.js';
 
 function resetStore() {
+  // 预览模式：让 ipcClient.generateFiles 在进程内跑 core 生成器（无需 Electron 主进程）
+  (window as unknown as { __MC_PREVIEW__?: boolean }).__MC_PREVIEW__ = true;
   useModStore.setState({
     loader: 'fabric',
     mcVersion: '1.21.11',
@@ -50,8 +60,9 @@ function resetStore() {
 }
 
 describe('agent-tools 注册表', () => {
-  it('注册 12 个工具', () => {
-    expect(agentTools).toHaveLength(12);
+  it('注册 13 个工具（含 search_knowledge）', () => {
+    expect(agentTools).toHaveLength(13);
+    expect(findTool('search_knowledge')).toBeDefined();
   });
 
   it('findTool 按名查找', () => {
@@ -62,7 +73,7 @@ describe('agent-tools 注册表', () => {
 
   it('toolsToFunctionDefinitions 生成 OpenAI 兼容定义', () => {
     const defs = toolsToFunctionDefinitions();
-    expect(defs.length).toBe(12);
+    expect(defs.length).toBe(13);
     const readFile = defs.find((d) => d.function.name === 'read_file')!;
     expect(readFile.type).toBe('function');
     expect(readFile.function.parameters.type).toBe('object');
@@ -154,6 +165,36 @@ describe('search_code', () => {
     const tool = findTool('search_code')!;
     const result = await tool.execute({ query: 'say', file_pattern: '.json' });
     expect(result).toContain('没有找到');
+  });
+});
+
+describe('search_knowledge', () => {
+  beforeEach(resetStore);
+
+  it('命中时返回标题+片段+来源', async () => {
+    vi.mocked(ipcClient.ragSearch).mockResolvedValue({
+      hits: [{ title: '自定义附魔 enchantment', snippet: 'supported_items 片段', source: 'Minecraft Wiki', score: 3.1 }],
+      cached: false,
+    });
+    const tool = findTool('search_knowledge')!;
+    const result = await tool.execute({ query: '附魔', generator_type: 'datapack' });
+    expect(result).toContain('自定义附魔');
+    expect(result).toContain('来源');
+    expect(ipcClient.ragSearch).toHaveBeenCalledWith({ query: '附魔', generatorType: 'datapack', topK: 5 });
+  });
+
+  it('零命中时提示换关键词', async () => {
+    vi.mocked(ipcClient.ragSearch).mockResolvedValue({ hits: [], cached: true });
+    const tool = findTool('search_knowledge')!;
+    const result = await tool.execute({ query: '不存在的内容xyz' });
+    expect(result).toContain('没有命中');
+  });
+
+  it('IPC 不可用时回退不断链', async () => {
+    vi.mocked(ipcClient.ragSearch).mockRejectedValue(new Error('no ipc'));
+    const tool = findTool('search_knowledge')!;
+    const result = await tool.execute({ query: '附魔' });
+    expect(result).toContain('暂不可用');
   });
 });
 
@@ -353,7 +394,7 @@ describe('generate_mod', () => {
     const result = await tool.execute({
       spec_json: JSON.stringify({ modId: 'bad id!', version: '1.0.0', name: '', description: '' }),
     });
-    expect(result).toContain('ModSpec 校验失败');
+    expect(result).toContain('Spec 校验失败');
   });
 });
 

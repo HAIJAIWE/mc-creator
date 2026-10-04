@@ -83,6 +83,18 @@ declare module 'skinview3d' {
     /** 渲染目标 canvas */
     readonly canvas: HTMLCanvasElement;
 
+    /** Three.js 场景（官方公开，用于射线拾取） */
+    readonly scene: import('three').Scene;
+
+    /** Three.js 相机（官方公开，用于射线拾取） */
+    readonly camera: import('three').PerspectiveCamera;
+
+    /** OrbitControls 控制器（官方公开；绘制模式下可禁用左键旋转） */
+    readonly controls: import('three/examples/jsm/controls/OrbitControls.js').OrbitControls;
+
+    /** 玩家对象（官方公开，用于部位显隐与拾取路由） */
+    readonly playerObject: SkinPlayerObject;
+
     /** 是否沿 y 轴自动旋转，默认 false */
     autoRotate: boolean;
     /** 自动旋转角速度（rad/s），默认 1.0 */
@@ -120,5 +132,32 @@ declare module 'skinview3d' {
 
     /** 释放资源 */
     dispose(): void;
+  }
+
+  /** 身体部位（对应真实类型 skinview3d.BodyPart，inner=底层/outer=表层） */
+  export interface SkinBodyPart {
+    readonly innerLayer: import('three').Object3D;
+    readonly outerLayer: import('three').Object3D;
+  }
+
+  /** 皮肤对象（对应真实类型 skinview3d.SkinObject 的公开子集） */
+  export interface SkinSkinObject {
+    readonly head: SkinBodyPart;
+    readonly body: SkinBodyPart;
+    readonly rightArm: SkinBodyPart;
+    readonly leftArm: SkinBodyPart;
+    readonly rightLeg: SkinBodyPart;
+    readonly leftLeg: SkinBodyPart;
+  }
+
+  /** 披风对象（对应真实类型 skinview3d.CapeObject 的公开子集） */
+  export interface SkinCapeObject {
+    readonly cape: import('three').Object3D;
+  }
+
+  /** 玩家对象（对应真实类型 skinview3d.PlayerObject 的公开子集） */
+  export interface SkinPlayerObject {
+    readonly skin: SkinSkinObject;
+    readonly cape: SkinCapeObject;
   }
 }

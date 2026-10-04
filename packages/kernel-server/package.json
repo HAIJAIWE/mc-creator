@@ -1,0 +1,26 @@
+{
+  "name": "@mc-creator/kernel-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MC 全链路 AI 工作台 · 服务端内核（长期托管进程，§7）。实现 KernelContract；外壳只依赖 @mc-creator/contract，不 import 内核实现（§2.2）。",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@mc-creator/contract": "workspace:*",
+    "@mc-creator/devkit": "workspace:*",
+    "@mc-creator/shell": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  }
+}

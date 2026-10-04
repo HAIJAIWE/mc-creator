@@ -26,13 +26,7 @@ import {
 import type { ModelProfile } from '../../../shared/ipc-channels.js';
 import { getLocale, setLocale, getAvailableLocales, getLocaleDisplayName } from '../i18n';
 import { useTranslation } from '../hooks/useTranslation.js';
-
-interface SettingsPanelProps {
-  leftWidth: number;
-  rightWidth: number;
-  onLeftWidthChange: (width: number) => void;
-  onRightWidthChange: (width: number) => void;
-}
+import { useLayoutStore, selectLeftWidth, selectRightWidth, selectSetLeftWidth, selectSetRightWidth } from '../shell/layout-store.js';
 
 interface Preset {
   name: string;
@@ -132,12 +126,11 @@ const LAYOUT_PRESETS = [
 
 type Tab = 'model' | 'curseforge' | 'appearance';
 
-export function SettingsPanel({
-  leftWidth,
-  rightWidth,
-  onLeftWidthChange,
-  onRightWidthChange,
-}: SettingsPanelProps) {
+export function SettingsPanel() {
+  const leftWidth = useLayoutStore(selectLeftWidth);
+  const rightWidth = useLayoutStore(selectRightWidth);
+  const setLeftWidth = useLayoutStore(selectSetLeftWidth);
+  const setRightWidth = useLayoutStore(selectSetRightWidth);
   const [activeTab, setActiveTab] = useState<Tab>('model');
   const { t, tCommon } = useTranslation();
 
@@ -324,8 +317,8 @@ export function SettingsPanel({
   };
 
   const applyLayoutPreset = (preset: (typeof LAYOUT_PRESETS)[0]) => {
-    onLeftWidthChange(preset.left);
-    onRightWidthChange(preset.right);
+    setLeftWidth(preset.left);
+    setRightWidth(preset.right);
   };
 
   const setTheme = (id: string) => {
@@ -615,7 +608,7 @@ export function SettingsPanel({
                     min="0"
                     max="400"
                     value={leftWidth}
-                    onChange={(e) => onLeftWidthChange(parseInt(e.target.value))}
+                    onChange={(e) => setLeftWidth(parseInt(e.target.value))}
                     className="w-full h-2 rounded-full bg-mc-surface-3 appearance-none cursor-pointer"
                   />
                 </div>
@@ -629,7 +622,7 @@ export function SettingsPanel({
                     min="0"
                     max="560"
                     value={rightWidth}
-                    onChange={(e) => onRightWidthChange(parseInt(e.target.value))}
+                    onChange={(e) => setRightWidth(parseInt(e.target.value))}
                     className="w-full h-2 rounded-full bg-mc-surface-3 appearance-none cursor-pointer"
                   />
                 </div>

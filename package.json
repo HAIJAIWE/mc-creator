@@ -48,6 +48,7 @@
     "@commitlint/config-conventional": "^19.0.0",
     "@eslint/js": "^9.0.0",
     "@types/node": "^26.6.2",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react-swc": "^4.3.3",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.0.0",
@@ -65,5 +66,8 @@
     "patchedDependencies": {
       "unicorn-magic@0.3.0": "patches/unicorn-magic@0.3.0.patch"
     }
+  },
+  "dependencies": {
+    "three": "^0.186.1"
   }
 }

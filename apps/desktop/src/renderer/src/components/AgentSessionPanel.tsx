@@ -19,6 +19,8 @@ import {
   type AgentToolCall,
 } from '../lib/agent-runtime.js';
 import { findTool } from '../lib/agent-tools.js';
+import { RagSources } from './RagSources.js';
+import { useModStore } from '../store/mod-store.js';
 
 /** 工具调用卡片 */
 function ToolCallCard({
@@ -191,6 +193,10 @@ export function AgentSessionPanel() {
   const [autoApprove, setAutoApprove] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const generatorType = useModStore((s) => s.generatorType);
+
+  // 会话级 RAG 引用：取最近一条用户消息作 query（key 变化时 RagSources 重新挂载）
+  const lastUserQuery = [...state.messages].reverse().find((m) => m.role === 'user')?.content ?? '';
 
   // 订阅 Agent 状态变更
   useEffect(() => {
@@ -315,6 +321,12 @@ export function AgentSessionPanel() {
 
       {/* 输入框 */}
       <div className="border-t border-mc-border px-3 py-2">
+        {/* 会话级引用来源（按最近用户消息检索，折叠展示，可点击跳转） */}
+        {lastUserQuery && (
+          <div className="mb-1.5" key={lastUserQuery}>
+            <RagSources query={lastUserQuery} generatorType={generatorType} />
+          </div>
+        )}
         <div className="flex gap-2">
           <textarea
             ref={inputRef}

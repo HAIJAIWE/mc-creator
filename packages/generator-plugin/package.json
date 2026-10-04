@@ -1,0 +1,26 @@
+{
+  "name": "@mc-creator/generator-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MC 全链路 AI 工作台 · Paper 插件生成器（生成阶梯 P1 甜点区）。设计文档 §7.3 插件清单双格式 / §10.3 Paper 成功判据 / §10.4 Paper API 上下文注入 / §11 生成阶梯。",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@mc-creator/contract": "workspace:*",
+    "@mc-creator/shared": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  }
+}

@@ -29,12 +29,16 @@ import { CollaborationPanel } from './CollaborationPanel.js';
 import { ModelComparePanel } from './ModelComparePanel.js';
 import { SpecFormEditor } from './SpecFormEditor.js';
 import { AgentSessionPanel } from './AgentSessionPanel.js';
+import { RagSourcesList } from './RagSources.js';
+import type { RagHitT } from '../../../shared/ipc-channels.js';
 import { defineMcMonacoTheme, mcEditorOptions, MC_MONACO_THEME } from '../lib/monaco-theme.js';
 import { useTranslation } from '../hooks/useTranslation.js';
 
 interface Msg {
   role: 'user' | 'assistant';
   text: string;
+  /** RAG 引用来源（assistant 消息在流式结束后回填） */
+  sources?: RagHitT[];
 }
 
 export function AgentPanel() {
@@ -250,20 +254,52 @@ export function AgentPanel() {
     }
 
     try {
-      await ipcClient.chatStream(text, (delta, done) => {
-        setMessages((m) => {
-          const next = [...m];
-          const last = next[next.length - 1];
-          if (last.role === 'assistant') {
-            next[next.length - 1] = { role: 'assistant', text: last.text + delta };
-          }
-          return next;
-        });
-        if (done) {
-          setSending(false);
-          bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // RAG：与流式问答并行检索引用来源，结束时回填到助手消息上展示
+      const srcPromise: Promise<RagHitT[]> = (async () => {
+        try {
+          const r = await ipcClient.ragSearch({ query: text, generatorType, topK: 5 });
+          return r.hits;
+        } catch {
+          return [];
         }
-      });
+      })();
+      // P12：把项目上下文传给主进程（拼 system message + 按 generatorType 过滤 RAG）
+      const context: { generatorType?: string; description?: string; specSummary?: string } = {};
+      if (generatorType) context.generatorType = generatorType;
+      if (description.trim()) context.description = description.trim().slice(0, 500);
+      if (spec) {
+        const summary = JSON.stringify(spec).slice(0, 600);
+        if (summary) context.specSummary = summary;
+      }
+      await ipcClient.chatStream(
+        text,
+        async (delta, done) => {
+          setMessages((m) => {
+            const next = [...m];
+            const last = next[next.length - 1];
+            if (last.role === 'assistant') {
+              next[next.length - 1] = { role: 'assistant', text: last.text + delta };
+            }
+            return next;
+          });
+          if (done) {
+            const sources = await srcPromise;
+            if (sources.length > 0) {
+              setMessages((m) => {
+                const next = [...m];
+                const last = next[next.length - 1];
+                if (last.role === 'assistant') {
+                  next[next.length - 1] = { ...last, sources };
+                }
+                return next;
+              });
+            }
+            setSending(false);
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }
+        },
+        context,
+      );
     } catch (e) {
       setMessages((m) => {
         const next = [...m];
@@ -543,6 +579,9 @@ export function AgentPanel() {
                       }`}
                     >
                       <div className="whitespace-pre-wrap text-mc-text">{m.text}</div>
+                      {m.role === 'assistant' &&
+                        m.sources &&
+                        m.sources.length > 0 && <RagSourcesList hits={m.sources} />}
                       {m.role === 'assistant' &&
                         sending &&
                         i === messages.length - 1 &&

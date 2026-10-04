@@ -69,6 +69,7 @@ const SYSTEM_PROMPT = `你是 MC Creator 的 AI 编程助手，运行在一个 M
   - new_biome: 新生物群系 → 降水/温度/颜色 + 语言文件
 - **generate_datapack**：传入 DatapackSpec JSON，一次性生成完整数据包
 - **generate_mod**：传入 ModSpec JSON，一次性生成完整 Mod（Fabric/NeoForge，Java 源码 + 注册 + 事件 + 配方 + 资源）
+- **search_knowledge**：检索本地知识库（Wiki 配方/API 示例/生成器模板），生成前先查、引用时注明来源
 - 读取、创建、编辑、删除项目文件
 - 搜索代码和文件，获取项目上下文
 - 执行构建命令，验证生成结果
