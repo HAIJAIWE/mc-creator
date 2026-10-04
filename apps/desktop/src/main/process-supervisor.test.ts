@@ -28,9 +28,17 @@ import {
   DEFAULT_GRACEFUL_MS,
   DEFAULT_PORT_WAIT_MS,
   DEFAULT_PORT_PROBE_TIMEOUT_MS,
+  DEFAULT_RESTART_DELAY_MS,
+  DEFAULT_MAX_RESTART_DELAY_MS,
+  DEFAULT_MAX_AUTO_RESTARTS,
+  type AutoRestartExhaustedEvent,
+  type AutoRestartScheduledEvent,
+  type ConfirmFn,
   type LogEvent,
   type ProcessSupervisor,
   type ProcessSupervisorOptions,
+  type ScheduleFn,
+  type SendOutcome,
   type ServerState,
   type SpawnFn,
   type StatusSnapshot,
@@ -83,6 +91,28 @@ process.exitCode = 3;
 const FAKE_QUIET_EXIT = `
 process.stdout.write('restarting myself\\n');
 process.exitCode = 0;
+`;
+
+/**
+ * 首次启动崩溃、第二次启动正常存活（测自动重启的**真实进程**集成路径）。
+ * marker 文件当"已经崩过一次"的证据：它是跨进程状态，第二次跑就会走存活分支。
+ */
+const FAKE_CRASH_ONCE = `
+const fs = require('fs');
+const marker = process.argv[2];
+if (!fs.existsSync(marker)) {
+  fs.writeFileSync(marker, '1');
+  process.stdout.write('first boot\\n');
+  process.stderr.write('error: first boot fails\\n');
+  process.exitCode = 4;
+} else {
+  process.stdout.write('second boot ok\\n');
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (c) => {
+    if (c.includes('stop')) { clearInterval(timer); process.stdin.destroy(); process.exitCode = 0; }
+  });
+  const timer = setInterval(() => {}, 1000);
+}
 `;
 
 /** 无视停机：读 stdin 只回声、永不退出（测强杀兜底）。 */
@@ -1816,5 +1846,707 @@ describe('资源清理（shutdownAll 真的结束所有子进程）', () => {
     await svc.shutdownAll();
     expect(svc.logs('s1').length).toBeGreaterThan(0);
     await handle.exited;
+  });
+});
+
+// =========================================================================
+// 10. 崩溃自动重启（§7.1）
+//
+// 时序纪律：退避定时器全部走**手动推进的虚拟时钟**，绝不用真实 sleep 硬等。
+// 为什么不能沿用上面第 2 节那个 fakeClock：它的 runAll 只触发「零延迟」定时器
+// （虚拟 now 恒为 0），测不了「等 1 秒再重启」这种真实语义；另起一个能按虚拟时间推进的。
+// =========================================================================
+
+interface ManualClock {
+  schedule: ScheduleFn;
+  scheduleHold: ScheduleFn;
+  /** 推进虚拟时间 ms，按到期顺序依次触发回调（同刻到期的按注册顺序）。 */
+  advance: (ms: number) => void;
+  /** 最近的挂起定时器距今多少毫秒；无挂起返回 null。 */
+  pendingMs: () => number | null;
+}
+
+function manualSchedule(): ManualClock {
+  let now = 0;
+  let seq = 0;
+  const timers: Array<{ fn: () => void; at: number; seq: number }> = [];
+  const schedule: ScheduleFn = (fn, ms) => {
+    const t = { fn, at: now + Math.max(0, ms), seq: seq++ };
+    timers.push(t);
+    return {
+      cancel: () => {
+        const i = timers.indexOf(t);
+        if (i !== -1) timers.splice(i, 1);
+      },
+    };
+  };
+  return {
+    schedule,
+    scheduleHold: schedule,
+    advance: (ms: number) => {
+      const target = now + ms;
+      for (;;) {
+        const due = timers
+          .filter((t) => t.at <= target)
+          .sort((a, b) => (a.at === b.at ? a.seq - b.seq : a.at - b.at));
+        const t = due[0];
+        if (t === undefined) break;
+        timers.splice(timers.indexOf(t), 1);
+        now = t.at;
+        t.fn();
+      }
+      now = target;
+    },
+    pendingMs: () => (timers.length === 0 ? null : Math.min(...timers.map((t) => t.at)) - now),
+  };
+}
+
+/**
+ * 可控假子进程：stdin 写入全部记录，退出由测试显式 die() 触发。
+ * 为什么不用真进程：自动重启的核心是「退避 + 计数 + 确认闸门」的纯逻辑，
+ * 确定性要求「什么时候崩由测试说了算」，真进程的崩溃时机不受控。
+ * kill() 直接 die：模拟 Windows 上 child.kill('SIGTERM') 就是 TerminateProcess（秒死）。
+ */
+class ControllableChild extends EventEmitter {
+  readonly pid: number;
+  readonly stdout = new PassThrough();
+  readonly stderr = new PassThrough();
+  readonly stdin = new PassThrough();
+  readonly stdinWrites: string[] = [];
+  readonly signals: Array<NodeJS.Signals | number> = [];
+  private dead = false;
+
+  constructor(pid: number) {
+    super();
+    this.pid = pid;
+    // stdin 假装可写并记录每次写入（断言「到底有没有写进控制台」）
+    Object.defineProperty(this.stdin, 'writable', { value: true, configurable: true });
+    const origWrite = this.stdin.write.bind(this.stdin);
+    this.stdin.write = ((chunk: unknown, ...rest: unknown[]): boolean => {
+      this.stdinWrites.push(String(chunk));
+      return origWrite(chunk as never, ...(rest as []));
+    }) as PassThrough['write'];
+  }
+
+  kill(signal?: NodeJS.Signals | number): boolean {
+    this.signals.push(signal ?? 'SIGTERM');
+    this.die(0);
+    return true;
+  }
+
+  /** 模拟进程退出（崩溃传非 0；收到信号传 0）。 */
+  die(code: number | null): void {
+    if (this.dead) return;
+    this.dead = true;
+    this.emit('exit', code, null);
+    this.emit('close', code, null);
+  }
+}
+
+interface CrashHarness {
+  svc: ProcessSupervisor;
+  clock: ManualClock;
+  /** 第 n 个假子进程 = 第 n 次 spawn 的产物。 */
+  children: ControllableChild[];
+  spawnSpy: ReturnType<typeof vi.fn>;
+  /** 自动重启相关事件（创建时就挂好监听，免得错过）。 */
+  events: {
+    /** 每次计划重启的退避时长（1 起）。 */
+    delays: number[];
+    exhausted: AutoRestartExhaustedEvent[];
+    rejected: number[];
+  };
+}
+
+function makeCrashHarness(opts: ProcessSupervisorOptions = {}): CrashHarness {
+  const clock = manualSchedule();
+  const children: ControllableChild[] = [];
+  const spawnSpy = vi.fn(() => {
+    const c = new ControllableChild(70_000 + children.length);
+    children.push(c);
+    return c as unknown as ChildProcess;
+  });
+  const svc = makeService({
+    spawn: spawnSpy as unknown as SpawnFn,
+    schedule: clock.schedule,
+    scheduleHold: clock.scheduleHold,
+    ...opts,
+  });
+  const events: CrashHarness['events'] = { delays: [], exhausted: [], rejected: [] };
+  svc.on('auto-restart-scheduled', (e: AutoRestartScheduledEvent) => {
+    events.delays.push(e.delayMs);
+  });
+  svc.on('auto-restart-exhausted', (e: AutoRestartExhaustedEvent) => {
+    events.exhausted.push(e);
+  });
+  svc.on('auto-restart-rejected', (e: { attempt: number }) => {
+    events.rejected.push(e.attempt);
+  });
+  return { svc, clock, children, spawnSpy, events };
+}
+
+/** 构造一个「先放行第一次确认、之后一律拒绝」的 confirm（模拟用户取消弹窗）。 */
+function confirmOnceOnly(): ConfirmFn {
+  let n = 0;
+  return () => {
+    n += 1;
+    return n === 1;
+  };
+}
+
+describe('崩溃自动重启（§7.1 指数退避；默认关闭 + 每次重启都过确认闸门）', () => {
+  it('默认常量：首次退避 1000ms、封顶 30000ms、连续崩溃上限 5 次', () => {
+    expect(DEFAULT_RESTART_DELAY_MS).toBe(1_000);
+    expect(DEFAULT_MAX_RESTART_DELAY_MS).toBe(30_000);
+    expect(DEFAULT_MAX_AUTO_RESTARTS).toBe(5);
+  });
+
+  it('默认关闭：崩溃只落 crashed，连「打算重启」都不排', async () => {
+    const { svc, spawnSpy, children, clock, events } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: ['-jar', 'a.jar'] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(120_000);
+
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    expect(events.delays).toEqual([]);
+    expect(svc.status('s1')?.autoRestartEnabled).toBe(false);
+    expect(svc.status('s1')?.autoRestartPending).toBe(false);
+    expect(svc.status('s1')?.state).toBe('crashed');
+  });
+
+  it('开启 + 确认通过 → 退避到点后自动拉起', async () => {
+    const { svc, spawnSpy, children, clock, events } = makeCrashHarness({ autoRestart: true });
+    svc.launch({ serverId: 's1', cmd: 'java', args: ['-jar', 'a.jar'] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+
+    // 退避没到点就不许重启（这就是退避的全部意义）
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    expect(clock.pendingMs()).toBe(1_000);
+    clock.advance(999);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+
+    clock.advance(1);
+    expect(spawnSpy).toHaveBeenCalledTimes(2);
+    await waitForState(svc, 's1', (s) => s === 'running');
+    expect(events.delays).toEqual([1_000]);
+  });
+
+  it('退避序列按 2 的幂递增：1s / 2s / 4s', async () => {
+    const { svc, children, clock, events } = makeCrashHarness({ autoRestart: true });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    for (let i = 0; i < 3; i += 1) {
+      children[i].die(1);
+      await waitForState(svc, 's1', (s) => s === 'crashed');
+      clock.advance(60_000);
+      await waitForState(svc, 's1', (s) => s === 'running');
+    }
+    expect(events.delays).toEqual([1_000, 2_000, 4_000]);
+  });
+
+  it('退避封顶：restartDelayMs=10000 且封顶 30000 → 10000/20000/30000/30000', async () => {
+    const { svc, children, clock, events } = makeCrashHarness({
+      autoRestart: true,
+      restartDelayMs: 10_000,
+      maxRestartDelayMs: 30_000,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    for (let i = 0; i < 4; i += 1) {
+      children[i].die(1);
+      await waitForState(svc, 's1', (s) => s === 'crashed');
+      clock.advance(60_000);
+      await waitForState(svc, 's1', (s) => s === 'running');
+    }
+    expect(events.delays).toEqual([10_000, 20_000, 30_000, 30_000]);
+  });
+
+  it('maxAutoRestarts=0 → 显式关闭自动重启，一次都不排', async () => {
+    const { svc, spawnSpy, children, clock, events } = makeCrashHarness({
+      autoRestart: true,
+      maxAutoRestarts: 0,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(120_000);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    expect(events.delays).toEqual([]);
+  });
+
+  it('连续崩溃达上限 → 停止重启并 emit auto-restart-exhausted（只发一次）', async () => {
+    const { svc, spawnSpy, children, clock, events } = makeCrashHarness({
+      autoRestart: true,
+      maxAutoRestarts: 2,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    // 第 1、2 次崩溃各重启一次；第 3 次崩溃达上限放弃
+    for (let i = 0; i < 2; i += 1) {
+      children[i].die(1);
+      await waitForState(svc, 's1', (s) => s === 'crashed');
+      clock.advance(60_000);
+      await waitForState(svc, 's1', (s) => s === 'running');
+    }
+    children[2].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(120_000);
+
+    // 初始 1 次 + 2 次自动重启 = 3 次 spawn；第 3 次崩溃后再无第 4 次
+    expect(spawnSpy).toHaveBeenCalledTimes(3);
+    expect(events.exhausted).toHaveLength(1);
+    expect(events.exhausted[0]).toMatchObject({
+      serverId: 's1',
+      crashCount: 3,
+      attempts: 2,
+      maxAutoRestarts: 2,
+    });
+    expect(svc.status('s1')?.state).toBe('crashed');
+    expect(svc.status('s1')?.autoRestartExhausted).toBe(true);
+    // 达上限后不再排任何退避定时器
+    expect(clock.pendingMs()).toBeNull();
+  });
+
+  it('核心红线：未确认 → 自动重启的 spawn 从未发生', async () => {
+    const { svc, spawnSpy, children, clock, events } = makeCrashHarness({
+      autoRestart: true,
+      confirm: confirmOnceOnly(),
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(120_000);
+
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    expect(svc.status('s1')?.state).toBe('crashed');
+    expect(svc.status('s1')?.autoRestartPending).toBe(false);
+    expect(events.rejected).toEqual([1]);
+  });
+
+  it('确认通道抛异常 → 按未确认处理，不重启（失败关闭）', async () => {
+    let n = 0;
+    const { svc, spawnSpy, children, clock } = makeCrashHarness({
+      autoRestart: true,
+      confirm: () => {
+        n += 1;
+        if (n === 1) return true;
+        throw new Error('dialog exploded');
+      },
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(120_000);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('确认返回 Promise（异步确认）→ 失败关闭，不重启', async () => {
+    let n = 0;
+    const { svc, spawnSpy, children, clock } = makeCrashHarness({
+      autoRestart: true,
+      confirm: () => {
+        n += 1;
+        return n === 1 ? true : Promise.resolve(true);
+      },
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(120_000);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('自动重启的确认请求 kind=restart_server、risk=execute（§10.6）', async () => {
+    const seen: Array<{ kind: string; risk: string }> = [];
+    const { svc, children, clock } = makeCrashHarness({
+      autoRestart: true,
+      confirm: (r) => {
+        seen.push({ kind: r.kind, risk: r.risk });
+        return true;
+      },
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(60_000);
+    await waitForState(svc, 's1', (s) => s === 'running');
+    // 用户启动确认一次 + 自动重启确认一次：绝不静默复用上次的批准
+    expect(seen).toEqual([
+      { kind: 'launch_instance', risk: 'execute' },
+      { kind: 'restart_server', risk: 'execute' },
+    ]);
+  });
+
+  it('用户主动 stop() → 退避定时器被掐掉，之后不会自动拉起', async () => {
+    const { svc, spawnSpy, children, clock } = makeCrashHarness({ autoRestart: true });
+    const handle = svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    expect(svc.status('s1')?.autoRestartPending).toBe(true);
+
+    // 用户在退避到点前喊停
+    await handle.stop();
+    expect(clock.pendingMs()).toBeNull();
+    clock.advance(120_000);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    // 状态仍是 crashed：崩溃现场要留给 UI 告警（stop 对已崩进程本就是 no-op）
+    expect(svc.status('s1')?.state).toBe('crashed');
+    expect(svc.status('s1')?.autoRestartPending).toBe(false);
+  });
+
+  it('用户 stop() 造成的退出不判 crashed，也不触发自动重启', async () => {
+    const { svc, spawnSpy, clock } = makeCrashHarness({ autoRestart: true });
+    const handle = svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    await handle.stop();
+    expect(svc.status('s1')?.state).toBe('stopped');
+    expect(svc.status('s1')?.crashCount).toBe(0);
+    clock.advance(120_000);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    expect(svc.status('s1')?.autoRestartPending).toBe(false);
+  });
+
+  it('shutdownAll → 掐掉挂起的退避定时器（应用退出后不凭空起进程）', async () => {
+    const { svc, spawnSpy, children, clock } = makeCrashHarness({ autoRestart: true });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    expect(clock.pendingMs()).toBe(1_000);
+
+    await svc.shutdownAll();
+    expect(clock.pendingMs()).toBeNull();
+    clock.advance(120_000);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('重启保留日志环形缓冲，crashCount 刻意不重置', async () => {
+    const { svc, children, clock } = makeCrashHarness({ autoRestart: true });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].stdout.write('boom: address in use\n');
+    await waitForLine(svc, 's1', (l) => l.startsWith('boom'));
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(1_000);
+    await waitForState(svc, 's1', (s) => s === 'running');
+
+    // 「上次为什么崩」的日志必须还在（否则重启等于把现场证据擦了）
+    expect(svc.logs('s1')).toContain('boom: address in use');
+    expect(svc.status('s1')?.crashCount).toBe(1);
+    expect(svc.status('s1')?.autoRestartCount).toBe(1);
+  });
+
+  it('用户手动 launch() → 退避计数归零，下一轮又从 1s 起步', async () => {
+    const { svc, children, clock, events } = makeCrashHarness({ autoRestart: true });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    // 第 1 次崩溃 → 自动重启，退避 1000
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(1_000);
+    await waitForState(svc, 's1', (s) => s === 'running');
+    expect(svc.status('s1')?.autoRestartCount).toBe(1);
+
+    // 第 2 次崩溃：这一轮退避应为 2000
+    children[1].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    expect(clock.pendingMs()).toBe(2_000);
+
+    // 用户主动介入 = 新的一轮：退避计数归零（crashCount 是诊断事实，不清零）
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    await waitForState(svc, 's1', (s) => s === 'running');
+    expect(svc.status('s1')?.autoRestartCount).toBe(0);
+    expect(svc.status('s1')?.crashCount).toBe(2);
+
+    children[2].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    expect(events.delays).toEqual([1_000, 2_000, 1_000]);
+  });
+
+  it('自动重启走 crashed → starting → running 合法流转，无 invalid-transition', async () => {
+    const { svc, children, clock } = makeCrashHarness({ autoRestart: true });
+    const seen: ServerState[] = [];
+    const bad: string[] = [];
+    svc.on('state', (s: StatusSnapshot) => {
+      if (s.serverId === 's1') seen.push(s.state);
+    });
+    svc.on('invalid-transition', (e: { from: string; to: string }) =>
+      bad.push(`${e.from}->${e.to}`),
+    );
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(1_000);
+    await waitForState(svc, 's1', (s) => s === 'running');
+    expect(bad).toEqual([]);
+    expect(seen).toEqual(['starting', 'running', 'crashed', 'starting', 'running']);
+  });
+
+  it('真实进程：崩溃后自动拉起第二个真进程（集成路径）', async () => {
+    const dir = await makeTempDir('mc-sup-restart-');
+    tempDirs.push(dir);
+    const marker = path.join(dir, 'first-boot');
+    const script = await tempScript(FAKE_CRASH_ONCE, 'crash-once');
+    // restartDelayMs 取 1ms：本用例只关心「真能再起一个真进程」，退避语义另有确定性用例覆盖
+    const svc = makeService({ autoRestart: true, restartDelayMs: 1 });
+    svc.launchServer({ serverId: 'srv-1', cmd: NODE, args: [script, marker] });
+    await waitForState(svc, 'srv-1', (s) => s === 'crashed');
+    await waitForState(svc, 'srv-1', (s) => s === 'running');
+    // 等第二个真进程真的开口说话：状态 running 只证明 spawn 成功，不证明它跑起来了
+    await waitForLine(svc, 'srv-1', (l) => l === 'second boot ok');
+    const snap = svc.status('srv-1');
+    expect(snap?.crashCount).toBe(1);
+    expect(snap?.lastLogLines).toContain('second boot ok');
+  });
+});
+
+// =========================================================================
+// 11. 控制台注入 sendCommand（§7.1 / §7.4 —— 本轮只做 stdin 注入，不做 RCON 协议）
+// =========================================================================
+
+/** 等 lastCommandOutcome 落定（订阅事件推进，不 sleep）。 */
+function waitForOutcome(svc: ProcessSupervisor, serverId: string): Promise<SendOutcome> {
+  return new Promise((resolve, reject) => {
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      svc.off('command-sent', onSent);
+    };
+    const onSent = (e: SendOutcome): void => {
+      if (e.serverId !== serverId) return;
+      cleanup();
+      resolve(e);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`等待注入结果超时：${serverId}`));
+    }, 10_000);
+    svc.on('command-sent', onSent);
+    const cur = svc.status(serverId)?.lastCommandOutcome ?? null;
+    if (cur !== null) {
+      cleanup();
+      resolve(cur);
+    }
+  });
+}
+
+describe('控制台注入 sendCommand（§7.1 走 stdin；未确认一字节都不写）', () => {
+  it('正常写入：命令补上换行后落到 stdin', async () => {
+    const { svc, children } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    const outcome = await svc.sendCommand('s1', 'say hello');
+    expect(outcome.delivered).toBe(true);
+    expect(outcome.code).toBeNull();
+    expect(outcome.reason).toBeNull();
+    expect(outcome.command).toBe('say hello');
+    expect(children[0].stdinWrites).toEqual(['say hello\n']);
+  });
+
+  it('命令自带换行 → 不重复补 \\n', async () => {
+    const { svc, children } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    await svc.sendCommand('s1', 'list\n');
+    expect(children[0].stdinWrites).toEqual(['list\n']);
+  });
+
+  it('核心红线：用户点取消 → stdin.write 从未被调用', async () => {
+    const { svc, children } = makeCrashHarness({ confirm: confirmOnceOnly() });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    expect(children[0].stdinWrites).toEqual([]);
+
+    const outcome = await svc.sendCommand('s1', 'op attacker');
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.code).toBe('NOT_CONFIRMED');
+    expect(outcome.reason).toContain('§10.6');
+    // 一个字节都没写进去
+    expect(children[0].stdinWrites).toEqual([]);
+  });
+
+  it('确认通道抛异常 → 按未确认处理，同样不写 stdin', async () => {
+    let n = 0;
+    const { svc, children } = makeCrashHarness({
+      confirm: () => {
+        n += 1;
+        if (n === 1) return true;
+        throw new Error('dialog exploded');
+      },
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    const outcome = await svc.sendCommand('s1', 'op me');
+    expect(outcome.code).toBe('NOT_CONFIRMED');
+    expect(children[0].stdinWrites).toEqual([]);
+  });
+
+  it('确认返回 Promise（异步确认）→ 失败关闭，不写 stdin', async () => {
+    let n = 0;
+    const { svc, children } = makeCrashHarness({
+      confirm: () => {
+        n += 1;
+        return n === 1 ? true : Promise.resolve(true);
+      },
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.code).toBe('NOT_CONFIRMED');
+    expect(children[0].stdinWrites).toEqual([]);
+  });
+
+  it('未配置 confirm → 既起不了进程，也无可注入/可重启的对象', async () => {
+    const clock = manualSchedule();
+    const spawnSpy = vi.fn(() => new ControllableChild(90_000) as unknown as ChildProcess);
+    const svc = createProcessSupervisor({
+      spawn: spawnSpy as unknown as SpawnFn,
+      schedule: clock.schedule,
+      scheduleHold: clock.scheduleHold,
+      autoRestart: true,
+      autoInjectReload: true,
+    });
+    supervisors.push(svc);
+    // 没有 confirm：launch 直接 PERMISSION_DENIED，spawn 一次都不会被调用
+    expect(() => svc.launch({ serverId: 's1', cmd: 'java', args: [] })).toThrow(/未确认/);
+    expect(spawnSpy).not.toHaveBeenCalled();
+    expect(svc.status('s1')).toBeNull();
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.code).toBe('NOT_MANAGED');
+    clock.advance(120_000);
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it('注入的确认请求 kind=send_console_command、risk=execute、中文摘要', async () => {
+    const seen: Array<{ kind: string; risk: string; summary: string }> = [];
+    const { svc } = makeCrashHarness({
+      confirm: (r) => {
+        seen.push({ kind: r.kind, risk: r.risk, summary: r.summary });
+        return true;
+      },
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    await svc.sendCommand('s1', 'op me');
+    const inject = seen.filter((s) => s.kind === 'send_console_command');
+    expect(inject).toHaveLength(1);
+    expect(inject[0].risk).toBe('execute');
+    expect(inject[0].summary).toContain('op me');
+    expect(inject[0].summary).toContain('s1');
+  });
+
+  it('进程已死（crashed）→ 返回 PROCESS_DEAD，不抛异常也不写', async () => {
+    const { svc, children } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.code).toBe('PROCESS_DEAD');
+    expect(outcome.reason).toContain('已退出');
+  });
+
+  it('stdin 已关闭（writableEnded）→ 明确 STDIN_CLOSED', async () => {
+    const { svc, children } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].stdin.end();
+    // 先自证前提成立，否则这个用例测的就不是 STDIN_CLOSED 这条分支了
+    expect(children[0].stdin.writableEnded).toBe(true);
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.code).toBe('STDIN_CLOSED');
+  });
+
+  it('stdin 已被 destroy → 明确 STDIN_CLOSED', async () => {
+    const { svc, children } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].stdin.destroy();
+    expect(children[0].stdin.destroyed).toBe(true);
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.code).toBe('STDIN_CLOSED');
+  });
+
+  it('reloadCommand 默认只记录、不自动注入（autoInjectReload 默认关）', async () => {
+    const script = await tempScript(FAKE_SERVER, 'reload-default');
+    const svc = makeService();
+    const handle = svc.launchServer({
+      serverId: 'srv-1',
+      cmd: NODE,
+      args: [script],
+      reloadCommand: '/reload confirm',
+    });
+    await waitForLine(svc, 'srv-1', (l) => l.startsWith('listening'));
+    expect(svc.status('srv-1')?.reloadCommand).toBe('/reload confirm');
+    // 假服务端会回显收到的命令行；没开自动注入就不该出现 reload 回显
+    expect(svc.logs('srv-1').some((l) => l.includes('reload'))).toBe(false);
+    await handle.stop();
+  });
+
+  it('autoInjectReload=true → 进程起来后自动注入 reloadCommand（真实 stdin 管道）', async () => {
+    const script = await tempScript(FAKE_SERVER, 'reload-on');
+    const svc = makeService({ autoInjectReload: true });
+    const handle = svc.launchServer({
+      serverId: 'srv-1',
+      cmd: NODE,
+      args: [script],
+      reloadCommand: '/reload confirm',
+    });
+    // 假服务端把收到的命令行回显成 "echo: <cmd>"
+    await waitForLine(svc, 'srv-1', (l) => l.includes('/reload confirm'));
+    expect(svc.status('srv-1')?.lastCommandOutcome?.delivered).toBe(true);
+    await handle.stop();
+  });
+
+  it('autoInjectReload=true 但未确认 → 不注入（§10.6 优先于自动注入）', async () => {
+    const script = await tempScript(FAKE_SERVER, 'reload-denied');
+    const svc = makeService({ autoInjectReload: true, confirm: confirmOnceOnly() });
+    const handle = svc.launchServer({
+      serverId: 'srv-1',
+      cmd: NODE,
+      args: [script],
+      reloadCommand: '/reload confirm',
+    });
+    await waitForLine(svc, 'srv-1', (l) => l.startsWith('listening'));
+    await waitForOutcome(svc, 'srv-1');
+    expect(svc.status('srv-1')?.lastCommandOutcome).toMatchObject({
+      delivered: false,
+      code: 'NOT_CONFIRMED',
+    });
+    expect(svc.logs('srv-1').some((l) => l.includes('reload'))).toBe(false);
+    await handle.stop();
+  });
+
+  it('注入结果可观测：command-sent 事件 + 快照 lastCommandOutcome', async () => {
+    const { svc } = makeCrashHarness();
+    const events: SendOutcome[] = [];
+    svc.on('command-sent', (e: SendOutcome) => events.push(e));
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    await svc.sendCommand('s1', 'save-all');
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ serverId: 's1', command: 'save-all', delivered: true });
+    expect(svc.status('s1')?.lastCommandOutcome).toEqual(events[0]);
+  });
+
+  it('空命令 → EMPTY_COMMAND，不写 stdin', async () => {
+    const { svc, children } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    const outcome = await svc.sendCommand('s1', '   ');
+    expect(outcome.code).toBe('EMPTY_COMMAND');
+    expect(children[0].stdinWrites).toEqual([]);
+  });
+
+  it('未托管的 serverId → NOT_MANAGED', async () => {
+    const { svc } = makeCrashHarness();
+    const outcome = await svc.sendCommand('ghost', 'list');
+    expect(outcome.code).toBe('NOT_MANAGED');
+  });
+
+  it('服务已 shutdownAll → 不再接受注入', async () => {
+    const { svc } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    await svc.shutdownAll();
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.code).toBe('SERVICE_CLOSED');
+  });
+
+  it('sendCommand 不改变进程状态（纯控制台操作）', async () => {
+    const { svc } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    expect(svc.status('s1')?.state).toBe('running');
+    await svc.sendCommand('s1', 'say hi');
+    expect(svc.status('s1')?.state).toBe('running');
+    expect(svc.status('s1')?.crashCount).toBe(0);
   });
 });

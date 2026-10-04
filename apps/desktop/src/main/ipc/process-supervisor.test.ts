@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { spawn as nodeSpawn } from 'node:child_process';
 
 // Mock electron：记录 ipcMain.handle 注册的通道与处理器，并提供 BrowserWindow 替身。
 const handlers = new Map<string, (e: unknown, ...args: unknown[]) => unknown>();
@@ -58,6 +59,7 @@ import {
   PROCESS_STATUS,
   PROCESS_LOGS,
   PROCESS_LOG_EVENT,
+  PROCESS_STATE_EVENT,
   ProcessStatusSchema,
   ProcessLogsRequest,
   ProcessStatusRequest,
@@ -76,6 +78,18 @@ process.stdout.write('up\\n');
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (c) => {
   if (c.includes('stop')) { clearInterval(t); process.stdin.destroy(); process.exitCode = 0; }
+});
+const t = setInterval(() => {}, 1000);
+`;
+/** 回显控制台命令行的假进程（验证 stdin 注入真的抵达服务端控制台）。 */
+const FAKE_ECHO = `
+process.stdout.write('up\\n');
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (c) => {
+  if (c.includes('stop')) { clearInterval(t); process.stdin.destroy(); process.exitCode = 0; return; }
+  for (const line of String(c).split('\\n')) {
+    if (line.trim() !== '') process.stdout.write('echo: ' + line + '\\n');
+  }
 });
 const t = setInterval(() => {}, 1000);
 `;
@@ -360,5 +374,248 @@ describe('进程托管状态流转经 IPC 可观测（§3 status）', () => {
     expect(parsed.state).toBe('stopped');
     expect(parsed.portReleased).toBeNull();
     expect(parsed.lastStop?.graceful).toBe(true);
+  });
+});
+
+// =========================================================================
+// §7.1 新增两项能力（崩溃自动重启 / 控制台注入）的 IPC 边界
+//
+// 核心立场：渲染层只能**读**这两项能力的状态，**不能**点火。
+// 一旦给出「重启一下」「往控制台发条命令」这类 IPC 通道，§10.6 的确认闸门
+// 就被绕过去了——那正是本文件第一组用例一直在守的东西。
+// =========================================================================
+
+describe('§7.1 新增能力的 IPC 边界（只读状态，不暴露触发通道，§10.6）', () => {
+  it('不注册 restart / reload / send / inject 触发通道：闸门不被绕过', () => {
+    registerProcessSupervisorHandlers();
+    // 通道名集合与第一组用例一致（只有三个只读通道 + 一个 logEvent 转发）
+    expect([...handlers.keys()].sort()).toEqual(
+      [PROCESS_LIST, PROCESS_LOGS, PROCESS_STATUS].sort(),
+    );
+    for (const ch of handlers.keys()) {
+      expect(ch).not.toMatch(/restart|reload|inject|send|command/i);
+    }
+  });
+
+  it('自动重启状态可经 PROCESS_STATUS 只读查询（契约不漂移）', async () => {
+    // maxAutoRestarts=0：状态可观测，但不真的重启（纯契约测试，不引入时序抖动）
+    svc = createProcessSupervisor({ confirm: () => true, autoRestart: true, maxAutoRestarts: 0 });
+    setProcessSupervisor(svc);
+    registerProcessSupervisorHandlers();
+    const script = await fakeScript(
+      "process.stdout.write('dying\\n');\nprocess.exitCode = 7;\n",
+      'crash-restart',
+    );
+    const handle = svc.launch({ serverId: 'srv-1', cmd: NODE, args: [script] });
+    await handle.exited;
+    await waitForState(svc, 'srv-1', 'crashed');
+
+    const res = handlers.get(PROCESS_STATUS)?.({}, { serverId: 'srv-1' }) as { status: unknown };
+    const parsed = ProcessStatusSchema.parse(res.status);
+    expect(parsed.state).toBe('crashed');
+    expect(parsed.crashCount).toBe(1);
+    expect(parsed.autoRestartEnabled).toBe(true);
+    expect(parsed.autoRestartCount).toBe(0);
+    expect(parsed.autoRestartExhausted).toBe(false);
+    expect(parsed.autoRestartPending).toBe(false);
+    expect(parsed.lastCommandOutcome).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------
+  // 状态事件转发（通知，非命令）
+  // ---------------------------------------------------------------------
+
+  /** 取转发出去的状态事件负载。 */
+  const stateEvents = (): Array<{
+    serverId: string;
+    event: string;
+    status: { state: string; autoRestartEnabled?: boolean };
+  }> =>
+    sentToWindows
+      .filter((m) => m.channel === PROCESS_STATE_EVENT)
+      .map(
+        (m) =>
+          m.payload as {
+            serverId: string;
+            event: string;
+            status: { state: string; autoRestartEnabled?: boolean };
+          },
+      );
+
+  it('状态流转经 PROCESS_STATE_EVENT 推给渲染进程', async () => {
+    svc = createProcessSupervisor({ confirm: () => true });
+    setProcessSupervisor(svc);
+    registerProcessSupervisorHandlers();
+    const script = await fakeScript(FAKE_QUICK, 'state-evt');
+    const handle = svc.launch({ serverId: 'srv-1', cmd: NODE, args: [script] });
+    await handle.exited;
+
+    const events = stateEvents();
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((e) => e.serverId === 'srv-1')).toBe(true);
+    // 至少能看到 starting 与最终态
+    const states = events.map((e) => e.status.state);
+    expect(states).toContain('starting');
+    expect(states[states.length - 1]).toBe('crashed');
+    expect(events[0]?.event).toBe('state');
+  });
+
+  it('自动重启达到上限时推 auto-restart-exhausted（UI 靠它弹告警，不靠轮询）', async () => {
+    /*
+     * 用可控的 fake schedule 推进退避，让「崩溃 → 重启 → 再崩 → 达上限」真的走完。
+     * 注意 maxAutoRestarts 不能取 0：0 的语义是「彻底不自动重启」
+     * （scheduleAutoRestart 在上限判断之前就 return 了），不是「立即耗尽」。
+     */
+    const fired: Array<() => void> = [];
+    svc = createProcessSupervisor({
+      confirm: () => true,
+      autoRestart: true,
+      maxAutoRestarts: 1,
+      // 手动收集定时器回调，测试自己决定何时触发（绝不 sleep 硬等）
+      schedule: (fn) => {
+        fired.push(fn);
+        return { cancel: () => undefined, unref: () => undefined } as unknown as {
+          cancel: () => void;
+          unref: () => void;
+        };
+      },
+    });
+    setProcessSupervisor(svc);
+    registerProcessSupervisorHandlers();
+    const script = await fakeScript('process.exitCode = 9;\n', 'state-exhausted');
+    const handle = svc.launch({ serverId: 'srv-1', cmd: NODE, args: [script] });
+    await handle.exited;
+    await waitForState(svc, 'srv-1', 'crashed');
+
+    // 第一次崩溃 → 排了一次重启；触发它（这次真的重启进程）
+    expect(fired.length).toBeGreaterThan(0);
+    fired.splice(0).forEach((fn) => fn());
+    await waitForState(svc, 'srv-1', 'crashed');
+    // 第二次崩溃时已用满 1 次配额 → exhausted
+    expect(stateEvents().some((e) => e.event === 'auto-restart-exhausted')).toBe(true);
+    expect(
+      ProcessStatusSchema.parse(
+        (
+          sentToWindows.find(
+            (m) =>
+              m.channel === PROCESS_STATE_EVENT &&
+              (m.payload as { event: string }).event === 'auto-restart-exhausted',
+          )?.payload as { status: unknown }
+        ).status,
+      ).autoRestartExhausted,
+    ).toBe(true);
+  });
+
+  it('自动重启被闸门拒绝时推 auto-restart-rejected', async () => {
+    /*
+     * 与 exhausted 同理：用 fake schedule 手动触发退避定时器。
+     * confirm 采用「首次启动放行、之后拒绝」—— 只有这样才能构造出
+     * 「启动过 → 崩溃 → 退避到点 → 重启被闸门拒绝」这条路径
+     * （若 confirm 一律 false，连首次 launch 都会被拒，根本没有 entry）。
+     */
+    const fired: Array<() => void> = [];
+    let confirmCalls = 0;
+    svc = createProcessSupervisor({
+      autoRestart: true,
+      maxAutoRestarts: 3,
+      confirm: () => {
+        confirmCalls += 1;
+        return confirmCalls === 1;
+      },
+      schedule: (fn) => {
+        fired.push(fn);
+        return { cancel: () => undefined, unref: () => undefined } as unknown as {
+          cancel: () => void;
+          unref: () => void;
+        };
+      },
+    });
+    setProcessSupervisor(svc);
+    registerProcessSupervisorHandlers();
+    const script = await fakeScript('process.exitCode = 3;\n', 'state-rejected');
+    const handle = svc.launch({ serverId: 'srv-1', cmd: NODE, args: [script] });
+    await handle.exited;
+    await waitForState(svc, 'srv-1', 'crashed');
+
+    // 退避到点 → runAutoRestart → confirm 拒绝 → rejected
+    expect(fired.length).toBeGreaterThan(0);
+    fired.splice(0).forEach((fn) => fn());
+
+    expect(stateEvents().some((e) => e.event === 'auto-restart-rejected')).toBe(true);
+    // 被拒后仍保持 crashed（不静默变成 stopped，UI 才知道要告警）
+    expect(svc.status('srv-1')?.state).toBe('crashed');
+  });
+
+  it('状态事件**不含**任何点火语义：不注册 start/stop 触发通道', () => {
+    // 转发通道走 webContents.send 而非 ipcMain.handle —— 渲染层只能被动收通知，
+    // 无法反过来要求主进程做动作（§10.6）
+    registerProcessSupervisorHandlers();
+    expect([...handlers.keys()].sort()).toEqual(
+      [PROCESS_LIST, PROCESS_LOGS, PROCESS_STATUS].sort(),
+    );
+    expect(PROCESS_STATE_EVENT).toBe('process:stateEvent');
+  });
+
+  it('控制台注入结果可经 PROCESS_STATUS 只读查询（含失败原因）', async () => {
+    svc = createProcessSupervisor({ confirm: () => true, autoInjectReload: true });
+    setProcessSupervisor(svc);
+    registerProcessSupervisorHandlers();
+    const script = await fakeScript(FAKE_ECHO, 'echo-inject');
+    const handle = svc.launchServer({
+      serverId: 'srv-1',
+      cmd: NODE,
+      args: [script],
+      reloadCommand: '/reload confirm',
+    });
+    // 假服务端回显注入的 reload 命令
+    await waitForLine(svc, 'srv-1', (l) => l.includes('/reload confirm'));
+
+    const res = handlers.get(PROCESS_STATUS)?.({}, { serverId: 'srv-1' }) as { status: unknown };
+    const parsed = ProcessStatusSchema.parse(res.status);
+    expect(parsed.reloadCommand).toBe('/reload confirm');
+    expect(parsed.lastCommandOutcome?.delivered).toBe(true);
+    expect(parsed.lastCommandOutcome?.command).toBe('/reload confirm');
+    expect(parsed.lastCommandOutcome?.reason).toBeNull();
+    await handle.stop();
+  });
+
+  it('默认单例：sendCommand 一律拒绝（未配置闸门 = 无执行权）', async () => {
+    const s = getProcessSupervisor();
+    const outcome = await s.sendCommand('srv-1', 'list');
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.code).toBe('NOT_MANAGED');
+    expect(outcome.reason).toContain('未托管');
+  });
+
+  it('默认配置：崩溃自动重启与自动注入都是关闭态（副作用行为不默认开）', async () => {
+    // 只给 confirm，不给 autoRestart / autoInjectReload ⇒ 两项能力都取默认「关」
+    let spawns = 0;
+    svc = createProcessSupervisor({
+      confirm: () => true,
+      spawn: (cmd, args, options) => {
+        spawns += 1;
+        return nodeSpawn(cmd, args, options);
+      },
+    });
+    setProcessSupervisor(svc);
+    registerProcessSupervisorHandlers();
+    const script = await fakeScript(
+      "process.stdout.write('dying\\n');\nprocess.exitCode = 9;\n",
+      'crash-default',
+    );
+    const handle = svc.launch({ serverId: 'srv-1', cmd: NODE, args: [script] });
+    await handle.exited;
+    await waitForState(svc, 'srv-1', 'crashed');
+
+    const res = handlers.get(PROCESS_STATUS)?.({}, { serverId: 'srv-1' }) as { status: unknown };
+    const parsed = ProcessStatusSchema.parse(res.status);
+    expect(parsed.state).toBe('crashed');
+    // 默认关：崩溃后既没有第二次 spawn，也没有排任何退避
+    expect(spawns).toBe(1);
+    expect(parsed.autoRestartEnabled).toBe(false);
+    expect(parsed.autoRestartCount).toBe(0);
+    expect(parsed.autoRestartPending).toBe(false);
+    expect(parsed.autoRestartExhausted).toBe(false);
+    expect(parsed.lastCommandOutcome).toBeNull();
   });
 });

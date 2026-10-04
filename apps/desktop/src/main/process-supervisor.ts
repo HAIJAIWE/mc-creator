@@ -37,12 +37,22 @@ import * as net from 'node:net';
 export type ServerState = 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed';
 
 /**
- * 崩溃自动重启属 §7.1 明列的外壳职责，但**本轮不实现**（刻意留白，见报告「已知局限」）。
- * 后续加法（不动内核，保持「内核只返回指令」）：
- * 1. 在 onUnexpectedExit() 里，若 crashCount 未超上限则经 confirm（risk:'execute'，
- *    §10.6 启动服务端必须弹窗确认）后调用 launch()——crashed → starting 已是合法流转；
- * 2. 退避用注入的 schedule 做指数退避（1s/2s/4s…），上限 5 次；
- * 3. 达上限后保持 'crashed' 不再自动拉起，交给 UI 告警 + §7.4 端口健康检测。
+ * §7.1 明列的两项外壳职责，本文件现已实现（内核侧仍然只「返回指令」，一行没动）：
+ *
+ * 1. **崩溃自动重启**（指数退避）：非预期退出 → crashed → 若未超上限，则经 §10.6 确认
+ *    闸门后按 1s/2s/4s… 退避自动 launch()（crashed → starting 本就是合法流转）。
+ *    默认**关闭**（autoRestart=false）：自动重启是有副作用的行为，必须用户显式打开；
+ *    用户 stop() 请求过的停机绝不触发重启；用户手动 launch() 视为「新一轮」并重置退避计数。
+ * 2. **控制台注入**（§7.1 / §7.4）：sendCommand() 与 reloadCommand 自动注入都走
+ *    **stdin 管道**——这是 Minecraft 服务端控制台的常规途径（BDS / Paper / Fabric 等），
+ *    与优雅停机写 "stop" 是同一条路（requestGracefulStop 已在用）。
+ *
+ * **范围限制（刻意）：RCON 协议本文件不实现。**
+ * RCON 需要口令管理（§7.1 把「RCON 口令」列为外壳职责）+ Minecraft 私有封包协议
+ * （TCP + VarInt 长度前缀 + 口令握手 + 两种包类型），成本高且与本轮重点无关。
+ * stdin 注入已覆盖「外壳自己 spawn 出来的服务端」这一主场景；后续接 RCON 的位置很明确：
+ * 把 dispatchCommand() 的写入环节从「只认 stdin」扩成「stdin 优先 → 无 stdin 通道时
+ * 退化为 RCON socket 写入」，对外的 SendOutcome 契约、§10.6 闸门与前置校验都可原样复用。
  */
 
 /** 默认日志环形缓冲行数：对齐 kernel-server `read_logs` 的「尾 200 行」语义。 */
@@ -53,6 +63,12 @@ export const DEFAULT_GRACEFUL_MS = 30_000;
 export const DEFAULT_PORT_WAIT_MS = 10_000;
 /** 端口探测单次连接超时。 */
 export const DEFAULT_PORT_PROBE_TIMEOUT_MS = 500;
+/** 崩溃自动重启的首次退避：后续按 2 的幂逐次翻倍（§7.1「1s/2s/4s…」）。 */
+export const DEFAULT_RESTART_DELAY_MS = 1_000;
+/** 单次退避的封顶：翻倍再翻也不会无限等，否则第 20 次就是十几分钟。 */
+export const DEFAULT_MAX_RESTART_DELAY_MS = 30_000;
+/** 连续崩溃上限：达上限后保持 'crashed' 不再自动拉起，交给 UI 告警（§7.1 / §7.4）。 */
+export const DEFAULT_MAX_AUTO_RESTARTS = 5;
 /** 端口释放轮询间隔。 */
 const PORT_POLL_INTERVAL_MS = 50;
 /** 强杀后等退出的兜底上限；超时不再阻塞 stop()（宁可状态滞后也不挂住应用退出）。 */
@@ -120,11 +136,62 @@ export interface ServerSpec extends LaunchSpec {
   /** 内核 data.serverDir；未显式给 cwd 时用它作工作目录。 */
   serverDir?: string;
   /**
-   * 内核 deploy_plugin 返回的 reloadCommand（'/reload confirm'）。
-   * 本服务只**记录**用于可观测，不自动注入控制台/RCON——§7.1 的控制台注入
-   * 需要 RCON 口令与协议实现，不在本轮范围。
+   * 内核 deploy_plugin 返回的 reloadCommand（'/reload confirm'，hotReload:true 时才有）。
+   * 默认只**记录**用于可观测（状态快照的 reloadCommand 字段）；
+   * 只有外壳在创建服务时显式打开 `autoInjectReload`，才会在进程进入 running 后
+   * 自动把它写进 stdin（§7.1 控制台注入）。仍然要过 §10.6 确认闸门。
    */
   reloadCommand?: string;
+}
+
+/** 一次控制台注入的结果（§7.1 / §7.4）。失败必须带明确原因，绝不静默丢。 */
+export interface SendOutcome {
+  serverId: string;
+  /** 唯一为 true 的情形：确实把命令写进了子进程 stdin。 */
+  delivered: boolean;
+  /** 原样命令（未补换行），便于审计串联。 */
+  command: string;
+  /** 中文失败原因；delivered=true 时为 null。 */
+  reason: string | null;
+  code: SendErrorCode | null;
+  at: string;
+}
+
+/** 注入失败码：UI 按 code 归类，reason 负责给人看。 */
+export type SendErrorCode =
+  /** 该 serverId 从未被托管。 */
+  | 'NOT_MANAGED'
+  /** 未获 §10.6 确认（或 confirm 未配置）：一个字节都没写进 stdin。 */
+  | 'NOT_CONFIRMED'
+  /** 进程已死（crashed / stopped）。 */
+  | 'PROCESS_DEAD'
+  /** stdin 管道不存在或已关闭（writableEnded / destroyed / 非 pipe）。 */
+  | 'STDIN_CLOSED'
+  /** 空命令。 */
+  | 'EMPTY_COMMAND'
+  /** 写入过程中管道报错（EPIPE 等）。 */
+  | 'WRITE_FAILED'
+  /** 服务已 shutdownAll。 */
+  | 'SERVICE_CLOSED';
+
+/** 自动重启达上限事件负载（§7.1：达上限保持 crashed，交给 UI 告警）。 */
+export interface AutoRestartExhaustedEvent {
+  serverId: string;
+  /** 累计崩溃次数（跨重启不清零，可观测）。 */
+  crashCount: number;
+  /** 已自动重启次数。 */
+  attempts: number;
+  maxAutoRestarts: number;
+  at: string;
+}
+
+/** 计划一次自动重启时的事件负载（让 UI 能显示「1 秒后重试」）。 */
+export interface AutoRestartScheduledEvent {
+  serverId: string;
+  /** 第几次尝试（1 起）。 */
+  attempt: number;
+  delayMs: number;
+  at: string;
 }
 
 /** 一次停机的结果报告（供 UI 与日志定位「为什么没停干净」）。 */
@@ -159,8 +226,18 @@ export interface StatusSnapshot {
   cmd: string;
   args: string[];
   cwd: string | null;
-  /** 仅记录，不自动执行（§7.1 控制台注入未做）。 */
+  /** 内核 deploy_plugin 的 reloadCommand；仅在开自动注入时才会真的写进 stdin（§7.1）。 */
   reloadCommand: string | null;
+  /** 崩溃自动重启是否已开启（默认 false，见 §7.1 副作用说明）。 */
+  autoRestartEnabled: boolean;
+  /** 连续自动重启次数；用户手动 launch() 后归零。 */
+  autoRestartCount: number;
+  /** 是否已达上限放弃自动重启（UI 应弹告警，§7.1）。 */
+  autoRestartExhausted: boolean;
+  /** 是否已挂起一次待触发的自动重启（UI 可据此显示倒计时）。 */
+  autoRestartPending: boolean;
+  /** 最近一次控制台注入结果（只读，UI 可直接展示失败原因）。 */
+  lastCommandOutcome: SendOutcome | null;
 }
 
 /** 一次停机的结果（LaunchedProcess.stop 的返回值；§7.4 端口等待「超时则报告」）。 */
@@ -227,6 +304,23 @@ export interface ProcessSupervisorOptions {
   platform?: NodeJS.Platform;
   /** 确认闸门（§10.6）。不提供则永不 spawn。 */
   confirm?: ConfirmFn;
+  /**
+   * 崩溃自动重启（§7.1）。默认 **false** —— 自动拉起进程是有副作用的行为，
+   * 不能默认替用户做主（与 §10.6「执行类操作必须用户确认」同一取向）。
+   * 开启后每次重启**仍然**要过 confirm 闸门，失败/未配置则保持 'crashed' 不拉起。
+   */
+  autoRestart?: boolean;
+  /** 自动重启的首次退避，默认 DEFAULT_RESTART_DELAY_MS；后续按 2 的幂翻倍。 */
+  restartDelayMs?: number;
+  /** 单次退避封顶，默认 DEFAULT_MAX_RESTART_DELAY_MS。 */
+  maxRestartDelayMs?: number;
+  /** 连续崩溃上限，默认 DEFAULT_MAX_AUTO_RESTARTS；达上限 emit 'auto-restart-exhausted'。 */
+  maxAutoRestarts?: number;
+  /**
+   * reloadCommand 自动注入控制台（§7.1）。默认 **false**，理由同 autoRestart：
+   * 无确认的自动写控制台属于未授权副作用。开启后也仍走 confirm 闸门。
+   */
+  autoInjectReload?: boolean;
 }
 
 /** 失败码：区分「非法流转 / 未确认 / 沙箱禁止 / spawn 失败 / 服务已关」，便于外壳与 UI 归类。 */
@@ -258,7 +352,7 @@ const LEGAL: Record<ServerState, readonly ServerState[]> = {
   starting: ['running', 'stopping', 'crashed', 'stopped'],
   running: ['stopping', 'crashed', 'stopped'],
   stopping: ['stopped', 'crashed'],
-  // crashed → starting 合法：崩溃后由用户再次 launch 即为 restart（自动重启不在本轮）。
+  // crashed → starting 合法：崩溃后自动重启（§7.1）或用户再次 launch 都走这条边。
   crashed: ['starting', 'stopping'],
 };
 
@@ -290,6 +384,14 @@ interface Entry {
   exitedSettled: boolean;
   /** 并发 stop() 共享同一个 promise。 */
   stopPromise: Promise<StopOutcome> | null;
+  /** 挂起的自动重启定时器（退避期间非 null）；停机/重启/关服时必须 cancel，否则定时器会在关服后复活进程。 */
+  restartTimer: TimerHandle | null;
+  /** 连续自动重启次数（退避计数；用户手动 launch 成功后归零，crashCount 不清零）。 */
+  autoRestartCount: number;
+  /** 是否已用尽自动重启次数（达上限后不再拉起，等 UI 告警）。 */
+  autoRestartExhausted: boolean;
+  /** 最近一次控制台注入结果（快照可观测，UI 直接展示失败原因）。 */
+  lastCommandOutcome: SendOutcome | null;
 }
 
 /** 轻量 deferred，避免 Promise.resolve 占位后再覆盖。 */
@@ -355,6 +457,13 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
   private readonly shutdownGracefulMs: number;
   private readonly platform: NodeJS.Platform;
   private readonly confirm: ConfirmFn | undefined;
+  /** 崩溃自动重启开关（§7.1）；默认关，避免替用户做主。 */
+  private readonly autoRestart: boolean;
+  private readonly restartDelayMs: number;
+  private readonly maxRestartDelayMs: number;
+  private readonly maxAutoRestarts: number;
+  /** reloadCommand 自动注入开关（§7.1）；默认关，同上。 */
+  private readonly autoInjectReload: boolean;
   private shutdownPromise: Promise<void> | null = null;
 
   constructor(opts: ProcessSupervisorOptions = {}) {
@@ -370,9 +479,19 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
     this.shutdownGracefulMs = opts.shutdownGracefulMs ?? 2_000;
     this.platform = opts.platform ?? process.platform;
     this.confirm = opts.confirm;
+    this.autoRestart = opts.autoRestart ?? false;
+    this.restartDelayMs = Math.max(0, opts.restartDelayMs ?? DEFAULT_RESTART_DELAY_MS);
+    this.maxRestartDelayMs = Math.max(
+      this.restartDelayMs,
+      opts.maxRestartDelayMs ?? DEFAULT_MAX_RESTART_DELAY_MS,
+    );
+    // 上限 0 视为「完全不自动重启」：显式表达"不要"，不静默退回默认值。
+    this.maxAutoRestarts = Math.max(0, opts.maxAutoRestarts ?? DEFAULT_MAX_AUTO_RESTARTS);
+    this.autoInjectReload = opts.autoInjectReload ?? false;
   }
 
   launch(spec: LaunchSpec): LaunchedProcess {
+    this.resetRestartBackoff(spec.serverId);
     return this.spawnManaged(spec, {
       // 客户端实例不该收到服务端控制台的 "stop" 文本；无 stdin 时退化为发信号。
       stopCommand: spec.stopCommand === undefined ? null : spec.stopCommand,
@@ -382,12 +501,27 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
   }
 
   launchServer(spec: ServerSpec): LaunchedProcess {
+    this.resetRestartBackoff(spec.serverId);
     return this.spawnManaged(spec, {
       // §7.4 停止：服务端控制台的 "stop" 是唯一的真优雅停机途径（先写 stdin 再等）。
       stopCommand: spec.stopCommand === undefined ? 'stop\n' : spec.stopCommand,
       taskKind: spec.taskKind ?? 'start_server',
       cwd: spec.cwd ?? spec.serverDir,
     });
+  }
+
+  /**
+   * 用户手动 launch 视为「新一轮」：退避计数归零（§7.1）。
+   * 为什么自动重启后要归零而 crashCount 不归零：crashCount 是**诊断事实**（这个 serverId
+   * 一共崩过几次），跨轮次累计；而退避计数是**策略状态**（当前这一轮已经让了几次），
+   * 用户主动介入说明他认为配置已改好，继续顶格退避没有意义。
+   * 只在 spawnManaged 真正走通后才归零（校验失败/未确认则不该动策略状态）。
+   */
+  private resetRestartBackoff(serverId: string): void {
+    const e = this.entries.get(serverId);
+    if (e === undefined) return;
+    e.autoRestartCount = 0;
+    e.autoRestartExhausted = false;
   }
 
   status(serverId: string): StatusSnapshot | null {
@@ -408,6 +542,11 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
       args: [...e.args],
       cwd: e.cwd,
       reloadCommand: e.reloadCommand,
+      autoRestartEnabled: this.autoRestart,
+      autoRestartCount: e.autoRestartCount,
+      autoRestartExhausted: e.autoRestartExhausted,
+      autoRestartPending: e.restartTimer !== null,
+      lastCommandOutcome: e.lastCommandOutcome,
     };
   }
 
@@ -429,6 +568,10 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
   async shutdownAll(): Promise<void> {
     // 幂等：重复调用共享同一个 promise，绝不重复 spawn / kill。
     if (this.shutdownPromise !== null) return this.shutdownPromise;
+    // 关键：先掐掉所有挂起的自动重启退避定时器。
+    // 否则关服流程走完之后，退避到期会在「服务已关闭」状态下仍尝试拉起进程——
+    // 那等于应用退出时凭空多起一个 Minecraft（§7.1 的保活绝不能活过应用生命周期）。
+    for (const e of this.entries.values()) this.cancelRestartTimer(e);
     const alive = [...this.entries.values()].filter(
       (e) => e.state !== 'stopped' && e.state !== 'crashed',
     );
@@ -549,6 +692,9 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
   private doSpawn(spec: LaunchSpec, cwd: string | null): LaunchedProcess {
     const args = [...spec.args];
     const previous = this.entries.get(spec.serverId);
+    // 复用 entry 前必须掐掉上一轮挂起的退避定时器：否则旧定时器到期会把
+    // 「已经手工/自动重启过的新进程」再顶掉一次（两个 timer 抢同一个 serverId）。
+    if (previous !== undefined) this.cancelRestartTimer(previous);
     const d = deferred<{ code: number | null; signal: NodeJS.Signals | null }>();
     const entry: Entry = {
       serverId: spec.serverId,
@@ -569,6 +715,9 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
       lastStop: null,
       // 重启不清零 crashCount：崩溃自动重启的退避策略要靠它判断是否放弃（§7.1）。
       crashCount: previous?.crashCount ?? 0,
+      // 退避计数也不清零：连续崩就该连续加倍，只有用户手动 launch 才归零（§7.1）。
+      autoRestartCount: previous?.autoRestartCount ?? 0,
+      autoRestartExhausted: previous?.autoRestartExhausted ?? false,
       // 日志也跨重启保留：崩溃后重启时，上一轮的尾部日志正是「为什么崩」的答案。
       // pending（半行）不保留——死进程留下的半行不该拼到新进程输出前面。
       lines: previous?.lines ?? [],
@@ -577,6 +726,8 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
       resolveExit: d.resolve,
       exitedSettled: false,
       stopPromise: null,
+      restartTimer: null,
+      lastCommandOutcome: previous?.lastCommandOutcome ?? null,
     };
     // 重启同一 serverId 时复用 entry，保留环形缓冲与 crashCount（可观测性不断线）。
     this.entries.set(entry.serverId, entry);
@@ -647,6 +798,9 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
       });
     }
 
+    // §7.1 控制台注入：reloadCommand 自动写 stdin。默认关闭，且仍走 §10.6 确认闸门。
+    this.injectReloadOnStart(entry);
+
     return {
       serverId: entry.serverId,
       pid: entry.pid ?? 0,
@@ -656,10 +810,129 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
     };
   }
 
-  /** 读 ServerSpec 上的 reloadCommand（只记录，不自动注入，§7.1）。 */
+  /**
+   * 读 ServerSpec 上的 reloadCommand（§7.1 控制台注入）。
+   * 记录进 Entry 供快照观测；是否真的注入由 injectReloadOnStart 决定（默认不注入）。
+   */
   private readReloadCommand(spec: LaunchSpec): string | null {
     const v = (spec as { reloadCommand?: unknown }).reloadCommand;
     return typeof v === 'string' && v !== '' ? v : null;
+  }
+
+  /**
+   * 进程起来后按需注入 reloadCommand（§7.1 控制台注入）。
+   * 三个前提缺一不可：开关打开、有 reloadCommand、有可写 stdin；
+   * 并且注入本身再过一次 §10.6 确认（与手动 sendCommand 同一道闸门）。
+   * 注入时机选在 spawn 之后：此刻 shell/服务端才真正开始读 stdin，早了会被丢掉。
+   */
+  private injectReloadOnStart(entry: Entry): void {
+    if (!this.autoInjectReload) return;
+    const cmd = entry.reloadCommand;
+    if (cmd === null) return;
+    // 故意不 await：launch 必须保持同步（内核 launch_instance 的返回形态是同步的），
+    // 注入结果通过 lastCommandOutcome / 'command-sent' 事件异步可观测。
+    void this.sendCommand(entry.serverId, cmd);
+  }
+
+  /**
+   * 向托管进程的控制台注入一条命令（§7.1 / §7.4）。
+   *
+   * 走 stdin 管道，与优雅停机写 "stop" 是同一条机制——Minecraft 服务端
+   * （BDS / Paper / Fabric 等）把 stdin 当控制台，跨平台都有效。
+   *
+   * 范围限制（重要）：这里**只做 stdin 注入**。RCON 协议（TCP 封包 + 口令握手）
+   * 本轮不实现——它需要口令管理（§7.1 把 RCON 口令列为外壳职责）与 Minecraft 私有协议解析，
+   * 成本高且不是本轮重点。后续接法：把 writeStdin 换成「stdin 优先 → 无 stdin 通道时退化
+   * 为 RCON socket 写入」，确认闸门与失败码契约都可原样复用。
+   *
+   * §10.6 硬红线：未配置 confirm、confirm 返回非 true、返回 Promise（异步确认走不通）
+   * 一律按「未确认」处理，**一个字节都不写进 stdin**（返回 NOT_CONFIRMED）。
+   */
+  async sendCommand(serverId: string, command: string): Promise<SendOutcome> {
+    const e = this.entries.get(serverId);
+    const finish = (
+      ok: boolean,
+      code: SendErrorCode | null,
+      reason: string | null,
+    ): SendOutcome => {
+      const outcome: SendOutcome = {
+        serverId,
+        delivered: ok,
+        command,
+        reason,
+        code,
+        at: new Date(this.now()).toISOString(),
+      };
+      if (e !== undefined) e.lastCommandOutcome = outcome;
+      this.emit('command-sent', outcome);
+      return outcome;
+    };
+
+    if (e === undefined) {
+      return finish(false, 'NOT_MANAGED', `未托管 ${serverId}，无法注入控制台命令`);
+    }
+    if (this.shutdownPromise !== null) {
+      return finish(false, 'SERVICE_CLOSED', '服务已关闭，拒绝注入控制台命令');
+    }
+    if (typeof command !== 'string' || command.trim() === '') {
+      return finish(false, 'EMPTY_COMMAND', '命令为空：拒绝向控制台写空白行');
+    }
+    const child = e.child;
+    if (child === null || e.exitedSettled || e.state === 'stopped' || e.state === 'crashed') {
+      return finish(false, 'PROCESS_DEAD', `${serverId} 进程已退出（当前 ${e.state}），无法注入`);
+    }
+    // §10.6：先过确认闸门，再碰 stdin。顺序反了就等于「先写后问」。
+    if (!this.confirmCommand(serverId, command)) {
+      return finish(false, 'NOT_CONFIRMED', `用户未确认，拒绝向 ${serverId} 注入命令（§10.6）`);
+    }
+    const written = this.writeStdin(child, command.endsWith('\n') ? command : `${command}\n`);
+    if (!written) {
+      return finish(
+        false,
+        'STDIN_CLOSED',
+        `${serverId} 的 stdin 通道不可用（未开管道或已关闭）；改用 RCON 需要口令管理，本服务暂不支持`,
+      );
+    }
+    return finish(true, null, null);
+  }
+
+  /** 控制台注入的确认请求（risk 恒为 execute：§10.6 执行类副作用）。 */
+  private confirmCommand(serverId: string, command: string): boolean {
+    if (this.confirm === undefined) return false;
+    const req: ConfirmRequest = {
+      kind: 'send_console_command',
+      payload: { serverId, command },
+      summary: `向 ${serverId} 控制台注入命令：${command}`,
+      risk: 'execute',
+    };
+    try {
+      const verdict = this.confirm(req);
+      if (isThenable(verdict)) {
+        verdict.then(
+          () => undefined,
+          () => undefined,
+        );
+        return false;
+      }
+      return verdict === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** 写一行到子进程 stdin；管道不可用返回 false（EPIPE/未 pipe 都在这里收口）。 */
+  private writeStdin(child: ChildProcess, line: string): boolean {
+    const stdin = child.stdin;
+    if (stdin === null || stdin === undefined) return false;
+    // writableEnded/destroyed 都表示对端已走，写进去只会得到 EPIPE 或直接被静默丢弃。
+    if (stdin.writableEnded === true || stdin.destroyed === true) return false;
+    try {
+      // 一条命令 = 一行：调用方已带尾换行就别再补一个，否则服务端控制台会看到空行。
+      stdin.write(line);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private setState(entry: Entry, next: ServerState): void {
@@ -722,15 +995,115 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
    * 非预期退出 → crashed。
    * 判定依据是「非我方发起的停机」，**不看退出码**：退出码 0 的自行退出对长驻
    * 服务同样是非预期（用户没让我停）。退出码与日志尾部保留在快照里供诊断。
+   *
+   * 崩完全默认就到此为止（§7.1 达上限保持 crashed，交给 UI 告警 + §7.4 端口健康检测）；
+   * 只有开了 autoRestart 且没超上限时，才按指数退避挂一次**待确认**的自动拉起。
    */
   private onUnexpectedExit(entry: Entry): void {
     if (entry.stopRequested) return;
     if (entry.state === 'crashed' || entry.state === 'stopped') return;
     entry.crashCount += 1;
     this.setState(entry, 'crashed');
+    this.scheduleAutoRestart(entry);
+  }
+
+  /**
+   * 挂一次带退避的自动重启（§7.1）。刻意不立刻重启：
+   * - **默认关闭**（autoRestart=false）：进程被自动拉起是有副作用的行为，
+   *   崩溃原因（比如磁盘满、配置写错）往往还在，不该在用户没表态前反复重试；
+   * - 退避用注入的 schedule（测试用 fake schedule 手动触发，绝不 sleep 硬等）；
+   * - 达上限只 emit 事件，不再拉起：把决定权交回 UI（告警 + 用户手动 launch）。
+   * 真正 spawn 发生在退避到点之后、并且**过完 §10.6 确认闸门**（见 runAutoRestart）。
+   */
+  private scheduleAutoRestart(entry: Entry): void {
+    if (!this.autoRestart) return;
+    if (this.maxAutoRestarts <= 0) return;
+    // 服务已关闭（应用正在退出）时绝不拉起：那会凭空多起一个 Minecraft。
+    if (this.shutdownPromise !== null) return;
+    if (entry.autoRestartCount >= this.maxAutoRestarts) {
+      if (!entry.autoRestartExhausted) {
+        entry.autoRestartExhausted = true;
+        this.emit('auto-restart-exhausted', {
+          serverId: entry.serverId,
+          crashCount: entry.crashCount,
+          attempts: entry.autoRestartCount,
+          maxAutoRestarts: this.maxAutoRestarts,
+          at: new Date(this.now()).toISOString(),
+        } satisfies AutoRestartExhaustedEvent);
+      }
+      return;
+    }
+    const attempt = entry.autoRestartCount + 1;
+    const delayMs = this.backoffDelayMs(attempt);
+    entry.restartTimer = this.schedule(() => {
+      // 先清句柄再干活：定时器已经触发，句柄不能再留着（否则 stop() 会去 cancel 一个死定时器）。
+      entry.restartTimer = null;
+      this.runAutoRestart(entry, attempt);
+    }, delayMs);
+    this.emit('auto-restart-scheduled', {
+      serverId: entry.serverId,
+      attempt,
+      delayMs,
+      at: new Date(this.now()).toISOString(),
+    } satisfies AutoRestartScheduledEvent);
+  }
+
+  /**
+   * 指数退避：第 n 次重启等 restartDelayMs * 2^(n-1)，封顶 maxRestartDelayMs。
+   * 默认 1s/2s/4s/8s/16s；封顶 30s（否则翻倍下去第 10 次就是好几分钟，
+   * 那不叫退避，那叫让用户以为程序死了）。
+   * 乘法而不是位移：避免 n 很大时 1<<n 溢出成负数得到荒谬的负延迟。
+   */
+  private backoffDelayMs(attempt: number): number {
+    const n = Math.max(1, attempt);
+    const scaled = this.restartDelayMs * 2 ** (n - 1);
+    if (!Number.isFinite(scaled)) return this.maxRestartDelayMs;
+    return Math.min(scaled, this.maxRestartDelayMs);
+  }
+
+  /**
+   * 退避到点，真正执行自动重启。
+   * 必须再过一次 §10.6 确认（risk:'execute'）：自动重启同样是「执行进程」这类副作用，
+   * 绝不能因为"之前批准过启动"就顺延批准每一次重启。
+   */
+  private runAutoRestart(entry: Entry, attempt: number): void {
+    // 三道闸：服务已关 / 这份 entry 已被新一轮 launch 顶掉 / 我方已请求停机。
+    // 任何一条成立都放弃：宁可少重启，也不要在用户已停止后偷偷把进程拉回来。
+    if (this.shutdownPromise !== null) return;
+    if (this.entries.get(entry.serverId) !== entry) return;
+    if (entry.stopRequested) return;
+    if (entry.state !== 'crashed') return;
+
+    if (!this.requestConfirmation(entry.spec, 'restart_server', entry.cwd)) {
+      // 未确认：保持 crashed（崩溃证据留给 UI），并计入这一轮尝试（否则会无限重试到上限）。
+      entry.autoRestartCount = attempt;
+      this.emit('auto-restart-rejected', {
+        serverId: entry.serverId,
+        attempt,
+        at: new Date(this.now()).toISOString(),
+      });
+      return;
+    }
+
+    // 确认通过才记账：计数代表"真的试过几次"，未确认的那次不算重试额度用掉。
+    entry.autoRestartCount = attempt;
+    // crashed → starting 是合法流转（LEGAL 里已开这条边），所以直接复用 doSpawn：
+    // 日志环形缓冲与 crashCount 自动跨重启保留（用户要能看到"上次为什么崩"）。
+    this.doSpawn(entry.spec, entry.cwd);
+  }
+
+  /** 掐掉挂起的自动重启（停机 / 手工重启 / 关服时都要调）。 */
+  private cancelRestartTimer(entry: Entry): void {
+    if (entry.restartTimer === null) return;
+    entry.restartTimer.cancel();
+    entry.restartTimer = null;
   }
 
   private stopPublic(entry: Entry, options?: { gracefulMs?: number }): Promise<StopOutcome> {
+    // 用户主动停机 ⇒ 绝不允许退避定时器再把进程拉回来（§7.1）。
+    // 这一句是"stop 不触发自动重启"的关键：onUnexpectedExit 里的 stopRequested 判断
+    // 守住的是"退避已经触发之后"，这里守的是"退避还没到点"。
+    this.cancelRestartTimer(entry);
     if (entry.state === 'stopped' || entry.state === 'crashed') {
       // 进程已死：stop 是 no-op，且**不**改变 crashed 状态——崩溃证据要留给 UI。
       return Promise.resolve({
@@ -896,6 +1269,11 @@ export interface ProcessSupervisor extends EventEmitter {
   list(): Array<{ serverId: string; state: ServerState; pid: number | null }>;
   /** 只读：读日志尾部（环形缓冲，默认末尾 logTailLines 行）。 */
   logs(serverId: string, limit?: number): string[];
+  /**
+   * 向托管进程的控制台注入命令（§7.1 / §7.4），走 stdin 管道。
+   * 必须过 §10.6 确认闸门；失败返回明确 code，绝不静默丢。
+   */
+  sendCommand(serverId: string, command: string): Promise<SendOutcome>;
   /** 全部优雅停机（应用退出时调用）。幂等。 */
   shutdownAll(): Promise<void>;
 }

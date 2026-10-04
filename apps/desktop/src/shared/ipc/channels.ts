@@ -44,3 +44,6 @@ export const PROCESS_LIST = 'process:list';
 export const PROCESS_STATUS = 'process:status';
 export const PROCESS_LOGS = 'process:logs';
 export const PROCESS_LOG_EVENT = 'process:logEvent';
+// 状态变更事件（**通知**，非命令）：自动重启有 1s 起退避，轮询会丢掉崩溃瞬间的
+// 告警时机。渲染层只消费 —— 点火权仍在主进程 confirm 闸门（§10.6）。
+export const PROCESS_STATE_EVENT = 'process:stateEvent';

@@ -79,6 +79,7 @@ import {
   type BuildStreamChunkT,
   type RagSearchRes,
   type ProcessLogEventT,
+  type ProcessStateEventT,
   NODE_GRAPH_SAVE,
   NODE_GRAPH_LOAD,
   NODE_GRAPH_SHOW_SAVE_DIALOG,
@@ -88,6 +89,7 @@ import {
   PROCESS_STATUS,
   PROCESS_LOGS,
   PROCESS_LOG_EVENT,
+  PROCESS_STATE_EVENT,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -418,6 +420,18 @@ const api = {
     const wrapper = (_e: unknown, payload: ProcessLogEventT) => handler(payload);
     ipcRenderer.on(PROCESS_LOG_EVENT, wrapper);
     return () => ipcRenderer.removeListener(PROCESS_LOG_EVENT, wrapper);
+  },
+  /**
+   * 订阅进程状态变更（含自动重启事件）。
+   *
+   * 这是**通知**不是命令：渲染层收到 `auto-restart-exhausted` 该弹告警、
+   * 提供一个走正常启动流程的按钮，而不是自己去点火 —— 点火权在主进程
+   * 的 confirm 闸门（§10.6）。返回值是取消订阅函数（React effect 清理用）。
+   */
+  onProcessState: (handler: (e: ProcessStateEventT) => void) => {
+    const wrapper = (_e: unknown, payload: ProcessStateEventT) => handler(payload);
+    ipcRenderer.on(PROCESS_STATE_EVENT, wrapper);
+    return () => ipcRenderer.removeListener(PROCESS_STATE_EVENT, wrapper);
   },
 
   // === 大文件流式传输 ===
