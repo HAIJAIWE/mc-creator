@@ -44,12 +44,22 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'>
   padding?: CardPadding;
   /** 标题标签，默认 `h3` */
   titleAs?: CardTitleAs;
+  /**
+   * 标题行右侧插槽（关闭按钮、状态徽标等）。
+   *
+   * 为什么需要：可关闭的卡片（警告条 / 错误条）要求关闭入口在**标题行右端**，
+   * 但 title/subtitle/footer 三个槽都塞不进去 —— footer 在内容下面、
+   * subtitle 是副标题语义。缺这个槽，调用方只能把整段标题行自己重画一遍，
+   * 于是 `.mc-card` 的标题排版规则被绕过，两处样式日后必然漂移。
+   */
+  titleAction?: ReactNode;
 }
 
 export function Card({
   title,
   subtitle,
   footer,
+  titleAction,
   interactive = false,
   padding = 'md',
   titleAs: TitleTag = 'h3',
@@ -85,10 +95,16 @@ export function Card({
         className,
       )}
     >
-      {title || subtitle ? (
-        <div className="border-b border-mc-border px-4 py-3">
-          {title ? <TitleTag className="text-sm font-semibold text-mc-text">{title}</TitleTag> : null}
-          {subtitle ? <p className="mt-0.5 text-xs text-mc-text-dim">{subtitle}</p> : null}
+      {title || subtitle || titleAction ? (
+        <div className="flex items-start justify-between gap-2 border-b border-mc-border px-4 py-3">
+          <div className="min-w-0">
+            {title ? (
+              <TitleTag className="text-sm font-semibold text-mc-text">{title}</TitleTag>
+            ) : null}
+            {subtitle ? <p className="mt-0.5 text-xs text-mc-text-dim">{subtitle}</p> : null}
+          </div>
+          {/* 标题行右侧插槽：不给就退化成原来的单列标题（视觉不变） */}
+          {titleAction ? <div className="shrink-0">{titleAction}</div> : null}
         </div>
       ) : null}
 

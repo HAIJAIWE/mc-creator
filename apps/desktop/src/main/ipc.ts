@@ -18,6 +18,7 @@ import { registerLauncherHandlers } from './ipc/launcher.js';
 import { registerNodeGraphHandlers } from './ipc/node-graph.js';
 import { registerFileManagerHandlers } from './ipc/file-manager.js';
 import { registerRagHandlers } from './ipc/rag.js';
+import { registerProcessSupervisorHandlers } from './ipc/process-supervisor.js';
 
 /**
  * 注册 IPC 处理器（规格 §4 端到端数据流）。
@@ -35,6 +36,8 @@ export function registerIpcHandlers(getOrchestrator: () => Orchestrator): void {
   registerNodeGraphHandlers();
   registerFileManagerHandlers();
   registerRagHandlers();
+  // 进程托管只读通道（§7.1/§10.2）。刻意不含 start/stop：那必须经确认闸门（§10.6）。
+  registerProcessSupervisorHandlers();
 }
 
 // 原模块级注册时序保持：import 本模块时即注册沙箱 Mustache 渲染通道（此前在旧 ipc.ts 尾部模块级注册）。

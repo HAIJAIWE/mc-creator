@@ -11,7 +11,11 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { JavaKernel } from '@mc-creator/kernel-java';
 import { ServerKernel } from '@mc-creator/kernel-server';
-import { buildContextPackFromKernel, fetchContextState, normalizeContextState } from './context-source.js';
+import {
+  buildContextPackFromKernel,
+  fetchContextState,
+  normalizeContextState,
+} from './context-source.js';
 import { createMcpServer } from './mcp-server.js';
 
 const dirs: string[] = [];
@@ -73,7 +77,9 @@ describe('normalizeContextState（宽松校验，脏字段不炸）', () => {
   });
 
   it('数组内的非字符串元素被过滤，空数组不下发（不产出空 installed 段）', () => {
-    expect(normalizeContextState({ parts: { mods: ['a.jar', 1, null, ''], plugins: [] } }).parts).toEqual({
+    expect(
+      normalizeContextState({ parts: { mods: ['a.jar', 1, null, ''], plugins: [] } }).parts,
+    ).toEqual({
       mods: ['a.jar'],
     });
   });
@@ -104,7 +110,9 @@ describe('fetchContextState（内核事实读取，失败降级不抛）', () =>
 
   it('实例不存在 → 返回 null（降级），不抛异常', async () => {
     const dataDir = mkTmp('ctx-src-miss-');
-    expect(await fetchContextState(new JavaKernel({ dataDir }), { instanceId: 'ghost' })).toBeNull();
+    expect(
+      await fetchContextState(new JavaKernel({ dataDir }), { instanceId: 'ghost' }),
+    ).toBeNull();
   });
 
   it('内核 dispatch 抛异常 → 返回 null（生成流程不被状态注入打断）', async () => {
@@ -116,8 +124,12 @@ describe('fetchContextState（内核事实读取，失败降级不抛）', () =>
         throw new Error('内核炸了');
       },
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(await fetchContextState(broken as any, { instanceId: 'i1' })).toBeNull();
+    // 结构上满足 KernelContract，但 dispatch 会抛 —— 验证状态注入不被它打断
+    expect(
+      await fetchContextState(broken as unknown as Parameters<typeof fetchContextState>[0], {
+        instanceId: 'i1',
+      }),
+    ).toBeNull();
   });
 });
 
@@ -227,7 +239,11 @@ describe('MCP 通道 get_context_pack 端到端（§10.4 + §10.6 只读免确�
     const dataDir = mkTmp('ctx-mcp-edition-');
     seedJava(dataDir, 'i1', ['jei.jar']);
     const server = createMcpServer({ java: { dataDir } });
-    const out = await server.callTool('get_context_pack', { serverId: 'anything', edition: 'java', instanceId: 'i1' });
+    const out = await server.callTool('get_context_pack', {
+      serverId: 'anything',
+      edition: 'java',
+      instanceId: 'i1',
+    });
     expect(out.isError).toBeUndefined();
     expect(out.content[0]?.text).toContain('installed_mods: jei.jar');
   });

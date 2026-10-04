@@ -14,6 +14,7 @@ import { CommandPalette, type Command } from '../components/CommandPalette.js';
 import { ProjectSaveDialog } from '../components/ProjectSaveDialog.js';
 import { TaskCompleteDialog } from '../components/TaskCompleteDialog.js';
 import { ErrorBanner } from '../components/ErrorBanner.js';
+import { WarningBanner } from '../components/WarningBanner.js';
 import { Breadcrumb } from '../components/Breadcrumb.js';
 import { TabBar } from '../components/TabBar.js';
 import { FileTree } from '../components/FileTree.js';
@@ -75,6 +76,18 @@ const AXE_OPTIONS = {
 async function runAxe(container: HTMLElement): Promise<AxeTypes.Result[]> {
   const axe = getAxe();
   const results = await axe.run(container, AXE_OPTIONS);
+  return results.violations;
+}
+
+/**
+ * 扫 document.body：给走 ui `Modal` portal 的组件用。
+ *
+ * Modal 用 createPortal 挂到 document.body，RTL 的 `container` 里是空的 ——
+ * 对空容器跑 axe 必然 0 违规，那不是「无障碍达标」而是「没扫到东西」。
+ */
+async function runAxePortal(): Promise<AxeTypes.Result[]> {
+  const axe = getAxe();
+  const results = await axe.run(document.body, AXE_OPTIONS);
   return results.violations;
 }
 
@@ -247,7 +260,7 @@ describe('P9.3 a11y 自动化扫描', () => {
 
   describe('PromptDialog', () => {
     it('prompt 模式无 a11y 违规', async () => {
-      const { container } = render(
+      render(
         <PromptDialog
           title="测试对话框"
           message="请输入内容"
@@ -256,20 +269,18 @@ describe('P9.3 a11y 自动化扫描', () => {
           onConfirm={() => {}}
         />,
       );
-      const violations = await runAxe(container);
+      const violations = await runAxePortal();
       expectNoViolations(violations);
     });
 
     it('confirm 模式无 a11y 违规', async () => {
-      const { container } = render(
-        <PromptDialog title="确认操作" onClose={() => {}} onConfirm={() => {}} />,
-      );
-      const violations = await runAxe(container);
+      render(<PromptDialog title="确认操作" onClose={() => {}} onConfirm={() => {}} />);
+      const violations = await runAxePortal();
       expectNoViolations(violations);
     });
 
     it('danger 模式无 a11y 违规', async () => {
-      const { container } = render(
+      render(
         <PromptDialog
           title="危险操作"
           message="确定要清空吗？"
@@ -279,7 +290,7 @@ describe('P9.3 a11y 自动化扫描', () => {
           onConfirm={() => {}}
         />,
       );
-      const violations = await runAxe(container);
+      const violations = await runAxePortal();
       expectNoViolations(violations);
     });
   });
@@ -391,6 +402,22 @@ describe('P10.3 a11y 扫描扩展', () => {
 
     it('无关闭按钮无 a11y 违规', async () => {
       const { container } = render(<ErrorBanner message="导出失败" />);
+      const violations = await runAxe(container);
+      expectNoViolations(violations);
+    });
+  });
+
+  describe('WarningBanner', () => {
+    it('带多条警告 + 关闭按钮无 a11y 违规', async () => {
+      const { container } = render(
+        <WarningBanner warnings={['缺少物品贴图', '配方 ID 重复']} onClose={() => {}} />,
+      );
+      const violations = await runAxe(container);
+      expectNoViolations(violations);
+    });
+
+    it('无关闭按钮无 a11y 违规', async () => {
+      const { container } = render(<WarningBanner warnings={['缺少物品贴图']} />);
       const violations = await runAxe(container);
       expectNoViolations(violations);
     });

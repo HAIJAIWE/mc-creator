@@ -48,6 +48,25 @@ const VARIANT_VAR: Record<ToastVariant, { border: string; text: string; icon: st
   error: { border: '--mc-redstone', text: '--mc-redstone', icon: '✕' },
 };
 
+/**
+ * 通知上的操作按钮（「需要用户决策」的场景）。
+ *
+ * 为什么需要：不是所有通知都只是「告知」。典型的有 desktop 的文件冲突提示
+ * ——「服务器版本与本地版本不同」，得给「接受服务器 / 保留本地 / 查看差异」
+ * 三个入口。没有 actions 槽就只能把 toast 降级成纯文字（用户看完没法做动作），
+ * 或者退回去自己写一套 toast（重复实现 + 两套样式漂移）。
+ */
+export interface ToastAction {
+  /** 按钮文案 */
+  label: string;
+  /** 点击回调 */
+  onClick: () => void;
+  /** 视觉权重，默认 `ghost`；`primary` 用于「推荐的正解」 */
+  tone?: 'ghost' | 'primary';
+  /** 禁用 */
+  disabled?: boolean;
+}
+
 /** 一条通知的静态描述（不含 id）。 */
 export interface ToastInput {
   /** 文案 */
@@ -56,6 +75,13 @@ export interface ToastInput {
   variant?: ToastVariant;
   /** 自动消失时长；`0` = 不自动消失。省略则按 variant 取默认值 */
   duration?: number;
+  /**
+   * 操作按钮（可选）。**给了 actions 就应把 duration 设为 0** ——
+   * 用户还没来得及点按钮提示就没了，等于把决策入口藏起来。
+   * 这里不做强制（自动纠正会让人意外），但会在渲染时给出可访问的提示，
+   * 且 duration 省略时自动按 variant 默认值（调用方需显式传 0）。
+   */
+  actions?: ToastAction[];
 }
 
 /** 一条通知（含运行时生成的 id）。 */
@@ -68,6 +94,13 @@ export interface ToastItem extends ToastInput {
   duration: number;
 }
 
+/** 快捷方法的可选参数（省略即用 variant 默认时长）。 */
+export type ToastQuickOptions = {
+  duration?: number;
+  actions?: ToastAction[];
+};
+
+/** 快捷方法。传了 actions 而没给 duration 时自动按 duration=0 处理。 */
 export interface ToastContextValue {
   /** 显示一条通知，返回其 id */
   show: (input: ToastInput) => string;
@@ -77,11 +110,10 @@ export interface ToastContextValue {
   clear: () => void;
   /** 当前通知列表（只读快照） */
   toasts: readonly ToastItem[];
-  /** 快捷方法 */
-  success: (message: string, options?: { duration?: number }) => string;
-  error: (message: string, options?: { duration?: number }) => string;
-  warning: (message: string, options?: { duration?: number }) => string;
-  info: (message: string, options?: { duration?: number }) => string;
+  success: (message: string, options?: ToastQuickOptions) => string;
+  error: (message: string, options?: ToastQuickOptions) => string;
+  warning: (message: string, options?: ToastQuickOptions) => string;
+  info: (message: string, options?: ToastQuickOptions) => string;
 }
 
 export const ToastContext = createContext<ToastContextValue | null>(null);
@@ -110,14 +142,31 @@ export interface ToastProps {
   duration?: number;
   /** 关闭回调。不传则不渲染关闭按钮的点击行为 */
   onDismiss?: (id: string) => void;
+  /** 操作按钮（可选，见 ToastAction）。渲染在文案下方独立一行。 */
+  actions?: ToastAction[];
+  /**
+   * 关闭按钮的可访问名。不传则回退到「关闭通知：{message}」。
+   *
+   * 为什么可注入：i18n（§4.5）要求错误文案映射层统一多语言，而关闭按钮是
+   * 每个桌面应用都要朗读的控件 —— 硬编码中文会让英文环境读出中文。
+   */
+  closeLabel?: string;
 }
 
 /** 单条通知。`role`/`aria-live` 挂在真实节点上（见文件头注释）。 */
-export function Toast({ id, message, variant = 'info', onDismiss }: ToastProps) {
+export function Toast({
+  id,
+  message,
+  variant = 'info',
+  onDismiss,
+  actions,
+  closeLabel,
+}: ToastProps) {
   const colors = VARIANT_VAR[variant];
   const isError = variant === 'error';
   // 独立使用（没经过 Provider）时不渲染关闭按钮，避免点了没反应的死按钮
   const dismissible = Boolean(onDismiss);
+  const actionList = actions ?? [];
   return (
     <div
       data-testid="mc-toast"
@@ -126,7 +175,7 @@ export function Toast({ id, message, variant = 'info', onDismiss }: ToastProps) 
       role={isError ? 'alert' : 'status'}
       aria-live={isError ? 'assertive' : 'polite'}
       aria-atomic="true"
-      className="mc-pop pointer-events-auto flex min-w-[240px] max-w-[420px] items-start gap-2 border px-4 py-3"
+      className="mc-pop pointer-events-auto flex w-full min-w-[240px] max-w-[420px] items-start gap-2 border px-4 py-3"
       style={{
         borderColor: `rgb(var(${colors.border}) / 0.55)`,
       }}
@@ -138,12 +187,34 @@ export function Toast({ id, message, variant = 'info', onDismiss }: ToastProps) 
       >
         {colors.icon}
       </span>
-      <div className="flex-1 whitespace-pre-wrap text-sm text-mc-text">{message}</div>
+      {/*
+        文案与操作区合成一个整体纵向流：actions 存在时按钮排在文案下方。
+        用 flex-col 包一层而不是给文案加 margin，这样无 actions 时布局与之前完全一致。
+      */}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="whitespace-pre-wrap text-sm text-mc-text">{message}</div>
+        {actionList.length > 0 ? (
+          // role=group + aria-label：读屏会念「操作」，用户知道这排按钮是干嘛的
+          <div role="group" aria-label="操作" className="flex flex-wrap items-center gap-1.5">
+            {actionList.map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                onClick={action.onClick}
+                disabled={action.disabled === true}
+                className={action.tone === 'primary' ? 'mc-btn-primary' : 'mc-btn-ghost'}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
       {dismissible ? (
         <button
           type="button"
           onClick={() => onDismiss?.(id ?? '')}
-          aria-label={`关闭通知：${message}`}
+          aria-label={closeLabel ?? `关闭通知：${message}`}
           className="shrink-0 text-mc-text-dim transition-colors hover:text-mc-text"
         >
           <svg
@@ -175,6 +246,28 @@ let toastSeq = 0;
 function nextToastId(): string {
   toastSeq += 1;
   return `mc-toast-${Date.now().toString(36)}-${toastSeq}`;
+}
+
+/**
+ * 快捷方法的可选参数 → ToastInput 片段。
+ *
+ * actions 存在且未显式给 duration 时补 duration: 0（见 ToastProvider value 注释）。
+ * `exactOptionalPropertyTypes` 下不能用 `{ duration: undefined }` 这种写法，
+ * 必须条件展开。
+ */
+function pickQuick(
+  options: ToastQuickOptions | undefined,
+): Pick<ToastInput, 'duration' | 'actions'> {
+  if (options === undefined) return {};
+  const hasActions = options.actions !== undefined && options.actions.length > 0;
+  return {
+    ...(options.duration !== undefined
+      ? { duration: options.duration }
+      : hasActions
+        ? { duration: 0 }
+        : {}),
+    ...(options.actions === undefined ? {} : { actions: options.actions }),
+  };
 }
 
 export interface ToastProviderProps {
@@ -211,10 +304,19 @@ export function ToastProvider({ children, placement = 'top-right' }: ToastProvid
   }, []);
 
   const show = useCallback(
-    ({ message, variant = 'info', duration }: ToastInput): string => {
+    ({ message, variant = 'info', duration, actions }: ToastInput): string => {
       const id = nextToastId();
       const resolvedDuration = duration ?? TOAST_DEFAULT_DURATION[variant];
-      setToasts((prev) => [...prev, { id, message, variant, duration: resolvedDuration }]);
+      setToasts((prev) => [
+        ...prev,
+        {
+          id,
+          message,
+          variant,
+          duration: resolvedDuration,
+          ...(actions === undefined ? {} : { actions }),
+        },
+      ]);
 
       // duration === 0 ⇒ 不自动消失（需用户手动关闭）
       if (resolvedDuration > 0) {
@@ -241,14 +343,33 @@ export function ToastProvider({ children, placement = 'top-right' }: ToastProvid
       dismiss,
       clear,
       toasts,
+      // actions 透传时**强制 duration=0**：带决策按钮的提示若 4 秒后自动消失，
+      // 用户还没点就没了入口 —— 这类提示的默认语义就该是「等人处理」。
+      // 显式传了 duration 则尊重调用方（他要的就是限时提醒）。
       success: (message, options) =>
-        show({ message, variant: 'success', ...(options?.duration !== undefined ? { duration: options.duration } : {}) }),
+        show({
+          message,
+          variant: 'success',
+          ...pickQuick(options),
+        }),
       error: (message, options) =>
-        show({ message, variant: 'error', ...(options?.duration !== undefined ? { duration: options.duration } : {}) }),
+        show({
+          message,
+          variant: 'error',
+          ...pickQuick(options),
+        }),
       warning: (message, options) =>
-        show({ message, variant: 'warning', ...(options?.duration !== undefined ? { duration: options.duration } : {}) }),
+        show({
+          message,
+          variant: 'warning',
+          ...pickQuick(options),
+        }),
       info: (message, options) =>
-        show({ message, variant: 'info', ...(options?.duration !== undefined ? { duration: options.duration } : {}) }),
+        show({
+          message,
+          variant: 'info',
+          ...pickQuick(options),
+        }),
     }),
     [show, dismiss, clear, toasts],
   );

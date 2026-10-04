@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { McIcon } from '../assets/mc-ui/McIcon';
+import { useRef, useState } from 'react';
+import { Button, Modal } from '@mc-creator/ui';
 
 interface PromptDialogProps {
   /** 标题 */
@@ -25,13 +25,15 @@ interface PromptDialogProps {
 /**
  * 通用对话框：替代 window.prompt / window.confirm。
  *
- * 风格参考 ProjectSaveDialog，统一 mc-* 主题色。
+ * 风格参考 ProjectSaveDialog，统一 mc-* 主题色。外壳已迁到
+ * `@mc-creator/ui` 的 `Modal` + `Button`（遮罩、居中、焦点陷阱、
+ * Escape/关闭按钮、焦点归还由 ui 组件承担），本文件只保留对话框语义。
  *
  * - prompt 模式：传 `defaultValue` 或 `placeholder`，onConfirm 接收输入值
  * - confirm 模式：不传输入相关 props，onConfirm 接收空字符串
  * - danger 模式：确认按钮变红色（用于删除/清空等不可逆操作）
  *
- * 按 Esc 取消，按 Enter 确认。
+ * 按 Esc 取消，按 Enter 确认（prompt 模式下由输入框自己消费 Enter）。
  */
 export function PromptDialog({
   title,
@@ -47,20 +49,6 @@ export function PromptDialog({
   const [value, setValue] = useState(defaultValue ?? '');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  useEffect(() => {
-    // autoFocus 在某些情况下不稳定，用 ref + setTimeout 确保 focus
-    const t = setTimeout(() => inputRef.current?.focus(), 0);
-    return () => clearTimeout(t);
-  }, []);
-
   const isPrompt = placeholder !== undefined || defaultValue !== undefined;
 
   const handleConfirm = () => {
@@ -69,56 +57,38 @@ export function PromptDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="prompt-dialog-title"
-        className="w-[420px] max-w-full rounded-mc-lg border border-mc-border-strong bg-mc-surface p-6 text-mc-text shadow-mc-pop animate-mc-dialog-in"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="prompt-dialog-title" className="font-display text-lg font-bold">
-            {title}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-mc-mute transition-colors hover:text-mc-text"
-            aria-label="关闭"
-          >
-            <McIcon scope="pixel" name="close" size={16} />
-          </button>
-        </div>
-
-        {message && <p className="mb-3 text-sm text-mc-dim">{message}</p>}
-
-        {isPrompt && (
-          <input
-            ref={inputRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleConfirm();
-            }}
-            className="mc-input"
-            placeholder={placeholder}
-            aria-label={title}
-          />
-        )}
-
-        <div className="mt-5 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="mc-btn-ghost">
+    <Modal
+      open
+      title={title}
+      onClose={onClose}
+      // 原实现点遮罩不关闭（避免误触丢失已输入内容），保持原行为
+      closeOnOverlayClick={false}
+      {...(isPrompt ? { initialFocusRef: inputRef } : {})}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
             {cancelLabel}
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            className={danger ? 'mc-btn-danger' : 'mc-btn-primary'}
-          >
+          </Button>
+          <Button variant={danger ? 'danger' : 'primary'} onClick={handleConfirm}>
             {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </>
+      }
+    >
+      {message && <p className="mb-3 text-mc-dim">{message}</p>}
+      {isPrompt && (
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleConfirm();
+          }}
+          className="mc-input"
+          placeholder={placeholder}
+          aria-label={title}
+        />
+      )}
+    </Modal>
   );
 }

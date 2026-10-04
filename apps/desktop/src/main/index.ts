@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, shell } from 'electron';
 import { join } from 'path';
 import { registerIpcHandlers, createDefaultOrchestrator } from './ipc.js';
+import { getProcessSupervisor } from './ipc/process-supervisor.js';
 
 // 受限环境（无 GPU / 沙箱代理）下禁用 GPU，避免 Chromium GPU 进程崩溃。
 // 代价：WebGL 不可用，skinview3d 等 3D 预览会加载失败（实测 SwiftShader
@@ -118,4 +119,23 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+/**
+ * 退出前把所有被托管的进程优雅停掉（§7.4「批量停止」，§7.1 进程保活属外壳职责）。
+ * 内核不下发 stop —— stop_server 只返回 controlCommand:'stop'，真正收尾在这里。
+ *
+ * 用一次 preventDefault + 标志位来等异步停机：直接依赖 before-quit 的异步回调
+ * 不会阻塞退出，Minecraft 服务端会变孤儿进程。停机本身有上限
+ * （shutdownGracefulMs + 强杀后兜底各 2s），不会无限挂住退出。
+ */
+let supervisorShutdownDone = false;
+app.on('before-quit', (event) => {
+  if (supervisorShutdownDone) return;
+  event.preventDefault();
+  supervisorShutdownDone = true;
+  void getProcessSupervisor()
+    .shutdownAll()
+    .catch(() => undefined)
+    .finally(() => app.quit());
 });

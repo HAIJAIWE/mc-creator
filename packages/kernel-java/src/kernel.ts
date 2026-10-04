@@ -199,7 +199,7 @@ function withString<T extends object, K extends string>(
   target: T,
   key: K,
   value: string | undefined,
-): T & (Record<K, string>) {
+): T & Record<K, string> {
   return (value === undefined ? target : { ...target, [key]: value }) as T & Record<K, string>;
 }
 
@@ -397,7 +397,7 @@ const STEP_DEFS: Record<string, { stage: string; message: string }[]> = {
   launch_instance: [
     { stage: 'starting', message: '准备启动参数' },
     { stage: 'spawned', message: '沙箱模式不执行 spawn（§13.4）' },
-    { stage: 'running', message: '启动命令已就绪，交外壳 launcher-service 在确认后执行' },
+    { stage: 'running', message: '启动命令已就绪，交外壳 process-supervisor 在确认后执行' },
   ],
   create_instance: [
     { stage: 'validating', message: '校验参数与重名' },
@@ -441,7 +441,8 @@ const STEP_DEFS: Record<string, { stage: string; message: string }[]> = {
 /** 汇总一行中文摘要（§10.2 弹窗确认要求可读的影响面）。 */
 function confirmSummary(kind: string, payload: unknown): string {
   const p = asRecord(payload);
-  const id = optString(p, 'instanceId') ?? optString(p, 'name') ?? optString(p, 'serverId') ?? '未命名';
+  const id =
+    optString(p, 'instanceId') ?? optString(p, 'name') ?? optString(p, 'serverId') ?? '未命名';
   switch (kind) {
     case 'create_instance':
       return `创建 Java 实例「${id}」并写入 mods/resourcepacks/config 等目录与 instance.json`;
@@ -567,7 +568,10 @@ export class JavaKernel implements KernelContract {
   private writeRoot(): string {
     if (this.mode === 'sandbox') {
       if (this.sandboxDir === undefined || this.sandboxDir === '') {
-        verr('mode=sandbox 但未配置 sandboxDir，拒绝写入（§13.4 沙箱隔离）', 'SANDBOX_ROOT_MISSING');
+        verr(
+          'mode=sandbox 但未配置 sandboxDir，拒绝写入（§13.4 沙箱隔离）',
+          'SANDBOX_ROOT_MISSING',
+        );
       }
       return this.sandboxDir;
     }
@@ -587,7 +591,11 @@ export class JavaKernel implements KernelContract {
     try {
       return assertWithinRoot(root, target);
     } catch (e) {
-      throw cerr('validation', `目标路径越界（${root} 之外）: ${target}（${(e as Error).message}）`, 'SANDBOX_ESCAPE');
+      throw cerr(
+        'validation',
+        `目标路径越界（${root} 之外）: ${target}（${(e as Error).message}）`,
+        'SANDBOX_ESCAPE',
+      );
     }
   }
 
@@ -611,7 +619,8 @@ export class JavaKernel implements KernelContract {
     if (existsSync(metaPath)) {
       try {
         const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as Partial<InstanceJson>;
-        if (typeof meta.versionId === 'string' && meta.versionId !== '') target.mcVersion = meta.versionId;
+        if (typeof meta.versionId === 'string' && meta.versionId !== '')
+          target.mcVersion = meta.versionId;
         if (typeof meta.loader === 'string' && meta.loader !== '') target.runtime = meta.loader;
       } catch {
         // instance.json 损坏不阻断状态注入：版本/加载器缺失只是精度下降。
@@ -772,7 +781,11 @@ export class JavaKernel implements KernelContract {
       await downloadFile(
         url,
         dest,
-        withString(withString({}, 'sha256', optString(mod, 'sha256')), 'sha512', optString(mod, 'sha512')),
+        withString(
+          withString({}, 'sha256', optString(mod, 'sha256')),
+          'sha512',
+          optString(mod, 'sha512'),
+        ),
       );
     } else {
       // localPath 已由上面的联合判定收窄为 string。
@@ -820,7 +833,11 @@ export class JavaKernel implements KernelContract {
     const zipBuf = readFileSync(packPath);
     const entries = readZipDirectory(zipBuf);
     const safeNames = assertSafeEntries(entries);
-    const limits = checkZipLimits(entries, { maxEntries: 10000, maxTotalSize: 2 * 1024 * 1024 * 1024, maxRatio: 100 });
+    const limits = checkZipLimits(entries, {
+      maxEntries: 10000,
+      maxTotalSize: 2 * 1024 * 1024 * 1024,
+      maxRatio: 100,
+    });
 
     const indexName = source === 'modrinth' ? 'modrinth.index.json' : 'manifest.json';
     const indexEntryIndex = entries.findIndex((e) => e.name === indexName);
@@ -831,10 +848,17 @@ export class JavaKernel implements KernelContract {
     if (indexEntry === undefined) zipFail('整合包索引条目丢失');
     let index: Record<string, unknown>;
     try {
-      index = JSON.parse(readZipEntryData(zipBuf, indexEntry).toString('utf8')) as Record<string, unknown>;
+      index = JSON.parse(readZipEntryData(zipBuf, indexEntry).toString('utf8')) as Record<
+        string,
+        unknown
+      >;
     } catch (e) {
       if (isClassifiedError(e)) throw e;
-      throw cerr('validation', `${indexName} 解析失败: ${(e as Error).message}`, 'PACK_INDEX_INVALID');
+      throw cerr(
+        'validation',
+        `${indexName} 解析失败: ${(e as Error).message}`,
+        'PACK_INDEX_INVALID',
+      );
     }
 
     // 期望哈希一律 sha512（§13.3 供应链）：mrpack 原生给 sha512，CF 由上层解析时回填。
@@ -1092,7 +1116,12 @@ export class JavaKernel implements KernelContract {
       }
       for (const world of readdirSync(worldsRoot, { withFileTypes: true })) {
         if (!world.isDirectory()) continue;
-        targets.push(this.guard(root, join('instances', instanceId, 'saves', world.name, 'datapack', identifier)));
+        targets.push(
+          this.guard(
+            root,
+            join('instances', instanceId, 'saves', world.name, 'datapack', identifier),
+          ),
+        );
       }
       if (targets.length === 0) verr(`实例没有世界目录: ${instanceId}`, 'WORLD_DIR_MISSING');
     } else {
@@ -1135,7 +1164,11 @@ export class JavaKernel implements KernelContract {
     try {
       meta = JSON.parse(readFileSync(metaPath, 'utf8')) as InstanceJson;
     } catch (e) {
-      throw cerr('validation', `instance.json 解析失败: ${(e as Error).message}`, 'INSTANCE_META_INVALID');
+      throw cerr(
+        'validation',
+        `instance.json 解析失败: ${(e as Error).message}`,
+        'INSTANCE_META_INVALID',
+      );
     }
 
     const cmd = optString(p, 'javaPath') ?? meta.javaPath ?? 'java';
@@ -1185,8 +1218,11 @@ export class JavaKernel implements KernelContract {
 
     step(1);
     step(2);
-    // §13.4：沙箱模式永不自动 spawn。真实 spawn 归 desktop 层 launcher-service，
-    // 在用户二次确认后执行；本内核只返回命令供审计（spawn 一律数组参数，无 shell:true）。
+    // §13.4：沙箱模式永不自动 spawn。真实 spawn 归 desktop 层 process-supervisor
+    // （apps/desktop/src/main/process-supervisor.ts），在用户二次确认后执行；
+    // 本内核只返回命令供审计（spawn 一律数组参数，无 shell:true）。
+    // 注意：desktop 下另有一个 **launcher-service.ts**，那是 PCL2/HMCL 客户端
+    // 下载器（downloadClient / launchGame），与这里的进程托管不是同一件事，别混。
     return {
       ok: true,
       data: {
@@ -1212,7 +1248,12 @@ export class JavaKernel implements KernelContract {
     let approved = false;
     try {
       approved = Boolean(
-        await this.confirm({ kind, payload, summary: confirmSummary(kind, payload), risk: riskOf(kind) }),
+        await this.confirm({
+          kind,
+          payload,
+          summary: confirmSummary(kind, payload),
+          risk: riskOf(kind),
+        }),
       );
     } catch {
       // 确认通道自身异常按「未确认」处理：宁可拒绝，绝不静默执行（§10.6）。
@@ -1265,7 +1306,12 @@ export class JavaKernel implements KernelContract {
         // §13.1 压缩包安全：zip-slip / 压缩炸弹 / 符号链接统一归 validation。
         return {
           ok: false,
-          error: { category: 'validation', message: e.message, code: `ZIP_${e.code}`, retryable: false },
+          error: {
+            category: 'validation',
+            message: e.message,
+            code: `ZIP_${e.code}`,
+            retryable: false,
+          },
         };
       }
       if (isClassifiedError(e)) return { ok: false, error: e };
@@ -1274,12 +1320,23 @@ export class JavaKernel implements KernelContract {
   }
 
   dispatch(task: TaskSpec): TaskHandle {
-    // result() 内this 指向 handle 而非 kernel，此处提前捕获。
-    const kernel = this;
     const id = task.id;
     const kind = task.kind;
     const payload = task.payload;
     const capabilities = this.capabilities();
+    // result() 是箭头函数，this 仍指向 kernel 实例 —— 无需把 this 存进局部变量
+    // （存了反而触发 @typescript-eslint/no-this-alias）。
+    const executeWrite = (
+      writeId: string,
+      writeKind: string,
+      writePayload: unknown,
+      bus: ProgressBus,
+    ) => this.executeWrite(writeId, writeKind, writePayload, bus);
+    const readRoot = () => this.readRoot();
+    const instancesDir = (root: string) => this.instancesDir(root);
+    const instanceDir = (root: string, instanceId: string) => this.instanceDir(root, instanceId);
+    const readContextParts = (root: string, instanceId: string) =>
+      this.readContextParts(root, instanceId);
 
     const permLevel = MCP_TOOL_PERMISSIONS[kind] as 'R' | 'W' | 'X' | undefined;
     const isWriteOrExecute = permLevel === 'W' || permLevel === 'X';
@@ -1302,16 +1359,16 @@ export class JavaKernel implements KernelContract {
         bus.markResultStarted();
         try {
           if (isWriteOrExecute) {
-            return await kernel.executeWrite(id, kind, payload, bus);
+            return await executeWrite(id, kind, payload, bus);
           }
 
           switch (kind) {
             case 'get_capabilities':
               return { ok: true, data: { capabilities } };
             case 'list_instances': {
-              const root = kernel.readRoot();
+              const root = readRoot();
               if (root === undefined || root === '') return { ok: true, data: { instances: [] } };
-              const dir = kernel.instancesDir(root);
+              const dir = instancesDir(root);
               if (!existsSync(dir)) return { ok: true, data: { instances: [] } };
               const names = readdirSync(dir, { withFileTypes: true })
                 .filter((entry) => entry.isDirectory())
@@ -1325,24 +1382,37 @@ export class JavaKernel implements KernelContract {
               if (instanceId === undefined) {
                 return {
                   ok: false,
-                  error: { category: 'validation', message: '缺少参数 payload.instanceId（状态注入需定位目标实例，§10.4）', retryable: false },
+                  error: {
+                    category: 'validation',
+                    message: '缺少参数 payload.instanceId（状态注入需定位目标实例，§10.4）',
+                    retryable: false,
+                  },
                 };
               }
-              const root = kernel.readRoot();
+              const root = readRoot();
               if (root === undefined || root === '') {
                 return {
                   ok: false,
-                  error: { category: 'validation', message: '未配置数据根目录，无法读取实例现状（§10.4）', retryable: false },
+                  error: {
+                    category: 'validation',
+                    message: '未配置数据根目录，无法读取实例现状（§10.4）',
+                    retryable: false,
+                  },
                 };
               }
-              const dir = kernel.instanceDir(root, instanceId);
+              const dir = instanceDir(root, instanceId);
               if (!existsSync(dir)) {
                 return {
                   ok: false,
-                  error: { category: 'validation', message: `实例不存在: ${instanceId}（${dir}）`, code: 'INSTANCE_NOT_FOUND', retryable: false },
+                  error: {
+                    category: 'validation',
+                    message: `实例不存在: ${instanceId}（${dir}）`,
+                    code: 'INSTANCE_NOT_FOUND',
+                    retryable: false,
+                  },
                 };
               }
-              return { ok: true, data: kernel.readContextParts(root, instanceId) };
+              return { ok: true, data: readContextParts(root, instanceId) };
             }
             default:
               return {

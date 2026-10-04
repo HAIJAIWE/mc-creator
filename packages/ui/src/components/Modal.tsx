@@ -71,6 +71,14 @@ export interface ModalProps {
   closeOnEscape?: boolean;
   /** 打开后聚焦的元素；不传则聚焦面板内第一个可聚焦元素 */
   initialFocusRef?: RefObject<HTMLElement>;
+  /**
+   * 关闭按钮的可访问名，默认 `关闭`。
+   *
+   * 为什么可注入：i18n（§4.5）要求错误文案映射层统一多语言。关闭按钮是
+   * 每个对话框都要朗读的控件，硬编码中文会让英文环境读出中文；
+   * 调用方从自己的文案表取 `common.close` 传进来即可。
+   */
+  closeLabel?: string;
   /** 面板 className 覆盖 */
   className?: string;
 }
@@ -100,6 +108,7 @@ export function Modal({
   closeOnOverlayClick = true,
   closeOnEscape = true,
   initialFocusRef,
+  closeLabel = '关闭',
   className,
 }: ModalProps) {
   const reactId = useId().replace(/:/g, '');
@@ -228,7 +237,7 @@ export function Modal({
             type="button"
             ref={closeButtonRef}
             onClick={onClose}
-            aria-label="关闭"
+            aria-label={closeLabel}
             className="shrink-0 text-mc-text-dim transition-colors hover:text-mc-text"
           >
             <CloseIcon />

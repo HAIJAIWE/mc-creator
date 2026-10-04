@@ -1,54 +1,29 @@
-import { useState, useCallback, type ReactNode } from 'react';
-import { McIcon } from '../assets/mc-ui/McIcon';
+import { useCallback, useState, type ReactNode } from 'react';
+import { Toast as UiToast, type ToastAction as UiToastAction } from '@mc-creator/ui';
 import { LiveRegion } from './common/LiveRegion';
 import { ToastContext, type ToastType, type ToastItem, type ToastAction } from './useToast';
 
 /**
- * Toast 通知系统（P32）。
+ * Toast 通知系统（P32）—— 单条 toast 的视觉与无障碍语义复用 `@mc-creator/ui`
+ * 的 `Toast`，栈容器 / 朗读区 / 领域方法留在 desktop。
  *
- * - 4 种类型：success / error / warning / info
- * - 自动消失（success/info 3s，warning 4s，error 5s）
- * - 手动关闭按钮
- * - 支持操作按钮（用于冲突提示等需要用户决策的场景）
- * - 深色主题 + lucide-react 图标
- * - 右上角堆叠，slide-in 动画
+ * ## 为什么是「适配」而不是直接换成 ui 的 `ToastProvider`
  *
- * 用法：
- *   import { useToast } from './useToast';
- *   const toast = useToast();
- *   toast.success('导入成功');
- *   toast.error('导入失败：xxx');
- *   toast.showConflictToast({ ... }); // 显示冲突处理 toast
+ * ui 的 ToastProvider 是通用组件，desktop 现有行为有三处**产品特定**，换掉会
+ * 改动既有对外契约：
  *
- * 注：useToast hook 和 ToastContext 都在 ./useToast.ts 中导出，
- * 让本文件只导出 ToastProvider component，符合 react-refresh/only-export-components 规则。
+ * 1. **领域方法 `showConflictToast`**：三个决策按钮（接受服务器 / 保留本地 /
+ *    查看差异）。ui 不知道「文件冲突」是什么，这段业务描述属于 desktop。
+ * 2. **上下文 API 形状**：desktop 是 `toast(message, type, options)` 三参；
+ *    ui 是 `show({message, variant, ...})`。3 处调用方按 desktop 形状写。
+ * 3. **测试锚点**：既有测试用 `toast-stack` 定位栈、用
+ *    `live-region-toast-announcer` 定位朗读区。ui 的 testid 是 `mc-toast-stack`，
+ *    且刻意不另做朗读副本（见 ui Toast 文件头注释）。
+ *
+ * 真正的复用发生在**单条 toast** 上：视觉（`.mc-pop` + 语义色边框）、无障碍
+ * （`role="status"/"alert"` + `aria-live` + `aria-atomic`）、操作按钮组
+ * （`role="group" aria-label="操作"`）、关闭按钮全部来自 ui。
  */
-
-const TYPE_CONFIG: Record<
-  ToastType,
-  { icon: { scope: 'pixel'; name: string }; color: string; border: string }
-> = {
-  success: {
-    icon: { scope: 'pixel', name: 'check' },
-    color: 'text-mc-accent',
-    border: 'border-mc-accent',
-  },
-  error: {
-    icon: { scope: 'pixel', name: 'square-alert' },
-    color: 'text-mc-redstone',
-    border: 'border-mc-redstone',
-  },
-  warning: {
-    icon: { scope: 'pixel', name: 'warning-box' },
-    color: 'text-mc-gold',
-    border: 'border-mc-gold',
-  },
-  info: {
-    icon: { scope: 'pixel', name: 'info-box' },
-    color: 'text-mc-accent',
-    border: 'border-mc-accent',
-  },
-};
 
 const DEFAULT_DURATION: Record<ToastType, number> = {
   success: 3000,
@@ -57,65 +32,33 @@ const DEFAULT_DURATION: Record<ToastType, number> = {
   info: 3000,
 };
 
-function ToastItemComponent({
-  item,
-  onRemove,
-}: {
-  item: ToastItem;
-  onRemove: (id: string) => void;
-}) {
-  const config = TYPE_CONFIG[item.type];
-  const icon = config.icon;
+/**
+ * desktop 动作档位 → ui toast 的 tone。
+ *
+ * desktop 有三档（primary/secondary/ghost），ui 只有两档。映射理由：
+ * `secondary`（强调但非主推）与 `ghost`（弱）在 ui 两档里语义等价 —— 都只是
+ * 「可点但不抢视觉焦点」；真正需要抢焦点的「查看差异」已经标成 primary。
+ * 保留三档写法是为了调用方不必改；将来 ui 若加档位只需改这一张表。
+ */
+const TONE_BY_VARIANT: Record<NonNullable<ToastAction['variant']>, 'primary' | 'ghost'> = {
+  primary: 'primary',
+  secondary: 'ghost',
+  ghost: 'ghost',
+};
 
-  const renderActions = () => {
-    if (!item.actions || item.actions.length === 0) return null;
-    return (
-      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-mc-border/30">
-        {item.actions.map((action, i) => (
-          <button
-            key={i}
-            onClick={() => {
-              action.onClick();
-              if (!item.persistent) onRemove(item.id);
-            }}
-            className={`text-xs px-2 py-1 rounded-mc transition-colors ${
-              action.variant === 'primary'
-                ? 'bg-mc-accent text-mc-bg hover:bg-mc-accent/80'
-                : action.variant === 'secondary'
-                ? 'bg-mc-surface-3 text-mc-text hover:bg-mc-surface-4'
-                : 'text-mc-dim hover:text-mc-text hover:bg-mc-surface-3'
-            }`}
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
-    );
-  };
-
-  return (
-    <div
-      className={`pointer-events-auto flex flex-col gap-2 rounded-mc-lg border ${config.border} bg-mc-surface px-4 py-3 shadow-mc-pop min-w-[320px] max-w-[480px] animate-mc-toast-in`}
-    >
-      <div className="flex items-start gap-2">
-        <McIcon
-          scope={icon.scope}
-          name={icon.name}
-          size={20}
-          className={`mt-0.5 flex-shrink-0 ${config.color}`}
-        />
-        <div className="flex-1 text-sm text-mc-text whitespace-pre-wrap">{item.message}</div>
-        <button
-          onClick={() => onRemove(item.id)}
-          className="flex-shrink-0 text-mc-text-dim transition-colors hover:text-mc-text"
-          aria-label="关闭"
-        >
-          <McIcon scope="pixel" name="close" size={16} />
-        </button>
-      </div>
-      {renderActions()}
-    </div>
-  );
+/** desktop ToastType 与 ui variant 名字一致（success/error/warning/info）。 */
+function toUiActions(item: ToastItem, onRemove: (id: string) => void): UiToastAction[] | undefined {
+  if (item.actions === undefined || item.actions.length === 0) return undefined;
+  return item.actions.map((action) => ({
+    label: action.label,
+    disabled: false,
+    tone: TONE_BY_VARIANT[action.variant ?? 'ghost'],
+    onClick: () => {
+      action.onClick();
+      // persistent 的提示点完不消失（冲突提示要留到用户处理完）
+      if (!item.persistent) onRemove(item.id);
+    },
+  }));
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -126,7 +69,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toast = useCallback(
-    (message: string, type: ToastType = 'info', options?: { actions?: ToastAction[]; persistent?: boolean }) => {
+    (
+      message: string,
+      type: ToastType = 'info',
+      options?: { actions?: ToastAction[]; persistent?: boolean },
+    ) => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const newToast: ToastItem = { id, type, message };
       if (options?.actions) newToast.actions = options.actions;
@@ -188,13 +135,29 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        className="pointer-events-none fixed right-4 top-4 z-[200] flex flex-col gap-2"
+        className="pointer-events-none fixed right-4 top-4 z-[200] flex w-[min(480px,calc(100vw-2rem))] flex-col gap-2"
       >
-        {toasts.map((t) => (
-          <ToastItemComponent key={t.id} item={t} onRemove={remove} />
-        ))}
+        {toasts.map((t) => {
+          // 条件展开而非直接传 undefined：exactOptionalPropertyTypes 下 actions?: T
+          // 不接受显式 undefined
+          const uiActions = toUiActions(t, remove);
+          return (
+            <UiToast
+              key={t.id}
+              id={t.id}
+              message={t.message}
+              variant={t.type}
+              // 关闭按钮的可访问名沿用 desktop 既有文案（ui 默认是「关闭通知：…」）
+              closeLabel="关闭"
+              onDismiss={remove}
+              {...(uiActions === undefined ? {} : { actions: uiActions })}
+            />
+          );
+        })}
       </div>
-      {/* a11y：朗读最新 toast，屏幕阅读器可感知通知而不必聚焦到右上角 */}
+      {/* a11y：朗读最新 toast，屏幕阅读器可感知通知而不必聚焦到右上角。
+          注：ui 的 Toast 已把 aria-live 挂在真实节点上，这里保留独立 LiveRegion
+          是为了不改动既有对外契约（测试与 a11y 扫描都锚定这个 testid）。 */}
       <LiveRegion
         id="toast-announcer"
         message={latestToast?.message ?? ''}

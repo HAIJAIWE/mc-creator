@@ -31,8 +31,10 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
+import { dirname } from 'node:path';
 import type { JsonRpcRequest, JsonRpcResponse, McpServer } from './mcp-server.js';
 import { handleRequest } from './mcp-server.js';
 
@@ -61,6 +63,7 @@ export const ERR_FORBIDDEN_ORIGIN = -32003;
 export const ERR_ENDPOINT_NOT_FOUND = -32004;
 export const ERR_METHOD_NOT_ALLOWED = -32005;
 export const ERR_PAYLOAD_TOO_LARGE = -32006;
+export const ERR_NOT_ACCEPTABLE = -32007;
 
 /** HTTP 层监听的方法白名单（其余 405 + Allow）。 */
 export const ALLOWED_METHODS = 'GET, POST, DELETE';
@@ -91,6 +94,119 @@ export function sseHeartbeatFrame(nowMs: number): string {
   return `: heartbeat ${nowMs}\n\n`;
 }
 
+// ---------------------------------------------------------------------------
+// Accept 头校验（MCP Streamable HTTP 规范强制项）
+// ---------------------------------------------------------------------------
+
+/** POST 必须同时可接受 JSON 与 SSE（MCP 规范要求客户端两者都声明）。 */
+const POST_REQUIRED_ACCEPT = ['application/json', 'text/event-stream'] as const;
+
+/** 单条 media-range（q 值已归一到 0..1，q=0 表示显式拒绝该类型）。 */
+interface MediaRange {
+  type: string;
+  q: number;
+}
+
+/**
+ * 解析 Accept 头为 media-range 列表。
+ *
+ * 为什么不能 `includes('application/json')`：那样写会把
+ * `application/json-seq` 误判为已声明 `application/json`（前缀匹配），
+ * 而 json-seq 是完全不同的媒体类型，接了它我们的响应格式就对不上了。
+ * 所以必须按 `type/subtype` 精确比对 type 与 subtype 两段。
+ *
+ * 语法细节：逗号分隔、每项 `type/subtype[;q=权重]`、参数间可有空格、
+ * type/subtype 大小写不敏感（RFC 9110 media type 是大小写无关的）、
+ * 非法 q 值按 1.0 处理（宁可宽松也不因畸形头拒绝合法请求）。
+ */
+export function parseAccept(header: string | undefined): MediaRange[] {
+  if (header === undefined) return [];
+  const out: MediaRange[] = [];
+  for (const rawPart of header.split(',')) {
+    const part = rawPart.trim();
+    if (part === '') continue;
+    const segments = part.split(';');
+    const media = (segments[0] ?? '').trim().toLowerCase();
+    const slash = media.indexOf('/');
+    if (slash <= 0) continue; // 没有合法 type/subtype → 忽略该项
+    const type = media.slice(0, slash);
+    const subtype = media.slice(slash + 1);
+    if (subtype === '') continue;
+    let q = 1;
+    for (const seg of segments.slice(1)) {
+      const [rawKey, ...rest] = seg.split('=');
+      if ((rawKey ?? '').trim().toLowerCase() !== 'q') continue;
+      const parsed = Number.parseFloat(rest.join('=').trim());
+      if (Number.isFinite(parsed)) q = Math.min(1, Math.max(0, parsed));
+    }
+    out.push({ type: `${type}/${subtype}`, q });
+  }
+  return out;
+}
+
+/**
+ * 请求是否可接受给定的媒体类型。
+ *
+ * 匹配规则（按 RFC 9110 §12.5.1）：精确 type/subtype > type 通配 > 全通配，
+ * 取**优先级最高**的那条比对其 q 值，而不是「只要有一条 q>0 就算可接受」——
+ * 后者会让「json 的 q=0 + 全通配的 q=1」被判为接受 json，
+ * 而客户端明明用 q=0 显式拒绝了它。
+ */
+export function acceptsMediaType(ranges: readonly MediaRange[], wanted: string): boolean {
+  const target = wanted.toLowerCase();
+  const slash = target.indexOf('/');
+  if (slash <= 0) return false;
+  const type = target.slice(0, slash);
+  const wildcardType = `${type}/*`;
+
+  // 优先级：精确 type/subtype(3) > type/*(2) > */*(1)；同优先级取 q 更高者。
+  let bestQ = -1;
+  let bestPriority = 0;
+  for (const range of ranges) {
+    let priority = 0;
+    if (range.type === target) priority = 3;
+    else if (range.type === wildcardType) priority = 2;
+    else if (range.type === '*/*') priority = 1;
+    if (priority === 0) continue;
+    if (priority > bestPriority || (priority === bestPriority && range.q > bestQ)) {
+      bestPriority = priority;
+      bestQ = range.q;
+    }
+  }
+  // 一条都没匹配上 → 不可接受（客户端没声明任何能收该类型的范围）。
+  return bestPriority > 0 && bestQ > 0;
+}
+
+/** POST 缺 Accept（或缺必需类型）→ false。规范要求客户端声明两者。 */
+export function postAcceptOk(accept: string | undefined): boolean {
+  // 完全不声明 Accept：按 RFC 9110 等价于 `*/*`，视为接受（规范用 MAY 措辞）。
+  const ranges = parseAccept(accept);
+  if (ranges.length === 0) return true;
+  return POST_REQUIRED_ACCEPT.every((wanted) => acceptsMediaType(ranges, wanted));
+}
+
+/** GET（SSE 流）只需客户端能接受 text/event-stream。 */
+export function sseAcceptOk(accept: string | undefined): boolean {
+  const ranges = parseAccept(accept);
+  if (ranges.length === 0) return true;
+  return acceptsMediaType(ranges, 'text/event-stream');
+}
+
+/**
+ * 默认 Accept 判定：**只管 POST**。
+ *
+ * 规范对 POST 要求客户端同时声明 `application/json` 与 `text/event-stream`
+ * （响应可能取其一，客户端得两个都能收）；对 GET 只说「可以声明
+ * text/event-stream」—— 是 MAY 不是 MUST，而且 SSE 的 Content-Type 是
+ * 服务端定的，客户端没声明不代表不能收。所以默认对 GET/DELETE 放行，
+ * 想严格校验 SSE 的调用方自己传 acceptChecker（用 sseAcceptOk）。
+ *
+ * 完全没有 Accept 头按 RFC 9110 等价「全通配」→ 放行。
+ */
+export function defaultAcceptChecker(accept: string | undefined, method: string): boolean {
+  return method.toUpperCase() !== 'POST' || postAcceptOk(accept);
+}
+
 /** 取头（大小写不敏感，兼容 string[] —— set-cookie 类多值头）。 */
 export function headerValue(
   headers: Record<string, string | string[] | undefined>,
@@ -115,6 +231,20 @@ export interface SessionRecord {
 }
 
 /**
+ * 会话存储的持久化后端（生产化用；内存态是默认）。
+ *
+ * 为什么抽成接口而不是直接写文件：`SessionStore.has()` 是请求热路径，
+ * 若每次都读盘就是同步 IO 阻塞事件循环。抽出来后，生产实现可在**启动时**加载
+ * 一次进内存、变更时异步落盘，请求路径仍只碰内存。
+ */
+export interface SessionPersistence {
+  /** 启动时载入全部会话（存档损坏时应返回空集而不是抛 —— 由实现保证）。 */
+  load(): SessionRecord[];
+  /** 变更后落盘（异步，允许乱序到达；实现需自行保证最终一致）。 */
+  save(records: SessionRecord[]): void | Promise<void>;
+}
+
+/**
  * Mcp-Session-Id 存储。
  * 时钟（now）与 id 生成器必须可注入 —— 否则测试无法断言具体 session id，也无法测过期。
  */
@@ -123,17 +253,71 @@ export class SessionStore {
   readonly #now: () => number;
   readonly #ttlMs: number;
   readonly #newId: () => string;
+  readonly #persist: SessionPersistence | undefined;
+  /** dispose() 之后停止落盘（关停语义，见 dispose 注释）。 */
+  #persistEnabled = true;
 
-  constructor(opts: { now?: () => number; ttlMs?: number; newSessionId?: () => string } = {}) {
+  constructor(
+    opts: {
+      now?: () => number;
+      ttlMs?: number;
+      newSessionId?: () => string;
+      /** 给了则启用跨重启持久化。 */
+      persistence?: SessionPersistence;
+    } = {},
+  ) {
     this.#now = opts.now ?? Date.now;
     this.#ttlMs = opts.ttlMs ?? DEFAULT_SESSION_TTL_MS;
     this.#newId = opts.newSessionId ?? randomUUID;
+    this.#persist = opts.persistence;
+    if (this.#persist !== undefined) {
+      // 启动加载：过滤掉已过期与畸形条目，避免把垃圾带进内存（存档可能半写/手改过）。
+      const cutoff = this.#now();
+      for (const record of this.#persist.load()) {
+        if (typeof record?.id !== 'string' || record.id === '') continue;
+        if (typeof record.createdAt !== 'number' || !Number.isFinite(record.createdAt)) continue;
+        if (this.#ttlMs > 0 && cutoff - record.createdAt > this.#ttlMs) continue;
+        this.#byId.set(record.id, { id: record.id, createdAt: record.createdAt });
+      }
+    }
+  }
+
+  /**
+   * 异步落盘快照（fire-and-forget：写失败不该让请求失败，会话在内存里仍可用）。
+   *
+   * 必须 try/catch 包住**调用本身**而不只是 .catch：后端允许同步抛
+   * （如 JSON 文件后端遇到不可写路径会 throw），那时 Promise.resolve 还没
+   * 接管，异常会直接冒泡打断请求。
+   */
+  #flush(): void {
+    const persist = this.#persist;
+    if (persist === undefined || !this.#persistEnabled) return;
+    try {
+      void Promise.resolve(persist.save([...this.#byId.values()])).catch(() => {
+        // 落盘失败只丢「跨重启仍可用」这一条能力，不影响当前进程。
+      });
+    } catch {
+      // 同上：同步抛错也吞掉（存档不可写不该让 initialize 失败）。
+    }
+  }
+
+  /**
+   * 关停：清内存但**不落盘**。
+   *
+   * 为什么必须有它：serveHttp.close() 走的是「服务没了」这条路径，
+   * 若顺手把空集合落盘，就把上一轮所有会话从存档里抹了 —— 下次重启
+   * 一个都恢复不了。语义上「关停」与「删除全部会话」是两件事。
+   */
+  dispose(): void {
+    this.#persistEnabled = false;
+    this.#byId.clear();
   }
 
   /** 建会话，返回 id。 */
   create(): SessionRecord {
     const record: SessionRecord = { id: this.#newId(), createdAt: this.#now() };
     this.#byId.set(record.id, record);
+    this.#flush();
     return record;
   }
 
@@ -146,6 +330,7 @@ export class SessionStore {
     if (record === undefined) return false;
     if (this.#ttlMs > 0 && this.#now() - record.createdAt > this.#ttlMs) {
       this.#byId.delete(id);
+      this.#flush();
       return false;
     }
     return true;
@@ -160,6 +345,7 @@ export class SessionStore {
   delete(id: string): boolean {
     const existed = this.has(id);
     this.#byId.delete(id);
+    this.#flush();
     return existed;
   }
 
@@ -173,7 +359,49 @@ export class SessionStore {
   /** 清空（DELETE 全量 / 测试 resetSessions）。 */
   clear(): void {
     this.#byId.clear();
+    this.#flush();
   }
+}
+
+/**
+ * JSON 文件持久化后端（生产化：重启后会话仍可用）。
+ *
+ * 安全性取舍：
+ * - 存档损坏（半写/手改）→ `load()` 返回空集而非抛异常。理由：会话丢失的代价
+ *   只是客户端要重新 initialize，而服务起不来是灾难性的。
+ * - 写用「临时文件 + rename」保证不产生半写的存档（同 shell 包的原子写思路）。
+ * - 同步 IO（readFileSync/writeFileSync）：只在启动与变更时发生，不在请求热路径。
+ */
+export function createJsonFilePersistence(filePath: string): SessionPersistence {
+  return {
+    load(): SessionRecord[] {
+      try {
+        if (!existsSync(filePath)) return [];
+        const parsed: unknown = JSON.parse(readFileSync(filePath, 'utf8'));
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter(
+          (r): r is SessionRecord =>
+            typeof r === 'object' &&
+            r !== null &&
+            typeof (r as SessionRecord).id === 'string' &&
+            typeof (r as SessionRecord).createdAt === 'number',
+        );
+      } catch {
+        // 损坏 / 不可读 → 当作无存档，不让服务起不来。
+        return [];
+      }
+    },
+    save(records: SessionRecord[]): void {
+      try {
+        mkdirSync(dirname(filePath), { recursive: true });
+        const tmp = `${filePath}.tmp`;
+        writeFileSync(tmp, `${JSON.stringify(records, null, 2)}\n`, 'utf8');
+        renameSync(tmp, filePath);
+      } catch {
+        // 落盘失败不影响当前进程可用性（见 SessionStore.#flush 的注释）。
+      }
+    },
+  };
 }
 
 /** 模块级默认会话存储（handleHttpRequest 不传 ctx 时使用；resetSessions() 清它）。 */
@@ -197,7 +425,9 @@ export function resetSessions(): void {
  * 25 个 MCP 工具（含 R 类读日志/读配置）暴露给任何打开的网页。
  * 生产环境应把 origins 钉成精确白名单（file:// 外壳走自定义 validateOrigin）。
  */
-export function createDefaultOriginValidator(allowedPorts: number[] = []): (origin: string | undefined) => boolean {
+export function createDefaultOriginValidator(
+  allowedPorts: number[] = [],
+): (origin: string | undefined) => boolean {
   // 端口一律按字符串比较（URL.port 在显式给出时是字符串，无端口时规范化为 '80'）。
   const allowed = new Set(allowedPorts.map((p) => String(p)));
   return (origin) => {
@@ -217,7 +447,8 @@ export function createDefaultOriginValidator(allowedPorts: number[] = []): (orig
 }
 
 /** 默认放行（无 origin 头 = 非浏览器客户端 / 桌面外壳 IPC 场景）。 */
-export const defaultValidateOrigin: (origin: string | undefined) => boolean = createDefaultOriginValidator();
+export const defaultValidateOrigin: (origin: string | undefined) => boolean =
+  createDefaultOriginValidator();
 
 // ---------------------------------------------------------------------------
 // body 解析（支持 batch —— 规范要求 HTTP 层支持，stdio 层不支持）
@@ -237,7 +468,12 @@ type ParsedEntry =
  */
 function parseEntry(value: unknown): ParsedEntry {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return { ok: false, code: -32600, message: 'Invalid Request: expected a JSON-RPC request object', id: null };
+    return {
+      ok: false,
+      code: -32600,
+      message: 'Invalid Request: expected a JSON-RPC request object',
+      id: null,
+    };
   }
   const obj = value as Record<string, unknown>;
   if (obj['jsonrpc'] !== undefined && obj['jsonrpc'] !== '2.0') {
@@ -249,7 +485,12 @@ function parseEntry(value: unknown): ParsedEntry {
     return { ok: false, code: -32600, message: 'Invalid Request: missing method', id };
   }
   if (rawId !== undefined && !isId(rawId)) {
-    return { ok: false, code: -32600, message: 'Invalid Request: id must be string | number | null', id: null };
+    return {
+      ok: false,
+      code: -32600,
+      message: 'Invalid Request: id must be string | number | null',
+      id: null,
+    };
   }
   const request: JsonRpcRequest = { jsonrpc: '2.0', method: obj['method'] };
   if (rawId !== undefined) request.id = rawId;
@@ -280,7 +521,12 @@ export function parseHttpPayload(body: string): ParsedPayload {
   }
   if (Array.isArray(parsed)) {
     if (parsed.length === 0) {
-      return { kind: 'error', code: -32600, message: 'Invalid Request: empty batch array', id: null };
+      return {
+        kind: 'error',
+        code: -32600,
+        message: 'Invalid Request: empty batch array',
+        id: null,
+      };
     }
     return { kind: 'batch', entries: parsed.map(parseEntry) };
   }
@@ -291,8 +537,16 @@ export function parseHttpPayload(body: string): ParsedPayload {
 // 响应构造小工具
 // ---------------------------------------------------------------------------
 
-function jsonBody(status: number, payload: unknown, headers: Record<string, string> = {}): HttpResponseLike {
-  return { status, headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(payload) };
+function jsonBody(
+  status: number,
+  payload: unknown,
+  headers: Record<string, string> = {},
+): HttpResponseLike {
+  return {
+    status,
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(payload),
+  };
 }
 
 function rpcError(
@@ -344,6 +598,19 @@ export interface HttpContext {
   maxBodyBytes?: number;
   /** SSE 心跳间隔（仅 serveHttp 真正开流时用）；0 = 不发心跳。 */
   heartbeatMs?: number;
+  /**
+   * 是否强制校验 Accept 头（规范要求客户端在 POST 时声明
+   * `application/json` 与 `text/event-stream`，GET 时声明 `text/event-stream`）。
+   *
+   * 默认 false = 宽松放行：规范用 MAY 措辞，且实测大量客户端（含官方 TS SDK 的
+   * 部分版本、curl 手测、部分 IDE 插件）省略 Accept 或只发全通配。
+   * 在本地工具通道这种「只监听 127.0.0.1 且已有 Origin 防护」的场景，
+   * 严格校验带来的只是排障噪音而非安全性 —— 真正的安全边界由 Origin + 授权钩子守。
+   * 生产暴露到非本机时建议置 true。
+   */
+  requireAccept?: boolean;
+  /** 宽松覆盖：给定 Accept 头是否可接受（默认按 POST 双类型判定）。 */
+  acceptChecker?: (accept: string | undefined, method: string) => boolean;
 }
 
 /**
@@ -374,9 +641,110 @@ function sseResponse(headers: Record<string, string> = {}): HttpResponseLike {
   };
 }
 
+/** 从响应头里取回显的会话 id（node:http 会小写化头名，故大小写不敏感）。 */
+function sessionIdOf(headers: Record<string, string>): string | undefined {
+  return headerValue(headers as Record<string, string | string[] | undefined>, 'mcp-session-id');
+}
+
 /** GET 回显会话头（带了的 id 已在上面校验过有效）。 */
 function sseHeaders(sessionId: string | undefined): Record<string, string> {
   return sessionId === undefined || sessionId === '' ? {} : { 'Mcp-Session-Id': sessionId };
+}
+
+// ---------------------------------------------------------------------------
+// 主动推送（MCP notifications/* over SSE）
+// ---------------------------------------------------------------------------
+
+/**
+ * 推送一条 SSE 数据帧。
+ *
+ * 与心跳帧（`: 注释行`）是**两条不同的路**：注释帧只保活、不进事件流，
+ * 数据帧才承载 JSON-RPC notification。格式按 SSE 规范：`event:` / `data:` / 空行。
+ * data 是单行 JSON（JSON.stringify 不产出裸换行），所以不需要多行 data 前缀处理。
+ */
+export function sseNotificationFrame(method: string, params: unknown): string {
+  const payload = JSON.stringify({ jsonrpc: '2.0', method, params });
+  return `event: message\ndata: ${payload}\n\n`;
+}
+
+/** 单个推送目标：与传输解耦，测试可注入 fake。 */
+export interface NotificationTarget {
+  /** 返回 false 表示背压（写缓冲已满），调用方据此决定策略。 */
+  write(frame: string): boolean;
+  /** 流是否仍可写（close 之后必须为 false）。 */
+  writable(): boolean;
+}
+
+/**
+ * 推送中心：管理各会话的 SSE 流，并提供主动推送能力。
+ *
+ * 背压策略：先探测后写 —— `write()` 返回 false 说明内核缓冲已满，
+ * 此时**丢弃该条并计数**（`dropped`），不排队。原因：SSE 推送的内容是
+ * 「进度/状态快照」这类**可丢的瞬时信息**（build 进度、read_logs 尾部），
+ * 为它无限排队会在慢客户端上把内存吃光；而排队重发一条过期进度毫无意义。
+ * 关键状态变更走 HTTP POST 的返回值而非推送，不依赖这条通道的可靠性。
+ * `dropped` 可读，调用方能观测到丢消息（测试固定该行为）。
+ */
+export class NotificationHub {
+  readonly #targets = new Map<string, NotificationTarget>();
+  #dropped = 0;
+
+  /** 登记一条 SSE 流；同 id 重复登记覆盖旧流（客户端重连场景）。 */
+  attach(sessionId: string, target: NotificationTarget): void {
+    this.#targets.set(sessionId, target);
+  }
+
+  /** 注销（流关闭时调用）。 */
+  detach(sessionId: string): void {
+    this.#targets.delete(sessionId);
+  }
+
+  /** 当前挂载的流数（测试断言用）。 */
+  size(): number {
+    return this.#targets.size;
+  }
+
+  /** 因背压被丢弃的条数（可观测；不因丢消息抛异常）。 */
+  droppedCount(): number {
+    return this.#dropped;
+  }
+
+  /** 推给单个会话；目标不存在或流已关 → false（调用方不必处理异常）。 */
+  notifySession(sessionId: string, method: string, params: unknown): boolean {
+    const target = this.#targets.get(sessionId);
+    if (target === undefined) return false;
+    return this.#write(target, method, params);
+  }
+
+  /** 推给所有已挂载的流；返回实际投递成功数。 */
+  notifyAll(method: string, params: unknown): number {
+    let delivered = 0;
+    for (const [sessionId, target] of [...this.#targets]) {
+      if (this.#write(target, method, params)) delivered += 1;
+      // 流已关的顺手清掉，避免 Map 无限增长（close 后仍挂着 = 泄漏）。
+      if (!target.writable()) this.#targets.delete(sessionId);
+    }
+    return delivered;
+  }
+
+  /** 全部断开（服务关闭时用）。 */
+  clear(): void {
+    this.#targets.clear();
+  }
+
+  #write(target: NotificationTarget, method: string, params: unknown): boolean {
+    if (!target.writable()) return false;
+    try {
+      if (target.write(sseNotificationFrame(method, params))) return true;
+      // 背压：丢弃而非排队（见类注释）。
+      this.#dropped += 1;
+      return false;
+    } catch {
+      // 流可能已在 write 途中被对端关闭；不能因推送失败炸掉调用方。
+      this.#dropped += 1;
+      return false;
+    }
+  }
 }
 
 /**
@@ -397,24 +765,27 @@ export async function handleHttpRequest(
   const authorize = ctx.authorize;
   const sessions = ctx.sessions ?? defaultSessions;
   const maxBodyBytes = ctx.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const acceptChecker = ctx.acceptChecker ?? defaultAcceptChecker;
+  const requireAccept = ctx.requireAccept ?? false;
 
   // 1) Origin 校验最先做（DNS rebinding 防护：不合法的 origin 连 body 都不该处理）。
   const origin = headerValue(req.headers, 'origin');
   if (!validateOrigin(origin)) {
-    return rpcError(403, null, ERR_FORBIDDEN_ORIGIN, `Forbidden: Origin not allowed (${origin ?? 'unknown'})`);
+    return rpcError(
+      403,
+      null,
+      ERR_FORBIDDEN_ORIGIN,
+      `Forbidden: Origin not allowed (${origin ?? 'unknown'})`,
+    );
   }
 
   // 2) 认证钩子（生产接 OAuth/token；本轮默认放行）。
   if (authorize !== undefined) {
     const allowed = await authorize(req);
     if (!allowed) {
-      return rpcError(
-        401,
-        null,
-        ERR_UNAUTHORIZED,
-        'Unauthorized: missing or invalid credentials',
-        { 'WWW-Authenticate': 'Bearer realm="mc-creator-mcp"' },
-      );
+      return rpcError(401, null, ERR_UNAUTHORIZED, 'Unauthorized: missing or invalid credentials', {
+        'WWW-Authenticate': 'Bearer realm="mc-creator-mcp"',
+      });
     }
   }
 
@@ -428,13 +799,9 @@ export async function handleHttpRequest(
 
   // 4) 方法不允许 → 405 + Allow（规范要求带 Allow 头）。
   if (method !== 'GET' && method !== 'POST' && method !== 'DELETE') {
-    return rpcError(
-      405,
-      null,
-      ERR_METHOD_NOT_ALLOWED,
-      `Method not allowed: ${method}`,
-      { Allow: ALLOWED_METHODS },
-    );
+    return rpcError(405, null, ERR_METHOD_NOT_ALLOWED, `Method not allowed: ${method}`, {
+      Allow: ALLOWED_METHODS,
+    });
   }
 
   // 5) 会话校验：带了的 id 必须存在且未过期（规范建议 404；过期策略见 SessionStore）。
@@ -447,20 +814,43 @@ export async function handleHttpRequest(
     );
   }
 
-  // 6) GET → 建立 SSE 流（保持连接 + 心跳，见 GET_SSE_BEHAVIOR）。
+  // 6) Accept 校验（规范强制项，默认宽松；见 HttpContext.requireAccept 的取舍说明）。
+  //    必须排在 GET/DELETE 分支**之前**，否则自定义判据永远管不到 SSE 流。
+  //    对所有方法都问一遍 acceptChecker，好让调用方自定义严格度；
+  //    默认判据 defaultAcceptChecker 只对 POST 严格（规范对 GET 是 MAY）。
+  if (requireAccept) {
+    const accept = headerValue(req.headers, 'accept');
+    if (!acceptChecker(accept, method)) {
+      return rpcError(
+        406,
+        null,
+        ERR_NOT_ACCEPTABLE,
+        `Not Acceptable: client must accept ${
+          method === 'POST' ? 'application/json and text/event-stream' : 'text/event-stream'
+        } (Accept: ${accept ?? 'absent'})`,
+      );
+    }
+  }
+
+  // 7) GET → 建立 SSE 流（保持连接 + 心跳，见 GET_SSE_BEHAVIOR）。
   if (method === 'GET') {
     return sseResponse(sseHeaders(sessionId));
   }
 
-  // 7) DELETE → 终止会话，204。
+  // 8) DELETE → 终止会话，204。
   if (method === 'DELETE') {
     if (sessionId !== undefined && sessionId !== '') sessions.delete(sessionId);
     return noContent();
   }
 
-  // 8) POST → body 限额 / 协议解析 / 方法分发。
+  // 9) POST → body 限额 / 协议解析 / 方法分发。
   if (Buffer.byteLength(req.body, 'utf8') > maxBodyBytes) {
-    return rpcError(413, null, ERR_PAYLOAD_TOO_LARGE, `Payload too large: limit is ${maxBodyBytes} bytes`);
+    return rpcError(
+      413,
+      null,
+      ERR_PAYLOAD_TOO_LARGE,
+      `Payload too large: limit is ${maxBodyBytes} bytes`,
+    );
   }
 
   const payload = parseHttpPayload(req.body);
@@ -482,7 +872,11 @@ export async function handleHttpRequest(
       if (payload.kind === 'single') {
         return rpcError(400, entry.id, entry.code, entry.message);
       }
-      responses.push({ jsonrpc: '2.0', id: entry.id, error: { code: entry.code, message: entry.message } });
+      responses.push({
+        jsonrpc: '2.0',
+        id: entry.id,
+        error: { code: entry.code, message: entry.message },
+      });
       continue;
     }
     if (entry.request.method === 'initialize' && createdSessionId === undefined) {
@@ -504,7 +898,11 @@ export async function handleHttpRequest(
   const headers: Record<string, string> = {};
   const activeId = createdSessionId ?? sessionId;
   if (activeId !== undefined && activeId !== '') headers['Mcp-Session-Id'] = activeId;
-  return jsonBody(200, payload.kind === 'batch' ? responses : (responses[0] as JsonRpcResponse), headers);
+  return jsonBody(
+    200,
+    payload.kind === 'batch' ? responses : (responses[0] as JsonRpcResponse),
+    headers,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -537,11 +935,19 @@ export interface ServeHttpOptions {
   maxBodyBytes?: number;
   /** SSE 心跳间隔，0 = 不发。 */
   heartbeatMs?: number;
+  /** 强制 Accept 校验（默认 false 宽松，见 HttpContext.requireAccept）。 */
+  requireAccept?: boolean;
+  /** 自定义 Accept 判定。 */
+  acceptChecker?: (accept: string | undefined, method: string) => boolean;
+  /** 会话存档路径；给了则跨重启持久化会话（见 createJsonFilePersistence）。 */
+  sessionStorePath?: string;
 }
 
 export interface RunningHttpServer {
   port: number;
   url: string;
+  /** 主动推送中心：外壳用它把进度/状态变化推给已连上的 SSE 客户端。 */
+  notifications: NotificationHub;
   close(): Promise<void>;
 }
 
@@ -550,11 +956,18 @@ function log(message: string): void {
   process.stderr.write(`[mcp-http] ${message}\n`);
 }
 
-function buildContext(opts: ServeHttpOptions): { ctx: Omit<HttpContext, 'server'>; sessions: SessionStore } {
+function buildContext(opts: ServeHttpOptions): {
+  ctx: Omit<HttpContext, 'server'>;
+  sessions: SessionStore;
+} {
   const sessions = new SessionStore({
     ...(opts.now === undefined ? {} : { now: opts.now }),
     ttlMs: opts.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS,
     ...(opts.newSessionId === undefined ? {} : { newSessionId: opts.newSessionId }),
+    // 会话存档路径：给了就跨重启持久化（§10.1 生产环境需要）。
+    ...(opts.sessionStorePath === undefined
+      ? {}
+      : { persistence: createJsonFilePersistence(opts.sessionStorePath) }),
   });
   const ctx: Omit<HttpContext, 'server'> = { sessions };
   if (opts.path !== undefined) ctx.path = opts.path;
@@ -564,6 +977,8 @@ function buildContext(opts: ServeHttpOptions): { ctx: Omit<HttpContext, 'server'
   if (opts.newSessionId !== undefined) ctx.newSessionId = opts.newSessionId;
   if (opts.maxBodyBytes !== undefined) ctx.maxBodyBytes = opts.maxBodyBytes;
   if (opts.heartbeatMs !== undefined) ctx.heartbeatMs = opts.heartbeatMs;
+  if (opts.requireAccept !== undefined) ctx.requireAccept = opts.requireAccept;
+  if (opts.acceptChecker !== undefined) ctx.acceptChecker = opts.acceptChecker;
   return { ctx, sessions };
 }
 
@@ -595,8 +1010,9 @@ export async function serveHttp(opts: ServeHttpOptions): Promise<RunningHttpServ
     return {
       port,
       url: `http://${host}:${port}${path}`,
+      notifications: new NotificationHub(),
       close: async () => {
-        sessions.clear();
+        sessions.dispose();
         if (injected.close !== undefined) await injected.close();
       },
     };
@@ -604,6 +1020,10 @@ export async function serveHttp(opts: ServeHttpOptions): Promise<RunningHttpServ
 
   const streams = new Set<ServerResponse>();
   const timers = new Set<NodeJS.Timeout>();
+  /** 每条 SSE 流对应一个推送目标（按会话 id 登记；无会话 id 的匿名流不进 Hub）。 */
+  const hub = new NotificationHub();
+  /** res → 会话 id，供关闭时反查注销。 */
+  const streamSession = new Map<ServerResponse, string>();
 
   const server: Server = createServer((req, res) => {
     void onNodeRequest(req, res).catch((e: unknown) => {
@@ -622,7 +1042,15 @@ export async function serveHttp(opts: ServeHttpOptions): Promise<RunningHttpServ
       body = await readBody(req, maxBodyBytes);
     } catch (e) {
       if (isPayloadTooLarge(e)) {
-        writeResponse(res, rpcError(413, null, ERR_PAYLOAD_TOO_LARGE, `Payload too large: limit is ${maxBodyBytes} bytes`));
+        writeResponse(
+          res,
+          rpcError(
+            413,
+            null,
+            ERR_PAYLOAD_TOO_LARGE,
+            `Payload too large: limit is ${maxBodyBytes} bytes`,
+          ),
+        );
         return;
       }
       throw e;
@@ -639,8 +1067,21 @@ export async function serveHttp(opts: ServeHttpOptions): Promise<RunningHttpServ
         streams.add(res);
         res.writeHead(out.status, out.headers);
         res.write(out.body);
+        const sid = sessionIdOf(out.headers);
+        if (sid !== undefined) {
+          streamSession.set(res, sid);
+          hub.attach(sid, {
+            write: (frame) => res.write(frame),
+            writable: () => !res.writableEnded && !res.destroyed,
+          });
+        }
         res.on('close', () => {
           streams.delete(res);
+          const closed = streamSession.get(res);
+          if (closed !== undefined) {
+            streamSession.delete(res);
+            hub.detach(closed);
+          }
         });
         if (heartbeatMs > 0) {
           const timer = setInterval(() => {
@@ -674,17 +1115,23 @@ export async function serveHttp(opts: ServeHttpOptions): Promise<RunningHttpServ
 
   const address = server.address();
   const actualPort = typeof address === 'object' && address !== null ? address.port : port;
-  log(`Streamable HTTP 服务启动 http://${host}:${actualPort}${path}（GET=GET_SSE_BEHAVIOR, body<=${maxBodyBytes}B）`);
+  log(
+    `Streamable HTTP 服务启动 http://${host}:${actualPort}${path}（GET=GET_SSE_BEHAVIOR, body<=${maxBodyBytes}B）`,
+  );
 
   return {
     port: actualPort,
     url: `http://${host}:${actualPort}${path}`,
+    notifications: hub,
     close: async () => {
-      sessions.clear();
+      // dispose 而非 clear：关停不该把空存档落盘（否则抹掉全部会话）。
+      sessions.dispose();
       for (const timer of timers) clearInterval(timer);
       timers.clear();
       for (const res of streams) res.end();
       streams.clear();
+      streamSession.clear();
+      hub.clear();
       await new Promise<void>((resolve) => {
         server.close(() => resolve());
         server.closeAllConnections?.();

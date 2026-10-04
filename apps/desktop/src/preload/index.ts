@@ -78,11 +78,16 @@ import {
   type GeneratorType,
   type BuildStreamChunkT,
   type RagSearchRes,
+  type ProcessLogEventT,
   NODE_GRAPH_SAVE,
   NODE_GRAPH_LOAD,
   NODE_GRAPH_SHOW_SAVE_DIALOG,
   NODE_GRAPH_SHOW_OPEN_DIALOG,
   PROJECT_CHANGED,
+  PROCESS_LIST,
+  PROCESS_STATUS,
+  PROCESS_LOGS,
+  PROCESS_LOG_EVENT,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -260,14 +265,37 @@ const api = {
   saveCurseForgeConfig: (config: { apiKey: string }) =>
     ipcRenderer.invoke(SAVE_CURSEFORGE_CONFIG, config),
   // === 整合包：依赖解析 + 冲突检测 + mrpack 导出 ===
-  modpackResolve: (req: { mods: { projectId: string; name?: string }[]; mcVersion: string; loader: string; allowCache?: boolean }) =>
-    ipcRenderer.invoke(MODPACK_RESOLVE, req),
+  modpackResolve: (req: {
+    mods: { projectId: string; name?: string }[];
+    mcVersion: string;
+    loader: string;
+    allowCache?: boolean;
+  }) => ipcRenderer.invoke(MODPACK_RESOLVE, req),
   modpackCheckConflicts: (req: { mods: unknown[]; mcVersion: string; loader: string }) =>
     ipcRenderer.invoke(MODPACK_CHECK_CONFLICTS, req),
   modpackExportMrpack: (req: { spec: unknown; projectId?: string; defaultName?: string }) =>
     ipcRenderer.invoke(MODPACK_EXPORT_MRPACK, req),
-  onModpackExportProgress: (handler: (data: { requestId: string; loaded: number; total: number; percentage: number; currentFile: string; done: boolean }) => void) => {
-    const wrapped = (_e: unknown, data: { requestId: string; loaded: number; total: number; percentage: number; currentFile: string; done: boolean }) => handler(data);
+  onModpackExportProgress: (
+    handler: (data: {
+      requestId: string;
+      loaded: number;
+      total: number;
+      percentage: number;
+      currentFile: string;
+      done: boolean;
+    }) => void,
+  ) => {
+    const wrapped = (
+      _e: unknown,
+      data: {
+        requestId: string;
+        loaded: number;
+        total: number;
+        percentage: number;
+        currentFile: string;
+        done: boolean;
+      },
+    ) => handler(data);
     ipcRenderer.on(MODPACK_EXPORT_PROGRESS, wrapped);
     return () => ipcRenderer.removeListener(MODPACK_EXPORT_PROGRESS, wrapped);
   },
@@ -319,7 +347,11 @@ const api = {
   fileProjectListDir: (projectId: string, path?: string) =>
     ipcRenderer.invoke(IPC.FILE_PROJECT_LIST_DIR, { projectId, path: path ?? '' }),
   fileProjectListTree: (projectId: string, path?: string, maxDepth?: number) =>
-    ipcRenderer.invoke(IPC.FILE_PROJECT_LIST_TREE, { projectId, path: path ?? '', maxDepth: maxDepth ?? -1 }),
+    ipcRenderer.invoke(IPC.FILE_PROJECT_LIST_TREE, {
+      projectId,
+      path: path ?? '',
+      maxDepth: maxDepth ?? -1,
+    }),
   fileProjectReadText: (projectId: string, path: string, encoding?: string) =>
     ipcRenderer.invoke(IPC.FILE_PROJECT_READ_TEXT, { projectId, path, encoding }),
   fileProjectWriteText: (projectId: string, path: string, content: string, encoding?: string) =>
@@ -347,14 +379,45 @@ const api = {
   // 文件元数据与冲突检测
   fileProjectGetFileMeta: (projectId: string, path: string) =>
     ipcRenderer.invoke(IPC.FILE_PROJECT_GET_FILE_META, { projectId, path }),
-  fileProjectWriteTextWithMeta: (projectId: string, path: string, content: string, expectedMeta?: { mtime: number; size: number; hash: string }, encoding?: string) =>
-    ipcRenderer.invoke(IPC.FILE_PROJECT_WRITE_TEXT_WITH_META, { projectId, path, content, expectedMeta, encoding }),
+  fileProjectWriteTextWithMeta: (
+    projectId: string,
+    path: string,
+    content: string,
+    expectedMeta?: { mtime: number; size: number; hash: string },
+    encoding?: string,
+  ) =>
+    ipcRenderer.invoke(IPC.FILE_PROJECT_WRITE_TEXT_WITH_META, {
+      projectId,
+      path,
+      content,
+      expectedMeta,
+      encoding,
+    }),
 
   // === 项目变更监听 ===
-  onProjectChanged: (handler: (payload: { type: 'created' | 'updated' | 'deleted'; projectId: string }) => void) => {
-    const handlerWrapper = (_e: unknown, payload: { type: 'created' | 'updated' | 'deleted'; projectId: string }) => handler(payload);
+  onProjectChanged: (
+    handler: (payload: { type: 'created' | 'updated' | 'deleted'; projectId: string }) => void,
+  ) => {
+    const handlerWrapper = (
+      _e: unknown,
+      payload: { type: 'created' | 'updated' | 'deleted'; projectId: string },
+    ) => handler(payload);
     ipcRenderer.on(PROJECT_CHANGED, handlerWrapper);
     return () => ipcRenderer.removeListener(PROJECT_CHANGED, handlerWrapper);
+  },
+
+  // === 进程托管（外壳层只读，§7.1 / §10.2）===
+  // 白名单里**只有只读查询**：列被托管进程 / 读状态 / 读日志尾部。
+  // 故意不暴露 start/stop —— 启动服务端必须先弹窗确认（§10.6），
+  // 那条路必须经内核的确认闸门，不能由渲染进程直接 spawn（§4.3 白名单原则）。
+  processList: () => ipcRenderer.invoke(PROCESS_LIST),
+  processStatus: (serverId: string) => ipcRenderer.invoke(PROCESS_STATUS, { serverId }),
+  processLogs: (serverId: string, limit?: number) =>
+    ipcRenderer.invoke(PROCESS_LOGS, limit === undefined ? { serverId } : { serverId, limit }),
+  onProcessLog: (handler: (e: ProcessLogEventT) => void) => {
+    const wrapper = (_e: unknown, payload: ProcessLogEventT) => handler(payload);
+    ipcRenderer.on(PROCESS_LOG_EVENT, wrapper);
+    return () => ipcRenderer.removeListener(PROCESS_LOG_EVENT, wrapper);
   },
 
   // === 大文件流式传输 ===
@@ -372,8 +435,15 @@ const api = {
     projectId: string,
     path: string,
     data: Uint8Array | AsyncIterable<Uint8Array>,
-    options?: { onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void; expectedHash?: string }
-  ): Promise<{ success: boolean; meta?: { size: number; mtime: number; hash: string }; error?: string }> => {
+    options?: {
+      onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void;
+      expectedHash?: string;
+    },
+  ): Promise<{
+    success: boolean;
+    meta?: { size: number; mtime: number; hash: string };
+    error?: string;
+  }> => {
     const requestId = nextStreamRequestId();
     let totalSize = 0;
 
@@ -409,7 +479,7 @@ const api = {
         for (let offset = 0; offset < data.byteLength; offset += chunkSize) {
           const chunk = data.slice(offset, offset + chunkSize);
           const isLast = offset + chunkSize >= data.byteLength;
-          
+
           const chunkResult = await ipcRenderer.invoke(IPC.FILE_PROJECT_WRITE_STREAM_CHUNK, {
             requestId,
             chunkIndex: chunkIndex++,
@@ -423,7 +493,11 @@ const api = {
 
           loaded += chunk.byteLength;
           if (options?.onProgress) {
-            options.onProgress({ loaded, total: totalSize, percentage: Math.round((loaded / totalSize) * 100) });
+            options.onProgress({
+              loaded,
+              total: totalSize,
+              percentage: Math.round((loaded / totalSize) * 100),
+            });
           }
         }
       }
@@ -446,11 +520,24 @@ const api = {
   fileProjectReadStream: (
     projectId: string,
     path: string,
-    onChunk: (data: { chunk: Uint8Array; isLast: boolean; progress: { loaded: number; total: number; percentage: number } }) => void,
-    options?: { chunkSize?: number }
+    onChunk: (data: {
+      chunk: Uint8Array;
+      isLast: boolean;
+      progress: { loaded: number; total: number; percentage: number };
+    }) => void,
+    options?: { chunkSize?: number },
   ): Promise<{ success: boolean; error?: string }> => {
     const requestId = nextStreamRequestId();
-    const handler = (_e: unknown, data: { requestId: string; chunkIndex: number; data: string; isLast: boolean; progress: { loaded: number; total: number; percentage: number } }) => {
+    const handler = (
+      _e: unknown,
+      data: {
+        requestId: string;
+        chunkIndex: number;
+        data: string;
+        isLast: boolean;
+        progress: { loaded: number; total: number; percentage: number };
+      },
+    ) => {
       if (data.requestId !== requestId) return;
       onChunk({
         chunk: Buffer.from(data.data, 'base64'),
@@ -462,9 +549,16 @@ const api = {
       }
     };
     ipcRenderer.on(IPC.FILE_PROJECT_READ_STREAM_CHUNK, handler);
-    return ipcRenderer.invoke(IPC.FILE_PROJECT_READ_STREAM, { projectId, path, chunkSize: options?.chunkSize, requestId }).finally(() => {
-      ipcRenderer.removeListener(IPC.FILE_PROJECT_READ_STREAM_CHUNK, handler);
-    });
+    return ipcRenderer
+      .invoke(IPC.FILE_PROJECT_READ_STREAM, {
+        projectId,
+        path,
+        chunkSize: options?.chunkSize,
+        requestId,
+      })
+      .finally(() => {
+        ipcRenderer.removeListener(IPC.FILE_PROJECT_READ_STREAM_CHUNK, handler);
+      });
   },
 };
 

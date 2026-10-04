@@ -36,3 +36,11 @@ export interface ProjectChangedPayload {
   type: 'created' | 'updated' | 'deleted';
   projectId: string;
 }
+
+// === 进程托管（外壳层只读查询，§7.1 / §7.4 / §10.2）===
+// 只列只读通道：列被托管进程 / 读状态 / 读日志尾部 / 控制台流式日志。
+// 刻意不提供「直接启动/停止」通道：那必须先经内核确认闸门弹窗（§10.6）。
+export const PROCESS_LIST = 'process:list';
+export const PROCESS_STATUS = 'process:status';
+export const PROCESS_LOGS = 'process:logs';
+export const PROCESS_LOG_EVENT = 'process:logEvent';
