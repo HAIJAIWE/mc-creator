@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { z } from 'zod';
 import { Button, Card } from '@mc-creator/ui';
 import { Cpu, RefreshCw, Server, Box } from 'lucide-react';
 import { McIcon } from '../assets/mc-ui/McIcon';
@@ -10,6 +11,7 @@ import type {
 } from '../../../shared/ipc-channels.js';
 import {
   KernelCapabilitiesResponse,
+  KernelContextPackResponse,
   KernelListInstancesResponse,
   KernelListServersResponse,
 } from '../../../shared/ipc-channels.js';
@@ -42,6 +44,32 @@ import {
 
 const EDITIONS: KernelEditionT[] = ['java', 'server', 'bedrock'];
 
+/**
+ * 构建隔离回报（kernel-server `build_project` 的 `data.isolation` 形状）。
+ * network 恒为 false —— Job Object 管不到网络，不要假装已禁网。
+ */
+const IsolationSchema = z.object({
+  source: z.enum(['job-object', 'unisolated']),
+  memory: z.boolean(),
+  cpu: z.boolean(),
+  network: z.boolean(),
+  treeKill: z.boolean(),
+  reason: z.string().nullable(),
+});
+type IsolationInfo = z.infer<typeof IsolationSchema>;
+
+/**
+ * 只读链路可见的构建信息（`get_context_pack` 的 `parts` 子集）。
+ * `lastBuildHash` 即部署账本里最新一条记录的 sha256（§0.5 哈希可见）；
+ * `isolation` 目前只读链路不返回，留作前向兼容（后端若在 parts 里回报则直接展示）。
+ */
+const BuildPartsSchema = z
+  .object({
+    lastBuildHash: z.string().min(1).optional(),
+    isolation: IsolationSchema.optional(),
+  })
+  .passthrough();
+
 interface EditionState {
   edition: KernelEditionT;
   healthy: boolean;
@@ -57,6 +85,10 @@ export function KernelPanel() {
   const [servers, setServers] = useState<{ id: string; hasConfig: boolean; hasLogs: boolean }[]>(
     [],
   );
+  const [buildSha256, setBuildSha256] = useState<string | null>(null);
+  const [buildServerId, setBuildServerId] = useState<string | null>(null);
+  const [isolation, setIsolation] = useState<IsolationInfo | null>(null);
+  const [buildError, setBuildError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,6 +99,7 @@ export function KernelPanel() {
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setBuildError(null);
     try {
       const kindTable = await ipcClient.kernelListKinds();
       setKinds(kindTable);
@@ -116,11 +149,62 @@ export function KernelPanel() {
       const srvRes = await read({ kind: 'list_servers', payload: {} });
       const srvParsed =
         srvRes.ok && srvRes.data !== null ? KernelListServersResponse.safeParse(srvRes.data) : null;
+      const serverIds: string[] =
+        srvParsed !== null && srvParsed.success ? srvParsed.data.servers.map((s) => s.id) : [];
       if (srvParsed !== null && srvParsed.success) {
         setServers(srvParsed.data.servers);
       } else {
         setError(srvRes.error?.message ?? '服务端列表形状不符合契约（KernelListServersResponse）');
       }
+
+      // 最近构建（只读）：经 get_context_pack 取部署账本的 lastBuildHash（§0.5 哈希可见）。
+      // build_project 本身是 X 类，仅主进程侧可达，渲染层绝不直接触达；此处只展示
+      // 只读链路可见的产物哈希与隔离回报（parts.isolation 目前只读链路不返回，留作前向兼容）。
+      // 无数据是正常态（展示“暂无构建记录”），形状对不上记为本节错误，绝不打崩整屏、
+      // 也不污染全局 error（富集失败不应掩盖实例/服务端的主错误）。
+      let foundHash: string | null = null;
+      let foundServer: string | null = null;
+      let foundIso: IsolationInfo | null = null;
+      let sectionError: string | null = null;
+      for (const sid of serverIds) {
+        let packRes: KernelTaskResultT;
+        try {
+          packRes = await read({
+            kind: 'get_context_pack',
+            payload: { edition: 'server', serverId: sid },
+          });
+        } catch {
+          continue;
+        }
+        const packParsed =
+          packRes.ok && packRes.data !== null
+            ? KernelContextPackResponse.safeParse(packRes.data)
+            : null;
+        if (packParsed === null || !packParsed.success) {
+          if (packRes.ok) {
+            sectionError = '构建信息形状不符合契约（KernelContextPackResponse）';
+          }
+          continue;
+        }
+        const partsParsed = BuildPartsSchema.safeParse(packParsed.data.parts);
+        if (!partsParsed.success) {
+          sectionError = '构建信息形状不符合契约（context parts）';
+          continue;
+        }
+        if (foundHash === null && partsParsed.data.lastBuildHash !== undefined) {
+          foundHash = partsParsed.data.lastBuildHash;
+          foundServer = sid;
+        }
+        if (foundIso === null && partsParsed.data.isolation !== undefined) {
+          foundIso = partsParsed.data.isolation;
+          if (foundServer === null) foundServer = sid;
+        }
+        if (foundHash !== null && foundIso !== null) break;
+      }
+      setBuildSha256(foundHash);
+      setBuildServerId(foundServer);
+      setIsolation(foundIso);
+      setBuildError(sectionError);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -243,6 +327,49 @@ export function KernelPanel() {
             ))}
           </ul>
         )}
+      </section>
+
+      {/* 最近构建（只读）：产物哈希与隔离回报 */}
+      <section className="border-b border-mc-border px-3 py-2">
+        <div className="mb-1.5 flex items-center gap-1 text-[10px] font-medium text-mc-dim">
+          <Box className="h-3 w-3" /> 最近构建（只读）
+        </div>
+        {buildSha256 === null && isolation === null ? (
+          <p className="py-1 text-[11px] text-mc-mute">暂无构建记录</p>
+        ) : (
+          <div className="space-y-1">
+            {buildSha256 !== null && (
+              <div className="rounded-mc border border-mc-border bg-mc-surface-2 px-2 py-1 text-[11px]">
+                <div className="text-[10px] text-mc-dim">
+                  产物 sha256{buildServerId !== null ? `（${buildServerId}）` : ''}
+                </div>
+                <div className="break-all font-mono text-[10px] text-mc-text">{buildSha256}</div>
+              </div>
+            )}
+            {isolation !== null ? (
+              <ul className="rounded-mc border border-mc-border bg-mc-surface-2 px-2 py-1 text-[11px] text-mc-text">
+                <li>source：{isolation.source}</li>
+                <li>memory：{String(isolation.memory)}</li>
+                <li>cpu：{String(isolation.cpu)}</li>
+                <li>network：{String(isolation.network)}</li>
+                <li>treeKill：{String(isolation.treeKill)}</li>
+                <li>reason：{isolation.reason ?? '—'}</li>
+              </ul>
+            ) : (
+              buildSha256 !== null && (
+                <p className="text-[10px] text-mc-mute">
+                  隔离状态未上报（只读链路未返回 isolation 明细；build_project 为 X
+                  类，仅主进程侧可达）。
+                </p>
+              )
+            )}
+          </div>
+        )}
+        {buildError !== null && <p className="mt-1 text-[10px] text-red-400">{buildError}</p>}
+        <p className="mt-1 text-[10px] text-mc-mute">
+          构建执行类未在 UI 暴露；此处仅展示只读链路可见的产物哈希与隔离回报，其中 network 恒为
+          false。
+        </p>
       </section>
 
       {/* kind 白名单自述：把「哪些能做、哪些还锁着」摆在明面上 */}
