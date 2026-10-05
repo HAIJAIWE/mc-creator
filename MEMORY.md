@@ -1,7 +1,7 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：规格闭环点火（真模型一轮过，3.3s）+ 全绿 310/5123；免费模型 reasoning 吃 85% 预算已量化
+> 最近更新：真机构建链逐段量通 —— NeoForge 生成的工程**从来构建不了**（`moddev {}` 包装不存在），已修；工具链解析器 + 快照同步完成
 
 > 📄 **设计文档已找到**：`D:\Downloads\MC全链路AI工作台-设计文档-v3.1.md`（931 行）。
 > 之前两轮「文档不在仓内」的判断只对仓内而言 —— 文档在 `D:\Downloads` 下，
@@ -534,6 +534,81 @@ revert，未提交**：无消费者就留着是死代码（§2-⑥ 模式），�
 > （更新器、存储选型）+ 真实 LLM 供应商接入（需要 Key 与出境合规决策，见 §10.0 合规开关）。
 > §17 闭环场景的链路已通（生成→编译→验证→部署），缺的是真实模型驱动。
 
+## 7.8 真机构建链：干净机器上「生成 → 编译出 jar」实测（2026-10）
+
+**方法**：不跑静态分析，用本仓生成器产出真实工程 + 真下 Gradle + 真跑构建，逐段量断点。
+
+### 量到的阻断链（按发生顺序）
+
+| #   | 阻断                                                               | 原文证据                                                                                                                                                                          | 修法                                            | 修后                                                                                                                                                 |
+| --- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Gradle 8.12 **无法在 JDK 26 上启动**（`JAVA_HOME=D:\Java\jdk-26`） | `java.lang.IllegalArgumentException: Unsupported class file major version 70` / `BUILD FAILED in 5s`                                                                              | 宿主 JVM 必须 ≤23                               | 换 JDK 23 后正常启动                                                                                                                                 |
+| 2   | toolchain 17 本机无、且无下载源                                    | `No locally installed toolchains match and toolchain download repositories have not been configured` / `BUILD FAILED in 1m 57s`                                                   | `settings.gradle` 加一行 foojay-resolver 0.10.0 | `BUILD SUCCESSFUL in 3m 14s`，Gradle 真下载了 `eclipse_adoptium-17-amd64-windows.2`（`JAVA_VERSION=17.0.20.1+1`），javac 真编译，jar 311 → 1458 字节 |
+| 3   | 工程无 `gradlew`/`gradlew.bat`/`wrapper.jar`                       | 4 处 `spawn gradlew.bat`（`devkit/gradle.ts:97`、`core/builder/gradle.ts:26`、`kernel-server/kernel.ts:923`、`desktop/ipc/build.ts:192`），生成器只写 `gradle-wrapper.properties` | **未做**（唯一剩下的硬阻断）                    | 手工下 130MB Gradle 顶上了                                                                                                                           |
+| 4   | NeoForge DSL 用了不存在的 `moddev {}` 包装                         | `Could not find method moddev() for arguments [...]` / `BUILD FAILED in 17s`                                                                                                      | 去掉包装，恒用顶层 `neoForge {}`                | 配置阶段通过，`:createArtifactManifest` 真的执行了                                                                                                   |
+
+### 已端到端验证的完整链（Forge 1.20.1，产品真实代码路径）
+
+```
+生成器产出工程 → gradle wrapper --gradle-version 8.12 --no-validate-url（补齐 4 个文件）
+→ gradlew.bat build → BUILD SUCCESSFUL in 21s
+→ jar 1458 字节，内含 com/example/probemod/ProbeMod.class（真编译产物）
+```
+
+两个必须记住的陷阱：
+
+- **`gradle wrapper` 默认联网校验 distribution URL**，网络抖就失败：
+  `Test of distribution url https://services.gradle.org/distributions/gradle-8.12-bin.zip failed.`
+  加 `--no-validate-url` 后 9s 成功，产出 gradlew(8763B) / gradlew.bat(2966B) /
+  gradle-wrapper.jar(43583B)。
+- **`wrapper` 任务会改写已存在的 `gradle-wrapper.properties`**（509B → 252B）：
+  字段功能等价，但说明注释被冲掉、`validateDistributionUrl` 被翻成 `false`。
+  bootstrap 因此必须**跑前读入、跑后写回**。
+
+### NeoForge 端到端：**本机无法验证，归因环境，不要再重试**
+
+修掉 `moddev {}` 后构建能跑到 `:createArtifactManifest`，然后卡在下载 NeoForge
+本体，**且该 host 从本机不可达**：
+
+```
+Could not GET 'https://maven.neoforged.net/releases/net/neoforged/neoforge/21.1.1/neoforge-21.1.1.pom'
+Connect to maven.neoforged.net:443 [89.187.187.20, .11, .14, 143.244.51.246, .58]
+  failed: Connection timed out: getsockopt
+```
+
+直接 HEAD 同一 URL 也在 60s 后超时。**能证明「DSL 修复正确且生效」，不能证明
+「NeoForge 工程在本机编得出 jar」。** 别把后者说成验过了，也别为此反复重试 ——
+卡点不在代码。
+
+### 第 4 条是本轮最重要的发现：**它被第 3 条挡了**
+
+两个 bug 叠在一起，外层（ENOENT）先死，内层根本没机会求值。而且第 4 条
+**不是「忘了写」，是有人特意实现并用 3 个测试钉住的错误分支**
+（`neoforge-adapter.test.ts` / `mod-version-matrix.test.ts` / `parchment.test.ts`），
+注释还写着「版本感知」。**测试全绿、快照全对、注释自洽 —— 所以静态看永远不会发现。**
+
+判定方式（不靠文档记忆）：应用插件后枚举真实扩展名。
+
+```
+ModDevGradle 1.0.21  → EXTNAMES 含 neoForge，HAS_MODDEV=false，HAS_NEOFORGE=true
+ModDevGradle 2.0.143 → EXTNAMES 含 neoForge，HAS_MODDEV=false，HAS_NEOFORGE=true
+```
+
+两个大版本一致 → 修法是**删掉版本分支**，不是再加一层判断。
+
+**教训：两个 bug 叠着时，先修外层才会暴露内层。「跑一次真机构建」不能省。**
+
+### 只有 Forge / NeoForge 需要 toolchain 解析器
+
+`forge-gradle.ts:73`、`neoforge-gradle.ts:91` 用 `java.toolchain`；
+`fabric-gradle.ts:88`、`quilt-adapter.ts:223`、`legacy-fabric-adapter.ts:101`
+用 `sourceCompatibility`/`targetCompatibility` —— **不需要**解析器。
+给不需要的地方加 resolver 是噪音，刻意没加。
+
+### 预热的价值有了数字
+
+同一工程冷启 `3m14s` → 热了之后 `17s`。这是「依赖预热」值得做的唯一依据。
+
 ## 7.7 规格闭环点火（L2，commit `ffb87d8`）：真模型一轮过的三个真 bug
 
 链路：`AgentPanel`「AI 闭环生成」→ IPC `agent:run-loop` → `runClosedLoop`
@@ -672,3 +747,17 @@ Tailwind 3.4（4 已发布）、Zod 3.23（4 已发布）。
 backup`**。不要盲删 stash 区，尤其指向旧 commit 的那些。
 5. `E:\Cache\temp\opencode` 是已批准的临时目录，探针/临时产物放那里，
    **不要留在仓库内**。
+6. **Windows PowerShell 读无 BOM 的 UTF-8 `.ps1` 会按 ANSI 解析**，中文注释会把
+   脚本语法搞崩（报 `ParserError` 且**行号指向数组右括号，完全误导**）。
+   临时 `.ps1` 一律**纯 ASCII**（中文写进同目录的 `.md`）——和 `packages/jobobject`
+   「源文件纯 ASCII」是同一条规矩。
+7. **Gradle 往 stderr 写 JVM 警告会让 PowerShell 管道直接中断**
+   （`NativeCommandError`），表现为「命令失败」而 Gradle 其实刚启动。
+   跑 Gradle 一律 `cmd /c "xxx.bat ... > log 2>&1"`，别用 `| Tee-Object`。
+8. **这台机器连不上 `github.com` 的 release 资产**（`github.com:443` TCP connect
+   timeout，重试多次一致；但 `api.github.com` 正常、`services.gradle.org` 正常、
+   Microsoft CDN 正常）。拉 JDK 换 `aka.ms/download-jdk`。
+   未解之谜：Gradle 8.12 **不认**手动下载的 JDK 21（`gradle.properties` 与
+   `-Dorg.gradle.java.installations.paths` 两种方式都试过，均未出现在
+   `javaToolchains` 输出里，尽管 `release` 文件与 `bin/javac.exe` 都正常）。
+   **原因未查清，不要当成 Gradle 的 bug 下结论。**
