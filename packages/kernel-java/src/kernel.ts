@@ -30,6 +30,9 @@
  * - 解压前 assertSafeEntries + checkZipLimits（§13.1 zip-slip / 压缩炸弹）；
  * - 下载先过 networkAllowlist 白名单（§10.6 网络出站），再走 engine.downloadFile；
  * - 产物一律 makeArtifactRef（§0.5 产物哈希对外可见）；
+ * - install_modpack 走 §5.4 增量更新：目标文件已是计划期望内容（流式 sha512 一致）
+ *   则跳过下载只登记产物，无 sha512（CurseForge 未回填哈希）时仍下载（见
+ *   content/modpack/incremental.ts 的判定口径）；
  * - launch_instance **只生成命令不 spawn**（§13.4 沙箱内生成的代码永不自动加载）。
  * - 未知 kind：ok:false + unknown 分类（保留 stub 语义）。
  */
@@ -62,6 +65,7 @@ import {
 } from '@mc-creator/shell';
 import { assertWithinRoot, javaVersionFor, makeArtifactRef } from '@mc-creator/devkit';
 import { downloadFile } from '@mc-creator/engine';
+import { checkLocalFile, sameDigest, type DownloadReason } from './content/modpack/incremental.js';
 
 /** 内核构造上下文。 */
 export interface KernelContext {
@@ -905,19 +909,66 @@ export class JavaKernel implements KernelContract {
       });
     }
 
-    step(1);
-    const artifacts: ArtifactRef[] = [];
-    await runWithLimit(plans, 4, async (plan) => {
+    // §5.4 增量更新：先把 plans 折叠成「每个目标路径一个安装单元」。
+    // 去重的理由不只是省下载 —— 同一目标被两个并发 worker 同时写会互相踩
+    // dest.part（断点续传临时文件），先去重就从根上消掉这个竞争。
+    type InstallUnit = { dest: string; url: string; sha512: string | undefined };
+    const units: InstallUnit[] = [];
+    const seenUnit = new Map<string, InstallUnit>();
+    plans.forEach((plan) => {
       const rel = plan.path.replace(/^[./]+/, '');
       if (rel.startsWith('overrides/') || rel.startsWith('server-overrides/')) {
         // 覆盖层文件走下面的 overrides 解包，不重复下载。
         return;
       }
       const dest = this.guard(root, join('instances', instanceId, rel));
-      this.assertUrlAllowed(plan.urls[0] ?? '');
-      await downloadFile(plan.urls[0] as string, dest, withString({}, 'sha512', plan.sha512));
-      artifacts.push(await makeArtifactRef(dest, 'mod'));
+      const seen = seenUnit.get(dest);
+      if (seen !== undefined) {
+        // 同一路径两条计划：sha512 一致 → 就是同一份文件，只装一次（大小写不敏感）。
+        // 两条都声明 sha512 却不同 → 无法判定该落哪一份，直接拒绝而不是猜。
+        if (seen.sha512 !== undefined && plan.sha512 !== undefined) {
+          if (!sameDigest(seen.sha512, plan.sha512)) {
+            verr(
+              `整合包内 ${rel} 出现两条 sha512 不同的计划（${seen.sha512} / ${plan.sha512}），无法判定应落哪一份`,
+              'PACK_PLAN_CONFLICT',
+            );
+          }
+        } else if (plan.sha512 !== undefined) {
+          // 首条没给哈希、后条给了：补上，让增量判定能用上更强的信号。
+          seen.sha512 = plan.sha512;
+        }
+        return;
+      }
+      const unit: InstallUnit = { dest, url: plan.urls[0] as string, sha512: plan.sha512 };
+      seenUnit.set(dest, unit);
+      units.push(unit);
     });
+
+    step(1);
+    const refs: Array<ArtifactRef | undefined> = new Array<ArtifactRef | undefined>(units.length);
+    const skipped = { count: 0 };
+    const downloaded = { count: 0 };
+    // 按原因计数：排障时能立刻分清「用户改了文件」/「包没给哈希」/「本地读不出来」。
+    const reasons = new Map<DownloadReason, number>();
+    await runWithLimit(units, 4, async (unit, index) => {
+      this.assertUrlAllowed(unit.url);
+      // 增量判定：目标已存在且 sha512 与计划一致 → 一个字节都不下载（§5.4）。
+      const verdict = await checkLocalFile(unit.dest, unit.sha512);
+      if (verdict.kind === 'unchanged') {
+        // sha512 相同意味着本地文件与「下载后应有的那份」逐字节一致，跳过是安全的；
+        // 产物引用照常产出（复用同一次读取算出的 sha256），不产生空洞。
+        skipped.count++;
+        refs[index] = { path: unit.dest, sha256: verdict.sha256, kind: 'mod' };
+        return;
+      }
+      // 目标不存在 / 内容不同 / 计划无 sha512（CurseForge 常见）：下载并覆盖。
+      // 无 sha512 时 withString 不带该键 → engine 不做哈希校验（保持原行为）。
+      reasons.set(verdict.reason, (reasons.get(verdict.reason) ?? 0) + 1);
+      await downloadFile(unit.url, unit.dest, withString({}, 'sha512', unit.sha512));
+      downloaded.count++;
+      refs[index] = await makeArtifactRef(unit.dest, 'mod');
+    });
+    const artifacts = refs.filter((r): r is ArtifactRef => r !== undefined);
 
     const extractPrefix = (prefix: string, destSub: string): Promise<number> => {
       let count = 0;
@@ -956,6 +1007,11 @@ export class JavaKernel implements KernelContract {
         zipEntries: limits.count,
         zipTotalSize: limits.totalSize,
         mode: this.mode,
+        // §5.4 增量更新的可观测口径：本次实际下了几个 / 跳过几个。
+        // 全量重下时先看这里，能立刻区分「用户改了文件」与「包本身没给哈希」。
+        downloaded: downloaded.count,
+        skipped: skipped.count,
+        downloadReasons: Object.fromEntries(reasons),
       },
     };
   }

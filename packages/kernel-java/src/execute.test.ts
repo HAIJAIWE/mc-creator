@@ -34,11 +34,42 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProgressEvent, TaskResult } from '@mc-creator/contract';
 import { JavaKernel } from './kernel.js';
 
+/* ------------------------------------------------------------------ *
+ * engine.downloadFile 的调用计数 spy（§5.4 增量更新的核心断言）
+ *
+ * 增量更新的正确性只有一件事可证：**该下的一个没少下，不该下的一个没下**。
+ * 只看落盘文件内容分不出来（跳过的文件本来就在那儿），所以这里在模块边界
+ * 上装计数器：downloadFile 每次真正发起网络请求都会先经过它。
+ *
+ * spy 实现必须**真调用**原函数（下面 downloadReal），否则测试会变成在断言
+ * 一个假下载器的行为，丢掉 sha512 校验、原子落盘、断点续传这些真行为。
+ * ------------------------------------------------------------------ */
+const dlCount = vi.hoisted(() => ({ n: 0, dests: [] as string[], urls: [] as string[] }));
+vi.mock('@mc-creator/engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@mc-creator/engine')>();
+  return {
+    ...actual,
+    downloadFile: (url: string, dest: string, opts?: unknown) => {
+      dlCount.n++;
+      dlCount.dests.push(dest);
+      dlCount.urls.push(url);
+      return actual.downloadFile(url, dest, opts as Parameters<typeof actual.downloadFile>[2]);
+    },
+  };
+});
+
 const dirs: string[] = [];
+
+/** 归零 downloadFile 调用计数（§5.4 增量更新断言的前置）。 */
+beforeEach(() => {
+  dlCount.n = 0;
+  dlCount.dests.length = 0;
+  dlCount.urls.length = 0;
+});
 
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
@@ -1378,6 +1409,341 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
     expect(modsFiles(dir)).toEqual([]);
   });
 });
+
+/* ------------------------------------------------------------------ *
+ * §5.4 整合包增量更新：「大整合包全量重下的体验不可接受」
+ *
+ * 核心断言是 dlCount.n —— engine.downloadFile 的调用次数（文件顶部的 spy，
+ * 计数后真调用）。只看落盘内容分不出「跳过了」与「本来就该有」，所以必须
+ * 在模块边界上数调用次数。
+ * ------------------------------------------------------------------ */
+
+/** 整合包里可下载文件的直链内容（同一份内容 → 同一 sha512）。 */
+const INC_BYTES = Buffer.from('incremental-mod-jar-bytes');
+const INC_SHA512 = createHash('sha512').update(INC_BYTES).digest('hex');
+const INC_SHA256 = createHash('sha256').update(INC_BYTES).digest('hex');
+const INC_BYTES2 = Buffer.from('incremental-other-mod-bytes');
+const INC_SHA512_2 = createHash('sha512').update(INC_BYTES2).digest('hex');
+
+interface PackFileSpec {
+  path: string;
+  sha512?: string;
+  urlPath: string;
+}
+
+/** 造一个带 modrinth.index.json 的 mrpack（files 由 spec 决定）。 */
+function buildMrpack(specs: PackFileSpec[], name = 'inc.mrpack'): string {
+  const zipPath = join(mkTmp(), name);
+  writeFileSync(
+    zipPath,
+    buildZip([
+      {
+        name: 'modrinth.index.json',
+        content: JSON.stringify({
+          formatVersion: 1,
+          game: 'minecraft',
+          versionId: '1.0.0',
+          name: 'inc',
+          files: specs.map((s) => ({
+            path: s.path,
+            ...(s.sha512 === undefined ? {} : { hashes: { sha512: s.sha512 } }),
+            downloads: [`${dlBase}${s.urlPath}`],
+          })),
+          dependencies: { minecraft: '1.21.1' },
+        }),
+      },
+    ]),
+  );
+  return zipPath;
+}
+
+/** 走白名单的 install_modpack。 */
+function installPack(dataDir: string, instanceId: string, zipPath: string): Promise<TaskResult> {
+  return new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['127.0.0.1'] })
+    .dispatch({
+      id: `inc-${instanceId}`,
+      kind: 'install_modpack',
+      payload: { instanceId, modpack: { source: 'modrinth', path: zipPath } },
+    })
+    .result();
+}
+
+describe('§5.4 整合包增量更新（downloadFile 调用次数为核心断言）', () => {
+  beforeAll(async () => {
+    dlServer = createServer((req, res) => {
+      const u = new URL(req.url ?? '/', 'http://127.0.0.1');
+      dlHits.push(`${u.pathname}${u.search}`);
+      // /two.jar 返回与 /one.jar 相同的内容（整合包里同内容多文件很常见），
+      // 其余按路径后缀区分。
+      const body = u.pathname.endsWith('/two.jar') ? INC_BYTES2 : INC_BYTES;
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(body.length),
+      });
+      res.end(body);
+    });
+    await new Promise<void>((resolve) => dlServer.listen(0, '127.0.0.1', resolve));
+    dlBase = `http://127.0.0.1:${(dlServer.address() as AddressInfo).port}`;
+  });
+
+  afterAll(async () => {
+    if (typeof dlServer.closeAllConnections === 'function') dlServer.closeAllConnections();
+    await new Promise<void>((resolve, reject) => {
+      dlServer.close((e) => (e ? reject(e) : resolve()));
+    });
+  });
+
+  beforeEach(() => {
+    dlHits = [];
+  });
+
+  it('回归：全新安装 → 每个文件都真的下载了（别把首次安装搞坏）', async () => {
+    const dataDir = mkTmp();
+    const dir = seedInstance(dataDir, 'i1');
+    const zipPath = buildMrpack([
+      { path: 'mods/one.jar', sha512: INC_SHA512, urlPath: '/one.jar' },
+      { path: 'mods/two.jar', sha512: INC_SHA512_2, urlPath: '/two.jar' },
+    ]);
+    const result = await installPack(dataDir, 'i1', zipPath);
+
+    expect(result.ok).toBe(true);
+    expect(dlCount.n).toBe(2); // 全新安装：一个都不能省
+    expect(dlHits.sort()).toEqual(['/one.jar', '/two.jar']);
+    expect(readFileSync(join(dir, 'mods', 'one.jar')).equals(INC_BYTES)).toBe(true);
+    expect(readFileSync(join(dir, 'mods', 'two.jar')).equals(INC_BYTES2)).toBe(true);
+    expect(result.data).toMatchObject({ downloaded: 2, skipped: 0 });
+  });
+
+  it('核心：二次安装、文件全未变 → 一个字节都不下载（downloadFile 次数 = 0）', async () => {
+    const dataDir = mkTmp();
+    const dir = seedInstance(dataDir, 'i2');
+    const specs: PackFileSpec[] = [
+      { path: 'mods/one.jar', sha512: INC_SHA512, urlPath: '/one.jar' },
+      { path: 'mods/two.jar', sha512: INC_SHA512_2, urlPath: '/two.jar' },
+    ];
+    const zipPath = buildMrpack(specs);
+
+    const first = await installPack(dataDir, 'i2', zipPath);
+    expect(first.ok).toBe(true);
+    expect(dlCount.n).toBe(2);
+
+    // 第二次：同实例、同整合包。dlHits/dlCount 在 beforeEach 已归零过，这里手动清。
+    dlCount.n = 0;
+    dlCount.dests.length = 0;
+    dlHits.length = 0;
+    const second = await installPack(dataDir, 'i2', zipPath);
+
+    expect(second.ok).toBe(true);
+    expect(dlCount.n).toBe(0); // 本任务的核心断言
+    expect(dlHits).toEqual([]); // 真的一条 HTTP 请求都没发
+    // 跳过之后产物引用必须仍然完整（不能因为跳过就少报 artifact）。
+    expect(second.artifacts?.length).toBe(2);
+    expect(second.artifacts?.every((a) => a.sha256 === INC_SHA256)).toBe(false); // two 内容不同
+    const shaList = (second.artifacts ?? []).map((a) => a.sha256).sort();
+    expect(shaList).toEqual(
+      [INC_SHA256, createHash('sha256').update(INC_BYTES2).digest('hex')].sort(),
+    );
+    expect(readFileSync(join(dir, 'mods', 'one.jar')).equals(INC_BYTES)).toBe(true);
+    expect(result_ok(second)).toBe(true);
+    expect(second.data).toMatchObject({ downloaded: 0, skipped: 2 });
+  });
+
+  it('某个文件本地被改 → 只重下那一个（其余仍然跳过）', async () => {
+    const dataDir = mkTmp();
+    const dir = seedInstance(dataDir, 'i3');
+    const zipPath = buildMrpack([
+      { path: 'mods/one.jar', sha512: INC_SHA512, urlPath: '/one.jar' },
+      { path: 'mods/two.jar', sha512: INC_SHA512_2, urlPath: '/two.jar' },
+    ]);
+    expect((await installPack(dataDir, 'i3', zipPath)).ok).toBe(true);
+
+    // 攻击场景：用户手动改了一个 jar（且改成等长 —— size 兜底在这里会误判跳过）。
+    writeFileSync(join(dir, 'mods', 'one.jar'), Buffer.alloc(INC_BYTES.length, 0x5a));
+
+    dlCount.n = 0;
+    dlCount.dests.length = 0;
+    dlHits.length = 0;
+    const second = await installPack(dataDir, 'i3', zipPath);
+
+    expect(second.ok).toBe(true);
+    expect(dlCount.n).toBe(1); // 只重下被改的那一个
+    expect(dlCount.dests).toEqual([join(dir, 'mods', 'one.jar')]);
+    expect(dlHits).toEqual(['/one.jar']);
+    // 改回来的内容必须真的是期望内容（不能跳过、也不能下到错的）。
+    expect(readFileSync(join(dir, 'mods', 'one.jar')).equals(INC_BYTES)).toBe(true);
+    expect(second.data).toMatchObject({
+      downloaded: 1,
+      skipped: 1,
+      downloadReasons: { changed: 1 },
+    });
+  });
+
+  it('某个文件被删 → 只重下那一个', async () => {
+    const dataDir = mkTmp();
+    const dir = seedInstance(dataDir, 'i4');
+    const zipPath = buildMrpack([
+      { path: 'mods/one.jar', sha512: INC_SHA512, urlPath: '/one.jar' },
+      { path: 'mods/two.jar', sha512: INC_SHA512_2, urlPath: '/two.jar' },
+    ]);
+    expect((await installPack(dataDir, 'i4', zipPath)).ok).toBe(true);
+    rmSync(join(dir, 'mods', 'two.jar'));
+
+    dlCount.n = 0;
+    dlCount.dests.length = 0;
+    dlHits.length = 0;
+    const second = await installPack(dataDir, 'i4', zipPath);
+
+    expect(second.ok).toBe(true);
+    expect(dlCount.n).toBe(1);
+    expect(dlCount.dests).toEqual([join(dir, 'mods', 'two.jar')]);
+    expect(existsSync(join(dir, 'mods', 'two.jar'))).toBe(true);
+    expect(second.data).toMatchObject({
+      downloaded: 1,
+      skipped: 1,
+      downloadReasons: { absent: 1 },
+    });
+  });
+
+  it('多个文件共用同一 sha512 → 只下载一次（同目标合并，不重复发请求）', async () => {
+    const dataDir = mkTmp();
+    const dir = seedInstance(dataDir, 'i5');
+    // 同一个路径在 files 里出现两次，内容（sha512）完全相同。
+    const zipPath = buildMrpack([
+      { path: 'mods/dup.jar', sha512: INC_SHA512, urlPath: '/one.jar' },
+      { path: 'mods/dup.jar', sha512: INC_SHA512.toUpperCase(), urlPath: '/one.jar' },
+    ]);
+    const result = await installPack(dataDir, 'i5', zipPath);
+
+    expect(result.ok).toBe(true);
+    expect(dlCount.n).toBe(1); // 同一份文件只下一次
+    expect(dlHits).toEqual(['/one.jar']);
+    expect(readFileSync(join(dir, 'mods', 'dup.jar')).equals(INC_BYTES)).toBe(true);
+    // 去重后产物也只报一份（同一目标路径不重复登记）。
+    expect(result.artifacts?.length).toBe(1);
+    expect(result.data).toMatchObject({ downloaded: 1, skipped: 0, mods: 1 });
+  });
+
+  it('同一路径两条 sha512 冲突 → validation（不猜该落哪一份）', async () => {
+    const dataDir = mkTmp();
+    seedInstance(dataDir, 'i6');
+    const zipPath = buildMrpack([
+      { path: 'mods/conflict.jar', sha512: INC_SHA512, urlPath: '/one.jar' },
+      { path: 'mods/conflict.jar', sha512: INC_SHA512_2, urlPath: '/two.jar' },
+    ]);
+    const result = await installPack(dataDir, 'i6', zipPath);
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'PACK_PLAN_CONFLICT' },
+    });
+    expect(dlCount.n).toBe(0); // 判不出来就不该下任何东西
+  });
+
+  it('CurseForge 无 sha512 → 仍下载（不拿 size 猜「应该没变」）', async () => {
+    const dataDir = mkTmp();
+    const dir = seedInstance(dataDir, 'i7');
+    const zipPath = join(mkTmp(), 'cf.mrpack');
+    writeFileSync(
+      zipPath,
+      buildZip([
+        {
+          name: 'manifest.json',
+          content: JSON.stringify({
+            minecraft: { version: '1.21.1', modLoaders: [{ id: 'fabric-0.15.0', primary: true }] },
+            manifestType: 'minecraftModpack',
+            manifestVersion: 1,
+            name: 'cf',
+            version: '1',
+            author: 'x',
+            files: [{ projectID: 1, fileID: 2, required: true }],
+            overrides: 'overrides',
+          }),
+        },
+      ]),
+    );
+    // 上层经 CF API 解析直链后回填 payload.files，但没回填 sha512（CF 常见）。
+    const payload = {
+      instanceId: 'i7',
+      modpack: { source: 'curseforge', path: zipPath },
+      files: [{ path: 'mods/cf.jar', downloads: [`${dlBase}/one.jar`] }],
+    };
+    const kernel = () => new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['127.0.0.1'] });
+
+    const first = await kernel().dispatch({ id: 'i7a', kind: 'install_modpack', payload }).result();
+    expect(first.ok).toBe(true);
+    expect(dlCount.n).toBe(1);
+
+    // 二次安装：文件确实已在、内容也确实没变，但**没有 sha512 可比** → 仍下载。
+    dlCount.n = 0;
+    dlCount.dests.length = 0;
+    dlHits.length = 0;
+    const second = await kernel()
+      .dispatch({ id: 'i7b', kind: 'install_modpack', payload })
+      .result();
+    expect(second.ok).toBe(true);
+    expect(dlCount.n).toBe(1);
+    expect(dlHits).toEqual(['/one.jar']);
+    expect(second.data).toMatchObject({
+      downloaded: 1,
+      skipped: 0,
+      downloadReasons: { 'no-expected-hash': 1 },
+    });
+    expect(readFileSync(join(dir, 'mods', 'cf.jar')).equals(INC_BYTES)).toBe(true);
+  });
+
+  it('mrpack 给了 sha512 → 二次安装走增量（对照组：证明上一条不是「都跳过」）', async () => {
+    const dataDir = mkTmp();
+    seedInstance(dataDir, 'i8');
+    const zipPath = buildMrpack([
+      { path: 'mods/one.jar', sha512: INC_SHA512, urlPath: '/one.jar' },
+    ]);
+    expect((await installPack(dataDir, 'i8', zipPath)).ok).toBe(true);
+    dlCount.n = 0;
+    dlHits.length = 0;
+    const second = await installPack(dataDir, 'i8', zipPath);
+    expect(second.ok).toBe(true);
+    expect(dlCount.n).toBe(0);
+    expect(dlHits).toEqual([]);
+    expect(second.data).toMatchObject({ downloaded: 0, skipped: 1 });
+  });
+
+  it('计划 sha512 非法 → 不跳过，走下载并由引擎报 HASH_MISMATCH（失败语义不变）', async () => {
+    const dataDir = mkTmp();
+    const dir = seedInstance(dataDir, 'i9');
+    const zipPath = buildMrpack([{ path: 'mods/bad.jar', sha512: 'nope', urlPath: '/one.jar' }]);
+    const result = await installPack(dataDir, 'i9', zipPath);
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'HASH_MISMATCH' },
+    });
+    expect(dlCount.n).toBe(1); // 仍然真下载了，让引擎做校验
+    expect(modsFiles(dir)).toEqual([]); // 原子性：失败不留残file
+  });
+
+  it('本地文件被替换成目录 → 不跳过，重新下载覆盖', async () => {
+    const dataDir = mkTmp();
+    const dir = seedInstance(dataDir, 'i10');
+    const zipPath = buildMrpack([
+      { path: 'mods/one.jar', sha512: INC_SHA512, urlPath: '/one.jar' },
+    ]);
+    expect((await installPack(dataDir, 'i10', zipPath)).ok).toBe(true);
+    // 攻击场景：jar 路径被塞成一个目录（磁盘位错 / 别的解包器留下的）。
+    rmSync(join(dir, 'mods', 'one.jar'), { recursive: true, force: true });
+    mkdirSync(join(dir, 'mods', 'one.jar'), { recursive: true });
+    dlCount.n = 0;
+    dlHits.length = 0;
+    const second = await installPack(dataDir, 'i10', zipPath);
+    // 下载落到一个已存在的目录路径上会失败（EISDIR/ENOTEMPTY 之类），
+    // 关键在于「没有把目录当成已装好的 jar 而跳过」。
+    expect(second.ok).toBe(false);
+    expect(dlCount.n).toBe(1);
+    expect(second.data).toBeUndefined();
+  });
+});
+
+/** 冗余但明确的成功断言（让上面的核心用例在 result 结构变化时立刻炸）。 */
+function result_ok(r: TaskResult): boolean {
+  return r.ok;
+}
 
 describe('JavaKernel launch_instance 真实现（§13.4 绝不 spawn）', () => {
   it('confirm true → 返回结构完整 cmd/args，不 spawn 任何进程', async () => {
