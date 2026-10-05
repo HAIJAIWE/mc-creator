@@ -39,8 +39,17 @@
  * - 未知 kind：ok:false + unknown 分类（保留 stub 语义）。
  */
 
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
+import { dirname, join } from 'node:path';
 import {
   capabilitiesFor,
   type ArtifactRef,
@@ -205,6 +214,62 @@ function serverIdOf(payload: unknown): string | undefined {
     return value;
   }
   return undefined;
+}
+
+/**
+ * §7.4 快照类 kind：contract 包尚无 backup 分级（MCP_TOOL_PERMISSIONS 无
+ * backup_* key），按 W 级走「确认闸门 + 真实现」（risk=write）。不改 contract
+ * 包（那是别人的文件），此处本地声明路由集合。
+ */
+const BACKUP_WRITE_KINDS = new Set([
+  'backup_server',
+  'list_backups',
+  'restore_backup',
+  'prune_backups',
+]);
+
+/** 递归列出目录下所有文件（相对路径，'/' 分隔，已排序）。读失败的条目直接跳过。 */
+function listFilesRecursive(dir: string, prefix: string): string[] {
+  const out: string[] = [];
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return out;
+  }
+  for (const entry of entries.sort()) {
+    const full = join(dir, entry);
+    const rel = prefix === '' ? entry : `${prefix}/${entry}`;
+    let st: ReturnType<typeof statSync> | undefined;
+    try {
+      st = statSync(full);
+    } catch {
+      continue;
+    }
+    if (st.isDirectory()) out.push(...listFilesRecursive(full, rel));
+    else if (st.isFile()) out.push(rel);
+  }
+  return out;
+}
+
+/** 快照排序键：manifest.createdAt 优先（ISO 字典序即时间序），缺失则退化为目录名；同键按名排。 */
+function backupSortKey(listRoot: string, id: string): [string, string] {
+  try {
+    const m = JSON.parse(readFileSync(join(listRoot, id, 'manifest.json'), 'utf8')) as {
+      createdAt?: unknown;
+    };
+    if (typeof m.createdAt === 'string' && m.createdAt !== '') return [m.createdAt, id];
+  } catch {
+    /* 读不到 manifest 就按目录名排，调用方再跳过坏条目 */
+  }
+  return [id, id];
+}
+
+function compareBackupIds(listRoot: string, a: string, b: string): number {
+  const [ca, na] = backupSortKey(listRoot, a);
+  const [cb, nb] = backupSortKey(listRoot, b);
+  if (ca !== cb) return ca < cb ? -1 : 1;
+  return na < nb ? -1 : na > nb ? 1 : 0;
 }
 
 /* ------------------------------------------------------------------ *
@@ -408,6 +473,23 @@ const STEP_DEFS: Record<string, { stage: string; message: string }[]> = {
     { stage: 'validating', message: '校验服务端存在性' },
     { stage: 'deleting', message: '删除服务端目录' },
   ],
+  backup_server: [
+    { stage: 'validating', message: '校验服务端存在性' },
+    { stage: 'snapshotting', message: '复制 world/ 与配置文件到快照目录' },
+    { stage: 'complete', message: '快照完成并写入 manifest' },
+  ],
+  list_backups: [
+    { stage: 'validating', message: '校验服务端存在性' },
+    { stage: 'listing', message: '列出已有快照' },
+  ],
+  restore_backup: [
+    { stage: 'validating', message: '校验服务端与快照存在性' },
+    { stage: 'restoring', message: '从快照拷回服务端目录' },
+  ],
+  prune_backups: [
+    { stage: 'validating', message: '校验服务端与保留数' },
+    { stage: 'pruning', message: '按 keepN 裁剪旧快照' },
+  ],
 };
 
 function confirmSummary(kind: string, payload: unknown): string {
@@ -428,6 +510,14 @@ function confirmSummary(kind: string, payload: unknown): string {
       return `优雅停止服务端「${id}」（控制指令，实际进程生命周期由外壳服务管理）`;
     case 'rollback_build':
       return `把服务端「${id}」的插件回滚到上一版产物（按 sha256 匹配）`;
+    case 'backup_server':
+      return `为服务端「${id}」创建世界/配置快照（写入 backups/ 目录）`;
+    case 'list_backups':
+      return `列出服务端「${id}」的已有快照（只读快照目录）`;
+    case 'restore_backup':
+      return `把快照恢复到服务端「${id}」（覆盖世界与配置，建议随后重启）`;
+    case 'prune_backups':
+      return `裁剪服务端「${id}」的旧快照（只保留最近 N 个）`;
     default:
       return `执行 ${kind}（写入或改动用户目标）`;
   }
@@ -1141,6 +1231,255 @@ export class ServerKernel implements KernelContract {
     };
   }
 
+  /* -------------------- §7.4 快照备份（定时快照中的“快照”一半） -------------------- */
+  /* 快照内容：<serverDir> 下 world/（递归）+ 顶层 *.properties / *.yml / *.yaml。
+   * 只取这两类 → logs/ 与 backups 自身天然排除。存放：<root>/backups/<serverId>/<ts>/。
+   * sandbox 模式下 root 即 sandboxDir，快照读写全走沙箱（与既有 .deployed 备份
+   * 同一套 root/guard 语义，§13.4）。 */
+
+  /** 快照源相对路径：world/ 递归 + 顶层 *.properties / *.yml / *.yaml（已排序）。 */
+  private collectSnapshotFiles(serverDirPath: string): string[] {
+    const rels: string[] = [];
+    const worldDir = join(serverDirPath, 'world');
+    if (existsSync(worldDir)) {
+      for (const rel of listFilesRecursive(worldDir, '')) rels.push(`world/${rel}`);
+    }
+    let entries: string[];
+    try {
+      entries = readdirSync(serverDirPath);
+    } catch {
+      entries = [];
+    }
+    for (const entry of entries) {
+      const full = join(serverDirPath, entry);
+      let isFile = false;
+      try {
+        isFile = statSync(full).isFile();
+      } catch {
+        continue;
+      }
+      if (isFile && /\.(properties|ya?ml)$/i.test(entry)) rels.push(entry);
+    }
+    return rels.sort();
+  }
+
+  /** 快照 manifest 的 files 条目形状（与 manifest.json 落盘形状一致）。 */
+  private async snapshotFileEntries(
+    serverDirPath: string,
+    rels: string[],
+  ): Promise<{ path: string; sha256: string; size: number }[]> {
+    const files: { path: string; sha256: string; size: number }[] = [];
+    for (const rel of rels) {
+      const src = join(serverDirPath, ...rel.split('/'));
+      files.push({ path: rel, sha256: await sha256File(src), size: statSync(src).size });
+    }
+    return files;
+  }
+
+  private async backupServer(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const serverId = serverIdOf(payload);
+    if (serverId === undefined) verr('缺少合法 serverId（payload.serverId）');
+    step(0);
+    const dir = this.serverDir(root, serverId);
+    if (!existsSync(dir)) verr(`服务端不存在: ${serverId}（${dir}）`, 'SERVER_NOT_FOUND');
+    const rels = this.collectSnapshotFiles(dir);
+    step(1);
+    const createdAt = new Date().toISOString();
+    const stamp = createdAt.replace(/[:.]/g, '-');
+    const listRoot = this.guard(root, join('backups', serverId));
+    // 同一毫秒连打两份快照时加 -N 后缀，保证目录名唯一且仍按字典序即时间序。
+    let backupId = stamp;
+    for (let n = 1; existsSync(join(listRoot, backupId)); n++) backupId = `${stamp}-${n}`;
+    const destRoot = this.guard(root, join('backups', serverId, backupId));
+    mkdirSync(destRoot, { recursive: true });
+    const files = await this.snapshotFileEntries(dir, rels);
+    for (const file of files) {
+      const dest = this.guard(root, join('backups', serverId, backupId, ...file.path.split('/')));
+      mkdirSync(dirname(dest), { recursive: true });
+      cpSync(join(dir, ...file.path.split('/')), dest);
+    }
+    const body = { serverId, createdAt, files };
+    const sha256 = createHash('sha256').update(JSON.stringify(body)).digest('hex');
+    await writeFileAtomic(
+      this.guard(root, join('backups', serverId, backupId, 'manifest.json')),
+      `${JSON.stringify({ ...body, sha256 }, null, 2)}\n`,
+    );
+    step(2);
+    return {
+      ok: true,
+      data: { serverId, backupId, path: destRoot, createdAt, files, sha256 },
+    };
+  }
+
+  private async listBackups(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const serverId = serverIdOf(payload);
+    if (serverId === undefined) verr('缺少合法 serverId（payload.serverId）');
+    step(0);
+    const dir = this.serverDir(root, serverId);
+    if (!existsSync(dir)) verr(`服务端不存在: ${serverId}（${dir}）`, 'SERVER_NOT_FOUND');
+    step(1);
+    const listRoot = this.guard(root, join('backups', serverId));
+    if (!existsSync(listRoot)) return { ok: true, data: { serverId, backups: [] } };
+    const ids = readdirSync(listRoot)
+      .sort()
+      .filter((entry) => {
+        try {
+          return statSync(join(listRoot, entry)).isDirectory();
+        } catch {
+          return false;
+        }
+      })
+      .sort((a, b) => compareBackupIds(listRoot, a, b));
+    const backups: {
+      backupId: string;
+      path: string;
+      createdAt?: string;
+      files?: { path: string; sha256: string; size: number }[];
+      sha256?: string;
+    }[] = [];
+    for (const entry of ids) {
+      const full = join(listRoot, entry);
+      let isDir = false;
+      try {
+        isDir = statSync(full).isDirectory();
+      } catch {
+        continue;
+      }
+      if (!isDir) continue;
+      let manifest:
+        | {
+            createdAt?: unknown;
+            files?: unknown;
+            sha256?: unknown;
+          }
+        | undefined;
+      try {
+        manifest = JSON.parse(readFileSync(join(full, 'manifest.json'), 'utf8')) as typeof manifest;
+      } catch {
+        manifest = undefined;
+      }
+      backups.push({
+        backupId: entry,
+        path: full,
+        ...(typeof manifest?.createdAt === 'string' ? { createdAt: manifest.createdAt } : {}),
+        ...(Array.isArray(manifest?.files) ? { files: manifest.files } : {}),
+        ...(typeof manifest?.sha256 === 'string' ? { sha256: manifest.sha256 } : {}),
+      });
+    }
+    return { ok: true, data: { serverId, backups } };
+  }
+
+  private async restoreBackup(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const p = asRecord(payload);
+    const serverId = serverIdOf(payload);
+    if (serverId === undefined) verr('缺少合法 serverId（payload.serverId）');
+    const backupId =
+      optString(p, 'backupId') ?? optString(p, 'snapshotId') ?? optString(p, 'snapshot');
+    if (backupId === undefined) verr('缺少参数 payload.backupId（快照名）');
+    if (backupId.includes('..') || /[\\/]/.test(backupId)) {
+      verr(`快照名非法（含路径穿越或分隔符）: ${backupId}`, 'PATH_TRAVERSAL');
+    }
+    step(0);
+    const dir = this.serverDir(root, serverId);
+    if (!existsSync(dir)) verr(`服务端不存在: ${serverId}（${dir}）`, 'SERVER_NOT_FOUND');
+    const snapRoot = this.guard(root, join('backups', serverId, backupId));
+    const manifestPath = join(snapRoot, 'manifest.json');
+    if (!existsSync(snapRoot) || !existsSync(manifestPath)) {
+      verr(`快照不存在: ${serverId}/${backupId}`, 'BACKUP_NOT_FOUND');
+    }
+    let manifest: { files?: unknown };
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as typeof manifest;
+    } catch (e) {
+      verr(`快照 manifest 解析失败: ${(e as Error).message}`, 'BACKUP_INVALID');
+    }
+    if (!Array.isArray(manifest.files))
+      verr(`快照 manifest 缺 files 列表: ${manifestPath}`, 'BACKUP_INVALID');
+    step(1);
+    const restoredFiles: string[] = [];
+    for (const entry of manifest.files) {
+      const rel = (entry as { path?: unknown } | undefined)?.path;
+      if (
+        typeof rel !== 'string' ||
+        rel === '' ||
+        rel.startsWith('/') ||
+        rel.includes('..') ||
+        rel.includes('\\') ||
+        /^[a-zA-Z]:/.test(rel)
+      ) {
+        verr(`快照 manifest 含非法路径: ${String(rel)}`, 'BACKUP_INVALID');
+      }
+      const src = this.guard(root, join('backups', serverId, backupId, ...rel.split('/')));
+      if (!existsSync(src)) verr(`快照文件缺失: ${rel}`, 'BACKUP_INVALID');
+      const dest = this.guard(root, join(serverId, ...rel.split('/')));
+      mkdirSync(dirname(dest), { recursive: true });
+      cpSync(src, dest);
+      restoredFiles.push(rel);
+    }
+    return {
+      ok: true,
+      data: {
+        serverId,
+        backupId,
+        restoredFiles,
+        serverDir: dir,
+        controlCommand: 'restart',
+        note: '快照已拷回服务端目录，未自动重启：重启由外壳进程托管服务在确认后执行（§7.1 controlServer 惯例）',
+      },
+    };
+  }
+
+  private async pruneBackups(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const p = asRecord(payload);
+    const serverId = serverIdOf(payload);
+    if (serverId === undefined) verr('缺少合法 serverId（payload.serverId）');
+    const keepN = optNumber(p, 'keepN') ?? optNumber(p, 'keep') ?? 5;
+    if (!Number.isInteger(keepN) || keepN < 0) {
+      verr(`payload.keepN 非法（需≥ 0 整数）: ${String(keepN)}`);
+    }
+    step(0);
+    const dir = this.serverDir(root, serverId);
+    if (!existsSync(dir)) verr(`服务端不存在: ${serverId}（${dir}）`, 'SERVER_NOT_FOUND');
+    step(1);
+    const listRoot = this.guard(root, join('backups', serverId));
+    if (!existsSync(listRoot)) {
+      return { ok: true, data: { serverId, keepN, kept: [], pruned: [] } };
+    }
+    const ids = readdirSync(listRoot)
+      .sort()
+      .filter((entry) => {
+        try {
+          return statSync(join(listRoot, entry)).isDirectory();
+        } catch {
+          return false;
+        }
+      })
+      .sort((a, b) => compareBackupIds(listRoot, a, b));
+    const pruned: string[] = [];
+    while (ids.length > keepN) {
+      const victim = ids.shift() as string;
+      rmSync(this.guard(root, join('backups', serverId, victim)), { recursive: true });
+      pruned.push(victim);
+    }
+    return { ok: true, data: { serverId, keepN, kept: ids, pruned } };
+  }
+
   /** X 派发：确认闸门 + 真实现。 */
   private async executeWrite(
     taskId: string,
@@ -1194,6 +1533,14 @@ export class ServerKernel implements KernelContract {
           return await this.controlServer(root, payload, 'stop_server', step);
         case 'rollback_build':
           return await this.rollbackBuild(root, payload, step);
+        case 'backup_server':
+          return await this.backupServer(root, payload, step);
+        case 'list_backups':
+          return await this.listBackups(root, payload, step);
+        case 'restore_backup':
+          return await this.restoreBackup(root, payload, step);
+        case 'prune_backups':
+          return await this.pruneBackups(root, payload, step);
         default:
           verr(`不支持的任务: ${kind}`, 'UNKNOWN_KIND');
       }
@@ -1243,6 +1590,11 @@ export class ServerKernel implements KernelContract {
       async result(): Promise<TaskResult> {
         bus.markResultStarted();
         try {
+          // §7.4 快照类：MCP_TOOL_PERMISSIONS 无 backup_* key（isWriteOrExecute
+          // 为 false），此处按 W 级直走确认闸门；既有分支一行未改。
+          if (BACKUP_WRITE_KINDS.has(kind)) {
+            return await kernel.executeWrite(id, kind, payload, bus);
+          }
           if (isWriteOrExecute) {
             return await kernel.executeWrite(id, kind, payload, bus);
           }

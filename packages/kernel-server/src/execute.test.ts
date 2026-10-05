@@ -1122,3 +1122,279 @@ describe('ServerKernel build_project 产物验证（step 2.5，接 devkit.valida
     }
   });
 });
+
+describe('ServerKernel §7.4 快照备份确认闸门（W 级，未确认零副作用）', () => {
+  it('四种快照 kind 未传 confirm → permission + backups/ 未创建', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'bk0');
+    const kernel = new ServerKernel({ dataDir });
+    const cases = [
+      { kind: 'backup_server', payload: { serverId: 'bk0' } },
+      { kind: 'list_backups', payload: { serverId: 'bk0' } },
+      { kind: 'restore_backup', payload: { serverId: 'bk0', backupId: 'x' } },
+      { kind: 'prune_backups', payload: { serverId: 'bk0', keepN: 1 } },
+    ] as const;
+    for (const [i, c] of cases.entries()) {
+      const result = await kernel
+        .dispatch({ id: `bk-gate-${i}`, kind: c.kind, payload: c.payload })
+        .result();
+      expect(result.error?.category).toBe('permission');
+      expect(result.data).toMatchObject({ confirmRequired: true });
+    }
+    expect(existsSync(join(dataDir, 'backups'))).toBe(false);
+  });
+
+  it('confirm 返回 false → 拒绝且不落快照', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'bk0b');
+    const result = await new ServerKernel({ dataDir, confirm: NO })
+      .dispatch({ id: 'bk-gate-no', kind: 'backup_server', payload: { serverId: 'bk0b' } })
+      .result();
+    expect(result.error?.category).toBe('permission');
+    expect(existsSync(join(dataDir, 'backups'))).toBe(false);
+  });
+});
+
+describe('ServerKernel §7.4 快照备份全链（快照→列表→恢复→裁剪）', () => {
+  /** 在既有 seedServer 基础上补 world 文件 + yml + 日志，模拟真实服务端。 */
+  function seedFull(dataDir: string, name: string): string {
+    const dir = seedServer(dataDir, name);
+    writeFileSync(join(dir, 'world', 'level.dat'), 'level-bytes');
+    mkdirSync(join(dir, 'world', 'region'), { recursive: true });
+    writeFileSync(join(dir, 'world', 'region', 'r.0.0.mca'), 'region-bytes');
+    writeFileSync(join(dir, 'bukkit.yml'), 'spawn-limits:\n  monsters: 70\n', 'utf8');
+    writeFileSync(join(dir, 'logs', 'latest.log'), 'log-line\n', 'utf8');
+    return dir;
+  }
+
+  interface BackupData {
+    serverId: string;
+    backupId: string;
+    path: string;
+    createdAt: string;
+    files: { path: string; sha256: string; size: number }[];
+    sha256: string;
+  }
+
+  it('backup_server → 落盘 world + properties/yml + manifest，排除 logs/', async () => {
+    const dataDir = mkTmp();
+    seedFull(dataDir, 'bk1');
+    const result = await new ServerKernel({ dataDir, confirm: YES })
+      .dispatch({ id: 'bk-a1', kind: 'backup_server', payload: { serverId: 'bk1' } })
+      .result();
+    expect(result.ok).toBe(true);
+    const data = result.data as BackupData;
+    expect(data.serverId).toBe('bk1');
+    expect(data.backupId).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(data.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(data.path).toBe(join(dataDir, 'backups', 'bk1', data.backupId));
+    const paths = data.files.map((f) => f.path);
+    expect(paths).toContain('world/level.dat');
+    expect(paths).toContain('world/region/r.0.0.mca');
+    expect(paths).toContain('server.properties');
+    expect(paths).toContain('bukkit.yml');
+    expect(paths.some((p) => p.startsWith('logs/'))).toBe(false);
+    for (const f of data.files) expect(f.sha256).toMatch(/^[0-9a-f]{64}$/);
+    // 物理落盘一致 + manifest.json 自描述
+    expect(readFileSync(join(data.path, 'world', 'level.dat'), 'utf8')).toBe('level-bytes');
+    expect(existsSync(join(data.path, 'logs'))).toBe(false);
+    const manifest = JSON.parse(
+      readFileSync(join(data.path, 'manifest.json'), 'utf8'),
+    ) as BackupData & { createdAt: string };
+    expect(manifest.createdAt).toBe(data.createdAt);
+    expect(manifest.sha256).toBe(data.sha256);
+    expect(manifest.files).toHaveLength(data.files.length);
+  });
+
+  it('list_backups → 列出快照；restore_backup → 拷回并建议 restart（不自动重启）', async () => {
+    const dataDir = mkTmp();
+    const dir = seedFull(dataDir, 'bk2');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const snap = await kernel
+      .dispatch({ id: 'bk-b1', kind: 'backup_server', payload: { serverId: 'bk2' } })
+      .result();
+    const backupId = (snap.data as BackupData).backupId;
+
+    const list = await kernel
+      .dispatch({ id: 'bk-b2', kind: 'list_backups', payload: { serverId: 'bk2' } })
+      .result();
+    expect(list.ok).toBe(true);
+    const backups = (list.data as { backups: { backupId: string; sha256: string }[] }).backups;
+    expect(backups).toHaveLength(1);
+    expect(backups[0]?.backupId).toBe(backupId);
+    expect(backups[0]?.sha256).toMatch(/^[0-9a-f]{64}$/);
+
+    // 篡改线上世界与配置，再恢复
+    writeFileSync(join(dir, 'world', 'level.dat'), 'MUTATED');
+    writeFileSync(join(dir, 'server.properties'), 'motd=hacked\n');
+    const restore = await kernel
+      .dispatch({
+        id: 'bk-b3',
+        kind: 'restore_backup',
+        payload: { serverId: 'bk2', backupId },
+      })
+      .result();
+    expect(restore.ok).toBe(true);
+    expect(restore.data).toMatchObject({ controlCommand: 'restart' });
+    expect((restore.data as { note: string }).note).toMatch(/未自动重启/);
+    expect(readFileSync(join(dir, 'world', 'level.dat'), 'utf8')).toBe('level-bytes');
+    expect(readFileSync(join(dir, 'server.properties'), 'utf8')).toContain('motd=test');
+  });
+
+  it('prune_backups → 按 keepN 裁最旧，保留最新', async () => {
+    const dataDir = mkTmp();
+    seedFull(dataDir, 'bk3');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const first = (
+      await kernel
+        .dispatch({ id: 'bk-c1', kind: 'backup_server', payload: { serverId: 'bk3' } })
+        .result()
+    ).data as BackupData;
+    const second = (
+      await kernel
+        .dispatch({ id: 'bk-c2', kind: 'backup_server', payload: { serverId: 'bk3' } })
+        .result()
+    ).data as BackupData;
+    expect(second.backupId).not.toBe(first.backupId);
+    const prune = await kernel
+      .dispatch({ id: 'bk-c3', kind: 'prune_backups', payload: { serverId: 'bk3', keepN: 1 } })
+      .result();
+    expect(prune.ok).toBe(true);
+    expect(prune.data).toMatchObject({
+      keepN: 1,
+      kept: [second.backupId],
+      pruned: [first.backupId],
+    });
+    expect(existsSync(join(dataDir, 'backups', 'bk3', first.backupId))).toBe(false);
+    expect(existsSync(join(dataDir, 'backups', 'bk3', second.backupId))).toBe(true);
+    const list = await kernel
+      .dispatch({ id: 'bk-c4', kind: 'list_backups', payload: { serverId: 'bk3' } })
+      .result();
+    expect((list.data as { backups: unknown[] }).backups).toHaveLength(1);
+  });
+
+  it('prune_backups 缺 keepN → 默认保留 5', async () => {
+    const dataDir = mkTmp();
+    seedFull(dataDir, 'bk4');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    for (let i = 0; i < 6; i++) {
+      const r = await kernel
+        .dispatch({ id: `bk-d${i}`, kind: 'backup_server', payload: { serverId: 'bk4' } })
+        .result();
+      expect(r.ok).toBe(true);
+    }
+    const prune = await kernel
+      .dispatch({ id: 'bk-dp', kind: 'prune_backups', payload: { serverId: 'bk4' } })
+      .result();
+    expect(prune.ok).toBe(true);
+    expect((prune.data as { keepN: number }).keepN).toBe(5);
+    expect((prune.data as { kept: unknown[] }).kept).toHaveLength(5);
+    expect((prune.data as { pruned: unknown[] }).pruned).toHaveLength(1);
+  });
+});
+
+describe('ServerKernel §7.4 快照备份 sandbox 隔离', () => {
+  it('mode=sandbox → 快照读写全走 sandbox root，dataDir 无痕迹', async () => {
+    const dataDir = mkTmp();
+    const sandboxDir = mkTmp();
+    const dir = seedServer(sandboxDir, 'sbbk');
+    writeFileSync(join(dir, 'world', 'level.dat'), 'sandbox-level');
+    const kernel = new ServerKernel({ dataDir, sandboxDir, mode: 'sandbox', confirm: YES });
+
+    const snap = await kernel
+      .dispatch({ id: 'sb-bk1', kind: 'backup_server', payload: { serverId: 'sbbk' } })
+      .result();
+    expect(snap.ok).toBe(true);
+    const backupId = (snap.data as { backupId: string }).backupId;
+    expect(existsSync(join(sandboxDir, 'backups', 'sbbk', backupId, 'manifest.json'))).toBe(true);
+    expect(existsSync(join(dataDir, 'backups'))).toBe(false);
+
+    writeFileSync(join(dir, 'world', 'level.dat'), 'MUTATED');
+    const restore = await kernel
+      .dispatch({ id: 'sb-bk2', kind: 'restore_backup', payload: { serverId: 'sbbk', backupId } })
+      .result();
+    expect(restore.ok).toBe(true);
+    expect(readFileSync(join(dir, 'world', 'level.dat'), 'utf8')).toBe('sandbox-level');
+    expect(existsSync(join(dataDir, 'sbbk'))).toBe(false);
+  });
+});
+
+describe('ServerKernel §7.4 快照备份越界与参数拒绝', () => {
+  it('serverId="../../evil" → validation，外部文件未动', async () => {
+    const dataDir = mkTmp();
+    const victim = join(dataDir, 'evil');
+    mkdirSync(victim, { recursive: true });
+    writeFileSync(join(victim, 'keep.txt'), 'keep');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    for (const [i, task] of [
+      { kind: 'backup_server', payload: { serverId: '../../evil' } },
+      { kind: 'list_backups', payload: { serverId: '../../evil' } },
+      { kind: 'restore_backup', payload: { serverId: '../../evil', backupId: 'x' } },
+      { kind: 'prune_backups', payload: { serverId: '../../evil' } },
+    ].entries()) {
+      const result = await kernel
+        .dispatch({ id: `bk-x${i}`, kind: task.kind, payload: task.payload })
+        .result();
+      expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
+    }
+    expect(readFileSync(join(victim, 'keep.txt'), 'utf8')).toBe('keep');
+    expect(existsSync(join(dataDir, 'backups'))).toBe(false);
+  });
+
+  it('服务端不存在 → SERVER_NOT_FOUND；快照不存在 → BACKUP_NOT_FOUND', async () => {
+    const dataDir = mkTmp();
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const missing = await kernel
+      .dispatch({ id: 'bk-y1', kind: 'backup_server', payload: { serverId: 'ghost' } })
+      .result();
+    expect(missing).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SERVER_NOT_FOUND' },
+    });
+    const listGhost = await kernel
+      .dispatch({ id: 'bk-y2', kind: 'list_backups', payload: { serverId: 'ghost' } })
+      .result();
+    expect(listGhost).toMatchObject({ ok: false, error: { category: 'validation' } });
+
+    seedServer(dataDir, 'bk5');
+    const noSnap = await kernel
+      .dispatch({
+        id: 'bk-y3',
+        kind: 'restore_backup',
+        payload: { serverId: 'bk5', backupId: 'no-such-snap' },
+      })
+      .result();
+    expect(noSnap).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'BACKUP_NOT_FOUND' },
+    });
+    const badId = await kernel
+      .dispatch({
+        id: 'bk-y4',
+        kind: 'restore_backup',
+        payload: { serverId: 'bk5', backupId: '../bk5' },
+      })
+      .result();
+    expect(badId).toMatchObject({ ok: false, error: { category: 'validation' } });
+  });
+
+  it('缺参数 → validation（缺 serverId / 缺 backupId / keepN 非法）', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'bk6');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const noId = await kernel
+      .dispatch({ id: 'bk-z1', kind: 'backup_server', payload: {} })
+      .result();
+    expect(noId).toMatchObject({ ok: false, error: { category: 'validation' } });
+    const noSnapId = await kernel
+      .dispatch({ id: 'bk-z2', kind: 'restore_backup', payload: { serverId: 'bk6' } })
+      .result();
+    expect(noSnapId).toMatchObject({ ok: false, error: { category: 'validation' } });
+    for (const [i, keepN] of [-1, 1.5].entries()) {
+      const badKeep = await kernel
+        .dispatch({ id: `bk-z3${i}`, kind: 'prune_backups', payload: { serverId: 'bk6', keepN } })
+        .result();
+      expect(badKeep).toMatchObject({ ok: false, error: { category: 'validation' } });
+    }
+  });
+});
