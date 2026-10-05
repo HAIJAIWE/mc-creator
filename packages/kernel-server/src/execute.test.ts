@@ -1035,3 +1035,74 @@ describe('ServerKernel R 类任务行为不变 + 确认请求形状', () => {
     });
   });
 });
+
+describe('ServerKernel build_project 产物验证（step 2.5，接 devkit.validateArtifact）', () => {
+  it('构建成功 → data.validation 存在，sandboxDir 在 root 内', async () => {
+    const dataDir = mkTmp();
+    const projectDir = makeFakeProject(dataDir, 'proj', fakeBuildScript(['demo-1.0.jar']));
+    const result = await new ServerKernel({ dataDir, confirm: YES })
+      .dispatch({ id: 'bp-val1', kind: 'build_project', payload: { projectDir, timeoutMs: 20000 } })
+      .result();
+    expect(result.ok).toBe(true);
+    const validation = (result.data as { validation?: Record<string, unknown> }).validation as {
+      ok: boolean;
+      timedOut: boolean;
+      log: string;
+      enforced: Record<string, unknown>;
+      sandboxDir: string;
+    };
+    expect(validation).toBeDefined();
+    expect(validation.ok).toBe(true);
+    expect(validation.timedOut).toBe(false);
+    expect(typeof validation.log).toBe('string');
+    // log 只取尾 20 行
+    expect(validation.log.split('\n').length).toBeLessThanOrEqual(20);
+    expect(validation.enforced).toMatchObject({ network: false });
+    expect(typeof validation.sandboxDir).toBe('string');
+    expect(validation.sandboxDir.startsWith(dataDir)).toBe(true);
+    // data.isolation 保持原样（仍是构建隔离的映射），验证字段是新增的 validation
+    expect((result.data as { isolation?: unknown }).isolation).toBeDefined();
+  });
+
+  it('验证失败不推翻构建成功 → ok:true 但 validation.ok=false', async () => {
+    const dataDir = mkTmp();
+    const projectDir = makeFakeProject(dataDir, 'proj', fakeBuildScript(['demo-1.0.jar']));
+    // 经模块命名空间替换一次 validateArtifact（动态 import 取同一模块实例，
+    // 不动文件顶部既有 import；单次生效后 restore，不影响其他用例）。
+    const { vi: vitestVi } = await import('vitest');
+    const devkit = await import('@mc-creator/devkit');
+    const spy = vitestVi.spyOn(devkit, 'validateArtifact').mockResolvedValueOnce({
+      ok: false,
+      log: 'artifact unreadable: mock failure',
+      timedOut: false,
+      enforced: {
+        source: 'unisolated',
+        memory: false,
+        cpu: false,
+        network: false,
+        treeKill: false,
+        reason: 'mock-validation-failure',
+      },
+      sandboxDir: join(dataDir, 'validate-mock'),
+    });
+    try {
+      const result = await new ServerKernel({ dataDir, confirm: YES })
+        .dispatch({
+          id: 'bp-val2',
+          kind: 'build_project',
+          payload: { projectDir, timeoutMs: 20000 },
+        })
+        .result();
+      expect(result.ok).toBe(true);
+      const validation = (result.data as { validation?: Record<string, unknown> }).validation as {
+        ok: boolean;
+        log: string;
+      };
+      expect(validation).toBeDefined();
+      expect(validation.ok).toBe(false);
+      expect(validation.log).toMatch(/mock failure/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

@@ -65,6 +65,7 @@ import {
   runGradleBuild,
   runSandboxed,
   sha256File,
+  validateArtifact,
   type EnforcedReport,
 } from '@mc-creator/devkit';
 
@@ -833,6 +834,54 @@ export class ServerKernel implements KernelContract {
       verr('构建成功但未找到 build/libs/*.jar 产物', 'ARTIFACT_NOT_FOUND');
     }
     const sha256 = await sha256File(jarPath);
+    // step(2.5): 产物隔离加载验证（devkit.validateArtifact，只读冒烟不执行 jar）。
+    // 验证失败不推翻构建成功（ok 仍 true），只把 validation.ok=false 如实带给上层；
+    // sandboxDir 保留供审计，由上层清理，内核不删。
+    let validation: {
+      ok: boolean;
+      timedOut: boolean;
+      log: string;
+      enforced: EnforcedReport;
+      sandboxDir: string;
+    };
+    try {
+      const v = await validateArtifact({
+        workdir: root,
+        artifactPath: jarPath,
+        env: { ...process.env },
+      });
+      const trimmed = v.log.trim();
+      validation = {
+        ok: v.ok,
+        timedOut: v.timedOut,
+        log: trimmed === '' ? '' : trimmed.split('\n').slice(-20).join('\n'),
+        enforced: {
+          source: v.enforced.source,
+          memory: v.enforced.memory,
+          cpu: v.enforced.cpu,
+          network: v.enforced.network,
+          treeKill: v.enforced.treeKill,
+          reason: v.enforced.reason,
+        },
+        sandboxDir: v.sandboxDir,
+      };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      validation = {
+        ok: false,
+        timedOut: false,
+        log: `validateArtifact failed: ${message}`,
+        enforced: {
+          source: 'unisolated',
+          memory: false,
+          cpu: false,
+          network: false,
+          treeKill: false,
+          reason: message,
+        },
+        sandboxDir: root,
+      };
+    }
     step(3);
     const artifact = await makeArtifactRef(jarPath, 'build-artifact');
     return {
@@ -859,6 +908,8 @@ export class ServerKernel implements KernelContract {
           this.mode === 'sandbox'
             ? '沙箱模式：产物留在沙箱目录，永不自动部署进正式服务端（§13.4）'
             : '产物已留在 build/libs；部署需另一次 deploy_plugin 确认（§10.6）',
+        // step(2.5) 产物验证回报：ok=false 也不推翻构建成功，上层据此决定是否部署。
+        validation,
       },
     };
   }
