@@ -3,6 +3,7 @@
  * 构建沙箱与工具链管理：JDK 选型、Gradle 编排、隔离沙箱、产物哈希。
  */
 export * from './jdk.js';
+export * from './jdk-download.js';
 export * from './gradle.js';
 export * from './sandbox.js';
 // §8.3 进程级隔离的实施者：把 sandbox.ts 的声明式契约接到真实进程隔离上。

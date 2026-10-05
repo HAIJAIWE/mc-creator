@@ -1398,3 +1398,102 @@ describe('ServerKernel §7.4 快照备份越界与参数拒绝', () => {
     }
   });
 });
+
+/** 假脚本：产 jar + 把构建进程看到的 JAVA_HOME 写进 java_home.txt（断言 env 透传用）。 */
+function fakeJavaHomeScript(jars: string[]): string {
+  if (IS_WIN) {
+    return (
+      '@echo off\r\nmkdir build\\libs 2>nul\r\n' +
+      jars.map((j) => `echo fake> build\\libs\\${j}\r\n`).join('') +
+      'echo %JAVA_HOME%> java_home.txt\r\n' +
+      'exit /b 0\r\n'
+    );
+  }
+  return `#!/bin/sh\nmkdir -p build/libs\n${jars.map((j) => `echo fake > build/libs/${j}\n`).join('')}echo "$JAVA_HOME" > java_home.txt\nexit 0\n`;
+}
+
+describe('ServerKernel build_project JDK 自动下载 opt-in（§8.1#1）', () => {
+  it('关：不带 mcVersion → 不触发下载，行为不变且 runtimes/ 未创建', async () => {
+    const dataDir = mkTmp();
+    const projectDir = makeFakeProject(dataDir, 'proj', fakeBuildScript(['demo-1.0.jar']));
+    const { vi: vitestVi } = await import('vitest');
+    const devkit = await import('@mc-creator/devkit');
+    const spy = vitestVi.spyOn(devkit, 'ensureJdk');
+    try {
+      const result = await new ServerKernel({ dataDir, confirm: YES })
+        .dispatch({
+          id: 'jdk-off1',
+          kind: 'build_project',
+          payload: { projectDir, timeoutMs: 20000 },
+        })
+        .result();
+      expect(result.ok).toBe(true);
+      expect(spy).not.toHaveBeenCalled();
+      expect(existsSync(join(dataDir, 'runtimes'))).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('开：带 mcVersion 且无 javaHome → 下载并用其 JAVA_HOME 构建', async () => {
+    const dataDir = mkTmp();
+    const projectDir = makeFakeProject(dataDir, 'proj', fakeJavaHomeScript(['demo-1.0.jar']));
+    const fakeJavaHome = join(mkTmp(), 'jdk-21');
+    mkdirSync(fakeJavaHome, { recursive: true });
+    const { vi: vitestVi } = await import('vitest');
+    const devkit = await import('@mc-creator/devkit');
+    const spy = vitestVi.spyOn(devkit, 'ensureJdk').mockResolvedValueOnce({
+      javaHome: fakeJavaHome,
+      source: 'download' as const,
+    });
+    try {
+      const result = await new ServerKernel({ dataDir, confirm: YES })
+        .dispatch({
+          id: 'jdk-on1',
+          kind: 'build_project',
+          payload: { projectDir, timeoutMs: 20000, mcVersion: '1.21.4' },
+        })
+        .result();
+      expect(result.ok).toBe(true);
+      // mcVersion 1.21.4 → JDK 21；缓存目录为 <root>/runtimes。
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0]?.[0]).toMatchObject({
+        version: 21,
+        cacheDir: join(dataDir, 'runtimes'),
+      });
+      // 构建进程实际看到的 JAVA_HOME 就是下载返回的 javaHome（env 透传被覆盖）。
+      expect(readFileSync(join(projectDir, 'java_home.txt'), 'utf8').trim()).toBe(fakeJavaHome);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('开但显式给了 javaHome → 不下载，直接用给定值', async () => {
+    const dataDir = mkTmp();
+    const projectDir = makeFakeProject(dataDir, 'proj', fakeJavaHomeScript(['demo-1.0.jar']));
+    const { vi: vitestVi } = await import('vitest');
+    const devkit = await import('@mc-creator/devkit');
+    const spy = vitestVi.spyOn(devkit, 'ensureJdk');
+    try {
+      const result = await new ServerKernel({ dataDir, confirm: YES })
+        .dispatch({
+          id: 'jdk-on2',
+          kind: 'build_project',
+          payload: {
+            projectDir,
+            timeoutMs: 20000,
+            mcVersion: '1.21.4',
+            javaHome: 'C:\\explicit\\jdk-21',
+          },
+        })
+        .result();
+      expect(result.ok).toBe(true);
+      expect(spy).not.toHaveBeenCalled();
+      expect(readFileSync(join(projectDir, 'java_home.txt'), 'utf8').trim()).toBe(
+        'C:\\explicit\\jdk-21',
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

@@ -68,9 +68,11 @@ import {
   assertWithinRoot,
   buildSandboxOptions,
   createBuildQueue,
+  ensureJdk as downloadJdk,
   filterEnv,
   findBuiltJar,
   findJarInLog,
+  javaVersionFor,
   makeArtifactRef,
   runGradleBuild,
   runSandboxed,
@@ -809,9 +811,11 @@ export class ServerKernel implements KernelContract {
    * enforcedIsolation 回报给上层 —— 不静默假装已隔离（MEMORY §2-④）。
    */
   private async runBuild(
+    root: string,
     projectDir: string,
     javaHome: string | undefined,
     timeoutMs: number | undefined,
+    ensureJdk?: { mcVersion: string },
   ): Promise<{
     success: boolean;
     jarPath: string | null;
@@ -823,6 +827,23 @@ export class ServerKernel implements KernelContract {
     // §8.2：整个 runBuild 都在槽内（隔离+降级两条路径都不例外）。
     const release = await acquireBuildSlot();
     try {
+      // §8.1#1 JDK 自动下载（opt-in）：仅当调用方未给 javaHome 且显式给出
+      // ensureJdk.mcVersion 时才触发；默认关闭（隐式下载几百 MB 必须显式 opt-in，
+      // 且 build_project 本就是 X 级、过确认闸门）。缓存落在 <root>/runtimes/<大版本>/。
+      let effectiveJavaHome = javaHome;
+      if (effectiveJavaHome === undefined && ensureJdk !== undefined) {
+        const version = javaVersionFor(ensureJdk.mcVersion);
+        try {
+          const got = await downloadJdk({ version, cacheDir: join(root, 'runtimes') });
+          effectiveJavaHome = got.javaHome;
+        } catch (e) {
+          throw cerr(
+            'network',
+            `JDK 自动下载失败: ${e instanceof Error ? e.message : String(e)}`,
+            'JDK_DOWNLOAD_FAILED',
+          );
+        }
+      }
       const limits = {
         ...(timeoutMs === undefined ? {} : { timeoutMs }),
       };
@@ -830,7 +851,7 @@ export class ServerKernel implements KernelContract {
       // 只塞 JAVA_HOME 会让 PATH 实际缺失，.bat 里的 node 找不到，
       // 构建「成功」却什么都没跑（实测 alloc.js 从未执行、build_project ok=true）。
       const env: Record<string, string | undefined> = { ...process.env };
-      if (javaHome !== undefined) env['JAVA_HOME'] = javaHome;
+      if (effectiveJavaHome !== undefined) env['JAVA_HOME'] = effectiveJavaHome;
       // PATH 缺失 = 构建会静默空转（.bat 里的 node/gradle 找不到，而退出码仍是 0）。
       // 与其产出一个空的「成功」，不如响。用 filterEnv 判定而不是 env['PATH']：
       // 本机 process.env 存的是 `Path`，直接读 'PATH' 会误判为缺失。
@@ -887,7 +908,7 @@ export class ServerKernel implements KernelContract {
         // 隔离不可用：退回原有实现（含 Windows shell:true 与 taskkill 杀树逻辑），
         // 避免为了「统一」而丢掉 gradlew.bat 的启动兼容性。
         const legacy = await runGradleBuild(projectDir, {
-          ...(javaHome === undefined ? {} : { javaHome }),
+          ...(effectiveJavaHome === undefined ? {} : { javaHome: effectiveJavaHome }),
           ...(timeoutMs === undefined ? {} : { timeoutMs }),
         });
         return { ...legacy, enforcedIsolation: run.enforced };
@@ -922,9 +943,17 @@ export class ServerKernel implements KernelContract {
     if (!existsSync(projectDir)) verr(`工程目录不存在: ${projectDir}`, 'PROJECT_DIR_NOT_FOUND');
     const javaHome = optString(p, 'javaHome');
     const timeoutMs = optNumber(p, 'timeoutMs');
+    // opt-in：仅 payload.mcVersion 给出时才允许自动下载 JDK（默认关闭）。
+    const mcVersion = optString(p, 'mcVersion');
 
     step(1);
-    const build = await this.runBuild(projectDir, javaHome, timeoutMs);
+    const build = await this.runBuild(
+      root,
+      projectDir,
+      javaHome,
+      timeoutMs,
+      mcVersion === undefined ? undefined : { mcVersion },
+    );
     if (!build.success) {
       // 构建失败归 validation（可读日志摘要）并带稳定 code，便于上层回灌修复（§10.3）。
       const tail = build.log.trim().split('\n').slice(-20).join(' | ');
