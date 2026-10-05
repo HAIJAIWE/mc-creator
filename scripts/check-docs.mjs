@@ -19,8 +19,17 @@ function extractTruth() {
     resolve(ROOT, 'packages/shared/src/schemas/node-graph-spec.ts'),
     'utf-8',
   );
-  const ipcChannels = readFileSync(
-    resolve(ROOT, 'apps/desktop/src/shared/ipc-channels.ts'),
+  // GENERATOR_TYPES 的唯一定义处。
+  //
+  // 原来这里读的是 `apps/desktop/src/shared/ipc-channels.ts`，但那个文件早把常量
+  // 搬进了 `ipc/generator-types.ts` 并只做再导出。而
+  // `GENERATOR_TYPES\s*=\s*\[` 匹配的是**字面量赋值**，匹配不到 re-export 行，
+  // 于是 generatorTypeCount 静默变成 0，脚本反过来想「修」本来正确的 README
+  // （把 13 改成 0）—— 一个恒定误报的检查比没有检查更糟。
+  //
+  // 教训：正则读源码对「搬家」极其脆弱。搬这个常量时必须一并改这里。
+  const generatorTypesSrc = readFileSync(
+    resolve(ROOT, 'apps/desktop/src/shared/ipc/generator-types.ts'),
     'utf-8',
   );
 
@@ -63,7 +72,7 @@ function extractTruth() {
   }
 
   // Generator types count
-  const generatorTypesMatch = ipcChannels.match(/GENERATOR_TYPES\s*=\s*\[([\s\S]*?)\]/);
+  const generatorTypesMatch = generatorTypesSrc.match(/GENERATOR_TYPES\s*=\s*\[([\s\S]*?)\]/);
   const genTypes = generatorTypesMatch
     ? (generatorTypesMatch[1].match(/'([^']+)'/g) || []).length
     : 0;
