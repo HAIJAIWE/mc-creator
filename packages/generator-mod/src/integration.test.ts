@@ -121,10 +121,16 @@ describe('ModGenerator loader×version 矩阵：内容哈希快照', () => {
     },
     // neoforge 1.20.1
     'neoforge:1.20.1': {
-      'build.gradle': 'b09dafb22e1f56b0',
+      // 变更原因：build.gradle 去掉不存在的 `moddev { }` 包装（实测 ModDevGradle
+      // 1.0.21/2.0.143 注册的扩展名都是 neoForge，带包装则 `Could not find method
+      // moddev()` → BUILD FAILED in 17s）。哈希由主代理独立复算，且仅此一项变化。
+      'build.gradle': 'd22a303b14f7b848',
       'gradle.properties': 'd99e6fc6e7438c2c',
       'gradle/wrapper/gradle-wrapper.properties': '1a6244405eccd5ba',
-      'settings.gradle': '107f7965de0bd2f5',
+      // 变更原因：settings.gradle 加入 foojay toolchain 解析器（不加则干净机器上
+      // toolchain 解析失败，实测 BUILD FAILED in 1m 57s）。哈希由主代理独立复算确认，
+      // 且只此一项变化（其余快照逐项比对为 SAME）。
+      'settings.gradle': 'c092a24b1b394c19',
       'src/main/resources/META-INF/mods.toml': 'cb9fdffc0a07eb0c',
       'src/main/java/com/example/int_test/IntTestMod.java': 'fe567ec41cf8610d',
       'src/main/java/com/example/int_test/ModItems.java': 'd44df922e6b73dcb',
@@ -135,10 +141,12 @@ describe('ModGenerator loader×version 矩阵：内容哈希快照', () => {
     },
     // neoforge 1.21.1
     'neoforge:1.21.1': {
-      'build.gradle': '16f3fe03da6da246',
+      // 同上：去掉 `moddev { }` 包装。
+      'build.gradle': 'cea0eae35ebb1643',
       'gradle.properties': '2f8d3cc70b76be67',
       'gradle/wrapper/gradle-wrapper.properties': 'c1af85a70af0c431',
-      'settings.gradle': '107f7965de0bd2f5',
+      // 同上：foojay toolchain 解析器（该行不含版本插值，故两个 MC 版本哈希相同）。
+      'settings.gradle': 'c092a24b1b394c19',
       'src/main/resources/META-INF/mods.toml': '2241de9746ff152b',
       'src/main/java/com/example/int_test/IntTestMod.java': 'fe567ec41cf8610d',
       'src/main/java/com/example/int_test/ModItems.java': 'd44df922e6b73dcb',

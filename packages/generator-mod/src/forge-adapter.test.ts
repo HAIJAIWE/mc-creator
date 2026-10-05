@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ForgeAdapter } from './forge-adapter.js';
 import { ModGenerator } from './mod-generator.js';
+import { FOOJAY_RESOLVER_VERSION } from './forge-gradle.js';
 import { ModSpec as ModSpecSchema } from '@mc-creator/shared';
 import type { GeneratorContext, ModSpec } from '@mc-creator/shared';
 
@@ -95,6 +96,57 @@ describe('ForgeAdapter 元数据与构建脚本', () => {
     const sg = files.find((f) => f.path === 'settings.gradle');
     expect(sg!.content).toContain('https://maven.minecraftforge.net/');
     expect(paths).toContain('gradle/wrapper/gradle-wrapper.properties');
+  });
+});
+
+describe('ForgeAdapter toolchain 解析器（settings.gradle）', () => {
+  const files = new ForgeAdapter().translate(CTX);
+  const sg = files.find((f) => f.path === 'settings.gradle');
+
+  it('build.gradle 用 java.toolchain，故 settings.gradle 必须带 foojay 解析器', () => {
+    // 前提：build.gradle 走 java.toolchain（本仓只有 Forge/NeoForge 用 toolchain，
+    // fabric/quilt/legacy-fabric 用的是 sourceCompatibility，不需要解析器）
+    const bg = files.find((f) => f.path === 'build.gradle');
+    expect(bg!.content).toContain('java.toolchain.languageVersion = JavaLanguageVersion.of(17)');
+    expect(sg).toBeDefined();
+    expect(sg!.content).toContain(
+      `id 'org.gradle.toolchains.foojay-resolver-convention' version '${FOOJAY_RESOLVER_VERSION}'`,
+    );
+  });
+
+  it('foojay 解析器版本钉在实测值 0.10.0（+ Gradle 8.12 验证通过）', () => {
+    // 实测：不带这一行 = 干净机器上 "No locally installed toolchains match and
+    // toolchain download repositories have not been configured." → BUILD FAILED；
+    // 带 0.10.0 则 BUILD SUCCESSFUL 且 Gradle 真的下载了 JDK 17（17.0.20.1+1）。
+    // 版本号别随手改，要改先重跑一遍真实构建。
+    expect(FOOJAY_RESOLVER_VERSION).toBe('0.10.0');
+    expect(sg!.content).toContain("version '0.10.0'");
+  });
+
+  it('plugins 块在 pluginManagement 之前（Gradle 要求 settings 的 plugins 块在最前）', () => {
+    const pluginsIdx = sg!.content.indexOf('plugins {');
+    const pluginManagementIdx = sg!.content.indexOf('pluginManagement {');
+    expect(pluginsIdx).toBeGreaterThanOrEqual(0);
+    expect(pluginManagementIdx).toBeGreaterThanOrEqual(0);
+    expect(pluginsIdx).toBeLessThan(pluginManagementIdx);
+    // 且 plugins 块就是文件第一句（前面没有任何 buildscript / pluginManagement）
+    expect(sg!.content.startsWith('plugins {')).toBe(true);
+  });
+
+  it('既有 pluginManagement 仓库声明完整保留（ForgeGradle 不在 Gradle Portal）', () => {
+    // 回归护栏：Forge maven 是 ForgeGradle 插件唯一的解析途径，动它 = 插件拉不到。
+    expect(sg!.content).toContain('pluginManagement {');
+    expect(sg!.content).toContain('repositories {');
+    expect(sg!.content).toContain('gradlePluginPortal()');
+    expect(sg!.content).toContain('maven { url "https://maven.minecraftforge.net/" }');
+    // pluginManagement 必须仍然完整包住这两条仓库
+    const pmBlock = sg!.content.slice(
+      sg!.content.indexOf('pluginManagement {'),
+      sg!.content.indexOf('rootProject.name'),
+    );
+    expect(pmBlock).toContain('gradlePluginPortal()');
+    expect(pmBlock).toContain('https://maven.minecraftforge.net/');
+    expect(sg!.content).toContain("rootProject.name = 'mc-mod'");
   });
 });
 

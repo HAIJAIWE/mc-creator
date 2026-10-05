@@ -15,6 +15,27 @@ import type { ModSpecLike } from './mod-common.js';
 import { tomlEscape } from './neoforge-gradle.js';
 import { parchmentForgeBlock } from './parchment.js';
 
+/**
+ * Foojay Toolchain Resolver 约定插件版本（Gradle 官方，解析缺失的 Java toolchain）。
+ *
+ * 为什么必须有它（不是保险起见，是实测踩过的坑）：
+ * build.gradle 里 `java.toolchain.languageVersion = JavaLanguageVersion.of(17)`
+ * 要求构建机上能找到 JDK 17。本机没装 JDK 17 时 Gradle 不会自动去下载 —— 它需要一个
+ * 「toolchain 下载源」，而这个源只能由 settings.gradle 里的这个约定插件注册。
+ *
+ * 不加这行的失败模式（干净机器 + 真实 Forge 1.20.1 构建实测）：
+ *   > No locally installed toolchains match and toolchain download repositories have not been configured.
+ *   > BUILD FAILED in 1m 57s
+ * 极具误导性：它是在 ForgeGradle 依赖解析之后才炸的，控制台往前翻全是依赖下载日志，
+ * 看起来像「maven 拉不到 / 依赖装不上」，真实原因却是「这台机器没装 JDK 17」。
+ * 用户会去查仓库配置、改 mappings 版本、换 Forge 版本 —— 全都白费。
+ *
+ * 版本号实测：0.10.0 + Gradle 8.12 可用。加上后同一工程 BUILD SUCCESSFUL in 3m 14s，
+ * Gradle 真的下载了 JDK 17（~/.gradle/jdks/eclipse_adoptium-17-amd64-windows.2，
+ * JAVA_VERSION=17.0.20.1+1），javac 真编译了源码，产物 jar 311 → 1458 字节。
+ */
+export const FOOJAY_RESOLVER_VERSION = '0.10.0';
+
 export function forgeModsToml(
   spec: ModSpecLike,
   _mcVersion: string,
@@ -92,10 +113,21 @@ repositories {
 }
 
 export function forgeSettingsGradle(): FileNode {
-  // ForgeGradle 插件不在 Gradle Portal，需声明 Forge maven（否则插件无法解析）
+  // 两块内容，顺序不能换：
+  // 1) plugins { } —— Foojay toolchain 解析器，让 Gradle 能自动下载缺失的 JDK 17
+  //    （见 FOOJAY_RESOLVER_VERSION 注释：不加 = 干净机器上 toolchain 解析失败，
+  //    报错长得像依赖问题）。Gradle 规定 settings 脚本的 plugins 块只能出现在最前，
+  //    即 pluginManagement 之前，实测这个顺序可正常构建。
+  // 2) pluginManagement { repositories { ... } } —— ForgeGradle 插件不在 Gradle Portal，
+  //    必须靠这里声明的 Forge maven 解析。**这段仓库声明是 Forge 能构建的前提，
+  //    不要因为调整 plugins 块而动它/删它**，否则插件直接拉不到。
   return {
     path: 'settings.gradle',
-    content: `pluginManagement {
+    content: `plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '${FOOJAY_RESOLVER_VERSION}'
+}
+
+pluginManagement {
     repositories {
         gradlePluginPortal()
         maven { url "https://maven.minecraftforge.net/" }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { NeoForgeAdapter } from './neoforge-adapter.js';
+import { FOOJAY_RESOLVER_VERSION } from './neoforge-gradle.js';
 import { ModSpec as ModSpecSchema } from '@mc-creator/shared';
 import type { GeneratorContext, ModSpec } from '@mc-creator/shared';
 
@@ -66,15 +67,27 @@ describe('NeoForgeAdapter 元数据与构建脚本', () => {
     expect(bg!.content).toContain('net.neoforged.moddev');
   });
 
-  it('1.20.x / 1.21.1 用 ModDevGradle 1.0 DSL（moddev {} 包装），1.21.5+ 用顶层 neoForge {}', () => {
+  it('ModDevGradle DSL 与插件大版本无关：恒为顶层 neoForge {}，绝不出现 moddev {} 包装', () => {
+    // 主代理裁决（语义修正，2026-10 实测）：旧用例断言「1.0.x 用 moddev {} 包装、
+    // 2.0 用顶层 neoForge {}」。实测两个大版本注册的扩展名**都是 neoForge**：
+    //   1.0.21  → HAS_MODDEV=false, HAS_NEOFORGE=true
+    //   2.0.143 → HAS_MODDEV=false, HAS_NEOFORGE=true
+    // 带 moddev {} 包装的真实构建原文：
+    //   > Could not find method moddev() for arguments [...] on root project 'mc-mod'
+    //   > BUILD FAILED in 17s
+    // 「按大版本分 DSL」这个前提本身是错的，因此旧用例的意图（版本感知）不再成立，
+    // 改为：版本感知仍要保留（插件版本号与 Java 版本随 MC 变），但 DSL 形状全版本统一，
+    // 并加一条回归守卫——`moddev {` 一旦被重新引入，本用例会立刻变红。
     const legacy = adapter.translate({ ...CTX, mcVersion: '1.20.4' });
     const legacyBg = legacy.find((f) => f.path === 'build.gradle');
     expect(legacyBg!.content).toContain("id 'net.neoforged.moddev' version '1.0.21'");
-    expect(legacyBg!.content).toContain('moddev {\n    neoForge {');
+    expect(legacyBg!.content).toContain('\nneoForge {');
+    expect(legacyBg!.content).not.toContain('moddev {');
     expect(legacyBg!.content).toContain('JavaLanguageVersion.of(17)');
     const legacy121 = adapter.translate({ ...CTX, mcVersion: '1.21.1' });
     const legacy121Bg = legacy121.find((f) => f.path === 'build.gradle');
-    expect(legacy121Bg!.content).toContain('moddev {\n    neoForge {');
+    expect(legacy121Bg!.content).toContain('\nneoForge {');
+    expect(legacy121Bg!.content).not.toContain('moddev {');
     expect(legacy121Bg!.content).toContain('JavaLanguageVersion.of(21)');
     const modern = adapter.translate({ ...CTX, mcVersion: '1.21.11' });
     const modernBg = modern.find((f) => f.path === 'build.gradle');
@@ -98,6 +111,52 @@ describe('NeoForgeAdapter 元数据与构建脚本', () => {
     const gp = files.find((f) => f.path === 'gradle.properties');
     expect(gp).toBeDefined();
     expect(gp!.content).toContain('mc_version=1.21.11');
+  });
+});
+
+describe('NeoForgeAdapter toolchain 解析器（settings.gradle）', () => {
+  const files = new NeoForgeAdapter().translate(CTX);
+  const sg = files.find((f) => f.path === 'settings.gradle');
+
+  it('build.gradle 用 java.toolchain，故 settings.gradle 必须带 foojay 解析器', () => {
+    // 前提：build.gradle 走 java.toolchain（本仓只有 Forge/NeoForge 用 toolchain，
+    // fabric/quilt/legacy-fabric 用的是 sourceCompatibility，不需要解析器）
+    const bg = files.find((f) => f.path === 'build.gradle');
+    expect(bg!.content).toContain('java.toolchain.languageVersion = JavaLanguageVersion.of(21)');
+    expect(sg).toBeDefined();
+    expect(sg!.content).toContain(
+      `id 'org.gradle.toolchains.foojay-resolver-convention' version '${FOOJAY_RESOLVER_VERSION}'`,
+    );
+  });
+
+  it('foojay 解析器版本钉在实测值 0.10.0（+ Gradle 8.12 验证通过）', () => {
+    // 实测：不带这一行 = 干净机器上 "No locally installed toolchains match and
+    // toolchain download repositories have not been configured." → BUILD FAILED；
+    // 带 0.10.0 则 BUILD SUCCESSFUL 且 Gradle 真的下载了 JDK（17.0.20.1+1 等）。
+    // 版本号别随手改，要改先重跑一遍真实构建。
+    expect(FOOJAY_RESOLVER_VERSION).toBe('0.10.0');
+    expect(sg!.content).toContain("version '0.10.0'");
+  });
+
+  it('plugins 块在最前（Gradle 要求 settings 的 plugins 块只能出现在最前）', () => {
+    // NeoForge 的 moddev 插件在 Gradle Portal 上，settings 里没有 pluginManagement 块；
+    // 顺序约束依然成立：plugins { } 必须在任何其它语句（含 rootProject.name）之前。
+    const pluginsIdx = sg!.content.indexOf('plugins {');
+    const rootIdx = sg!.content.indexOf('rootProject.name');
+    expect(pluginsIdx).toBeGreaterThanOrEqual(0);
+    expect(sg!.content.startsWith('plugins {')).toBe(true);
+    expect(pluginsIdx).toBeLessThan(rootIdx);
+    // 形状：plugins 块闭括号 → 空行 → rootProject.name，且文件到此结束
+    expect(sg!.content).toMatch(/\}\r?\n\r?\nrootProject\.name = 'mc-mod'\r?\n$/);
+  });
+
+  it('每个 MC 版本档位（Java 17 / 21 / 25）都带解析器，且 rootProject.name 未丢', () => {
+    for (const mc of ['1.20.6', '1.21.1', '1.21.11', '26.1']) {
+      const f = new NeoForgeAdapter().translate({ ...CTX, mcVersion: mc });
+      const s = f.find((x) => x.path === 'settings.gradle');
+      expect(s!.content).toContain('org.gradle.toolchains.foojay-resolver-convention');
+      expect(s!.content).toContain("rootProject.name = 'mc-mod'");
+    }
   });
 });
 

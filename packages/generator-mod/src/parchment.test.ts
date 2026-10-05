@@ -137,10 +137,15 @@ describe('有条目输出块（注入已核实版本号验证渲染与拼接位�
     });
   });
 
-  it('legacy moddev 分支（1.21.1）：parchment 块位于内层 neoForge 内、version 之后 runs 之前', () => {
+  it('1.21.1：parchment 块位于顶层 neoForge 内、version 之后 runs 之前', () => {
+    // 主代理语义修正（2026-10 实测）：旧用例叫「legacy moddev 分支」，断言 8 空格缩进
+    // 与 moddev 内层嵌套。实测 ModDevGradle 1.0.21 与 2.0.143 注册的扩展名都是 neoForge
+    // （HAS_MODDEV=false），带 moddev {} 包装的真实构建报 `Could not find method moddev()`
+    // → BUILD FAILED in 17s。DSL 全版本统一后缩进回到 4 空格基准。
     withParchmentEntries(VERIFIED_FIXTURES, () => {
       const bg = neoforgeBuildGradle(SPEC, '1.21.1', getLoaderVersions('1.21.1')).content;
-      expect(bg).toContain('moddev {\n    neoForge {');
+      expect(bg).toContain('\nneoForge {');
+      expect(bg).not.toContain('moddev {');
       const iNeo = bg.indexOf('neoForge {');
       const iParch = bg.indexOf('parchment {');
       const iRuns = bg.indexOf('runs {');
@@ -148,18 +153,18 @@ describe('有条目输出块（注入已核实版本号验证渲染与拼接位�
       expect(iParch).toBeGreaterThan(iNeo);
       expect(iRuns).toBeGreaterThan(iParch);
       expect(iMods).toBeGreaterThan(iRuns);
-      // legacy 包装统一 +4 缩进：块内基准 4 空格变为 8 空格
-      expect(bg).toContain('\n        parchment {');
-      expect(bg).toContain('\n            minecraftVersion = "1.21.1"');
-      expect(bg).toContain('\n            mappingsVersion = "2024.11.17"');
+      expect(bg).toContain('\n    parchment {');
+      expect(bg).toContain('\n        minecraftVersion = "1.21.1"');
+      expect(bg).toContain('\n        mappingsVersion = "2024.11.17"');
     });
   });
 
-  it('legacy moddev 分支（1.20.x）：同样包在 moddev 内层', () => {
+  it('1.20.x：同样位于顶层 neoForge 内', () => {
     withParchmentEntries(VERIFIED_FIXTURES, () => {
       const bg = neoforgeBuildGradle(SPEC, '1.20.1', getLoaderVersions('1.20.1')).content;
-      expect(bg).toContain('moddev {\n    neoForge {');
-      expect(bg).toContain('\n        parchment {');
+      expect(bg).toContain('\nneoForge {');
+      expect(bg).not.toContain('moddev {');
+      expect(bg).toContain('\n    parchment {');
       expect(bg).toContain('mappingsVersion = "2023.09.03"');
     });
   });
@@ -252,17 +257,15 @@ base { archivesName = '${SPEC.modId}' }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
-moddev {
-    neoForge {
-        version = "${versions.neoforgeVersion}"
-        runs {
-            client { client() }
-            server { server() }
-        }
-        mods {
-            "${SPEC.modId}" {
-                sourceSet sourceSets.main
-            }
+neoForge {
+    version = "${versions.neoforgeVersion}"
+    runs {
+        client { client() }
+        server { server() }
+    }
+    mods {
+        "${SPEC.modId}" {
+            sourceSet sourceSets.main
         }
     }
 }

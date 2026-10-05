@@ -90,13 +90,18 @@ describe('版本×loader 矩阵（防回归）', () => {
       const versions = getLoaderVersions(mcVersion);
       const isLegacyMdg = mcVersion.startsWith('1.20.') || mcVersion === '1.21.1';
       expect(bg).toContain(versions.neoforgeVersion);
+      // 插件版本随 MC 版本变（1.20.x–1.21.1 → 1.0.21；1.21.5+ → 2.0.143），这部分保留。
       if (isLegacyMdg) {
         expect(bg).toContain("id 'net.neoforged.moddev' version '1.0.21'");
-        expect(bg).toContain('moddev {\n    neoForge {');
       } else {
         expect(bg).toContain("id 'net.neoforged.moddev' version '2.0.143'");
-        expect(bg).toContain('\nneoForge {');
       }
+      // 但 DSL 形状与插件大版本无关：恒为顶层 neoForge {}。
+      // 主代理语义修正（2026-10 实测）：两个大版本注册的扩展名都是 neoForge
+      // （HAS_MODDEV=false / HAS_NEOFORGE=true），带 moddev {} 包装的真实构建报
+      // `Could not find method moddev() ... BUILD FAILED in 17s`。
+      expect(bg).toContain('\nneoForge {');
+      expect(bg).not.toContain('moddev {');
     },
   );
 
