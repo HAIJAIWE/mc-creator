@@ -32,6 +32,7 @@ import {
 } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as net from 'node:net';
+import { sendRcon as defaultSendRcon, type RconSendFn } from './rcon-client.js';
 
 /** 被托管进程的状态机取值（§7.4 长驻服务生命周期）。 */
 export type ServerState = 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed';
@@ -125,6 +126,11 @@ export interface LaunchSpec {
   gracefulMs?: number;
   /** 停机后要等待释放的端口（§7.4 端口健康检测）。 */
   port?: PortSpec;
+  /**
+   * Source RCON 地址（§7.4 stdin 不可用时回退用）。
+   * 无配置则不猜默认端口，保持原 STDIN_CLOSED 行为。
+   */
+  rcon?: { host: string; port: number };
   /** mode='sandbox' 时永不 spawn（§13.4）。 */
   mode?: 'sandbox' | 'live';
   /** 确认弹窗展示的 kind，默认 'launch_instance'（launchServer 为 'start_server'）。 */
@@ -147,13 +153,15 @@ export interface ServerSpec extends LaunchSpec {
 /** 一次控制台注入的结果（§7.1 / §7.4）。失败必须带明确原因，绝不静默丢。 */
 export interface SendOutcome {
   serverId: string;
-  /** 唯一为 true 的情形：确实把命令写进了子进程 stdin。 */
+  /** 唯一为 true 的情形：确实把命令写进了子进程 stdin，或经 RCON 回退发送成功。 */
   delivered: boolean;
   /** 原样命令（未补换行），便于审计串联。 */
   command: string;
   /** 中文失败原因；delivered=true 时为 null。 */
   reason: string | null;
   code: SendErrorCode | null;
+  /** 实际投递通道：stdin 成功为 'stdin'，RCON 回退成功为 'rcon'；失败时为 undefined。 */
+  channel?: 'stdin' | 'rcon';
   at: string;
 }
 
@@ -171,6 +179,12 @@ export type SendErrorCode =
   | 'EMPTY_COMMAND'
   /** 写入过程中管道报错（EPIPE 等）。 */
   | 'WRITE_FAILED'
+  /** RCON 鉴权失败（口令错误或被拒绝）。 */
+  | 'RCON_AUTH_FAILED'
+  /** RCON 操作超时。 */
+  | 'RCON_TIMEOUT'
+  /** RCON 连接失败（连不上 / 握手前断开）。 */
+  | 'RCON_CONN_FAILED'
   /** 服务已 shutdownAll。 */
   | 'SERVICE_CLOSED';
 
@@ -321,6 +335,15 @@ export interface ProcessSupervisorOptions {
    * 无确认的自动写控制台属于未授权副作用。开启后也仍走 confirm 闸门。
    */
   autoInjectReload?: boolean;
+  /**
+   * RCON 口令来源（§7.1 外壳职责：RCON 口令管理归外壳）。
+   * 默认无 → 永不走 RCON 回退，保持今日行为。口令绝不落日志。
+   */
+  getRconPassword?: (serverId: string) => string | null | undefined;
+  /** RCON 发送注入点（默认走真实 TCP；测试可注入 fake）。 */
+  rconSend?: RconSendFn;
+  /** RCON 单次操作超时毫秒（透传给 sendRcon，默认 5000ms）。 */
+  rconTimeoutMs?: number;
 }
 
 /** 失败码：区分「非法流转 / 未确认 / 沙箱禁止 / spawn 失败 / 服务已关」，便于外壳与 UI 归类。 */
@@ -464,6 +487,12 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
   private readonly maxAutoRestarts: number;
   /** reloadCommand 自动注入开关（§7.1）；默认关，同上。 */
   private readonly autoInjectReload: boolean;
+  /** RCON 口令来源（§7.1）；默认无 → 永不回退。 */
+  private readonly getRconPassword: ((serverId: string) => string | null | undefined) | undefined;
+  /** RCON 发送实现（默认真实 TCP，测试可注入 fake）。 */
+  private readonly rconSend: RconSendFn;
+  /** RCON 单次超时（undefined = 用 rcon-client 默认 5s）。 */
+  private readonly rconTimeoutMs: number | undefined;
   private shutdownPromise: Promise<void> | null = null;
 
   constructor(opts: ProcessSupervisorOptions = {}) {
@@ -488,6 +517,9 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
     // 上限 0 视为「完全不自动重启」：显式表达"不要"，不静默退回默认值。
     this.maxAutoRestarts = Math.max(0, opts.maxAutoRestarts ?? DEFAULT_MAX_AUTO_RESTARTS);
     this.autoInjectReload = opts.autoInjectReload ?? false;
+    this.getRconPassword = opts.getRconPassword;
+    this.rconSend = opts.rconSend ?? defaultSendRcon;
+    this.rconTimeoutMs = opts.rconTimeoutMs;
   }
 
   launch(spec: LaunchSpec): LaunchedProcess {
@@ -854,6 +886,7 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
       ok: boolean,
       code: SendErrorCode | null,
       reason: string | null,
+      channel?: 'stdin' | 'rcon',
     ): SendOutcome => {
       const outcome: SendOutcome = {
         serverId,
@@ -863,6 +896,8 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
         code,
         at: new Date(this.now()).toISOString(),
       };
+      // exactOptionalPropertyTypes 下不许显式赋 undefined：有值才挂字段。
+      if (channel !== undefined) outcome.channel = channel;
       if (e !== undefined) e.lastCommandOutcome = outcome;
       this.emit('command-sent', outcome);
       return outcome;
@@ -887,13 +922,43 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
     }
     const written = this.writeStdin(child, command.endsWith('\n') ? command : `${command}\n`);
     if (!written) {
-      return finish(
-        false,
-        'STDIN_CLOSED',
-        `${serverId} 的 stdin 通道不可用（未开管道或已关闭）；改用 RCON 需要口令管理，本服务暂不支持`,
-      );
+      // §7.4 回退：stdin 优先 → 无 stdin 通道时退化为 RCON。
+      // 条件缺一不可：有口令来源且取到口令，且 spec 显式配了 rcon 主机端口；
+      // 无 rcon 配置则保持原 outcome 不变（不猜默认端口）。
+      const rconCfg = e.spec.rcon;
+      const password = this.getRconPassword?.(serverId);
+      if (rconCfg === undefined || password === undefined || password === null || password === '') {
+        return finish(
+          false,
+          'STDIN_CLOSED',
+          `${serverId} 的 stdin 通道不可用（未开管道或已关闭）；改用 RCON 需要口令管理，本服务暂不支持`,
+        );
+      }
+      try {
+        const opts: { host: string; port: number; password: string; command: string } & {
+          timeoutMs?: number;
+        } =
+          this.rconTimeoutMs === undefined
+            ? { host: rconCfg.host, port: rconCfg.port, password, command }
+            : {
+                host: rconCfg.host,
+                port: rconCfg.port,
+                password,
+                command,
+                timeoutMs: this.rconTimeoutMs,
+              };
+        await this.rconSend(opts);
+        return finish(true, null, null, 'rcon');
+      } catch (err) {
+        const code = (err as { code?: unknown }).code;
+        const message = err instanceof Error ? err.message : String(err);
+        if (code === 'RCON_AUTH_FAILED' || code === 'RCON_TIMEOUT' || code === 'RCON_CONN_FAILED') {
+          return finish(false, code, message);
+        }
+        return finish(false, 'WRITE_FAILED', `RCON 发送失败：${message}`);
+      }
     }
-    return finish(true, null, null);
+    return finish(true, null, null, 'stdin');
   }
 
   /** 控制台注入的确认请求（risk 恒为 execute：§10.6 执行类副作用）。 */

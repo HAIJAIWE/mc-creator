@@ -2550,3 +2550,208 @@ describe('控制台注入 sendCommand（§7.1 走 stdin；未确认一字节都�
     expect(svc.status('s1')?.crashCount).toBe(0);
   });
 });
+
+// =========================================================================
+// 12. RCON 回退（§7.4 stdin 不可用时退化；只加新用例，既有断言一行未动）
+// =========================================================================
+
+describe('RCON 回退（§7.4 stdin 不可用时退化 RCON）', () => {
+  function encodeRcon(id: number, type: number, body: string): Buffer {
+    const b = Buffer.from(body, 'utf8');
+    const len = 4 + 4 + b.length + 2;
+    const buf = Buffer.alloc(4 + len);
+    buf.writeInt32LE(len, 0);
+    buf.writeInt32LE(id, 4);
+    buf.writeInt32LE(type, 8);
+    b.copy(buf, 12);
+    return buf;
+  }
+
+  it('stdin 正常时走 stdin：channel=stdin 且不调 RCON', async () => {
+    const rconSend = vi.fn(() => Promise.resolve('should-not-run'));
+    const { svc, children } = makeCrashHarness({
+      getRconPassword: () => 'pw',
+      rconSend: rconSend as unknown as import('./rcon-client.js').RconSendFn,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [], rcon: { host: '127.0.0.1', port: 25575 } });
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.delivered).toBe(true);
+    expect(outcome.channel).toBe('stdin');
+    expect(children[0].stdinWrites).toEqual(['list\n']);
+    expect(rconSend).not.toHaveBeenCalled();
+  });
+
+  it('stdin 不可用 + 无口令（默认）→ 保持原 STDIN_CLOSED', async () => {
+    const { svc, children } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].stdin.end();
+    expect(children[0].stdin.writableEnded).toBe(true);
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.code).toBe('STDIN_CLOSED');
+    expect(outcome.reason).toContain('暂不支持');
+    expect(outcome.channel).toBeUndefined();
+  });
+
+  it('stdin 不可用 + 有口令但无 rcon 配置 → 保持原 STDIN_CLOSED（不猜默认端口）', async () => {
+    const rconSend = vi.fn(() => Promise.resolve('x'));
+    const { svc, children } = makeCrashHarness({
+      getRconPassword: () => 'pw',
+      rconSend: rconSend as unknown as import('./rcon-client.js').RconSendFn,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].stdin.end();
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.code).toBe('STDIN_CLOSED');
+    expect(rconSend).not.toHaveBeenCalled();
+  });
+
+  it('stdin 不可用 + 口令 + rcon 配置 → 经 RCON 发送，channel=rcon', async () => {
+    const seen: Array<{ host: string; port: number; password: string; command: string }> = [];
+    const rconSend = vi.fn(
+      (o: { host: string; port: number; password: string; command: string }) => {
+        seen.push(o);
+        return Promise.resolve('ok');
+      },
+    );
+    const { svc, children } = makeCrashHarness({
+      getRconPassword: (id) => (id === 's1' ? 's3cret' : null),
+      rconSend: rconSend as unknown as import('./rcon-client.js').RconSendFn,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [], rcon: { host: '127.0.0.1', port: 25575 } });
+    children[0].stdin.end();
+    const outcome = await svc.sendCommand('s1', 'say hi');
+    expect(outcome.delivered).toBe(true);
+    expect(outcome.code).toBeNull();
+    expect(outcome.channel).toBe('rcon');
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({
+      host: '127.0.0.1',
+      port: 25575,
+      password: 's3cret',
+      command: 'say hi',
+    });
+    expect(svc.status('s1')?.lastCommandOutcome?.channel).toBe('rcon');
+  });
+
+  it('回退仍先过确认闸门：未确认则 NOT_CONFIRMED 且不调 RCON', async () => {
+    const rconSend = vi.fn(() => Promise.resolve('x'));
+    const { svc, children } = makeCrashHarness({
+      confirm: confirmOnceOnly(),
+      getRconPassword: () => 'pw',
+      rconSend: rconSend as unknown as import('./rcon-client.js').RconSendFn,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [], rcon: { host: '127.0.0.1', port: 25575 } });
+    children[0].stdin.end();
+    const outcome = await svc.sendCommand('s1', 'op me');
+    expect(outcome.code).toBe('NOT_CONFIRMED');
+    expect(outcome.delivered).toBe(false);
+    expect(rconSend).not.toHaveBeenCalled();
+  });
+
+  it('RCON 鉴权失败 → outcome code=RCON_AUTH_FAILED（口令不落日志）', async () => {
+    const { RconError } = await import('./rcon-client.js');
+    const rconSend = vi.fn(() =>
+      Promise.reject(
+        new RconError('RCON 鉴权失败：127.0.0.1:25575 拒绝了口令', 'RCON_AUTH_FAILED'),
+      ),
+    );
+    const { svc, children } = makeCrashHarness({
+      getRconPassword: () => 'bad',
+      rconSend: rconSend as unknown as import('./rcon-client.js').RconSendFn,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [], rcon: { host: '127.0.0.1', port: 25575 } });
+    children[0].stdin.end();
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.delivered).toBe(false);
+    expect(outcome.code).toBe('RCON_AUTH_FAILED');
+    expect(outcome.reason).toContain('鉴权失败');
+    expect(outcome.reason).not.toContain('bad');
+  });
+
+  it('RCON 超时 → outcome code=RCON_TIMEOUT', async () => {
+    const { RconError } = await import('./rcon-client.js');
+    const rconSend = vi.fn(() =>
+      Promise.reject(
+        new RconError('RCON 操作超时（200ms）：127.0.0.1:25575 未在时限内响应', 'RCON_TIMEOUT'),
+      ),
+    );
+    const { svc, children } = makeCrashHarness({
+      getRconPassword: () => 'pw',
+      rconSend: rconSend as unknown as import('./rcon-client.js').RconSendFn,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [], rcon: { host: '127.0.0.1', port: 25575 } });
+    children[0].stdin.end();
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.code).toBe('RCON_TIMEOUT');
+    expect(outcome.delivered).toBe(false);
+  });
+
+  it('RCON 连接失败 → outcome code=RCON_CONN_FAILED', async () => {
+    const { RconError } = await import('./rcon-client.js');
+    const rconSend = vi.fn(() =>
+      Promise.reject(
+        new RconError('RCON 连接失败：无法连接到 127.0.0.1:25575', 'RCON_CONN_FAILED'),
+      ),
+    );
+    const { svc, children } = makeCrashHarness({
+      getRconPassword: () => 'pw',
+      rconSend: rconSend as unknown as import('./rcon-client.js').RconSendFn,
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [], rcon: { host: '127.0.0.1', port: 25575 } });
+    children[0].stdin.end();
+    const outcome = await svc.sendCommand('s1', 'list');
+    expect(outcome.code).toBe('RCON_CONN_FAILED');
+  });
+
+  it('真实 localhost 回路：stdin 关闭后走真实 TCP fake RCON 成功', async () => {
+    const password = 'real-pw';
+    const srv = net.createServer((sock) => {
+      let buf: Buffer = Buffer.alloc(0);
+      let authed = false;
+      sock.on('data', (chunk: Buffer) => {
+        buf = Buffer.concat([buf, chunk]);
+        while (buf.length >= 4) {
+          const len = buf.readInt32LE(0);
+          if (len < 10 || buf.length - 4 < len) break;
+          const id = buf.readInt32LE(4);
+          const type = buf.readInt32LE(8);
+          const body = buf.slice(12, 12 + (len - 10)).toString('utf8');
+          buf = buf.slice(4 + len);
+          if (type === 3) {
+            if (body === password) {
+              authed = true;
+              sock.write(encodeRcon(id, 2, ''));
+            } else {
+              sock.write(encodeRcon(-1, 2, ''));
+            }
+          } else if (type === 2 && authed) {
+            sock.write(encodeRcon(id, 0, `echo:${body}`));
+            sock.write(encodeRcon(id, 0, ''));
+          }
+        }
+      });
+      sock.on('error', () => undefined);
+    });
+    await new Promise<void>((resolve) => srv.listen(0, '127.0.0.1', resolve));
+    const port = (srv.address() as net.AddressInfo).port;
+    try {
+      // 不注 rconSend：走默认真实 TCP，证明端到端接线。
+      const { svc: svcReal, children } = makeCrashHarness({
+        getRconPassword: () => password,
+      });
+      svcReal.launch({
+        serverId: 'rcon-real',
+        cmd: 'java',
+        args: [],
+        rcon: { host: '127.0.0.1', port },
+      });
+      children[0].stdin.end();
+      const outcome = await svcReal.sendCommand('rcon-real', 'list');
+      expect(outcome.delivered).toBe(true);
+      expect(outcome.channel).toBe('rcon');
+    } finally {
+      await new Promise<void>((r) => srv.close(() => r()));
+    }
+  });
+});
