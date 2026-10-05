@@ -56,12 +56,23 @@ function alive(pid) {
  * 等文件出现并返回其内容（用于跨进程传回退出码）。
  * 传 parse=number 时返回值转数字，否则返回原始字符串。
  */
-async function waitForFile(file, timeoutMs, parse = 'number') {
+/**
+ * 等文件出现并写入**终态**内容。
+ *
+ * `skip` 是被探针显式声明的「中间态」标记：分配探针会先写 'start' 表示进程起来了，
+ * 再在分配成败后覆写成 'ok'/'refused'。不跳过它的话，50ms 的轮询有可能正好落在
+ * 两次写之间读到 'start'，于是「内存上限生效」这条用例在机器繁忙时随机变红
+ * （实测：并发跑 Gradle 构建时红、单独跑绿）。跳过的是中间态标记，**断言本身没动**
+ * ——终态仍必须是 'refused'，读不到终态照样超时失败。
+ */
+async function waitForFile(file, timeoutMs, parse = 'number', skip = []) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (existsSync(file)) {
       const raw = readFileSync(file, 'utf8').trim();
-      if (raw !== '') return parse === 'number' ? Number(raw) : raw;
+      if (raw !== '' && !skip.includes(raw)) {
+        return parse === 'number' ? Number(raw) : raw;
+      }
     }
     await sleep(50);
   }
@@ -207,7 +218,7 @@ describeIfAvailable('Job Object 真隔离（需要已编译的二进制）', () 
       );
     }
 
-    const got = await waitForFile(resultFile, 60000, 'string');
+    const got = await waitForFile(resultFile, 60000, 'string', ['start']);
     // refused = 上限真的传到了孙进程；ok = 只约束了直接子进程（那就毫无意义）。
     expect(got, '内存上限没有作用到孙进程 —— 对 Gradle 构建等于没设限').toBe('refused');
     jobobject.closeJob(job);
