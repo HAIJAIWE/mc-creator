@@ -10,3 +10,4 @@ export * from './generate.js';
 export * from './mcp-server.js';
 export * from './host.js';
 export * from './infer.js';
+export * from './openai-chat.js';
