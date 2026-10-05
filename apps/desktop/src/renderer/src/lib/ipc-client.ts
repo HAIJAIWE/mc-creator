@@ -39,6 +39,8 @@ import type {
   RagSearchRes,
   KernelListKindsRes,
   KernelReadReq,
+  KernelExecuteReq,
+  KernelExecuteRes,
   KernelTaskResultT,
 } from '../../../shared/ipc-channels.js';
 
@@ -718,6 +720,10 @@ export const ipcClient = {
 
   /** 调一个只读内核 kind；kind 不在白名单时主进程会直接拒（ZodError）。 */
   kernelRead: (req: KernelReadReq): Promise<KernelTaskResultT> => window.mcApi.kernelRead(req),
+
+  /** 调一个写/执行内核 kind；经 §10.6 确认闸门（渲染层弹窗确认，超时/取消一律拒绝）。 */
+  kernelExecute: (req: KernelExecuteReq): Promise<KernelExecuteRes> =>
+    window.mcApi.kernelExecute(req),
 
   /**
    * 监听项目变更

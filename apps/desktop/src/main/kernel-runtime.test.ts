@@ -401,13 +401,15 @@ describe('runRead / runWrite 的白名单与路由', () => {
     expect(riskOf('delete_instance', 'X')).toBe('execute');
   });
 
-  it('describeKernelKinds 自描述全部 kind：R/W/X 分级 + uiReachable 只给 R 类', () => {
+  it('describeKernelKinds 自描述全部 kind：R/W/X 分级 + uiReachable 给读写名单（W/X 经确认闸门）', () => {
+    // 主代理裁决（§4.5）：X2b 起 kernel:execute 进白名单，W/X 经确认可达；
+    // 旧“只给 R 类”规则已过期。新规则：读写名单内一律可达。
     const kinds = describeKernelKinds();
     const byName = new Map(kinds.map((k) => [k.kind, k]));
     expect(byName.get('get_capabilities')?.permission).toBe('R');
     expect(byName.get('get_capabilities')?.uiReachable).toBe(true);
     expect(byName.get('launch_instance')?.permission).toBe('X');
-    expect(byName.get('launch_instance')?.uiReachable).toBe(false);
+    expect(byName.get('launch_instance')?.uiReachable).toBe(true);
     expect(byName.get('read_logs')?.edition).toBe('server');
     expect(byName.get('validate_content')?.edition).toBe('bedrock');
     expect(byName.get('get_capabilities')?.edition).toBe('java');

@@ -474,7 +474,9 @@ export function describeKernelKinds(): KernelKindDescriptor[] {
       edition,
       permission,
       risk: riskOf(kind, permission),
-      uiReachable: (KERNEL_READ_KINDS as readonly string[]).includes(kind),
+      uiReachable:
+        (KERNEL_READ_KINDS as readonly string[]).includes(kind) ||
+        (KERNEL_WRITE_KINDS as readonly string[]).includes(kind),
     };
   });
 }

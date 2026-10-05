@@ -107,21 +107,21 @@ describe('通道注册', () => {
     const res = KernelListKindsResponse.parse(await handler(KERNEL_LIST_KINDS)(null));
     const byName = new Map(res.kinds.map((k) => [k.kind, k]));
 
-    // R 类可达，W/X 不可达（这正是 preload 白名单的依据）
+    // X2b：W/X 经 kernel:execute + §10.6 确认闸门对渲染层可达，故 READ||WRITE 全为 true。
     for (const kind of KERNEL_READ_KINDS) {
       expect(byName.get(kind)?.permission, `${kind} 应是 R 类`).toBe('R');
       expect(byName.get(kind)?.uiReachable, `${kind} 应可达`).toBe(true);
     }
     for (const kind of KERNEL_WRITE_KINDS) {
-      // R2b-wiring：run_due_tasks 是 R 级（免确认读+账本推进）但仅主进程侧可达，
+      // R2b-wiring：run_due_tasks 是 R 级但列在 WRITE 清单（经 execute 可达），
       // 不满足「W/X 类」假设，跳过通用断言，见下显式分级。
       if (kind === 'run_due_tasks') continue;
       expect(byName.get(kind)?.permission, `${kind} 应是 W/X 类`).not.toBe('R');
-      expect(byName.get(kind)?.uiReachable, `${kind} 不可达`).toBe(false);
+      expect(byName.get(kind)?.uiReachable, `${kind} 应可达`).toBe(true);
     }
-    // R2b-wiring 新增 kind 分级：run_due_tasks 标 R 但主进程侧（定时触发器不进渲染层）。
+    // R2b-wiring 新增 kind 分级：run_due_tasks 标 R；X2b 起经 execute 可达。
     expect(byName.get('run_due_tasks')?.permission, 'run_due_tasks 应是 R 类').toBe('R');
-    expect(byName.get('run_due_tasks')?.uiReachable, 'run_due_tasks 不可达').toBe(false);
+    expect(byName.get('run_due_tasks')?.uiReachable, 'run_due_tasks 应可达').toBe(true);
     expect(res.kinds).toHaveLength(KERNEL_READ_KINDS.length + KERNEL_WRITE_KINDS.length);
   });
 

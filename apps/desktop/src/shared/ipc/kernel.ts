@@ -19,12 +19,13 @@ import { z } from 'zod';
  * 但「整个内核面」就这么暴露给了一个可能存在 XSS 的渲染进程，违反 §4.3 白名单原则。
  * 所以这里显式枚举允许的 kind，未列入者由 `kernel:read` 直接拒绝。
  *
- * ## W/X 类为什么单列一个「主进程侧」通道
+ * ## W/X 类经确认闸门对渲染层可达（X2b 已开放）
  *
  * `KERNEL_WRITE_KINDS` 是 §10.2 里的写实例 / 执行进程类 kind。它们**已实现**、
- * 也**已接线**（走 `kernel:execute`，同样过 §10.6 确认闸门），但
- * `KERNEL_EXECUTE` **刻意不进 preload 的 contextBridge 白名单**：
- * 门控弹窗的呈现与错误分类还没在 UI 上验证过，先只在主进程侧可达并测透。
+ * 也**已接线**（走 `kernel:execute`，同样过 §10.6 确认闸门），X2b 起
+ * `KERNEL_EXECUTE` 已进 preload 的 contextBridge 白名单（渲染层经确认弹窗可点）：
+ * 安全由三缓解兜底 —— 1. 超时拒绝（主进程侧计时，默认 60s，无应答一律拒绝）；
+ * 2. id 关联（并发按 id 归位，对不上 id 的应答丢弃）；3. 审计（confirmLog，主进程内存）。
  * 详见 `src/main/ipc/kernel.ts` 的注释。
  */
 
@@ -78,10 +79,10 @@ export const KernelReadKindSchema = z.enum(KERNEL_READ_KINDS);
 export type KernelReadKindT = z.infer<typeof KernelReadKindSchema>;
 
 /**
- * W/X 类 kind：已接线、只在**主进程侧**可达（`kernel:execute`，不进 preload 白名单）。
+ * W/X 类 kind：已接线，经 `kernel:execute` 对渲染层可达（X2b 已开放，进 preload 白名单）。
  *
  * 依据 §10.2 的「内容装配 / 执行与运维 / 生成」三组，全部经内核的 confirm 闸门
- * （§10.6）。`generate_content` 只有 bedrock 内核实现了 `validate_content` 的
+ * （§10.6，三缓解：超时拒绝 / id 关联 / 审计 confirmLog）。`generate_content` 只有 bedrock 内核实现了 `validate_content` 的
  * 同族分支，`generate_content` 本身在 bedrock 里是 X 类。
  */
 export const KERNEL_WRITE_KINDS = [

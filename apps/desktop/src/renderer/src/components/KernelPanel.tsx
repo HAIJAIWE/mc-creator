@@ -4,6 +4,7 @@ import { Button, Card } from '@mc-creator/ui';
 import { Cpu, RefreshCw, Server, Box } from 'lucide-react';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { ipcClient } from '../lib/ipc-client.js';
+import { KernelConfirmHost } from './KernelConfirmHost.js';
 import type {
   KernelEditionT,
   KernelListKindsRes,
@@ -105,6 +106,9 @@ export function KernelPanel() {
   const [configFiles, setConfigFiles] = useState<Record<string, string>>({});
   const [configErrors, setConfigErrors] = useState<Record<string, string | null>>({});
   const [configLoading, setConfigLoading] = useState<Record<string, boolean>>({});
+  // 服务端重启/停止（X 类，经 kernel:execute + §10.6 确认闸门）：错误进本节错误条，不打崩。
+  const [actionErrors, setActionErrors] = useState<Record<string, string | null>>({});
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
   const read = useCallback(async (req: Parameters<typeof ipcClient.kernelRead>[0]) => {
     return await ipcClient.kernelRead(req);
@@ -172,6 +176,28 @@ export function KernelPanel() {
       }
     },
     [configOpen, read],
+  );
+
+  const runServerAction = useCallback(
+    async (serverId: string, kind: 'restart_server' | 'stop_server') => {
+      const key = `${serverId}:${kind}`;
+      setActionLoading((prev) => ({ ...prev, [key]: true }));
+      setActionErrors((prev) => ({ ...prev, [serverId]: null }));
+      try {
+        const res = await ipcClient.kernelExecute({ kind, payload: { serverId } });
+        if (!res.ok) {
+          setActionErrors((prev) => ({
+            ...prev,
+            [serverId]: res.error?.message ?? `${kind} 执行失败`,
+          }));
+        }
+      } catch (e) {
+        setActionErrors((prev) => ({ ...prev, [serverId]: (e as Error).message }));
+      } finally {
+        setActionLoading((prev) => ({ ...prev, [key]: false }));
+      }
+    },
+    [],
   );
 
   const refresh = useCallback(async () => {
@@ -424,6 +450,24 @@ export function KernelPanel() {
                   >
                     配置
                   </button>
+                  <button
+                    type="button"
+                    aria-label={`重启 ${s.id}`}
+                    disabled={actionLoading[`${s.id}:restart_server`] === true}
+                    onClick={() => void runServerAction(s.id, 'restart_server')}
+                    className="rounded-mc border border-red-500/40 px-1.5 py-0.5 text-[10px] text-red-400 disabled:opacity-40"
+                  >
+                    重启
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`停止 ${s.id}`}
+                    disabled={actionLoading[`${s.id}:stop_server`] === true}
+                    onClick={() => void runServerAction(s.id, 'stop_server')}
+                    className="rounded-mc border border-red-500/40 px-1.5 py-0.5 text-[10px] text-red-400 disabled:opacity-40"
+                  >
+                    停止
+                  </button>
                   {!s.hasLogs && (
                     <span className="text-[10px] text-mc-mute">无日志文件，日志不可查看</span>
                   )}
@@ -431,6 +475,9 @@ export function KernelPanel() {
                     <span className="text-[10px] text-mc-mute">无配置文件，配置不可查看</span>
                   )}
                 </div>
+                {actionErrors[s.id] != null && (
+                  <p className="mt-1 text-[10px] text-red-400">{actionErrors[s.id]}</p>
+                )}
                 {logsOpen[s.id] === true && s.hasLogs && (
                   <div className="mt-1">
                     {logLoading[s.id] === true ? (
@@ -520,8 +567,10 @@ export function KernelPanel() {
       <section className="px-3 py-2">
         <Card title="内核 kind（§10.2）" padding="sm">
           <p className="mb-1.5 text-[10px] text-mc-dim">
-            只读 {reachable.length} 项已接入 UI；写/执行 {gated.length} 项已在主进程侧测通，
-            但未暴露给 UI（§10.6 确认门控的 UI 呈现尚未验证）。
+            共 {kinds?.kinds.length ?? 0} 项已接入 UI（含只读与经 §10.6 确认闸门可达的写/执行，UI
+            可达 {reachable.length} 项、未达 {gated.length}{' '}
+            项）；其中重启/停止已在服务端行暴露按钮，其余写/执行（build_project
+            等）需参数，暂未暴露。
           </p>
           <ul className="flex flex-wrap gap-1">
             {kinds?.kinds.map((k) => (
@@ -532,7 +581,7 @@ export function KernelPanel() {
                     ? 'bg-green-500/15 text-green-400'
                     : 'bg-yellow-500/15 text-yellow-400'
                 }`}
-                title={`${k.edition} · ${k.permission} · ${k.risk}${k.uiReachable ? '' : ' · 仅主进程侧'}`}
+                title={`${k.edition} · ${k.permission} · ${k.risk}${k.uiReachable ? '' : ' · 需参数，暂未暴露'}`}
               >
                 {k.kind}
               </li>
@@ -540,6 +589,7 @@ export function KernelPanel() {
           </ul>
         </Card>
       </section>
+      <KernelConfirmHost />
     </div>
   );
 }

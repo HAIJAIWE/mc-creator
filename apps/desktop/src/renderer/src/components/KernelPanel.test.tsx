@@ -132,11 +132,13 @@ describe('KernelPanel：只读链路确实走通了', () => {
     expect(screen.getAllByText('支持 2/2')).toHaveLength(1);
   });
 
-  it('把 kind 白名单摆在明面上：R 类可达、X 类标为仅主进程侧', async () => {
+  it('把 kind 白名单摆在明面上：R/W/X 可达状态与确认闸门说明一致', async () => {
+    // 主代理裁决（§4.5）：X2b 起 W/X 经 kernel:execute+确认可达，旧文案
+    // “写/执行 2 项已在主进程侧测通”已过期；断言意图（名单摆明面上）不变。
     render(<KernelPanel />);
     expect(await screen.findByText('list_instances')).toBeTruthy();
     expect(screen.getByText('create_instance')).toBeTruthy();
-    expect(screen.getByText(/写\/执行 2 项已在主进程侧测通/)).toBeTruthy();
+    expect(screen.getByText(/重启\/停止已在服务端行暴露按钮/)).toBeTruthy();
   });
 
   it('空实例目录时给出说明（含「为何不能在这里建实例」）', async () => {
@@ -190,17 +192,25 @@ describe('KernelPanel：只读链路确实走通了', () => {
     await waitFor(() => expect(kernelRead.mock.calls.length).toBeGreaterThan(first));
   });
 
-  it('面板里没有任何创建/删除/启动类的按钮（破坏性 kind 未暴露）', async () => {
+  it('破坏性按钮仅限重启/停止（服务端行，确认闸门覆盖；创建/删除等仍未暴露）', async () => {
+    // 主代理裁决（§4.5）：X2b 起重启/停止按钮存在且走确认闸门；旧“零破坏性按钮”
+    // 断言已过期。新不变量：创建/删除/部署/回滚类按钮仍不得出现，重启/停止必须出现。
     render(<KernelPanel />);
     await screen.findByText('inst-a');
-    const forbidden = ['创建', '删除', '启动', '部署', '回滚', '停止'];
-    const clickable = screen.getAllByRole('button');
-    for (const btn of clickable) {
-      const label = btn.textContent ?? '';
-      for (const word of forbidden) {
-        expect(label.includes(word), `按钮「${label}」不应含破坏性动作「${word}」`).toBe(false);
+    const labels = screen.getAllByRole('button').map((btn) => btn.textContent ?? '');
+    for (const word of ['创建', '删除', '部署', '回滚']) {
+      for (const label of labels) {
+        expect(label.includes(word), `按钮「${label}」不应含未暴露动作「${word}」`).toBe(false);
       }
     }
+    expect(
+      labels.some((l) => l.includes('重启')),
+      '应有重启按钮',
+    ).toBe(true);
+    expect(
+      labels.some((l) => l.includes('停止')),
+      '应有停止按钮',
+    ).toBe(true);
   });
 });
 
@@ -308,5 +318,78 @@ describe('KernelPanel：服务端日志/配置查看（只读）', () => {
     expect(await screen.findByText(/KernelReadConfigResponse/)).toBeTruthy();
     expect(screen.getByText(serverId)).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('KernelPanel：服务端重启/停止（X2b，经 kernel:execute + 确认闸门）', () => {
+  async function mockExecute(
+    impl: (req: { kind: string; payload: { serverId: string } }) => unknown,
+  ): Promise<ReturnType<typeof vi.fn>> {
+    const mod = await import('../lib/ipc-client.js');
+    const mocked = mod.ipcClient as unknown as Record<string, unknown>;
+    const fn = vi.fn(impl);
+    mocked['kernelExecute'] = fn;
+    return fn;
+  }
+
+  function executeOk(kind: string) {
+    return {
+      ok: true,
+      data: {},
+      error: null,
+      kind,
+      permission: 'X',
+      risk: 'execute',
+      confirmRequested: true,
+    };
+  }
+
+  it('重启按钮调 kernelExecute 并传对 serverId', async () => {
+    const fn = await mockExecute(async (req) => executeOk(req.kind));
+    render(<KernelPanel />);
+    const btn = (await screen.findByLabelText('重启 srv-a')) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    fireEvent.click(btn);
+    await waitFor(() => expect(fn).toHaveBeenCalledTimes(1));
+    expect(fn.mock.calls[0]?.[0]).toEqual({
+      kind: 'restart_server',
+      payload: { serverId: 'srv-a' },
+    });
+  });
+
+  it('停止按钮调 kernelExecute 并传对 serverId', async () => {
+    const fn = await mockExecute(async (req) => executeOk(req.kind));
+    render(<KernelPanel />);
+    const btn = (await screen.findByLabelText('停止 srv-b')) as HTMLButtonElement;
+    fireEvent.click(btn);
+    await waitFor(() => expect(fn).toHaveBeenCalledTimes(1));
+    expect(fn.mock.calls[0]?.[0]).toEqual({
+      kind: 'stop_server',
+      payload: { serverId: 'srv-b' },
+    });
+  });
+
+  it('执行失败时进本节错误条，不打崩整屏', async () => {
+    await mockExecute(async (req) => ({
+      ok: false,
+      data: null,
+      error: {
+        category: 'permission',
+        message: '用户取消了确认',
+        code: 'KERNEL_CONFIRM_DENIED',
+        retryable: false,
+      },
+      kind: req.kind,
+      permission: 'X',
+      risk: 'execute',
+      confirmRequested: true,
+    }));
+    render(<KernelPanel />);
+    const btn = await screen.findByLabelText('停止 srv-a');
+    fireEvent.click(btn);
+    expect(await screen.findByText('用户取消了确认')).toBeTruthy();
+    // 整屏未崩：服务端行仍在
+    expect(screen.getByText('srv-a')).toBeTruthy();
+    expect(screen.getByText('srv-b')).toBeTruthy();
   });
 });
