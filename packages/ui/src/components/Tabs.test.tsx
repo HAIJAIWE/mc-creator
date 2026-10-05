@@ -382,7 +382,11 @@ describe('Tabs · 键盘导航', () => {
 
   it('方向键阻止默认滚动', () => {
     render(<Tabs items={ITEMS} />);
-    const event = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+    });
     fireEvent(screen.getByRole('tablist'), event);
     expect(event.defaultPrevented).toBe(true);
   });
@@ -425,11 +429,7 @@ describe('Tabs · 面板内容', () => {
   });
 
   it('切换后面板内容随之更新', () => {
-    render(
-      <Tabs items={ITEMS}>
-        {({ value }) => <span data-testid="panel">{value}</span>}
-      </Tabs>,
-    );
+    render(<Tabs items={ITEMS}>{({ value }) => <span data-testid="panel">{value}</span>}</Tabs>);
     fireEvent.click(screen.getByRole('tab', { name: '设置' }));
     expect(screen.getByTestId('panel')).toHaveTextContent('settings');
   });

@@ -56,7 +56,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 /** 内联 SVG spinner：零第三方依赖（不引 lucide），且继承 currentColor。 */
 function Spinner() {
   return (
-    <svg className="mc-icon-svg h-3 w-3 animate-spin" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    <svg
+      className="mc-icon-svg h-3 w-3 animate-spin"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      focusable="false"
+    >
       <circle
         cx="8"
         cy="8"

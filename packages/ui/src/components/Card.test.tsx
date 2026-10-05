@@ -19,7 +19,11 @@ describe('Card · 基础渲染', () => {
   });
 
   it('渲染副标题', () => {
-    render(<Card title="构建配置" subtitle="仅影响 release">正文</Card>);
+    render(
+      <Card title="构建配置" subtitle="仅影响 release">
+        正文
+      </Card>,
+    );
     expect(screen.getByText('仅影响 release')).toBeInTheDocument();
   });
 
@@ -193,11 +197,7 @@ describe('Card · interactive', () => {
   it('调用方 onKeyDown 里 preventDefault 会抑制内置激活（尊重外层拦截）', () => {
     const onClick = vi.fn();
     render(
-      <Card
-        interactive
-        onClick={onClick}
-        onKeyDown={(event) => event.preventDefault()}
-      >
+      <Card interactive onClick={onClick} onKeyDown={(event) => event.preventDefault()}>
         点我
       </Card>,
     );

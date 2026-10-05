@@ -69,12 +69,7 @@ describe('Progress · 基础渲染与语义', () => {
   });
 
   it('非字符串 label 不污染可访问名（ReactNode 无法转 aria-label）', () => {
-    render(
-      <Progress
-        value={40}
-        label={<span data-testid="fancy-label">复杂</span>}
-      />,
-    );
+    render(<Progress value={40} label={<span data-testid="fancy-label">复杂</span>} />);
     expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-label');
     expect(screen.getByTestId('fancy-label')).toBeInTheDocument();
   });
@@ -183,9 +178,7 @@ describe('Progress · tone', () => {
 
   it('填充色引用 CSS 变量而非硬编码三元组（否则换肤失效）', () => {
     render(<Progress value={40} />);
-    expect(screen.getByTestId('mc-progress-fill').style.background).not.toContain(
-      MC_COLORS.accent,
-    );
+    expect(screen.getByTestId('mc-progress-fill').style.background).not.toContain(MC_COLORS.accent);
   });
 
   it('tone 映射表覆盖三个语义色', () => {

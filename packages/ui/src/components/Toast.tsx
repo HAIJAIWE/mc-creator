@@ -215,7 +215,7 @@ export function Toast({
           type="button"
           onClick={() => onDismiss?.(id ?? '')}
           aria-label={closeLabel ?? `关闭通知：${message}`}
-          className="shrink-0 text-mc-text-dim transition-colors hover:text-mc-text"
+          className="shrink-0 text-mc-dim transition-colors hover:text-mc-text"
         >
           <svg
             viewBox="0 0 16 16"

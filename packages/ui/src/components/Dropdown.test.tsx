@@ -48,7 +48,9 @@ describe('Dropdown · 基础渲染', () => {
   });
 
   it('渲染选项图标', () => {
-    const items: DropdownItem[] = [{ value: 'a', label: '甲', icon: <span data-testid="ico">I</span> }];
+    const items: DropdownItem[] = [
+      { value: 'a', label: '甲', icon: <span data-testid="ico">I</span> },
+    ];
     render(<Dropdown items={items} open onOpenChange={() => {}} />);
     expect(screen.getByTestId('ico')).toBeInTheDocument();
   });
@@ -167,7 +169,10 @@ describe('Dropdown · 选择', () => {
 
   it('未选中项 aria-selected=false', () => {
     render(<Dropdown items={ITEMS} defaultValue="kotlin" open onOpenChange={() => {}} />);
-    expect(screen.getByRole('option', { name: 'Java 21' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('option', { name: 'Java 21' })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
   });
 
   it('受控 value：点击只回调不改变显示', () => {
@@ -205,7 +210,9 @@ describe('Dropdown · 选择', () => {
   });
 
   it('选中项渲染对勾标记', () => {
-    const { container } = render(<Dropdown items={ITEMS} defaultValue="kotlin" open onOpenChange={() => {}} />);
+    const { container } = render(
+      <Dropdown items={ITEMS} defaultValue="kotlin" open onOpenChange={() => {}} />,
+    );
     expect(container.textContent).toContain('✓');
   });
 });
@@ -325,7 +332,15 @@ describe('Dropdown · 键盘导航', () => {
 
   it('Enter 选中当前高亮项', () => {
     const onValueChange = vi.fn();
-    render(<Dropdown items={ITEMS} open onOpenChange={() => {}} defaultValue="java" onValueChange={onValueChange} />);
+    render(
+      <Dropdown
+        items={ITEMS}
+        open
+        onOpenChange={() => {}}
+        defaultValue="java"
+        onValueChange={onValueChange}
+      />,
+    );
     fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
     fireEvent.keyDown(trigger(), { key: 'Enter' });
     expect(onValueChange).toHaveBeenCalledWith('kotlin');
@@ -333,14 +348,30 @@ describe('Dropdown · 键盘导航', () => {
 
   it('Space 选中当前高亮项', () => {
     const onValueChange = vi.fn();
-    render(<Dropdown items={ITEMS} open onOpenChange={() => {}} defaultValue="kotlin" onValueChange={onValueChange} />);
+    render(
+      <Dropdown
+        items={ITEMS}
+        open
+        onOpenChange={() => {}}
+        defaultValue="kotlin"
+        onValueChange={onValueChange}
+      />,
+    );
     fireEvent.keyDown(trigger(), { key: ' ' });
     expect(onValueChange).toHaveBeenCalledWith('kotlin');
   });
 
   it('展开时按 Enter 直接选中默认高亮项', () => {
     const onValueChange = vi.fn();
-    render(<Dropdown items={ITEMS} open onOpenChange={() => {}} defaultValue="kotlin" onValueChange={onValueChange} />);
+    render(
+      <Dropdown
+        items={ITEMS}
+        open
+        onOpenChange={() => {}}
+        defaultValue="kotlin"
+        onValueChange={onValueChange}
+      />,
+    );
     fireEvent.keyDown(trigger(), { key: 'Enter' });
     expect(onValueChange).toHaveBeenCalledWith('kotlin');
   });

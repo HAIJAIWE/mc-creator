@@ -205,7 +205,7 @@ export function Modal({
         data-testid="mc-modal-overlay"
         aria-hidden="true"
         onClick={handleOverlayClick}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-mc-fade-in"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-mc-dialog-in"
       />
 
       <div
@@ -238,7 +238,7 @@ export function Modal({
             ref={closeButtonRef}
             onClick={onClose}
             aria-label={closeLabel}
-            className="shrink-0 text-mc-text-dim transition-colors hover:text-mc-text"
+            className="shrink-0 text-mc-dim transition-colors hover:text-mc-text"
           >
             <CloseIcon />
           </button>

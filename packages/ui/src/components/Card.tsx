@@ -101,7 +101,7 @@ export function Card({
             {title ? (
               <TitleTag className="text-sm font-semibold text-mc-text">{title}</TitleTag>
             ) : null}
-            {subtitle ? <p className="mt-0.5 text-xs text-mc-text-dim">{subtitle}</p> : null}
+            {subtitle ? <p className="mt-0.5 text-xs text-mc-dim">{subtitle}</p> : null}
           </div>
           {/* 标题行右侧插槽：不给就退化成原来的单列标题（视觉不变） */}
           {titleAction ? <div className="shrink-0">{titleAction}</div> : null}

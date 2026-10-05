@@ -103,6 +103,8 @@ export function Dropdown({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const selectedItem = items.find((item) => item.value === currentValue);
+  // 次要文字色用 `text-mc-mute`（tailwind.config.js 定义的是 mc.mute）；
+  // 曾误写 `text-mc-text-mute` —— 那个键从不存在，静默不生成样式。
 
   /**
    * 从未导航过时的回退高亮：有选中值就落在选中项上，没有选中值则**不猜**。
@@ -116,7 +118,10 @@ export function Dropdown({
       ? -1
       : items.length === 0
         ? -1
-        : Math.max(0, items.findIndex((item) => item.value === currentValue));
+        : Math.max(
+            0,
+            items.findIndex((item) => item.value === currentValue),
+          );
   const activeOptionIndex = activeIndex === null ? fallbackActiveIndex : activeIndex;
 
   const setOpenState = useCallback(
@@ -137,7 +142,12 @@ export function Dropdown({
     // 打开时把高亮落在当前选中项上（没有选中项则第一项）。
     // 这里给的是**显式**高亮而非留 null：非受控模式下 openListbox 是唯一的
     // 展开入口，若留 null 就退回「无选中值不猜」的语义，用户展开后看不到高亮。
-    setActiveIndex(Math.max(0, items.findIndex((item) => item.value === currentValue)));
+    setActiveIndex(
+      Math.max(
+        0,
+        items.findIndex((item) => item.value === currentValue),
+      ),
+    );
     setOpenState(true);
   }, [disabled, items, currentValue, setOpenState]);
 
@@ -282,11 +292,11 @@ export function Dropdown({
           disabled && 'cursor-not-allowed opacity-50',
         )}
       >
-        <span className={cx('truncate', selectedItem ? 'text-mc-text' : 'text-mc-text-mute')}>
+        <span className={cx('truncate', selectedItem ? 'text-mc-text' : 'text-mc-mute')}>
           {selectedItem ? selectedItem.label : placeholder}
         </span>
         {/* 纯装饰的展开箭头，不参与朗读（状态由 aria-expanded 表达） */}
-        <span aria-hidden="true" className="shrink-0 text-mc-text-mute">
+        <span aria-hidden="true" className="shrink-0 text-mc-mute">
           ▾
         </span>
       </button>
@@ -321,7 +331,7 @@ export function Dropdown({
                 className={cx(
                   'flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-mc-text',
                   isActive && !item.disabled && 'bg-mc-surface-3',
-                  item.disabled && 'cursor-not-allowed opacity-50 text-mc-text-mute',
+                  item.disabled && 'cursor-not-allowed opacity-50 text-mc-mute',
                 )}
               >
                 {item.icon ? <span className="mc-icon-svg shrink-0">{item.icon}</span> : null}

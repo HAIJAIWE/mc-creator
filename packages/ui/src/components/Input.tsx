@@ -51,7 +51,7 @@ function InputComponent(
   const reactId = useId();
   // React 18 的 useId 产出 `:r0:`（带冒号），冒号会让消费方的
   // CSS/文档查询选择器写起来必须转义，去掉更省心。
-  const baseId = (id ?? (label ? `mc-input-${reactId.replace(/:/g, '')}` : undefined));
+  const baseId = id ?? (label ? `mc-input-${reactId.replace(/:/g, '')}` : undefined);
 
   const errorId = error ? `${baseId}-error` : undefined;
   const hintId = hint && !error ? `${baseId}-hint` : undefined;

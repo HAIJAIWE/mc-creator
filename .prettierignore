@@ -7,6 +7,17 @@ pnpm-lock.yaml
 package-lock.json
 yarn.lock
 
+# 工具缓存与本地产物 —— 必须排除，否则 `prettier --write .` 会去改写
+# 第三方缓存文件（实测一次 --write 重写了 .pnpm-store 下 1007 个文件）。
+# 注意 eslint.config.mjs 早就忽略了 .pnpm-store，prettier 之前是唯一的例外。
+.pnpm-store
+.trae
+.workbuddy
+out_prev_*
+release
+.vite
+.turbo
+
 # 无 parser 的文件
 .nvmrc
 .env*

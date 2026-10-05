@@ -1,6 +1,16 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./src/renderer/**/*.{ts,tsx,html}'],
+  // 扫描范围必须含 packages/ui：desktop 真实消费该包（ConfirmDialog / TabBar /
+  // ErrorBanner / WarningBanner / ToastProvider / PromptDialog 均 import 它），
+  // 而 ui 组件输出的是**原生 utility class**（tabular-nums / w-1/3 /
+  // min-w-[240px] / bg-black/60 …），这些类只能由调用方的 Tailwind 编译产出。
+  //
+  // 漏掉它的后果是静默的：Tailwind v3 对 `@layer components` 里自定义的类同样
+  // 「未用即删」，所以连 index.css 里明确定义的 .mc-panel / .mc-divider 也会消失。
+  // 实测漏掉时 mc-badge / tabular-nums / w-1/3 / min-w-[240px] / max-w-[420px]
+  // 在产物中 occurrences=0 —— Tabs 脏徽标、Toast 宽度约束、Progress 数字对齐
+  // 全部无样式，且不报错。
+  content: ['./src/renderer/**/*.{ts,tsx,html}', '../../packages/ui/src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {

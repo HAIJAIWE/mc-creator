@@ -21,6 +21,22 @@
  * - 少数必须内联的取值（如 Progress 的 tone、Toast 的边框色）一律走
  *   `theme` 的 `rgbVar()`，引用 CSS 变量而非 RGB 三元组 —— 否则换肤就失效了。
  *
+ * ## 与调用方 Tailwind 编译的耦合（升级 v4 时必读）
+ *
+ * 组件除语义 class 外，**也输出原生 Tailwind utility class**（如
+ * `flex items-center gap-2 px-3 py-1.5`、`hover:bg-mc-surface-3`、
+ * `min-w-[240px]`）。Tailwind 按 content 扫描结果生成 CSS，而且
+ * **`@layer components` 里的自定义类同样「未用即删」** —— 不在扫描范围内
+ * 就不会出现在产物里。
+ *
+ * 因此调用方的扫描范围必须覆盖本包源码，否则这些类**既不报错也没有任何
+ * 样式**（静默失效，最难排查）：
+ * - Tailwind v3：把 `packages/ui/src/**\/*.{ts,tsx}` 加进 `tailwind.config.js`
+ *   的 `content`；
+ * - Tailwind v4：自动扫描以**构建 CWD** 为基准（pnpm monorepo 下即
+ *   `apps/desktop`），不会自动覆盖本包，必须在 `index.css` 里显式写
+ *   `@source "../../../../../packages/ui/src";`（相对该文件求值）。
+ *
  * ## 可访问性基线
  *
  * 桌面端已引入 `axe-core`，本包按同一标准实现：语义 role、完整的

@@ -61,7 +61,9 @@ export function Progress({
   // 带上 label 读起来才是「项目构建 40%」而不是孤零零的「40」
   const valueText = isIndeterminate
     ? (labelText ?? '加载中')
-    : (labelText ? `${labelText} ${percentText}` : percentText);
+    : labelText
+      ? `${labelText} ${percentText}`
+      : percentText;
 
   const fillStyle: CSSProperties = {
     background: rgbVar(TONE_COLOR_VAR[tone]),

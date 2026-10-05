@@ -1,12 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import {
-  TOAST_DEFAULT_DURATION,
-  Toast,
-  ToastProvider,
-  useToast,
-  type ToastVariant,
-} from './Toast';
+import { TOAST_DEFAULT_DURATION, Toast, ToastProvider, useToast, type ToastVariant } from './Toast';
 
 /** 测试探针：在 Provider 内消费 toast API */
 function ToastProbe() {
