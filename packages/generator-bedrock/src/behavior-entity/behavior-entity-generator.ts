@@ -62,6 +62,20 @@ export class BehaviorEntityGenerator implements Generator {
 
   async generate(ctx: GeneratorContext): Promise<GenerationResult> {
     const spec = BehaviorEntitySpec.parse(ctx.spec as unknown as BehaviorEntitySpecType);
+    // `is_experimental` 不再硬编码：与 behavior_pack 生成器同源，取调用方对
+    // 「本次生成用到实验性 API」的显式声明。
+    //
+    // 为什么从 ctx.spec 原始对象上读而不是从 parse 结果上读：BehaviorEntitySpec
+    // 的 zod schema 里没有该字段，`parse()` 会把未知键剥掉。故必须在 parse
+    // 之前取出。字段名与 behavior_pack 的 spec.script.experimentalApi 保持一致，
+    // 也接受顶层 `experimentalApi`（本 spec 顶层直接写）。
+    const rawSpec = ctx.spec as {
+      experimentalApi?: unknown;
+      script?: { experimentalApi?: unknown };
+    };
+    const experimental =
+      rawSpec?.experimentalApi === true ||
+      (rawSpec?.script?.experimentalApi === true ? true : false);
 
     const files: FileNode[] = [];
     const warnings: string[] = [];
@@ -71,7 +85,7 @@ export class BehaviorEntityGenerator implements Generator {
     for (const entity of spec.entities) {
       files.push({
         path: `entities/${entity.id}.behavior.json`,
-        content: this.generateBehaviorFile(spec, entity, warnings),
+        content: this.generateBehaviorFile(spec, entity, warnings, experimental),
       });
       files.push({
         path: `entity/${entity.id}.client_entity.json`,
@@ -143,6 +157,7 @@ export class BehaviorEntityGenerator implements Generator {
     spec: BehaviorEntitySpecType,
     entity: BpCustomEntitySpec,
     warnings: string[],
+    experimental = false,
   ): string {
     const components: Record<string, unknown> = {
       'minecraft:type_family': { family: [entity.id] },
@@ -227,7 +242,9 @@ export class BehaviorEntityGenerator implements Generator {
           identifier: `${spec.packId}:${entity.id}`,
           is_spawnable: true,
           is_summonable: true,
-          is_experimental: false,
+          // 不再硬编码 false：取调用方的实验性声明（见 generate() 注释）。
+          // 该字段决定实体定义在未开启 Beta APIs 的世界里能否加载。
+          is_experimental: experimental,
         },
         components,
       },

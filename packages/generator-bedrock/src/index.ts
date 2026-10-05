@@ -10,4 +10,5 @@
 export * from './behavior-pack/index.js';
 export * from './behavior-item/index.js';
 export * from './behavior-entity/index.js';
+export * from './script-api/index.js';
 export * from './kinds.js';
