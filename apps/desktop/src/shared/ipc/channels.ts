@@ -57,3 +57,11 @@ export const PROCESS_STATE_EVENT = 'process:stateEvent';
 export const KERNEL_LIST_KINDS = 'kernel:listKinds';
 export const KERNEL_READ = 'kernel:read';
 export const KERNEL_EXECUTE = 'kernel:execute';
+
+// === UI 确认（X1：主进程侧 UI 确认，为开放 kernel:execute 做准备，本任务不开白名单）===
+// main→renderer 是 send（主进程主动推请求），renderer→main 是 invoke（渲染层应答）。
+// 本任务只定通道名、不接线（接线是 X2 的事），且刻意不进 preload 白名单 ——
+// 白名单开的是「renderer 主动调 main」的读通道，而这里是「main 主动问 renderer」：
+// 渲染层只有应答权、没有发起权（XSS 伪造的"同意"必须先有主进程的请求 id 才有效）。
+export const KERNEL_CONFIRM_REQUEST = 'kernel:confirm-request';
+export const KERNEL_CONFIRM_RESPONSE = 'kernel:confirm-response';

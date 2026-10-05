@@ -284,6 +284,14 @@ export interface KernelRuntime {
   /** 已发出的确认请求（审计用；测试据此断言「闸门确实被问到」）。 */
   confirmLog(): readonly KernelConfirmRequest[];
 
+  /**
+   * X1 确认源切换入口（构造后替换，二选一里改动最小的：只加方法，不改既有逻辑）。
+   * 默认仍是构造时传入的 confirm（生产是原生 dialog，`index.ts` 本任务不改仍传
+   * native —— 切换成 UI 确认是 X2/接线任务的事）。替换前后所有请求照记
+   * confirmLog，审计不受影响。
+   */
+  setConfirm(fn: KernelConfirmFn): void;
+
   /** 释放（will-quit）。释放后任何 dispatch 一律返回结构化的 unavailable，不抛。 */
   dispose(): void;
 
@@ -297,12 +305,14 @@ export function createKernelRuntime(opts: KernelRuntimeOptions): KernelRuntime {
   const confirmLog: KernelConfirmRequest[] = [];
   let disposed = false;
 
-  // 审计 + 转发：真正的弹窗由 opts.confirm 提供（生产是原生 dialog）。
+  // 审计 + 转发：真正的弹窗由 activeConfirm 提供（默认是构造时传入的 confirm，
+  // 生产是原生 dialog；X1 新增的 setConfirm 只换这个变量，不碰包装层）。
   // 包一层是为了「每一次确认请求都留下记录」—— §10.6 的闸门如果哪天被误改成
   // 直接 return true，测试会立刻因为 confirmLog 长度为 0 而变红。
+  let activeConfirm: KernelConfirmFn = opts.confirm;
   const confirm: KernelConfirmFn = async (req) => {
     confirmLog.push({ ...req });
-    return await opts.confirm(req);
+    return await activeConfirm(req);
   };
 
   const ctx = {
@@ -385,6 +395,9 @@ export function createKernelRuntime(opts: KernelRuntimeOptions): KernelRuntime {
     runRead: (kind, payload = {}) => dispatch(kind, payload, KERNEL_READ_KINDS),
     runWrite: (kind, payload = {}) => dispatch(kind, payload, KERNEL_WRITE_KINDS),
     confirmLog: () => confirmLog.slice(),
+    setConfirm: (fn: KernelConfirmFn): void => {
+      activeConfirm = fn;
+    },
     dispose(): void {
       disposed = true;
     },

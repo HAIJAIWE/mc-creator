@@ -340,3 +340,31 @@ export const KernelExecuteResponse = z.object({
   confirmRequested: z.boolean(),
 });
 export type KernelExecuteRes = z.infer<typeof KernelExecuteResponse>;
+
+// ---------------------------------------------------------------------------
+// UI 确认通道的线上传输形状（X1：主进程侧 UI 确认，为开放 kernel:execute 做准备）
+// ---------------------------------------------------------------------------
+//
+// 只追加，不改既有。注意命名：`KernelConfirmRequest` 在 `main/kernel-runtime.ts`
+// 里还有一个同名的**运行时**接口（含 payload、不含 id）；这里的是**线上传输**
+// 形状（带 id/requestedAt、不带 payload —— payload 可能含路径等敏感信息，
+// 不发往可能存在 XSS 的渲染进程，渲染层只需要 kind/summary/risk 来向用户展示）。
+//
+// 缓解三件套落到形状上的两处：
+// - `id`（uuid）：并发请求 id 关联（`Map<id, deferred>`，对不上 id 的应答丢弃）；
+// - `requestedAt`（`now()`，默认 `Date.now()`）：渲染层可据此做展示，
+//   超时拒绝由主进程侧计时（`timeoutMs` 默认 60s），不信任渲染层的时间。
+export const KernelConfirmRequest = z.object({
+  id: z.string().uuid(),
+  kind: z.string().min(1).max(256),
+  summary: z.string().min(1).max(2000),
+  risk: KernelRiskSchema,
+  requestedAt: z.number().int().nonnegative(),
+});
+export type KernelConfirmReq = z.infer<typeof KernelConfirmRequest>;
+
+export const KernelConfirmResponse = z.object({
+  id: z.string().uuid(),
+  approved: z.boolean(),
+});
+export type KernelConfirmRes = z.infer<typeof KernelConfirmResponse>;
