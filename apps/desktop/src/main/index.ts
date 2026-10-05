@@ -5,6 +5,13 @@ import { getProcessSupervisor } from './ipc/process-supervisor.js';
 import { runStartupRecovery, formatRecoveryReport } from './startup-recovery.js';
 import { getKernelRuntime, initKernelRuntime, resolveKernelRoot } from './kernel-runtime.js';
 import { createTaskPoller, type TaskPoller } from './server-task-poller.js';
+import {
+  createAgentHost,
+  createAgentSelfStartConfirm,
+  resolveAgentDataDir,
+  type AgentHost,
+} from './agent-host.js';
+import { createProcessSupervisor } from './process-supervisor.js';
 import { createNativeConfirm } from './kernel-confirm.js';
 import { createUiConfirm } from './kernel-confirm-ui.js';
 import { KERNEL_CONFIRM_RESPONSE, KernelConfirmResponse } from '../shared/ipc-channels.js';
@@ -193,6 +200,66 @@ function initKernels(): void {
  */
 let taskPoller: TaskPoller | null = null;
 
+/**
+ * §10.1 智能体独立进程自启（任务 W1：`agent-host.ts` 此前是死代码）。
+ *
+ * `createAgentHost` 写好且测透了，但生产入口从未调用它 —— 智能体进程**从来没起来过**。
+ * 这里把它接到 whenReady 上，补上最后一段「起 → 退出必停」的生命周期。
+ *
+ * ## 三条硬约束（主代理拍板）
+ *
+ * 1. **try/catch 包裹，失败只 warn**：智能体是增值能力，它起不来绝不能拦住应用启动
+ *    （与 taskPoller 同一范式、同一句式）。spawn 失败 / 端口被占 / node 不在 PATH
+ *    全部落在 warn 里，应用照常进主界面。
+ * 2. **before-quit 必须停它**：见文件末尾的收尾链。窗口关了主进程还在，但主进程
+ *    自己退出时智能体必须跟着走，否则它会变成孤儿进程占着 3001 端口。
+ * 3. **路径全部自动推导，零硬编码**：dataDir 用
+ *    `resolveAgentDataDir(app.getPath('userData'))`，port/host/path 走 agent-host
+ *    的缺省（与 `packages/agent` 的 `main(['--http'])` 一致）。写死路径在这里等于
+ *    把「打包后在别人机器上起不来」变成必然事件。
+ *
+ * ## 为什么给智能体一个**专用** supervisor，而不是复用 `getProcessSupervisor()` 单例
+ *
+ * 实测（读源码确认，非推测）：单例由 `createProcessSupervisor()` 无参构造，
+ * **没有 confirm**；而 `Supervisor.spawnManaged` 在 confirm 缺失时一律
+ * `throw ProcessSupervisorError('PERMISSION_DENIED')`。所以拿单例去 start() 必然
+ * 抛错 —— 那样只是把「智能体永不启动」换成了「智能体启动时报一条 warn」，假接线。
+ *
+ * 代价（明说）：智能体托管在另一个 supervisor 实例上，因此
+ * 1. 它**不出现在**渲染层的 PROCESS_LIST（那读的是单例）；
+ * 2. 单例的 `shutdownAll()` 收不到它 —— 所以退出收尾里必须显式 `agentHost.stop()`，
+ *    这也正是「把 supervisor 私有引用留在 AgentHost 句柄里」的价值所在。
+ *
+ * ## confirm 为什么不是 `() => true`（主代理驳回过一次）
+ *
+ * 子代理初版给了恒真闸门，理由是「自启没有可确认的用户意图」。**驳回**：
+ * 恒真 = 给这个实例开永久通行证，今后复用它 launch 任何命令都无条件放行，
+ * 正是 §10.6 守的那条线。改用 `createAgentSelfStartConfirm`：只放行
+ * `buildAgentCommand` 拼出的那一条命令（cmd + 全部 args 逐字节比对），
+ * 端口/dataDir/脚本任一变化期望值随之重算，其余请求一律 false。
+ * 单例的 fail-closed 语义仍一个字节未动。
+ */
+let agentHost: AgentHost | null = null;
+
+/** 开机自启的固定放行闸门：窄口径，只放行本函数拼出的那一条命令（见 createAgentSelfStartConfirm）。 */
+function startAgentHost(): void {
+  try {
+    // userDataDir 必传（agent-host 不 import electron），dataDir 显式走 resolveAgentDataDir
+    // 而不是留缺省：让「智能体数据落在 <userData>/mc-creator/agent」在接线处一眼可见。
+    const userDataDir = app.getPath('userData');
+    const dataDir = resolveAgentDataDir(userDataDir);
+    agentHost = createAgentHost(
+      createProcessSupervisor({ confirm: createAgentSelfStartConfirm({ userDataDir, dataDir }) }),
+      { userDataDir, dataDir },
+    );
+    agentHost.start();
+    console.log(`[§10.1 智能体] 独立进程已拉起，dataDir=${dataDir}`);
+  } catch (e) {
+    // 自启失败只 warn：绝不拦应用启动（与 taskPoller 的失败处理同款取向）。
+    console.warn('[§10.1 智能体] 独立进程启动失败（不影响主流程）:', e);
+  }
+}
+
 app.whenReady().then(() => {
   // §4.1 第二道闸：quit 分支已调 app.quit()，这里直接返回，绝不初始化内核。
   if (instanceRole !== 'primary') return;
@@ -221,6 +288,9 @@ app.whenReady().then(() => {
   } catch (e) {
     console.warn('[定时任务] 轮询器启动失败（不影响主流程）：', e);
   }
+  // §10.1 智能体独立进程自启（W1）：同样 try/catch，失败只 warn，不拦应用启动。
+  // 放在 registerIpcHandlers / 轮询器之后 —— supervisor 单例与内核运行时都已就绪。
+  startAgentHost();
   Menu.setApplicationMenu(createChineseMenu());
   createWindow();
   app.on('activate', () => {
@@ -256,8 +326,16 @@ app.on('before-quit', (event) => {
     // 停轮询失败不拦退出。
   }
   taskPoller = null;
-  void getProcessSupervisor()
-    .shutdownAll()
+  // §10.1 智能体（W1）：先停独立进程再走既有收尾。未自启成功时 stop() 是安全空操作
+  // （agent-host 的既定语义，调用方无需先查状态），所以这里无需判空分支之外的任何条件。
+  // 它托管在专用 supervisor 上，单例的 shutdownAll() 收不到它 —— 这一句是唯一的停机点。
+  // 接进同一条 Promise 链（而不是 fire-and-forget）：app.quit() 一旦跑完主进程就没了，
+  // 没停掉的智能体会变成占着 3001 端口的孤儿进程。停机失败/超时仍不拦退出（下方 catch）。
+  const agentHostStopped = agentHost === null ? Promise.resolve() : agentHost.stop();
+  agentHost = null;
+  void agentHostStopped
+    .catch(() => undefined)
+    .then(() => getProcessSupervisor().shutdownAll())
     .catch(() => undefined)
     .finally(() => {
       getKernelRuntime()?.dispose();

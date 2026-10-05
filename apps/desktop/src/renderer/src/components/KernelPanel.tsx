@@ -5,6 +5,7 @@ import { Cpu, RefreshCw, Server, Box } from 'lucide-react';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { ipcClient } from '../lib/ipc-client.js';
 import { KernelConfirmHost } from './KernelConfirmHost.js';
+import { ServerConsole } from './ServerConsole.js';
 import type {
   KernelEditionT,
   KernelListKindsRes,
@@ -43,6 +44,21 @@ import {
  *
  * 解锁条件：UI 侧确认框 + 权限拒绝的呈现做好之后，在 preload 白名单里加一行
  * `kernelExecute`，本面板再加按钮。闸门接线本身不需要再改内核。
+ *
+ * ## 服务端行的「控制台」开关（任务 W1：接线 ServerConsole）
+ *
+ * `ServerConsole.tsx` 此前**全仓没有任何组件引用它**（只有它自己的测试渲染它），
+ * 即一整块已写好、已测透的只读观测面在产品里不可达。本节把它接进服务端行。
+ *
+ * 三条硬约束（主代理拍板）：
+ * 1. **懒挂载**：`ServerConsole` 只在用户点开后才渲染。理由是它是自带 5s 轮询
+ *    `read_logs` 的活组件 —— 未展开就挂载等于让每台服务端在用户没要求时就开始
+ *    轮询主进程。与既有「日志/配置也是懒加载、不随 refresh 预取」同一取向。
+ * 2. **同一时刻最多开一个**（单槽 `string | null` 槽位，点别的先关旧的）：
+ *    多个同时轮询的控制台是真实的 IPC / 主进程读盘开销，而用户一次只会盯一台。
+ *    本仓已有同款先例：`KernelConfirmHost` 的确认弹窗就是单槽（后到覆盖先到）。
+ * 3. **只读**：控制台不新增任何 IPC 面、不碰 `kernel:execute`、不经确认闸门 ——
+ *    它读的就是 `read_logs`，与上方「日志」按钮同源，只是多了自动刷新与暂停。
  */
 
 const EDITIONS: KernelEditionT[] = ['java', 'server', 'bedrock'];
@@ -109,6 +125,9 @@ export function KernelPanel() {
   // 服务端重启/停止（X 类，经 kernel:execute + §10.6 确认闸门）：错误进本节错误条，不打崩。
   const [actionErrors, setActionErrors] = useState<Record<string, string | null>>({});
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  // 控制台展开槽（单槽，见文件头「服务端行的控制台开关」）：存当前展开的 serverId，
+  // null = 全关。存 id 而不是 Record<id, boolean> 是为了从类型上就不可能同时开两个。
+  const [consoleServerId, setConsoleServerId] = useState<string | null>(null);
 
   const read = useCallback(async (req: Parameters<typeof ipcClient.kernelRead>[0]) => {
     return await ipcClient.kernelRead(req);
@@ -199,6 +218,12 @@ export function KernelPanel() {
     },
     [],
   );
+
+  const toggleConsole = useCallback((serverId: string) => {
+    // 单槽切换：再点已展开的那台 = 收起；点别的 = 先关旧的再开新的（旧的随之 unmount，
+    // 它的 5s 轮询与 interval 在 unmount 时清掉，见 ServerConsole 的 mountedRef 守卫）。
+    setConsoleServerId((cur) => (cur === serverId ? null : serverId));
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -452,6 +477,15 @@ export function KernelPanel() {
                   </button>
                   <button
                     type="button"
+                    aria-label={`查看 ${s.id} 控制台`}
+                    aria-expanded={consoleServerId === s.id}
+                    onClick={() => toggleConsole(s.id)}
+                    className="rounded-mc border border-mc-border px-1.5 py-0.5 text-[10px] text-mc-text"
+                  >
+                    控制台
+                  </button>
+                  <button
+                    type="button"
                     aria-label={`重启 ${s.id}`}
                     disabled={actionLoading[`${s.id}:restart_server`] === true}
                     onClick={() => void runServerAction(s.id, 'restart_server')}
@@ -512,6 +546,15 @@ export function KernelPanel() {
                         </pre>
                       </>
                     )}
+                  </div>
+                )}
+                {/* 控制台（W1 接死代码）：懒挂载 + 单槽，同一时刻全面板至多一个实例。
+                    刻意**不**用 hasLogs 门禁 —— 没有日志文件时 ServerConsole 自己会
+                    呈现空态/错误态（它就是为「服务端刚起、还没日志」准备的），在这里
+                    把入口按 hasLogs 灰掉等于把它刚修好的降级路径又藏回去。 */}
+                {consoleServerId === s.id && (
+                  <div className="mt-1 overflow-hidden rounded-mc border border-mc-border">
+                    <ServerConsole serverId={s.id} />
                   </div>
                 )}
               </li>

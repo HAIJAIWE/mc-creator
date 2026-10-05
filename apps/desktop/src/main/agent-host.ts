@@ -103,6 +103,41 @@ export function buildAgentCommand(opts: BuildAgentCommandOptions): {
   return { command: 'node', args: ['--input-type=module', '-e', script] };
 }
 
+/**
+ * 开机自启专用的**窄**确认闸门（§10.6 的例外，且是最小例外）。
+ *
+ * ## 为什么不是 `() => true`
+ *
+ * 自启确实没有「用户逐次发起的意图」可确认（窗口还没建），但把它实现成
+ * 恒真，等于给那个 supervisor 实例开了一张**永久通行证**：今后任何人复用它
+ * launch 任何命令都会被无条件放行。这正是 §10.6 拒绝 `kernel:execute` 时
+ * 守的那条线，不能因为「是自启」就开口子。
+ *
+ * ## 本函数的边界
+ *
+ * 只放行**用同一组参数拼出来的那一条命令**（`buildAgentCommand` 的输出），
+ * 逐字节比对 cmd 与全部 args（含内联脚本与 dataDir）。命令一变、端口一改、
+ * dataDir 一漂移，期望值随之重算，因此不存在「旧期望值放过新命令」。
+ * 其余任何请求（含 payload 缺失/形状不符/参数被改一个字符）一律 false。
+ *
+ * 注意闸门本身仍遵守 supervisor 的 fail-closed：确认函数抛错按未确认处理，
+ * 返回 thenable 也按未确认处理（`process-supervisor.ts` 的既有语义）。
+ */
+export function createAgentSelfStartConfirm(
+  opts: BuildAgentCommandOptions,
+): (req: unknown) => boolean {
+  const expected = buildAgentCommand(opts);
+  return (req: unknown): boolean => {
+    if (typeof req !== 'object' || req === null) return false;
+    const payload = (req as { payload?: unknown }).payload;
+    if (typeof payload !== 'object' || payload === null) return false;
+    const { cmd, args } = payload as { cmd?: unknown; args?: unknown };
+    if (cmd !== expected.command) return false;
+    if (!Array.isArray(args) || args.length !== expected.args.length) return false;
+    return args.every((a, i) => a === expected.args[i]);
+  };
+}
+
 /** `createAgentHost` 的装配选项（supervisor 本体由第一个参数注入）。 */
 export interface AgentHostOptions {
   /** 调用方传入的 userData，用于推导默认 dataDir。 */

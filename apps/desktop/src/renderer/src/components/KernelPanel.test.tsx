@@ -393,3 +393,100 @@ describe('KernelPanel：服务端重启/停止（X2b，经 kernel:execute + 确�
     expect(screen.getByText('srv-b')).toBeTruthy();
   });
 });
+
+/**
+ * W1：`ServerConsole` 此前全仓无任何组件引用（只有它自己的测试渲染它）= 死代码。
+ * 这一组钉死接线后的两条硬约束：懒挂载（不展开就不渲染/不轮询）与单槽（同时至多一个）。
+ *
+ * 断言用 `ServerConsole` 自带的 `data-testid`（console-status / console-file /
+ * console-tail），不用 `.xterm` 选择器：复核源码后该组件是 `<pre>` 轮询渲染，
+ * 并不引入 xterm（任务书里「自带 xterm」的说法与当前源码不符，见交付说明）。
+ */
+describe('KernelPanel：服务端控制台（W1 接死代码 ServerConsole）', () => {
+  /** 两台服务端，read_logs 各自回不同 file/tail，便于分辨当前挂着的是哪一个实例。 */
+  function mockConsoleServers(ids: string[]) {
+    kernelRead.mockImplementation(async (req: KernelReadReq) => {
+      switch (req.kind) {
+        case 'get_capabilities':
+          return capsFor(String(req.payload['edition']));
+        case 'list_instances':
+          return ok({ instances: [] });
+        case 'list_servers':
+          return ok({ servers: ids.map((id) => ({ id, hasConfig: true, hasLogs: true })) });
+        case 'get_context_pack':
+          return fail('暂无构建记录');
+        case 'read_logs': {
+          const serverId = String((req.payload as { serverId: string }).serverId);
+          return ok({ serverId, file: `logs/${serverId}.log`, tail: [`${serverId}-行-1`] });
+        }
+        default:
+          return fail(`不该被调用: ${req.kind}`);
+      }
+    });
+  }
+
+  function readLogsCalls(): string[] {
+    return kernelRead.mock.calls
+      .filter((c) => (c[0] as { kind: string }).kind === 'read_logs')
+      .map((c) => (c[0] as { payload: { serverId: string } }).payload.serverId);
+  }
+
+  it('懒挂载：未展开时控制台不在 DOM 里、也不调 read_logs；点开后就地出现', async () => {
+    mockConsoleServers(['srv-x']);
+    render(<KernelPanel />);
+    const btn = await screen.findByLabelText('查看 srv-x 控制台');
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
+
+    // 未展开：组件未挂载（无它自带的任何 testid），且一次 read_logs 都没发。
+    expect(screen.queryByTestId('console-status')).toBeNull();
+    expect(screen.queryByTestId('console-file')).toBeNull();
+    expect(readLogsCalls()).toEqual([]);
+
+    fireEvent.click(btn);
+    // 展开后就地渲染，且开始按 serverId 轮询只读 read_logs。
+    expect(await screen.findByTestId('console-status')).toBeTruthy();
+    expect(screen.getByTestId('console-file').textContent).toBe('logs/srv-x.log');
+    expect(screen.getByTestId('console-tail').textContent).toContain('srv-x-行-1');
+    await waitFor(() => expect(readLogsCalls()).toEqual(['srv-x']));
+    expect(screen.getByLabelText('查看 srv-x 控制台').getAttribute('aria-expanded')).toBe('true');
+
+    // 再点一次 = 收起：组件卸载、轮询随之停止（不新增 read_logs 调用）。
+    const callsBefore = readLogsCalls().length;
+    fireEvent.click(screen.getByLabelText('查看 srv-x 控制台'));
+    expect(screen.queryByTestId('console-status')).toBeNull();
+    expect(readLogsCalls()).toHaveLength(callsBefore);
+  });
+
+  it('单槽：开第二个控制台时第一个卸载，同一时刻只有一个实例', async () => {
+    mockConsoleServers(['srv-a1', 'srv-b1']);
+    render(<KernelPanel />);
+    const first = await screen.findByLabelText('查看 srv-a1 控制台');
+    fireEvent.click(first);
+    expect(await screen.findByTestId('console-file')).toBeTruthy();
+    expect(screen.getByTestId('console-file').textContent).toBe('logs/srv-a1.log');
+    expect(screen.getAllByTestId('console-status')).toHaveLength(1);
+
+    // 点第二台：旧的必须卸载（否则就是两个 5s 轮询同时跑）。
+    fireEvent.click(screen.getByLabelText('查看 srv-b1 控制台'));
+    await waitFor(() =>
+      expect(screen.getByTestId('console-file').textContent).toBe('logs/srv-b1.log'),
+    );
+    expect(screen.getAllByTestId('console-status')).toHaveLength(1);
+    expect(screen.queryByText('logs/srv-a1.log')).toBeNull();
+    // 两台的 aria-expanded 状态也必须互斥（单槽的可见证据）。
+    expect(screen.getByLabelText('查看 srv-a1 控制台').getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByLabelText('查看 srv-b1 控制台').getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('控制台只读：展开它不发任何 kernel:execute（不碰确认闸门）', async () => {
+    mockConsoleServers(['srv-ro']);
+    const mod = await import('../lib/ipc-client.js');
+    const mocked = mod.ipcClient as unknown as Record<string, unknown>;
+    const execute = vi.fn();
+    mocked['kernelExecute'] = execute;
+    render(<KernelPanel />);
+    fireEvent.click(await screen.findByLabelText('查看 srv-ro 控制台'));
+    await screen.findByTestId('console-status');
+    expect(execute).not.toHaveBeenCalled();
+  });
+});
