@@ -14,6 +14,8 @@ import {
   KernelContextPackResponse,
   KernelListInstancesResponse,
   KernelListServersResponse,
+  KernelReadConfigResponse,
+  KernelReadLogsResponse,
 } from '../../../shared/ipc-channels.js';
 
 /**
@@ -91,10 +93,86 @@ export function KernelPanel() {
   const [buildError, setBuildError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // 服务端日志/配置查看（纯只读）：按 serverId 展开后懒加载，不随 refresh 预取。
+  // 所有响应走各自 zod schema safeParse，形状不对只记本节错误，不污染全局 error。
+  const [logsOpen, setLogsOpen] = useState<Record<string, boolean>>({});
+  const [configOpen, setConfigOpen] = useState<Record<string, boolean>>({});
+  const [logTails, setLogTails] = useState<Record<string, string[]>>({});
+  const [logFiles, setLogFiles] = useState<Record<string, string>>({});
+  const [logErrors, setLogErrors] = useState<Record<string, string | null>>({});
+  const [logLoading, setLogLoading] = useState<Record<string, boolean>>({});
+  const [configTexts, setConfigTexts] = useState<Record<string, string>>({});
+  const [configFiles, setConfigFiles] = useState<Record<string, string>>({});
+  const [configErrors, setConfigErrors] = useState<Record<string, string | null>>({});
+  const [configLoading, setConfigLoading] = useState<Record<string, boolean>>({});
 
   const read = useCallback(async (req: Parameters<typeof ipcClient.kernelRead>[0]) => {
     return await ipcClient.kernelRead(req);
   }, []);
+
+  const toggleLogs = useCallback(
+    async (serverId: string) => {
+      if (logsOpen[serverId]) {
+        setLogsOpen((prev) => ({ ...prev, [serverId]: false }));
+        return;
+      }
+      setLogsOpen((prev) => ({ ...prev, [serverId]: true }));
+      setLogLoading((prev) => ({ ...prev, [serverId]: true }));
+      setLogErrors((prev) => ({ ...prev, [serverId]: null }));
+      try {
+        // serverId 直接用列表返回的 id，不做任何拼接。
+        const res = await read({ kind: 'read_logs', payload: { serverId } });
+        const parsed =
+          res.ok && res.data !== null ? KernelReadLogsResponse.safeParse(res.data) : null;
+        if (parsed !== null && parsed.success) {
+          setLogTails((prev) => ({ ...prev, [serverId]: parsed.data.tail.slice(-50) }));
+          setLogFiles((prev) => ({ ...prev, [serverId]: parsed.data.file }));
+        } else {
+          setLogErrors((prev) => ({
+            ...prev,
+            [serverId]: res.error?.message ?? '日志形状不符合契约（KernelReadLogsResponse）',
+          }));
+        }
+      } catch (e) {
+        setLogErrors((prev) => ({ ...prev, [serverId]: (e as Error).message }));
+      } finally {
+        setLogLoading((prev) => ({ ...prev, [serverId]: false }));
+      }
+    },
+    [logsOpen, read],
+  );
+
+  const toggleConfig = useCallback(
+    async (serverId: string) => {
+      if (configOpen[serverId]) {
+        setConfigOpen((prev) => ({ ...prev, [serverId]: false }));
+        return;
+      }
+      setConfigOpen((prev) => ({ ...prev, [serverId]: true }));
+      setConfigLoading((prev) => ({ ...prev, [serverId]: true }));
+      setConfigErrors((prev) => ({ ...prev, [serverId]: null }));
+      try {
+        // serverId 直接用列表返回的 id，不做任何拼接。
+        const res = await read({ kind: 'read_config', payload: { serverId } });
+        const parsed =
+          res.ok && res.data !== null ? KernelReadConfigResponse.safeParse(res.data) : null;
+        if (parsed !== null && parsed.success) {
+          setConfigTexts((prev) => ({ ...prev, [serverId]: parsed.data.text }));
+          setConfigFiles((prev) => ({ ...prev, [serverId]: parsed.data.file }));
+        } else {
+          setConfigErrors((prev) => ({
+            ...prev,
+            [serverId]: res.error?.message ?? '配置形状不符合契约（KernelReadConfigResponse）',
+          }));
+        }
+      } catch (e) {
+        setConfigErrors((prev) => ({ ...prev, [serverId]: (e as Error).message }));
+      } finally {
+        setConfigLoading((prev) => ({ ...prev, [serverId]: false }));
+      }
+    },
+    [configOpen, read],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -316,13 +394,79 @@ export function KernelPanel() {
             {servers.map((s) => (
               <li
                 key={s.id}
-                className="flex items-center gap-2 rounded-mc border border-mc-border bg-mc-surface-2 px-2 py-1 text-[11px]"
+                className="rounded-mc border border-mc-border bg-mc-surface-2 px-2 py-1 text-[11px]"
               >
-                <span className="text-mc-text">{s.id}</span>
-                <span className="ml-auto flex items-center gap-1 text-[9px] text-mc-dim">
-                  <span className={s.hasConfig ? 'text-green-400' : 'text-mc-mute'}>config</span>
-                  <span className={s.hasLogs ? 'text-green-400' : 'text-mc-mute'}>logs</span>
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-mc-text">{s.id}</span>
+                  <span className="ml-auto flex items-center gap-1 text-[9px] text-mc-dim">
+                    <span className={s.hasConfig ? 'text-green-400' : 'text-mc-mute'}>config</span>
+                    <span className={s.hasLogs ? 'text-green-400' : 'text-mc-mute'}>logs</span>
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label={`查看 ${s.id} 日志`}
+                    aria-expanded={logsOpen[s.id] === true}
+                    disabled={!s.hasLogs}
+                    onClick={() => void toggleLogs(s.id)}
+                    className="rounded-mc border border-mc-border px-1.5 py-0.5 text-[10px] text-mc-text disabled:opacity-40"
+                  >
+                    日志
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`查看 ${s.id} 配置`}
+                    aria-expanded={configOpen[s.id] === true}
+                    disabled={!s.hasConfig}
+                    onClick={() => void toggleConfig(s.id)}
+                    className="rounded-mc border border-mc-border px-1.5 py-0.5 text-[10px] text-mc-text disabled:opacity-40"
+                  >
+                    配置
+                  </button>
+                  {!s.hasLogs && (
+                    <span className="text-[10px] text-mc-mute">无日志文件，日志不可查看</span>
+                  )}
+                  {!s.hasConfig && (
+                    <span className="text-[10px] text-mc-mute">无配置文件，配置不可查看</span>
+                  )}
+                </div>
+                {logsOpen[s.id] === true && s.hasLogs && (
+                  <div className="mt-1">
+                    {logLoading[s.id] === true ? (
+                      <p className="text-[10px] text-mc-mute">日志加载中…</p>
+                    ) : logErrors[s.id] != null ? (
+                      <p className="text-[10px] text-red-400">{logErrors[s.id]}</p>
+                    ) : (
+                      <>
+                        {logFiles[s.id] !== undefined && (
+                          <div className="text-[10px] text-mc-dim">{logFiles[s.id]}</div>
+                        )}
+                        <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-all font-mono text-[10px] text-mc-text">
+                          {(logTails[s.id] ?? []).join('\n')}
+                        </pre>
+                      </>
+                    )}
+                  </div>
+                )}
+                {configOpen[s.id] === true && s.hasConfig && (
+                  <div className="mt-1">
+                    {configLoading[s.id] === true ? (
+                      <p className="text-[10px] text-mc-mute">配置加载中…</p>
+                    ) : configErrors[s.id] != null ? (
+                      <p className="text-[10px] text-red-400">{configErrors[s.id]}</p>
+                    ) : (
+                      <>
+                        {configFiles[s.id] !== undefined && (
+                          <div className="text-[10px] text-mc-dim">{configFiles[s.id]}</div>
+                        )}
+                        <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-all font-mono text-[10px] text-mc-text">
+                          {configTexts[s.id] ?? ''}
+                        </pre>
+                      </>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

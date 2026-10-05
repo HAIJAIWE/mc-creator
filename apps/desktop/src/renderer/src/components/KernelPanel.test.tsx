@@ -203,3 +203,110 @@ describe('KernelPanel：只读链路确实走通了', () => {
     }
   });
 });
+
+describe('KernelPanel：服务端日志/配置查看（只读）', () => {
+  function mockDetailServers(opts: {
+    tail: unknown;
+    text: unknown;
+    serverId?: string;
+    hasLogs?: boolean;
+    hasConfig?: boolean;
+  }) {
+    const serverId = opts.serverId ?? 'srv-logs';
+    kernelRead.mockImplementation(async (req: KernelReadReq) => {
+      switch (req.kind) {
+        case 'get_capabilities':
+          return capsFor(String(req.payload['edition']));
+        case 'list_instances':
+          return ok({ instances: [] });
+        case 'list_servers':
+          return ok({
+            servers: [
+              { id: serverId, hasConfig: opts.hasConfig ?? true, hasLogs: opts.hasLogs ?? true },
+            ],
+          });
+        case 'get_context_pack':
+          return fail('暂无构建记录');
+        case 'read_logs':
+          return ok({ serverId, file: 'logs/latest.log', tail: opts.tail });
+        case 'read_config':
+          return ok({ serverId, file: 'server.properties', text: opts.text });
+        default:
+          return fail(`不该被调用: ${req.kind}`);
+      }
+    });
+    return serverId;
+  }
+
+  it('点日志展开后调 read_logs 并以 <pre> 展示 tail（只取尾 50 行）', async () => {
+    const tail60 = Array.from({ length: 60 }, (_, i) => `line-${i + 1}`);
+    const serverId = mockDetailServers({ tail: tail60, text: 'motd=x' });
+    render(<KernelPanel />);
+    const btn = (await screen.findByLabelText(`查看 ${serverId} 日志`)) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    fireEvent.click(btn);
+    const pre = await screen.findByText(/line-60/);
+    expect(pre.tagName).toBe('PRE');
+    const lines = (pre.textContent ?? '').split('\n');
+    expect(lines).toHaveLength(50);
+    expect(lines[0]).toBe('line-11');
+    expect(lines[49]).toBe('line-60');
+    const logCalls = kernelRead.mock.calls.filter(
+      (c) => (c[0] as { kind: string }).kind === 'read_logs',
+    );
+    expect(logCalls.length).toBeGreaterThan(0);
+    expect((logCalls[0][0] as { payload: { serverId: string } }).payload.serverId).toBe(serverId);
+  });
+
+  it('点配置展开后调 read_config 并以 <pre> 展示 text', async () => {
+    const serverId = mockDetailServers({
+      tail: ['a'],
+      text: 'motd=hello-world\nmax-players=20',
+    });
+    render(<KernelPanel />);
+    const btn = (await screen.findByLabelText(`查看 ${serverId} 配置`)) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    fireEvent.click(btn);
+    const pre = await screen.findByText(/motd=hello-world/);
+    expect(pre.tagName).toBe('PRE');
+    expect(pre.textContent ?? '').toContain('max-players=20');
+    const cfgCalls = kernelRead.mock.calls.filter(
+      (c) => (c[0] as { kind: string }).kind === 'read_config',
+    );
+    expect(cfgCalls.length).toBeGreaterThan(0);
+    expect((cfgCalls[0][0] as { payload: { serverId: string } }).payload.serverId).toBe(serverId);
+  });
+
+  it('hasLogs/hasConfig 为 false 时对应按钮 disabled 并注明原因', async () => {
+    // 沿用 beforeEach 默认：srv-a（有配置无日志）、srv-b（都没配）
+    render(<KernelPanel />);
+    const logsBtn = (await screen.findByLabelText('查看 srv-a 日志')) as HTMLButtonElement;
+    expect(logsBtn.disabled).toBe(true);
+    const configBtn = screen.getByLabelText('查看 srv-a 配置') as HTMLButtonElement;
+    expect(configBtn.disabled).toBe(false);
+    expect((await screen.findAllByText('无日志文件，日志不可查看')).length).toBeGreaterThan(0);
+    const bConfigBtn = screen.getByLabelText('查看 srv-b 配置') as HTMLButtonElement;
+    expect(bConfigBtn.disabled).toBe(true);
+    expect(screen.getAllByText('无配置文件，配置不可查看').length).toBeGreaterThan(0);
+    // 未展开前不调 read_logs/read_config（纯懒加载）
+    await waitFor(() => expect(kernelRead).toHaveBeenCalled());
+    const calledKinds = kernelRead.mock.calls.map((c) => (c[0] as { kind: string }).kind);
+    expect(calledKinds).not.toContain('read_logs');
+    expect(calledKinds).not.toContain('read_config');
+  });
+
+  it('日志/配置形状错误只记本节错误，不打崩整屏、不污染全局 error', async () => {
+    const serverId = mockDetailServers({ tail: { wrongKey: [] }, text: { wrongKey: [] } });
+    render(<KernelPanel />);
+    expect(await screen.findByText(serverId)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(`查看 ${serverId} 日志`));
+    expect(await screen.findByText(/KernelReadLogsResponse/)).toBeTruthy();
+    // 整屏未崩：服务端行仍在；全局 role=alert 未被污染
+    expect(screen.getByText(serverId)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(screen.getByLabelText(`查看 ${serverId} 配置`));
+    expect(await screen.findByText(/KernelReadConfigResponse/)).toBeTruthy();
+    expect(screen.getByText(serverId)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
