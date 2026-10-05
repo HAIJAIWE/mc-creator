@@ -4,6 +4,7 @@ import { registerIpcHandlers, createDefaultOrchestrator } from './ipc.js';
 import { getProcessSupervisor } from './ipc/process-supervisor.js';
 import { runStartupRecovery, formatRecoveryReport } from './startup-recovery.js';
 import { getKernelRuntime, initKernelRuntime, resolveKernelRoot } from './kernel-runtime.js';
+import { createTaskPoller, type TaskPoller } from './server-task-poller.js';
 import { createNativeConfirm } from './kernel-confirm.js';
 import { ensureSingleInstance } from './single-instance.js';
 
@@ -184,12 +185,29 @@ function initKernels(): void {
   console.log(`[§10 内核] 已装配 java / server / bedrock，dataDir=${dataDir}`);
 }
 
+/**
+ * §7.4 定时任务轮询器单例（R2c，外壳侧）。
+ * 增值后台任务：启动/运行失败绝不拦住应用启动与退出（见 whenReady / before-quit）。
+ */
+let taskPoller: TaskPoller | null = null;
+
 app.whenReady().then(() => {
   // §4.1 第二道闸：quit 分支已调 app.quit()，这里直接返回，绝不初始化内核。
   if (instanceRole !== 'primary') return;
   initKernels();
   runStartupRecoveryScan();
   registerIpcHandlers(createDefaultOrchestrator);
+  // §7.4 定时轮询器（R2c）：registerIpcHandlers 之后启动（runtime 已就绪）。
+  // try/catch 包裹：轮询器是增值功能，启动失败只 warn，绝不拦住应用启动。
+  try {
+    taskPoller = createTaskPoller({
+      getRuntime: getKernelRuntime,
+      supervisor: getProcessSupervisor(),
+    });
+    taskPoller.start();
+  } catch (e) {
+    console.warn('[定时任务] 轮询器启动失败（不影响主流程）：', e);
+  }
   Menu.setApplicationMenu(createChineseMenu());
   createWindow();
   app.on('activate', () => {
@@ -218,6 +236,13 @@ app.on('before-quit', (event) => {
   if (supervisorShutdownDone) return;
   event.preventDefault();
   supervisorShutdownDone = true;
+  // R2c：先停轮询再走既有收尾，避免退出过程中又打出一轮 run_due_tasks。
+  try {
+    taskPoller?.stop();
+  } catch {
+    // 停轮询失败不拦退出。
+  }
+  taskPoller = null;
   void getProcessSupervisor()
     .shutdownAll()
     .catch(() => undefined)
