@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, shell } from 'electron';
 import { join } from 'path';
 import { registerIpcHandlers, createDefaultOrchestrator } from './ipc.js';
 import { getProcessSupervisor } from './ipc/process-supervisor.js';
+import { runStartupRecovery, formatRecoveryReport } from './startup-recovery.js';
 
 // 受限环境（无 GPU / 沙箱代理）下禁用 GPU，避免 Chromium GPU 进程崩溃。
 // 代价：WebGL 不可用，skinview3d 等 3D 预览会加载失败（实测 SwiftShader
@@ -108,7 +109,43 @@ function createChineseMenu(): Menu {
   ]);
 }
 
+/**
+ * §14 半成品检测：启动时扫描并清理未完成实例 + 残留中间文件。
+ *
+ * 放在 IPC 注册之前：让渲染进程第一次 list_projects / 触发任何内核调用时，
+ * 磁盘已经是干净的，不需要每个读路径各自防御一遍。
+ *
+ * kernelRoot 传 undefined —— 注意这不是「忘了传一个参数」，而是**内核层尚未接入
+ * desktop**（设计文档 §18 阶段 10「产品体验层」尚未开始）：
+ *   - apps/desktop/package.json 只依赖 core / shared / shell / ui，
+ *     不依赖 kernel-java / kernel-server / kernel-bedrock / agent；
+ *   - 内核唯一的生产构造点是 packages/agent 的 createMcpServer，
+ *     而它当前只被测试调用，没有生产宿主；
+ *   - 因此 desktop 进程内不存在任何「内核数据根目录」概念可传。
+ *
+ * 所以现在生效的只有 userData/projects 的 *.tmp 残留清理。实例级扫描逻辑
+ * （有目录无 instance.json → 改名隔离）已在 startup-recovery.ts 落地并测透，
+ * 阶段 10 把内核接进 desktop 时，把 kernelRoot 指向内核 dataDir 即可，
+ * 无需改动本函数与 scanInstanceRoot。
+ */
+function runStartupRecoveryScan(): void {
+  try {
+    const report = runStartupRecovery({
+      userDataDir: app.getPath('userData'),
+      kernelRoot: undefined,
+      apply: true,
+    });
+    const line = formatRecoveryReport(report);
+    if (line !== null) console.log(line);
+    for (const err of report.errors) console.warn('[§14 半成品检测]', err);
+  } catch (e) {
+    // 清理是尽力而为的维护动作，绝不能拦住应用启动
+    console.warn('[§14 半成品检测] 启动扫描异常：', e);
+  }
+}
+
 app.whenReady().then(() => {
+  runStartupRecoveryScan();
   registerIpcHandlers(createDefaultOrchestrator);
   Menu.setApplicationMenu(createChineseMenu());
   createWindow();
