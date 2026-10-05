@@ -12,6 +12,7 @@ import {
   type McVersion,
 } from '@mc-creator/shared';
 import type { ModSpecLike } from './mod-common.js';
+import { parchmentModDevGradleBlock } from './parchment.js';
 
 /** TOML 字符串转义（mods.toml 用） */
 export function tomlEscape(s: string): string {
@@ -59,9 +60,13 @@ export function neoforgeBuildGradle(
   const javaVersion = javaVersionFor('neoforge', mcVersion as McVersion);
   // ModDevGradle DSL 分支：1.0.x（1.20.x / 1.21.1）用 moddev { } 包装，2.0（1.21.5+/26.x）用顶层 neoForge { }
   const isLegacyMdg = mcVersion.startsWith('1.20.') || mcVersion === '1.21.1';
+  // Parchment（§8.4）：仅当 PARCHMENT_VERSIONS 有该 MC 版本条目时拼接；
+  // 缺条目（外部版本号待核实，宁缺毋错）时 parchmentPart 为空字符串，输出与原来逐字一致。
+  const parchment = parchmentModDevGradleBlock(mcVersion);
+  const parchmentPart = parchment === null ? '' : `${parchment}\n`;
   const neoForgeBlock = `neoForge {
     version = "${versions.neoforgeVersion}"
-    runs {
+${parchmentPart}    runs {
         client { client() }
         server { server() }
     }

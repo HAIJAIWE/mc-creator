@@ -13,6 +13,7 @@ import {
 } from '@mc-creator/shared';
 import type { ModSpecLike } from './mod-common.js';
 import { tomlEscape } from './neoforge-gradle.js';
+import { parchmentForgeBlock } from './parchment.js';
 
 export function forgeModsToml(
   spec: ModSpecLike,
@@ -53,6 +54,10 @@ export function forgeBuildGradle(
   versions: LoaderVersionConfig,
 ): FileNode {
   const javaVersion = javaVersionFor('forge', mcVersion as McVersion);
+  // Parchment（§8.4）：仅当 PARCHMENT_VERSIONS 有该 MC 版本条目时拼接；
+  // 缺条目（外部版本号待核实，宁缺毋错）时 parchmentPart 为空字符串，输出与原来逐字一致。
+  const parchment = parchmentForgeBlock(mcVersion);
+  const parchmentPart = parchment === null ? '' : `${parchment}\n`;
   const content = `plugins {
     id 'java'
     id 'net.minecraftforge.gradle' version '${versions.forgeGradleVersion}'
@@ -69,7 +74,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(${javaVersion})
 
 minecraft {
     mappings channel: 'official', version: '1.20.1'
-    runs {
+${parchmentPart}    runs {
         client {}
         server {}
     }
