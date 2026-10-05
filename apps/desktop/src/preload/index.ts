@@ -92,9 +92,16 @@ import {
   PROCESS_STATE_EVENT,
   KERNEL_LIST_KINDS,
   KERNEL_READ,
+  KERNEL_EXECUTE,
+  KERNEL_CONFIRM_REQUEST,
+  KERNEL_CONFIRM_RESPONSE,
   type KernelListKindsRes,
   type KernelTaskResultT,
   type KernelReadReq,
+  type KernelExecuteReq,
+  type KernelExecuteRes,
+  type KernelConfirmReq,
+  type KernelConfirmRes,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -440,13 +447,28 @@ const api = {
   },
 
   // === 内核（外壳 ↔ 内核，§4.2 / §10）===
-  // 白名单里**只有只读（R 类）通道**：列 kind 的自描述表 + 一个 kind 受 zod enum
-  // 约束的读通道。刻意不暴露 KERNEL_EXECUTE（W/X 类写实例 / 执行进程）：
-  // 它的确认弹窗与错误呈现在 UI 上还没验证过，闸门接线留待后续阶段补齐。
-  // 这里给渲染层的是 `window.mcApi.kernel.*`，仍然只有 invoke，没有任何 fs/进程能力。
+  // 白名单含只读（R 类）通道 + 执行（W/X 类）通道 + UI 确认两通道。
+  // KERNEL_EXECUTE 曾刻意不暴露（确认弹窗与错误呈现在 UI 上没验证过）；
+  // 现按用户决策开放（W/X 可点），安全由三道缓解兜底，缺一不可：
+  //  1. 超时拒绝：主进程侧计时（默认 60s），无应答一律拒绝（fail-closed）；
+  //  2. id 关联：并发请求按 id 归位，对不上 id 的应答静默丢弃；
+  //  3. 审计：每次确认请求都记 confirmLog（主进程内存，渲染层够不着）。
+  // 渲染层仍然只有 invoke/on，没有任何 fs/进程能力；执行入参仍先过 zod
+  // 白名单 kind 校验（KernelExecuteRequest.parse），非法 kind 到不了内核。
+  // 这里给渲染层的是 `window.mcApi.kernel.*` + 确认两通道。
   kernelListKinds: () => ipcRenderer.invoke(KERNEL_LIST_KINDS) as Promise<KernelListKindsRes>,
   kernelRead: (req: KernelReadReq) =>
     ipcRenderer.invoke(KERNEL_READ, req) as Promise<KernelTaskResultT>,
+  kernelExecute: (req: KernelExecuteReq) =>
+    ipcRenderer.invoke(KERNEL_EXECUTE, req) as Promise<KernelExecuteRes>,
+  // 确认请求是主进程 send 方向（渲染层只有应答权、没有发起权）；
+  // 应答走 invoke 回 KERNEL_CONFIRM_RESPONSE，由主进程侧 parse + id 关联。
+  onKernelConfirmRequest: (cb: (req: KernelConfirmReq) => void) => {
+    const wrapper = (_e: unknown, payload: KernelConfirmReq) => cb(payload);
+    ipcRenderer.on(KERNEL_CONFIRM_REQUEST, wrapper);
+    return () => ipcRenderer.removeListener(KERNEL_CONFIRM_REQUEST, wrapper);
+  },
+  respondKernelConfirm: (res: KernelConfirmRes) => ipcRenderer.invoke(KERNEL_CONFIRM_RESPONSE, res),
 
   // === 大文件流式传输 ===
 

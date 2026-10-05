@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, shell } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, shell } from 'electron';
 import { join } from 'path';
 import { registerIpcHandlers, createDefaultOrchestrator } from './ipc.js';
 import { getProcessSupervisor } from './ipc/process-supervisor.js';
@@ -6,6 +6,8 @@ import { runStartupRecovery, formatRecoveryReport } from './startup-recovery.js'
 import { getKernelRuntime, initKernelRuntime, resolveKernelRoot } from './kernel-runtime.js';
 import { createTaskPoller, type TaskPoller } from './server-task-poller.js';
 import { createNativeConfirm } from './kernel-confirm.js';
+import { createUiConfirm } from './kernel-confirm-ui.js';
+import { KERNEL_CONFIRM_RESPONSE, KernelConfirmResponse } from '../shared/ipc-channels.js';
 import { ensureSingleInstance } from './single-instance.js';
 
 // 受限环境（无 GPU / 沙箱代理）下禁用 GPU，避免 Chromium GPU 进程崩溃。
@@ -197,6 +199,17 @@ app.whenReady().then(() => {
   initKernels();
   runStartupRecoveryScan();
   registerIpcHandlers(createDefaultOrchestrator);
+  // X2a UI 确认接线（§10.6）：W/X 执行走渲染层确认框，降级链 "UI → 原生 dialog"。
+  // getWindow 闭包在确认请求到达时才取值，故放在 createWindow 之前装配无妨；
+  // setConfirm 需运行时已存在，故放在 initKernels 之后。
+  const uiConfirm = createUiConfirm({
+    getWindow: () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null,
+    fallback: createNativeConfirm(),
+  });
+  ipcMain.handle(KERNEL_CONFIRM_RESPONSE, (_e, raw: unknown): void => {
+    uiConfirm.handleResponse(KernelConfirmResponse.parse(raw));
+  });
+  getKernelRuntime()?.setConfirm(uiConfirm);
   // §7.4 定时轮询器（R2c）：registerIpcHandlers 之后启动（runtime 已就绪）。
   // try/catch 包裹：轮询器是增值功能，启动失败只 warn，绝不拦住应用启动。
   try {

@@ -37,6 +37,8 @@ import {
   KERNEL_LIST_KINDS,
   KERNEL_READ,
   KERNEL_EXECUTE,
+  KERNEL_CONFIRM_RESPONSE,
+  KernelConfirmResponse,
   KernelReadRequest,
   KernelExecuteRequest,
   KernelEmptyRequest,
@@ -70,6 +72,7 @@ import {
   riskOf,
   type KernelRuntime,
 } from '../kernel-runtime.js';
+import type { UiConfirmHandle } from '../kernel-confirm-ui.js';
 
 /** 内核未初始化（渲染层抢在 whenReady 之前 invoke）时的统一返回。 */
 function notReady<T>(): KernelResult<T> {
@@ -156,8 +159,12 @@ function listServersFrom(root: string): KernelListServersRes {
  *
  * @param runtime 注入的内核宿主；不传则每请求现取单例（生产路径）。
  *                测试注入一个用临时目录构造的实例，避免污染真实 userData。
+ * @param uiConfirm UI 确认源（X2a）；传了才注册 `kernel:confirm-response` 应答
+ *                通道。不传时不注册：悬空的应答通道没有任何 pending 可归位，
+ *                注册了也只会静默丢弃，不如不暴露（fail-closed；既有调用的
+ *                三通道断言保持不变）。
  */
-export function registerKernelHandlers(runtime?: KernelRuntime): void {
+export function registerKernelHandlers(runtime?: KernelRuntime, uiConfirm?: UiConfirmHandle): void {
   const pick = (): KernelRuntime | null => runtime ?? getKernelRuntime();
 
   // --- 自描述表：kind → 内核 / 权限 / 风险 / 是否渲染层可达（只读）---
@@ -311,6 +318,17 @@ export function registerKernelHandlers(runtime?: KernelRuntime): void {
       confirmRequested: rt.confirmLog().length > before,
     };
   });
+
+  // --- 确认应答（renderer→main，X2a）---
+  // 仅当调用方传入 uiConfirm 时注册（生产由 main/index.ts 传入，测试可注入 fake）。
+  // 非法形状 / 非 uuid 的 id 在这里 parse 即抛（invoke 侧可见拒绝），根本到不了
+  // id 关联；过了 parse 再进 handleResponse 的 id 关联（错配 / 迟到静默丢弃，
+  // 靠超时兜底为 false）。
+  if (uiConfirm !== undefined) {
+    ipcMain.handle(KERNEL_CONFIRM_RESPONSE, (_e, raw: unknown): void => {
+      uiConfirm.handleResponse(KernelConfirmResponse.parse(raw));
+    });
+  }
 }
 
 function unimplementedKind(kind: string): KernelTaskResultT {
