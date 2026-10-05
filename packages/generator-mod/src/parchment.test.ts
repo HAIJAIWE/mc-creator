@@ -40,6 +40,27 @@ const VERIFIED_FIXTURES: Record<string, ParchmentMapping> = {
   '1.21.1': { minecraftVersion: '1.21.1', mappingsVersion: '2024.11.17' },
 };
 
+/**
+ * 在回调期间临时清空整张表，结束后原样恢复。
+ *
+ * 用途：表填满后，“无条目→逐字一致”这条规则仍需覆盖。用真实缺条目的版本
+ * （如 26.1）反而要新写一套期望模板（Java 大版本/loader 号全不同），
+ * 且模板正确性无人背书；清空表后沿用已验证的逐字模板，测的正是同一条规则。
+ */
+function withEmptyTable(fn: () => void): void {
+  const backup: Record<string, ParchmentMapping> = { ...PARCHMENT_VERSIONS };
+  for (const key of Object.keys(PARCHMENT_VERSIONS)) {
+    delete PARCHMENT_VERSIONS[key];
+  }
+  try {
+    fn();
+  } finally {
+    for (const [key, prev] of Object.entries(backup)) {
+      PARCHMENT_VERSIONS[key] = prev;
+    }
+  }
+}
+
 /** 在回调期间临时注入表条目，结束后原样恢复（有则还原、无则删除）。 */
 function withParchmentEntries(entries: Record<string, ParchmentMapping>, fn: () => void): void {
   const backup = new Map<string, ParchmentMapping | undefined>();
@@ -177,11 +198,12 @@ describe('有条目输出块（注入已核实版本号验证渲染与拼接位�
 });
 
 describe('无条目时输出与原来逐字一致', () => {
-  it('neoforge 新顶层分支（1.21.11，无条目）：逐字等于原模板且无 parchment 痕迹', () => {
-    expect(PARCHMENT_VERSIONS['1.21.11'] ?? null).toBeNull();
-    const versions = getLoaderVersions('1.21.11');
-    const bg = neoforgeBuildGradle(SPEC, '1.21.11', versions).content;
-    const expected = `plugins {
+  it('neoforge 新顶层分支（表清空模拟无条目）：逐字等于原模板且无 parchment 痕迹', () => {
+    withEmptyTable(() => {
+      expect(PARCHMENT_VERSIONS['1.21.11'] ?? null).toBeNull();
+      const versions = getLoaderVersions('1.21.11');
+      const bg = neoforgeBuildGradle(SPEC, '1.21.11', versions).content;
+      const expected = `plugins {
     id 'net.neoforged.moddev' version '${versions.neoforgeModdevVersion}'
 }
 
@@ -209,15 +231,17 @@ repositories {
     mavenCentral()
 }
 `;
-    expect(bg).toBe(expected);
-    expect(bg.toLowerCase()).not.toContain('parchment');
+      expect(bg).toBe(expected);
+      expect(bg.toLowerCase()).not.toContain('parchment');
+    });
   });
 
-  it('neoforge legacy 分支（1.20.4，无条目）：逐字等于原模板且无 parchment 痕迹', () => {
-    expect(PARCHMENT_VERSIONS['1.20.4'] ?? null).toBeNull();
-    const versions = getLoaderVersions('1.20.4');
-    const bg = neoforgeBuildGradle(SPEC, '1.20.4', versions).content;
-    const expected = `plugins {
+  it('neoforge legacy 分支（表清空模拟无条目）：逐字等于原模板且无 parchment 痕迹', () => {
+    withEmptyTable(() => {
+      expect(PARCHMENT_VERSIONS['1.20.4'] ?? null).toBeNull();
+      const versions = getLoaderVersions('1.20.4');
+      const bg = neoforgeBuildGradle(SPEC, '1.20.4', versions).content;
+      const expected = `plugins {
     id 'net.neoforged.moddev' version '${versions.neoforgeModdevVersion}'
 }
 
@@ -247,15 +271,17 @@ repositories {
     mavenCentral()
 }
 `;
-    expect(bg).toBe(expected);
-    expect(bg.toLowerCase()).not.toContain('parchment');
+      expect(bg).toBe(expected);
+      expect(bg.toLowerCase()).not.toContain('parchment');
+    });
   });
 
-  it('forge（1.20.1，无条目）：逐字等于原模板且无 parchment 痕迹', () => {
-    expect(PARCHMENT_VERSIONS['1.20.1'] ?? null).toBeNull();
-    const versions = getLoaderVersions('1.20.1');
-    const bg = forgeBuildGradle(SPEC, '1.20.1', versions).content;
-    const expected = `plugins {
+  it('forge（表清空模拟无条目）：逐字等于原模板且无 parchment 痕迹', () => {
+    withEmptyTable(() => {
+      expect(PARCHMENT_VERSIONS['1.20.1'] ?? null).toBeNull();
+      const versions = getLoaderVersions('1.20.1');
+      const bg = forgeBuildGradle(SPEC, '1.20.1', versions).content;
+      const expected = `plugins {
     id 'java'
     id 'net.minecraftforge.gradle' version '${versions.forgeGradleVersion}'
 }
@@ -285,14 +311,24 @@ repositories {
     mavenCentral()
 }
 `;
-    expect(bg).toBe(expected);
-    expect(bg.toLowerCase()).not.toContain('parchment');
+      expect(bg).toBe(expected);
+      expect(bg.toLowerCase()).not.toContain('parchment');
+    });
   });
 
   it('注入条目在测试结束后完全恢复（不污染真实表）', () => {
     const before = { ...PARCHMENT_VERSIONS };
     withParchmentEntries(VERIFIED_FIXTURES, () => {
       expect(PARCHMENT_VERSIONS['1.20.1']).toBeDefined();
+    });
+    expect(PARCHMENT_VERSIONS).toEqual(before);
+  });
+
+  it('清空表在测试结束后完全恢复（6 个已核实条目不丢失）', () => {
+    const before = { ...PARCHMENT_VERSIONS };
+    expect(Object.keys(before).length).toBeGreaterThan(0);
+    withEmptyTable(() => {
+      expect(Object.keys(PARCHMENT_VERSIONS)).toHaveLength(0);
     });
     expect(PARCHMENT_VERSIONS).toEqual(before);
   });

@@ -121,7 +121,7 @@ describe('ModGenerator loader×version 矩阵：内容哈希快照', () => {
     },
     // neoforge 1.20.1
     'neoforge:1.20.1': {
-      'build.gradle': '6ef003cdb0e84273',
+      'build.gradle': 'b09dafb22e1f56b0',
       'gradle.properties': 'd99e6fc6e7438c2c',
       'gradle/wrapper/gradle-wrapper.properties': '1a6244405eccd5ba',
       'settings.gradle': '107f7965de0bd2f5',
@@ -135,7 +135,7 @@ describe('ModGenerator loader×version 矩阵：内容哈希快照', () => {
     },
     // neoforge 1.21.1
     'neoforge:1.21.1': {
-      'build.gradle': 'b63a836619b74df8',
+      'build.gradle': '16f3fe03da6da246',
       'gradle.properties': '2f8d3cc70b76be67',
       'gradle/wrapper/gradle-wrapper.properties': 'c1af85a70af0c431',
       'settings.gradle': '107f7965de0bd2f5',
