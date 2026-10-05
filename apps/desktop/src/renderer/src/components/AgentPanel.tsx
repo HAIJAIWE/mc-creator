@@ -87,6 +87,12 @@ export function AgentPanel() {
   const [originalSpec, setOriginalSpec] = useState('');
   const [specError, setSpecError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  // L2 AI 规格闭环：运行中禁用态 + transcript 折叠展示（旧 generateSpec/generateFiles 流程不动）
+  const [loopRunning, setLoopRunning] = useState(false);
+  const [loopTranscript, setLoopTranscript] = useState<{ stage: string; text: string }[] | null>(
+    null,
+  );
+  const [loopAttempts, setLoopAttempts] = useState<number | null>(null);
 
   const [showTemplates, setShowTemplates] = useState(false);
   const [showModrinthSearch, setShowModrinthSearch] = useState(false);
@@ -169,6 +175,40 @@ export function AgentPanel() {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * L2 AI 规格闭环：prompt 复用 description 输入，经真模型多轮校验修复，
+   * 合法 spec 经 setSpec 落入编辑器，transcript 折叠展示。
+   */
+  const runClosedLoopSpec = async () => {
+    if (loopRunning) return;
+    setLoopRunning(true);
+    setError(null);
+    try {
+      const res = await ipcClient.agentRunLoop({
+        prompt: description,
+        kind: generatorType,
+        mcVersion,
+        maxAttempts: 3,
+      });
+      if (res.ok && res.spec) {
+        const text = JSON.stringify(res.spec, null, 2);
+        setSpec(res.spec as unknown as ModSpec);
+        setEditorText(text);
+        setOriginalSpec(text);
+        setSpecError(null);
+        setWarnings([]);
+        setLoopTranscript(res.transcript ?? []);
+        setLoopAttempts(res.attempts ?? null);
+      } else {
+        setError(res.error ?? 'AI 闭环生成失败');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoopRunning(false);
     }
   };
 
@@ -358,6 +398,15 @@ export function AgentPanel() {
                   生成代码
                 </button>
                 <button
+                  onClick={runClosedLoopSpec}
+                  disabled={loading || loopRunning || !description}
+                  className="mc-btn-primary"
+                  title="经真模型多轮校验修复生成合法 Spec（当前仅支持 datapack）"
+                >
+                  {(loading || loopRunning) && <Loader2 className="h-3 w-3 animate-spin" />}
+                  AI 闭环生成
+                </button>
+                <button
                   onClick={() => setShowTemplates(true)}
                   disabled={loading}
                   className="mc-btn-ghost !px-2.5"
@@ -444,6 +493,22 @@ export function AgentPanel() {
               {error && <ErrorBanner message={error} onClose={() => setError(null)} />}
               {warnings.length > 0 && (
                 <WarningBanner warnings={warnings} onClose={() => setWarnings([])} />
+              )}
+              {loopTranscript !== null && loopTranscript.length > 0 && (
+                <details className="rounded-mc border border-mc-border bg-mc-surface-2 px-2 py-1.5 text-xs">
+                  <summary className="cursor-pointer text-mc-dim">
+                    闭环过程（{loopTranscript.length} 轮对话
+                    {loopAttempts !== null ? `，失败 ${loopAttempts} 次` : ''}）
+                  </summary>
+                  {loopTranscript.map((t, i) => (
+                    <pre
+                      key={i}
+                      className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap text-mc-text"
+                    >
+                      [{t.stage}] {t.text.slice(0, 2000)}
+                    </pre>
+                  ))}
+                </details>
               )}
             </div>
           )}

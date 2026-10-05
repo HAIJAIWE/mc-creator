@@ -25,6 +25,7 @@ import react from '@vitejs/plugin-react-swc';
  * zod schema），内核实现只出现在 main 侧。
  */
 const workspacePkgs = [
+  '@mc-creator/agent',
   '@mc-creator/contract',
   '@mc-creator/core',
   '@mc-creator/kernel-bedrock',
@@ -52,6 +53,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: workspacePkgs })],
     resolve: {
       alias: {
+        '@mc-creator/agent': resolve(__dirname, '../../packages/agent/src'),
         '@mc-creator/contract': resolve(__dirname, '../../packages/contract/src'),
         '@mc-creator/core': resolve(__dirname, '../../packages/core/src'),
         '@mc-creator/kernel-bedrock': resolve(__dirname, '../../packages/kernel-bedrock/src'),

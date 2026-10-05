@@ -43,6 +43,7 @@ import type {
   KernelExecuteRes,
   KernelTaskResultT,
 } from '../../../shared/ipc-channels.js';
+import type { AgentRunLoopRes } from '../../../shared/ipc/agent-loop.js';
 
 /**
  * 预览模式下的简单规则式 Spec 生成：根据描述关键词 + 生成器类型返回模板 spec。
@@ -717,6 +718,17 @@ export const ipcClient = {
 
   /** 内核 kind 自描述表（kind → 内核 / R·W·X 分级 / 风险 / 是否对 UI 可达）。 */
   kernelListKinds: (): Promise<KernelListKindsRes> => window.mcApi.kernelListKinds(),
+
+  /**
+   * AI 规格闭环（L2：prompt→真模型→spec JSON→校验→修复→合法 spec）。
+   * prompt 复用 AgentPanel description 输入；合法 spec 由调用方经 setSpec 落入编辑器。
+   */
+  agentRunLoop: (req: {
+    prompt: string;
+    kind?: string;
+    mcVersion?: string;
+    maxAttempts?: number;
+  }): Promise<AgentRunLoopRes> => window.mcApi.agentRunLoop(req),
 
   /** 调一个只读内核 kind；kind 不在白名单时主进程会直接拒（ZodError）。 */
   kernelRead: (req: KernelReadReq): Promise<KernelTaskResultT> => window.mcApi.kernelRead(req),

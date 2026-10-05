@@ -71,6 +71,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@mc-creator/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
       '@mc-creator/contract':
         specifier: workspace:*
         version: link:../../packages/contract

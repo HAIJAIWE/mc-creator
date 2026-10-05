@@ -303,3 +303,45 @@ describe('AgentPanel', () => {
     expect(screen.queryByTitle('搜索 CurseForge')).toBeNull();
   });
 });
+
+describe('AgentPanel AI 闭环生成（L2，只加新用例）', () => {
+  it('点击「AI 闭环生成」调用 agentRunLoop，合法 spec 经 setSpec 落入 store 并展示闭环过程', async () => {
+    const spec = { packId: 'test_pack', packName: 'Test', packFormat: 48 };
+    mockMcApi.agentRunLoop = vi.fn().mockResolvedValue({
+      ok: true,
+      spec,
+      transcript: [{ stage: 'generate', text: JSON.stringify(spec) }],
+      attempts: 0,
+    });
+    useModStore.setState({ generatorType: 'datapack', description: '一个会说话的村民' });
+    render(<AgentPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /AI 闭环生成/ }));
+    await act(async () => {});
+    expect(mockMcApi.agentRunLoop).toHaveBeenCalledWith({
+      prompt: '一个会说话的村民',
+      kind: 'datapack',
+      mcVersion: '1.21.11',
+      maxAttempts: 3,
+    });
+    expect(useModStore.getState().spec).toMatchObject({ packId: 'test_pack' });
+    expect(screen.getByText(/闭环过程/)).toBeTruthy();
+  });
+
+  it('闭环失败时展示主进程返回的错误', async () => {
+    mockMcApi.agentRunLoop = vi
+      .fn()
+      .mockResolvedValue({ ok: false, error: 'Datapack 校验失败：xxx' });
+    useModStore.setState({ generatorType: 'datapack', description: '做错的东西' });
+    render(<AgentPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /AI 闭环生成/ }));
+    await act(async () => {});
+    expect(screen.getByText('Datapack 校验失败：xxx')).toBeTruthy();
+  });
+
+  it('描述为空时「AI 闭环生成」按钮被禁用', () => {
+    useModStore.setState({ generatorType: 'datapack', description: '' });
+    render(<AgentPanel />);
+    const btn = screen.getByRole('button', { name: /AI 闭环生成/ }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+});

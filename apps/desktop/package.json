@@ -23,6 +23,7 @@
     "test:e2e:install": "playwright install"
   },
   "dependencies": {
+    "@mc-creator/agent": "workspace:*",
     "@mc-creator/contract": "workspace:*",
     "@mc-creator/core": "workspace:*",
     "@mc-creator/kernel-bedrock": "workspace:*",

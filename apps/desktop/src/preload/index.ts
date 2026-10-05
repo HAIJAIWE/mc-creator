@@ -103,6 +103,7 @@ import {
   type KernelConfirmReq,
   type KernelConfirmRes,
 } from '../shared/ipc-channels.js';
+import { AGENT_RUN_LOOP } from '../shared/ipc/agent-loop.js';
 
 /**
  * 流式请求的并发隔离 id（见 shared/ipc/stream.ts）。
@@ -457,6 +458,13 @@ const api = {
   // 白名单 kind 校验（KernelExecuteRequest.parse），非法 kind 到不了内核。
   // 这里给渲染层的是 `window.mcApi.kernel.*` + 确认两通道。
   kernelListKinds: () => ipcRenderer.invoke(KERNEL_LIST_KINDS) as Promise<KernelListKindsRes>,
+  /** AI 规格闭环（L2：prompt→真模型→spec JSON→校验→修复→合法 spec）。 */
+  agentRunLoop: (req: {
+    prompt: string;
+    kind?: string;
+    mcVersion?: string;
+    maxAttempts?: number;
+  }) => ipcRenderer.invoke(AGENT_RUN_LOOP, req),
   kernelRead: (req: KernelReadReq) =>
     ipcRenderer.invoke(KERNEL_READ, req) as Promise<KernelTaskResultT>,
   kernelExecute: (req: KernelExecuteReq) =>
