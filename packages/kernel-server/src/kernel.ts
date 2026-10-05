@@ -37,9 +37,21 @@
  *   sandbox 模式产物留在 sandboxDir，**永不自动部署进正式服务端**；
  * - deploy_plugin 的热重载只返回建议命令，不自动发控制台命令。
  * - 未知 kind：ok:false + unknown 分类（保留 stub 语义）。
+ *
+ * §7.4 定时任务预授权语义（backlog R1 内核侧，runner 轮询是 R2 的事）：
+ * - schedule_task 过确认闸门一次（W 级，risk=write）；run_due_tasks 只执行
+ *   账本里冻结的 action/payload，不接受新输入；
+ * - 范围限 backup/restart/stop/broadcast 四种；backup 是文件动作（内核直接做，
+ *   与 backup_server 同一套快照实现），restart/stop/broadcast 只返回待办指令
+ *   给外壳执行（controlServer 惯例：真实 SIGTERM/RCON 由外壳执行；broadcast
+ *   不经过内核发送，返回 {action:'broadcast',message} 待办由外壳 sendCommand
+ *   执行，与 RCON/控制台注入职责划分一致）；
+ * - run_due_tasks 定为 R（读+账本状态推进，无用户可见副作用：不写业务文件、
+ *   不启进程——到期触发的 backup 文件动作与控制指令均属已预授权的一次确认
+ *   范围内，不需二次弹窗）。
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   cpSync,
   existsSync,
@@ -229,6 +241,13 @@ const BACKUP_WRITE_KINDS = new Set([
   'restore_backup',
   'prune_backups',
 ]);
+
+/**
+ * §7.4 定时任务 W 类路由（MCP_TOOL_PERMISSIONS 尚无 schedule/cancel 分级，
+ * 与 BACKUP_WRITE_KINDS 同理按 W 级直走确认闸门；R 类 list_tasks/run_due_tasks
+ * 走 dispatch 只读分支，不进确认闸门）。
+ */
+const TASK_WRITE_KINDS = new Set(['schedule_task', 'cancel_task']);
 
 /** 递归列出目录下所有文件（相对路径，'/' 分隔，已排序）。读失败的条目直接跳过。 */
 function listFilesRecursive(dir: string, prefix: string): string[] {
@@ -492,6 +511,23 @@ const STEP_DEFS: Record<string, { stage: string; message: string }[]> = {
     { stage: 'validating', message: '校验服务端与保留数' },
     { stage: 'pruning', message: '按 keepN 裁剪旧快照' },
   ],
+  schedule_task: [
+    { stage: 'validating', message: '校验服务端与定时参数' },
+    { stage: 'scheduling', message: '写入定时账本' },
+    { stage: 'complete', message: '定时任务已调度' },
+  ],
+  cancel_task: [
+    { stage: 'validating', message: '校验任务存在性' },
+    { stage: 'cancelling', message: '从账本移除定时任务' },
+  ],
+  list_tasks: [
+    { stage: 'validating', message: '校验过滤参数' },
+    { stage: 'listing', message: '读取定时账本' },
+  ],
+  run_due_tasks: [
+    { stage: 'validating', message: '校验时间参数' },
+    { stage: 'running', message: '执行到期定时任务' },
+  ],
 };
 
 function confirmSummary(kind: string, payload: unknown): string {
@@ -520,6 +556,16 @@ function confirmSummary(kind: string, payload: unknown): string {
       return `把快照恢复到服务端「${id}」（覆盖世界与配置，建议随后重启）`;
     case 'prune_backups':
       return `裁剪服务端「${id}」的旧快照（只保留最近 N 个）`;
+    case 'schedule_task':
+      return `为服务端「${id}」调度定时任务（backup/restart/stop/broadcast，预授权一次）`;
+    case 'cancel_task': {
+      const tid = optString(p, 'taskId') ?? '未知任务';
+      return `取消定时任务「${tid}」（从账本移除，不再触发）`;
+    }
+    case 'list_tasks':
+      return `列出定时任务账本${id === '未命名' ? '' : `（服务端「${id}」过滤）`}（只读账本）`;
+    case 'run_due_tasks':
+      return `执行到期的定时任务（只执行账本冻结动作，不接受新输入）`;
     default:
       return `执行 ${kind}（写入或改动用户目标）`;
   }
@@ -1509,6 +1555,283 @@ export class ServerKernel implements KernelContract {
     return { ok: true, data: { serverId, keepN, kept: ids, pruned } };
   }
 
+  /* -------------------- §7.4 定时任务账本（backlog R1 内核侧） -------------------- */
+  /* 账本 <root>/server-tasks/tasks.json（原子写 tmp+rename，经 writeFileAtomic）；
+   * sandbox 下 root 即 sandboxDir（与快照同根，§13.4）。
+   * 预授权语义见文件头：schedule_task 过闸门一次，run_due_tasks 只执行冻结动作。 */
+
+  /** 定时动作范围（§7.4 到期执行：backup 文件动作内核做，其余返回待办外壳做）。 */
+  private tasksPath(root: string): string {
+    return this.guard(root, join('server-tasks', 'tasks.json'));
+  }
+
+  private loadScheduledTasks(root: string): {
+    taskId: string;
+    serverId: string;
+    action: 'backup' | 'restart' | 'stop' | 'broadcast';
+    message?: string;
+    nextRun: string;
+    intervalMs?: number;
+    status: 'pending' | 'done';
+    createdAt: string;
+  }[] {
+    const file = this.tasksPath(root);
+    if (!existsSync(file)) return [];
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(file, 'utf8')) as unknown;
+    } catch (e) {
+      verr(`定时账本解析失败: ${(e as Error).message}`, 'TASKS_INVALID');
+    }
+    const arr = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray((parsed as { tasks?: unknown }).tasks)
+        ? (parsed as { tasks: unknown[] }).tasks
+        : undefined;
+    if (arr === undefined) verr('定时账本缺 tasks 列表', 'TASKS_INVALID');
+    return arr as {
+      taskId: string;
+      serverId: string;
+      action: 'backup' | 'restart' | 'stop' | 'broadcast';
+      message?: string;
+      nextRun: string;
+      intervalMs?: number;
+      status: 'pending' | 'done';
+      createdAt: string;
+    }[];
+  }
+
+  private async saveScheduledTasks(
+    root: string,
+    tasks: {
+      taskId: string;
+      serverId: string;
+      action: 'backup' | 'restart' | 'stop' | 'broadcast';
+      message?: string;
+      nextRun: string;
+      intervalMs?: number;
+      status: 'pending' | 'done';
+      createdAt: string;
+    }[],
+  ): Promise<void> {
+    await writeFileAtomic(this.tasksPath(root), `${JSON.stringify({ tasks }, null, 2)}\n`);
+  }
+
+  private async scheduleTask(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const p = asRecord(payload);
+    const serverId = serverIdOf(payload);
+    if (serverId === undefined) verr('缺少合法 serverId（payload.serverId）');
+    const action = optString(p, 'action');
+    if (
+      action !== 'backup' &&
+      action !== 'restart' &&
+      action !== 'stop' &&
+      action !== 'broadcast'
+    ) {
+      verr(`payload.action 非法（需 backup/restart/stop/broadcast）: ${String(p['action'])}`);
+    }
+    const message = optString(p, 'message');
+    if (action === 'broadcast' && message === undefined) {
+      verr('broadcast 需 payload.message（广播内容必填）');
+    }
+    let runAt: string | undefined;
+    if (p['runAt'] !== undefined) {
+      const v = p['runAt'];
+      if (typeof v !== 'string' || v.trim() === '' || Number.isNaN(Date.parse(v.trim()))) {
+        verr(`payload.runAt 非法时间: ${String(v)}`);
+      }
+      runAt = new Date(Date.parse((v as string).trim())).toISOString();
+    }
+    let intervalMs: number | undefined;
+    if (p['intervalMs'] !== undefined) {
+      const v = p['intervalMs'];
+      if (typeof v !== 'number' || !Number.isInteger(v) || v <= 0) {
+        verr(`payload.intervalMs 非法（需>0 整数毫秒）: ${String(v)}`);
+      }
+      intervalMs = v as number;
+    }
+    if (runAt === undefined && intervalMs === undefined) {
+      verr('payload.runAt 与 payload.intervalMs 二选一必填（一次性或周期二选一）');
+    }
+    step(0);
+    const dir = this.serverDir(root, serverId);
+    if (!existsSync(dir)) verr(`服务端不存在: ${serverId}（${dir}）`, 'SERVER_NOT_FOUND');
+    step(1);
+    const tasks = this.loadScheduledTasks(root);
+    const taskId = `task-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
+    const nextRun =
+      runAt !== undefined ? runAt : new Date(Date.now() + (intervalMs as number)).toISOString();
+    const createdAt = new Date().toISOString();
+    tasks.push({
+      taskId,
+      serverId,
+      action,
+      ...(message === undefined ? {} : { message }),
+      nextRun,
+      ...(intervalMs === undefined ? {} : { intervalMs }),
+      status: 'pending',
+      createdAt,
+    });
+    await this.saveScheduledTasks(root, tasks);
+    step(2);
+    return { ok: true, data: { taskId, nextRun } };
+  }
+
+  private async cancelTask(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const p = asRecord(payload);
+    const taskId = optString(p, 'taskId');
+    if (taskId === undefined) verr('缺少参数 payload.taskId（定时任务名）');
+    if (taskId.includes('..') || /[\\/]/.test(taskId)) {
+      verr(`taskId 非法（含路径穿越或分隔符）: ${taskId}`, 'PATH_TRAVERSAL');
+    }
+    step(0);
+    const tasks = this.loadScheduledTasks(root);
+    const idx = tasks.findIndex((t) => t.taskId === taskId);
+    if (idx === -1) verr(`任务不存在: ${taskId}`, 'TASK_NOT_FOUND');
+    step(1);
+    tasks.splice(idx, 1);
+    await this.saveScheduledTasks(root, tasks);
+    return { ok: true, data: { taskId, cancelled: true } };
+  }
+
+  private async listScheduledTasks(root: string, payload: unknown): Promise<TaskResult> {
+    const p = asRecord(payload);
+    const hasKey =
+      p['serverId'] !== undefined || p['server'] !== undefined || p['id'] !== undefined;
+    let filter: string | undefined;
+    if (hasKey) {
+      const parsed = serverIdOf(payload);
+      if (parsed === undefined) verr('缺少合法 serverId（payload.serverId）');
+      filter = parsed;
+    }
+    const all = this.loadScheduledTasks(root);
+    const tasks = filter === undefined ? all : all.filter((t) => t.serverId === filter);
+    return { ok: true, data: { tasks } };
+  }
+
+  private async runDueTasks(root: string, payload: unknown): Promise<TaskResult> {
+    const p = asRecord(payload);
+    let nowMs: number;
+    if (p['now'] === undefined) {
+      nowMs = Date.now();
+    } else {
+      const v = p['now'];
+      if (typeof v !== 'string' || v.trim() === '' || Number.isNaN(Date.parse(v.trim()))) {
+        verr(`payload.now 非法时间: ${String(v)}`);
+      }
+      nowMs = Date.parse((v as string).trim());
+    }
+    const nowIso = new Date(nowMs).toISOString();
+    const tasks = this.loadScheduledTasks(root);
+    const due = tasks
+      .filter(
+        (t) =>
+          t.status !== 'done' &&
+          typeof t.nextRun === 'string' &&
+          Number.isFinite(Date.parse(t.nextRun)) &&
+          Date.parse(t.nextRun) <= nowMs,
+      )
+      .sort((a, b) => Date.parse(a.nextRun) - Date.parse(b.nextRun));
+    if (due.length === 0) return { ok: true, data: { fired: [], now: nowIso } };
+    const noop = (): void => undefined;
+    const fired: Record<string, unknown>[] = [];
+    for (const t of due) {
+      try {
+        if (t.action === 'backup') {
+          // 到期执行中 backup 由内核直接做文件动作（与 backup_server 同实现）。
+          const res = await this.backupServer(root, { serverId: t.serverId }, noop);
+          if (res.ok)
+            fired.push({
+              taskId: t.taskId,
+              serverId: t.serverId,
+              action: t.action,
+              result: res.data,
+            });
+          else
+            fired.push({
+              taskId: t.taskId,
+              serverId: t.serverId,
+              action: t.action,
+              error: res.error,
+            });
+        } else if (t.action === 'restart' || t.action === 'stop') {
+          // restart/stop 只返回待办指令给外壳执行（controlServer 惯例，不启进程）。
+          const kind = t.action === 'restart' ? 'restart_server' : 'stop_server';
+          const res = await this.controlServer(root, { serverId: t.serverId }, kind, noop);
+          if (res.ok) {
+            const d = res.data as { controlCommand?: string };
+            fired.push({
+              taskId: t.taskId,
+              serverId: t.serverId,
+              action: t.action,
+              controlCommand: d?.controlCommand,
+            });
+          } else {
+            fired.push({
+              taskId: t.taskId,
+              serverId: t.serverId,
+              action: t.action,
+              error: res.error,
+            });
+          }
+        } else if (t.action === 'broadcast') {
+          // broadcast 不经过内核发送：返回待办由外壳 sendCommand 执行，
+          // 与 RCON/控制台注入职责划分一致（§7.1）。
+          fired.push({
+            taskId: t.taskId,
+            serverId: t.serverId,
+            action: t.action,
+            message: t.message ?? '',
+          });
+        } else {
+          fired.push({
+            taskId: t.taskId,
+            serverId: t.serverId,
+            action: String((t as { action?: unknown }).action),
+            error: {
+              category: 'validation',
+              message: `未知定时动作: ${String((t as { action?: unknown }).action)}`,
+              retryable: false,
+            },
+          });
+        }
+      } catch (e) {
+        // 单任务失败不中断整体；服务端不存在等沿用既有 code（SERVER_NOT_FOUND 等）。
+        if (e instanceof KernelTaskError) {
+          fired.push({
+            taskId: t.taskId,
+            serverId: t.serverId,
+            action: t.action,
+            error: e.classified,
+          });
+        } else if (isClassifiedError(e)) {
+          fired.push({ taskId: t.taskId, serverId: t.serverId, action: t.action, error: e });
+        } else {
+          fired.push({
+            taskId: t.taskId,
+            serverId: t.serverId,
+            action: t.action,
+            error: toDiskError(e),
+          });
+        }
+      }
+      // 账本推进：interval 任务 nextRun=now+intervalMs 写回，一次性标记 done 不再触发；
+      // 失败也推进，避免毒丸任务无限重发。
+      if (t.intervalMs !== undefined) t.nextRun = new Date(nowMs + t.intervalMs).toISOString();
+      else t.status = 'done';
+    }
+    await this.saveScheduledTasks(root, tasks);
+    return { ok: true, data: { fired, now: nowIso } };
+  }
+
   /** X 派发：确认闸门 + 真实现。 */
   private async executeWrite(
     taskId: string,
@@ -1570,6 +1893,10 @@ export class ServerKernel implements KernelContract {
           return await this.restoreBackup(root, payload, step);
         case 'prune_backups':
           return await this.pruneBackups(root, payload, step);
+        case 'schedule_task':
+          return await this.scheduleTask(root, payload, step);
+        case 'cancel_task':
+          return await this.cancelTask(root, payload, step);
         default:
           verr(`不支持的任务: ${kind}`, 'UNKNOWN_KIND');
       }
@@ -1624,6 +1951,10 @@ export class ServerKernel implements KernelContract {
           if (BACKUP_WRITE_KINDS.has(kind)) {
             return await kernel.executeWrite(id, kind, payload, bus);
           }
+          // §7.4 定时 W 类：schedule_task/cancel_task 同理按 W 级直走确认闸门。
+          if (TASK_WRITE_KINDS.has(kind)) {
+            return await kernel.executeWrite(id, kind, payload, bus);
+          }
           if (isWriteOrExecute) {
             return await kernel.executeWrite(id, kind, payload, bus);
           }
@@ -1669,6 +2000,16 @@ export class ServerKernel implements KernelContract {
                 return validation(`服务端不存在: ${serverId}（${dir}）`);
               }
               return { ok: true, data: kernel.readContextParts(root, serverId) };
+            }
+            case 'list_tasks': {
+              // R：只读账本，sandbox 下走 sandbox root（与快照同根）。
+              const root = kernel.writeRoot();
+              return await kernel.listScheduledTasks(root, payload);
+            }
+            case 'run_due_tasks': {
+              // R：读+账本状态推进；到期 backup 文件动作属已预授权范围，不需二次确认。
+              const root = kernel.writeRoot();
+              return await kernel.runDueTasks(root, payload);
             }
             default:
               return {

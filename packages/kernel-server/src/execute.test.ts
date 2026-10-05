@@ -1497,3 +1497,480 @@ describe('ServerKernel build_project JDK 自动下载 opt-in（§8.1#1）', () =
     }
   });
 });
+
+describe('ServerKernel §7.4 定时账本：确认闸门与参数拒绝', () => {
+  it('schedule_task/cancel_task 未传 confirm → permission，账本未创建', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'ts1');
+    const kernel = new ServerKernel({ dataDir });
+    const s = await kernel
+      .dispatch({
+        id: 'ts-g1',
+        kind: 'schedule_task',
+        payload: { serverId: 'ts1', action: 'backup', runAt: '2026-01-01T00:00:00.000Z' },
+      })
+      .result();
+    expect(s.error?.category).toBe('permission');
+    expect(s.data).toMatchObject({ confirmRequired: true });
+    const c = await kernel
+      .dispatch({ id: 'ts-g2', kind: 'cancel_task', payload: { taskId: 'task-x' } })
+      .result();
+    expect(c.error?.category).toBe('permission');
+    expect(existsSync(join(dataDir, 'server-tasks'))).toBe(false);
+  });
+
+  it('confirm 返回 false → 拒绝且不写账本', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'ts1b');
+    const result = await new ServerKernel({ dataDir, confirm: NO })
+      .dispatch({
+        id: 'ts-g3',
+        kind: 'schedule_task',
+        payload: { serverId: 'ts1b', action: 'stop', runAt: '2026-01-01T00:00:00.000Z' },
+      })
+      .result();
+    expect(result.error?.category).toBe('permission');
+    expect(existsSync(join(dataDir, 'server-tasks'))).toBe(false);
+  });
+
+  it('list_tasks/run_due_tasks 不触发 confirm（R 级）', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'tsr');
+    let called = 0;
+    const kernel = new ServerKernel({
+      dataDir,
+      confirm: () => {
+        called++;
+        return true;
+      },
+    });
+    const list = await kernel.dispatch({ id: 'ts-r1', kind: 'list_tasks', payload: {} }).result();
+    expect(list.ok).toBe(true);
+    const due = await kernel.dispatch({ id: 'ts-r2', kind: 'run_due_tasks', payload: {} }).result();
+    expect(due.ok).toBe(true);
+    expect(called).toBe(0);
+  });
+
+  it('schedule 缺参/非法 → validation（action 非法/broadcast 缺 message/二选一缺失/非法时间）', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'tsv');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const badAction = await kernel
+      .dispatch({
+        id: 'ts-v1',
+        kind: 'schedule_task',
+        payload: { serverId: 'tsv', action: 'reboot', runAt: '2026-01-01T00:00:00.000Z' },
+      })
+      .result();
+    expect(badAction).toMatchObject({ ok: false, error: { category: 'validation' } });
+    const noMsg = await kernel
+      .dispatch({
+        id: 'ts-v2',
+        kind: 'schedule_task',
+        payload: { serverId: 'tsv', action: 'broadcast', runAt: '2026-01-01T00:00:00.000Z' },
+      })
+      .result();
+    expect(noMsg).toMatchObject({ ok: false, error: { category: 'validation' } });
+    const neither = await kernel
+      .dispatch({
+        id: 'ts-v3',
+        kind: 'schedule_task',
+        payload: { serverId: 'tsv', action: 'backup' },
+      })
+      .result();
+    expect(neither).toMatchObject({ ok: false, error: { category: 'validation' } });
+    const badTime = await kernel
+      .dispatch({
+        id: 'ts-v4',
+        kind: 'schedule_task',
+        payload: { serverId: 'tsv', action: 'backup', runAt: 'not-a-time' },
+      })
+      .result();
+    expect(badTime).toMatchObject({ ok: false, error: { category: 'validation' } });
+    const badInterval = await kernel
+      .dispatch({
+        id: 'ts-v5',
+        kind: 'schedule_task',
+        payload: { serverId: 'tsv', action: 'backup', intervalMs: -5 },
+      })
+      .result();
+    expect(badInterval).toMatchObject({ ok: false, error: { category: 'validation' } });
+    const badNow = await kernel
+      .dispatch({ id: 'ts-v6', kind: 'run_due_tasks', payload: { now: 'nope' } })
+      .result();
+    expect(badNow).toMatchObject({ ok: false, error: { category: 'validation' } });
+    const noTaskId = await kernel
+      .dispatch({ id: 'ts-v7', kind: 'cancel_task', payload: {} })
+      .result();
+    expect(noTaskId).toMatchObject({ ok: false, error: { category: 'validation' } });
+  });
+
+  it('服务端不存在 → SERVER_NOT_FOUND；cancel 不存在 → TASK_NOT_FOUND', async () => {
+    const dataDir = mkTmp();
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const missing = await kernel
+      .dispatch({
+        id: 'ts-n1',
+        kind: 'schedule_task',
+        payload: { serverId: 'ghost', action: 'backup', runAt: '2026-01-01T00:00:00.000Z' },
+      })
+      .result();
+    expect(missing).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SERVER_NOT_FOUND' },
+    });
+    const cancelGhost = await kernel
+      .dispatch({ id: 'ts-n2', kind: 'cancel_task', payload: { taskId: 'task-nope' } })
+      .result();
+    expect(cancelGhost).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'TASK_NOT_FOUND' },
+    });
+  });
+});
+
+describe('ServerKernel §7.4 定时账本：调度→到期→done/interval', () => {
+  it('一次性 backup：调度→注入 now 触发文件动作→done 不重发', async () => {
+    const dataDir = mkTmp();
+    const dir = seedServer(dataDir, 'td1');
+    writeFileSync(join(dir, 'world', 'level.dat'), 'level-bytes');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const sched = await kernel
+      .dispatch({
+        id: 'td-a1',
+        kind: 'schedule_task',
+        payload: { serverId: 'td1', action: 'backup', runAt: '2026-01-01T00:00:00.000Z' },
+      })
+      .result();
+    expect(sched.ok).toBe(true);
+    const taskId = (sched.data as { taskId: string }).taskId;
+    expect(taskId).toMatch(/^task-/);
+    expect((sched.data as { nextRun: string }).nextRun).toBe('2026-01-01T00:00:00.000Z');
+    // 账本落盘且无 tmp 残留
+    expect(existsSync(join(dataDir, 'server-tasks', 'tasks.json'))).toBe(true);
+
+    // 未到期不触发
+    const early = await kernel
+      .dispatch({
+        id: 'td-a2',
+        kind: 'run_due_tasks',
+        payload: { now: '2025-12-31T23:00:00.000Z' },
+      })
+      .result();
+    expect(early.ok).toBe(true);
+    expect((early.data as { fired: unknown[] }).fired).toEqual([]);
+
+    // 到期触发：backup 文件动作真实落盘
+    const fired = await kernel
+      .dispatch({
+        id: 'td-a3',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-01-01T00:00:01.000Z' },
+      })
+      .result();
+    expect(fired.ok).toBe(true);
+    const entries = (
+      fired.data as {
+        fired: {
+          taskId: string;
+          serverId: string;
+          action: string;
+          result: { backupId: string; path: string };
+        }[];
+      }
+    ).fired;
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.taskId).toBe(taskId);
+    expect(entries[0]?.action).toBe('backup');
+    expect(entries[0]?.result.backupId).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(existsSync(join(entries[0]?.result.path ?? '', 'manifest.json'))).toBe(true);
+
+    // 一次性 done 不重发
+    const again = await kernel
+      .dispatch({
+        id: 'td-a4',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-01-01T05:00:00.000Z' },
+      })
+      .result();
+    expect((again.data as { fired: unknown[] }).fired).toEqual([]);
+    const list = await kernel.dispatch({ id: 'td-a5', kind: 'list_tasks', payload: {} }).result();
+    const tasks = (list.data as { tasks: { taskId: string; status: string }[] }).tasks;
+    expect(tasks.find((t) => t.taskId === taskId)?.status).toBe('done');
+  });
+
+  it('interval 任务执行后 nextRun=now+intervalMs 写回并可再次触发', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'td2');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const sched = await kernel
+      .dispatch({
+        id: 'td-b1',
+        kind: 'schedule_task',
+        payload: {
+          serverId: 'td2',
+          action: 'stop',
+          runAt: '2026-01-01T00:00:00.000Z',
+          intervalMs: 3600000,
+        },
+      })
+      .result();
+    const taskId = (sched.data as { taskId: string }).taskId;
+    const first = await kernel
+      .dispatch({
+        id: 'td-b2',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-01-01T00:30:00.000Z' },
+      })
+      .result();
+    const f1 = (first.data as { fired: { taskId: string; controlCommand: string }[] }).fired;
+    expect(f1).toHaveLength(1);
+    expect(f1[0]?.controlCommand).toBe('stop');
+    // nextRun 已推进为 now+interval
+    const listed = await kernel.dispatch({ id: 'td-b3', kind: 'list_tasks', payload: {} }).result();
+    const task = (
+      listed.data as { tasks: { taskId: string; nextRun: string; intervalMs: number }[] }
+    ).tasks.find((t) => t.taskId === taskId);
+    expect(task?.nextRun).toBe('2026-01-01T01:30:00.000Z');
+    expect(task?.intervalMs).toBe(3600000);
+    // 推进前不重发，推进后再次触发
+    const quiet = await kernel
+      .dispatch({
+        id: 'td-b4',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-01-01T01:00:00.000Z' },
+      })
+      .result();
+    expect((quiet.data as { fired: unknown[] }).fired).toEqual([]);
+    const second = await kernel
+      .dispatch({
+        id: 'td-b5',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-01-01T01:30:00.000Z' },
+      })
+      .result();
+    expect((second.data as { fired: unknown[] }).fired).toHaveLength(1);
+  });
+
+  it('restart 到期只返回控制指令待办（不启进程）', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'td3');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const sched = await kernel
+      .dispatch({
+        id: 'td-c1',
+        kind: 'schedule_task',
+        payload: { serverId: 'td3', action: 'restart', runAt: '2026-02-01T00:00:00.000Z' },
+      })
+      .result();
+    const taskId = (sched.data as { taskId: string }).taskId;
+    const due = await kernel
+      .dispatch({
+        id: 'td-c2',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-02-01T00:00:01.000Z' },
+      })
+      .result();
+    const fired = (
+      due.data as {
+        fired: { taskId: string; serverId: string; action: string; controlCommand: string }[];
+      }
+    ).fired;
+    expect(fired).toHaveLength(1);
+    expect(fired[0]).toMatchObject({
+      taskId,
+      serverId: 'td3',
+      action: 'restart',
+      controlCommand: 'restart',
+    });
+  });
+
+  it('broadcast 到期只返回 {action,message} 待办，不经内核发送', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'td4');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const sched = await kernel
+      .dispatch({
+        id: 'td-d1',
+        kind: 'schedule_task',
+        payload: {
+          serverId: 'td4',
+          action: 'broadcast',
+          message: 'hello players',
+          runAt: '2026-03-01T00:00:00.000Z',
+        },
+      })
+      .result();
+    const taskId = (sched.data as { taskId: string }).taskId;
+    const due = await kernel
+      .dispatch({
+        id: 'td-d2',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-03-01T00:00:01.000Z' },
+      })
+      .result();
+    const fired = (
+      due.data as { fired: { taskId: string; serverId: string; action: string; message: string }[] }
+    ).fired;
+    expect(fired).toHaveLength(1);
+    expect(fired[0]).toMatchObject({
+      taskId,
+      serverId: 'td4',
+      action: 'broadcast',
+      message: 'hello players',
+    });
+    // 内核未写任何业务文件（logs/ 未被触碰）
+    expect(existsSync(join(dataDir, 'td4', 'logs', 'latest.log'))).toBe(false);
+  });
+
+  it('cancel 幂等：首次 ok 移除，再次 TASK_NOT_FOUND；list_tasks 按 serverId 过滤', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'td5a');
+    seedServer(dataDir, 'td5b');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const s1 = await kernel
+      .dispatch({
+        id: 'td-e1',
+        kind: 'schedule_task',
+        payload: { serverId: 'td5a', action: 'stop', runAt: '2026-04-01T00:00:00.000Z' },
+      })
+      .result();
+    const t1 = (s1.data as { taskId: string }).taskId;
+    const s2 = await kernel
+      .dispatch({
+        id: 'td-e2',
+        kind: 'schedule_task',
+        payload: { serverId: 'td5b', action: 'stop', runAt: '2026-04-01T00:00:00.000Z' },
+      })
+      .result();
+    const t2 = (s2.data as { taskId: string }).taskId;
+    const all = await kernel.dispatch({ id: 'td-e3', kind: 'list_tasks', payload: {} }).result();
+    expect((all.data as { tasks: unknown[] }).tasks).toHaveLength(2);
+    const filtered = await kernel
+      .dispatch({ id: 'td-e4', kind: 'list_tasks', payload: { serverId: 'td5a' } })
+      .result();
+    const ft = (filtered.data as { tasks: { taskId: string }[] }).tasks;
+    expect(ft).toHaveLength(1);
+    expect(ft[0]?.taskId).toBe(t1);
+    const cancel = await kernel
+      .dispatch({ id: 'td-e5', kind: 'cancel_task', payload: { taskId: t1 } })
+      .result();
+    expect(cancel.ok).toBe(true);
+    const after = await kernel.dispatch({ id: 'td-e6', kind: 'list_tasks', payload: {} }).result();
+    expect((after.data as { tasks: { taskId: string }[] }).tasks.map((t) => t.taskId)).toEqual([
+      t2,
+    ]);
+    // 到期只剩 t2
+    const due = await kernel
+      .dispatch({
+        id: 'td-e7',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-04-01T00:00:01.000Z' },
+      })
+      .result();
+    expect((due.data as { fired: { taskId: string }[] }).fired.map((f) => f.taskId)).toEqual([t2]);
+    // 幂等：再次取消同一 taskId → TASK_NOT_FOUND
+    const recancel = await kernel
+      .dispatch({ id: 'td-e8', kind: 'cancel_task', payload: { taskId: t1 } })
+      .result();
+    expect(recancel).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'TASK_NOT_FOUND' },
+    });
+  });
+
+  it('run_due_tasks 无到期返回 fired:[]（空账本亦如此）', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'td6');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    const empty = await kernel
+      .dispatch({
+        id: 'td-f1',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-05-01T00:00:00.000Z' },
+      })
+      .result();
+    expect(empty).toMatchObject({ ok: true, data: { fired: [] } });
+    await kernel
+      .dispatch({
+        id: 'td-f2',
+        kind: 'schedule_task',
+        payload: { serverId: 'td6', action: 'stop', runAt: '2026-06-01T00:00:00.000Z' },
+      })
+      .result();
+    const early = await kernel
+      .dispatch({
+        id: 'td-f3',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-05-01T00:00:00.000Z' },
+      })
+      .result();
+    expect((early.data as { fired: unknown[] }).fired).toEqual([]);
+  });
+});
+
+describe('ServerKernel §7.4 定时账本 sandbox 隔离与越界拒绝', () => {
+  it('mode=sandbox → 账本走 sandbox root，dataDir 无痕迹', async () => {
+    const dataDir = mkTmp();
+    const sandboxDir = mkTmp();
+    seedServer(sandboxDir, 'sbtd');
+    const kernel = new ServerKernel({ dataDir, sandboxDir, mode: 'sandbox', confirm: YES });
+    const sched = await kernel
+      .dispatch({
+        id: 'sb-t1',
+        kind: 'schedule_task',
+        payload: {
+          serverId: 'sbtd',
+          action: 'broadcast',
+          message: 'hi',
+          runAt: '2026-07-01T00:00:00.000Z',
+        },
+      })
+      .result();
+    expect(sched.ok).toBe(true);
+    expect(existsSync(join(sandboxDir, 'server-tasks', 'tasks.json'))).toBe(true);
+    expect(existsSync(join(dataDir, 'server-tasks'))).toBe(false);
+    const list = await kernel.dispatch({ id: 'sb-t2', kind: 'list_tasks', payload: {} }).result();
+    expect((list.data as { tasks: unknown[] }).tasks).toHaveLength(1);
+    const due = await kernel
+      .dispatch({
+        id: 'sb-t3',
+        kind: 'run_due_tasks',
+        payload: { now: '2026-07-01T00:00:01.000Z' },
+      })
+      .result();
+    expect((due.data as { fired: unknown[] }).fired).toHaveLength(1);
+    expect(existsSync(join(dataDir, 'sbtd'))).toBe(false);
+  });
+
+  it('serverId 越界 → validation，外部文件未动且无账本', async () => {
+    const dataDir = mkTmp();
+    const victim = join(dataDir, 'evil');
+    mkdirSync(victim, { recursive: true });
+    writeFileSync(join(victim, 'keep.txt'), 'keep');
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    for (const [i, payload] of [
+      { serverId: '../../evil', action: 'backup', runAt: '2026-01-01T00:00:00.000Z' },
+      { serverId: '../evil', action: 'stop', intervalMs: 1000 },
+    ].entries()) {
+      const result = await kernel
+        .dispatch({ id: `sb-x${i}`, kind: 'schedule_task', payload })
+        .result();
+      expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
+    }
+    expect(readFileSync(join(victim, 'keep.txt'), 'utf8')).toBe('keep');
+    // 越界未落账本（或账本仍空）
+    if (existsSync(join(dataDir, 'server-tasks', 'tasks.json'))) {
+      const listed = await kernel
+        .dispatch({ id: 'sb-x-list', kind: 'list_tasks', payload: {} })
+        .result();
+      expect((listed.data as { tasks: unknown[] }).tasks).toHaveLength(0);
+    } else {
+      expect(existsSync(join(dataDir, 'server-tasks'))).toBe(false);
+    }
+    const badList = await kernel
+      .dispatch({ id: 'sb-x3', kind: 'list_tasks', payload: { serverId: '../../evil' } })
+      .result();
+    expect(badList).toMatchObject({ ok: false, error: { category: 'validation' } });
+  });
+});
