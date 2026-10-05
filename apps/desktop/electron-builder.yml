@@ -4,12 +4,70 @@ directories:
   output: release
   buildResources: build-resources
 files:
+  # 白名单：只收 electron-vite 的编译产物 out/，外加 Electron 启动必需的 package.json。
+  #
+  # 为什么用对象形式 from/to 而不是直接写 'out/**/*'：
+  #   1. 排除规则的作用域。对象形式的 filter 只作用于 from 子树，
+  #      顶层的 '!**/node_modules/**' 会被 electron-builder 同时灌进
+  #      node_modules 收集器（app-builder-lib getNodeModuleFileMatcher），
+  #      那会把生产依赖全部排除掉，包里连 zod/jszip 都不会有。
+  #   2. 必须显式写 to: out。`- from: out`（to 默认是包根）会把 out/ 前缀剥掉，
+  #      导致 out/main/index.js 进包后变成 main/index.js，而 package.json 的
+  #      "main": "./out/main/index.js" 指向不存在的路径 —— 实测直接报
+  #      Application entry file "out\main\index.js" ... was not found in this archive。
+  #   3. package.json 必须单列。对象形式的 from 是 out（!= appDir），
+  #      electron-builder 不会自动补 package.json，不写则包里没有清单文件。
+  - 'package.json'
   - from: out
+    to: out
     filter:
       - '**/*'
       - '!**/node_modules/**'
       - '!**/.vite/**'
 asar: true
+# 原生模块解包（设计文档 §15 硬性要求）
+# asar 只是归档格式，dlopen 无法从归档内加载 .node，必须解包到 app.asar.unpacked/
+# 精确列出实际用到的原生模块，不用宽泛的 '**/*.node'（那会把无关二进制也拖出包体）
+#
+# 为什么不能只依赖 electron-builder 的 smartUnpack（默认开启，实测确实会兜底）：
+#   smartUnpack 靠「模块里出现 .node/.dll/.exe/.dylib/.so 或无扩展名二进制」来猜。
+#   它能猜对 node-pty，但属于隐式行为：一旦有人关掉 smartUnpack 就会静默失效。
+#   而且它会误伤——实测 jszip 因为一个无扩展名的 .jekyll-metadata 被判为二进制，
+#   整包 jszip（约 60 个文件）被无谓解包。显式列出既精确又不依赖猜测。
+asarUnpack:
+  # isolated-vm：主进程沙箱渲染 Mustache（src/main/ipc/generate.ts require('isolated-vm')）。
+  #   非 N-API（binding.gyp 无 node_api.h），.node 绑定 V8 ABI，必须实文件路径。
+  #   降级行为：require 失败时 catch 住，走纯 JS Mustache 渲染器，不阻断生成流程。
+  - '**/node_modules/isolated-vm/**'
+  # node-pty：集成终端面板（src/main/ipc/terminal.ts require('node-pty')）。
+  #   需整包解包：不止 pty.node，还有 conpty.dll / winpty.dll / OpenConsole.exe /
+  #   winpty-agent.exe —— 这些是 .node 在运行时按同级相对路径加载的伴生二进制，
+  #   只解 .node 会导致加载 .node 成功但创建 PTY 失败。
+  #   降级行为：require 失败时 catch 住，终端 IPC 返回结构化错误，其余功能不受影响。
+  - '**/node_modules/node-pty/**'
+# ABI 重建取舍（三个选项的关系，基于本机实测结论）
+#   npmRebuild: false —— 必须显式关闭（electron-builder 默认 true）。
+#     实测：保持默认 true 时 `electron-builder --dir` 直接构建失败：
+#       isolated-vm@7.0.1 会被 @electron/rebuild 用 Electron 44.4.3 的 V8 头文件重编，
+#       源码与该 V8 版本不兼容，编译报错
+#       C2660: 'v8::External::New' 函数不接受 2 个参数（src/isolate/external.h:23）
+#       C2660: 'v8::External::Value' 函数不接受 0 个参数（src/module/callback.cc:140）
+#       => MSBuild exit code 1，整个打包流程中断。
+#     关闭 rebuild 对两个原生模块都不损失功能：
+#       - node-pty 是 N-API 模块（binding.gyp 依赖 node-addon-api，预编译文件名不带 abi 标签），
+#         N-API 跨 Node/Electron ABI 稳定，其 prebuilds/win32-x64/pty.node 可直接用，无需 rebuild。
+#       - isolated-vm 不是 N-API，其预编译只有 abi137(Node24)/abi147(Node26)，
+#         而 Electron 44 的 ABI 是 149 —— 不匹配；且实测无法针对 Electron 44 编译成功。
+#         也就是说 isolated-vm 在 Electron 44 上「rebuild 也用不上」，只会让打包失败。
+#     代价与降级：isolated-vm 在 Electron 44 下 require 必然失败，
+#     由 src/main/ipc/generate.ts 的 try/catch 兜住，回退到纯 JS Mustache 渲染器，
+#     生成流程不中断（P0 安全沙箱失效，但功能可用）。
+#     若将来升级到 isolated-vm 支持的 Electron 版本，需重新打开 npmRebuild 并验证编译通过。
+#   buildDependenciesFromSource: 保持不配置（默认 false）。
+#     它只在「没有匹配 Electron 的预编译」时才需要从源码重编，代价是本机必须有完整
+#     C++ 工具链且耗时数分钟。当前即使打开也救不了 isolated-vm（见上，源码不兼容），
+#     反而会在无工具链的机器/CI 上让打包直接失败，因此不启用。
+npmRebuild: false
 compression: maximum
 win:
   target:

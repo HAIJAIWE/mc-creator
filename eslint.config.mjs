@@ -16,6 +16,9 @@ export default tseslint.config(
       '**/out/**',
       '**/out_*/**',
       '**/coverage/**',
+      // electron-builder 的产物目录（.gitignore:19 已忽略，git ls-files 为 0）：
+      // 里面是被打包进去的**第三方脚本副本**，lint 它们只会报出一堆无意义的错。
+      '**/release/**',
       '**/*.snap',
       '**/*.config.ts',
       '**/*.config.mjs',
@@ -47,6 +50,13 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-explicit-any': 'error',
+      // kernel-bedrock / kernel-server 的 `dispatch()` 都写了 `const kernel = this;`：
+      // 返回的 TaskHandle 里 `result()` 是**闭包**，其中的 `this` 指向 handle 对象
+      // 而不是 kernel，必须靠这个提前捕获的别名才能调到 kernel 的私有方法
+      // （executeWrite / serverDir / readContextParts）。这是"闭包捕获 this"的标准
+      // 写法，不是漏写箭头函数——把回调改成箭头函数只会把 handle 自身的 this
+      // 一起捕获，反而更错。
+      '@typescript-eslint/no-this-alias': 'off',
     },
   },
 
@@ -129,11 +139,88 @@ export default tseslint.config(
     },
   },
 
+  /**
+   * 仓库根的一次性 Node 脚本（.js，CJS）。
+   *
+   * 必须留成 CommonJS：根 package.json 没有 `"type": "module"`，
+   * `create-demo-project.js` 就是靠 `require()` 跑的；改成 ESM 要连带改扩展名
+   * 和调用方式，超出 lint 配置该管的范围。所以这里显式声明 sourceType: commonjs
+   * 并注入 node globals（否则 require/process/console 全报 no-undef），
+   * 同时关掉 no-require-imports —— 那条规则针对的是"在 ESM 里偷懒用 require"，
+   * 而这个文件本来就跑在合法的 CJS 里。
+   *
+   * `*.js` 只匹配根目录那一层，不会波及任何嵌套 .js。
+   */
+  {
+    files: ['*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+
+  // ---- Playwright E2E（TS 用例与夹具：跑在 Node 侧，不是浏览器/渲染层）----
+  {
+    files: ['apps/desktop/e2e/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      '@typescript-eslint/no-explicit-any': 'error',
+      // Playwright 的 fixture 签名被它自己的 loader 强制要求写成
+      // `async ({}, use) => {}`（否则启动即报 "First argument must use the
+      // object destructuring pattern"），而这个 fixture 恰好一个上游 fixture
+      // 都不用。这是框架强制的签名，不是漏写解构。
+      'no-empty-pattern': 'off',
+    },
+  },
+
+  /**
+   * E2E 主进程守卫（.cjs）。
+   *
+   * 必须留成 CommonJS：它是 `electron.launch()` 的**入口文件**，而
+   * `out/main/index.js` 也是 CJS，靠 `require` 链接起来；换成 ESM 就接不上了。
+   * 所以这里显式声明 sourceType: commonjs 并关掉 no-require-imports，
+   * 而不是把文件硬改成 .ts 再加一堆运行时兼容代码。
+   */
+  {
+    files: ['apps/desktop/e2e/**/*.cjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+
   // ---- Test files: relax some rules ----
   {
     files: [
       '**/*.test.*',
       '**/*.spec.*',
+      '**/*.e2e.*',
       '**/*.test.ts',
       '**/*.test.tsx',
       '**/*.spec.ts',
