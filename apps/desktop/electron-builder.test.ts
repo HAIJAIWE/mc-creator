@@ -36,7 +36,15 @@ const stripComments = (yaml: string): string =>
     .filter((line) => !/^\s*#/.test(line))
     .join('\n');
 
-const yaml = stripComments(readText('electron-builder.yml'));
+/**
+ * 行尾归一化：工作区文件在 Windows checkout（core.autocrlf=true）下是 CRLF，
+ * 而仓库 blob 是 LF。下游所有行解析（topLevelScalar 的 `m` 标志 `$`、
+ * topLevelList 的 `[ \t]*$`）都卡不住尾随 `\r`，会导致 asarUnpack 读出空数组、
+ * 标量读出 undefined —— 在 Windows 本机全红，在 CI（LF）全绿。
+ * 实测踩过：一次 `git checkout -- electron-builder.yml` 把工作区翻成 CRLF，
+ * 本用例随即全红，而 yml 内容本身一个字符没变。
+ */
+const yaml = stripComments(readText('electron-builder.yml').replace(/\r/g, ''));
 
 /** 读取顶层标量键，如 asar / npmRebuild */
 const topLevelScalar = (key: string): string | undefined => {
