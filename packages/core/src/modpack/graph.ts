@@ -13,9 +13,7 @@ function sourceOf(m: ModEntry): DependencyNode['source'] {
 }
 
 /** Modrinth dependencyType → 图边 kind */
-function edgeKindOf(
-  t: string,
-): DependencyEdge['kind'] {
+function edgeKindOf(t: string): DependencyEdge['kind'] {
   switch (t) {
     case 'optional':
       return 'optional';

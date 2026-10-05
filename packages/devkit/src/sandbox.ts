@@ -60,16 +60,10 @@ export function assertWithinRoot(root: string, target: string): string {
   // 跨盘符拒绝：Windows 下 path.relative('D:\\a', 'E:\\b') 返回绝对路径，
   // 属逃逸；posix 下对比首段亦可由 isAbsolute 覆盖。
   const rel = path.relative(resolvedRoot, resolvedTarget);
-  if (
-    rel === '' ||
-    rel === '.' ||
-    (!rel.startsWith('..') && !path.isAbsolute(rel))
-  ) {
+  if (rel === '' || rel === '.' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
     return resolvedTarget;
   }
-  throw new Error(
-    `[sandbox] path escapes root: root=${resolvedRoot} target=${target}`,
-  );
+  throw new Error(`[sandbox] path escapes root: root=${resolvedRoot} target=${target}`);
 }
 
 export function buildSandboxOptions(
@@ -84,9 +78,7 @@ export function buildSandboxOptions(
 ): SandboxOptions {
   const resolvedRoot = path.resolve(root);
   const cwd =
-    overrides.cwd === undefined
-      ? resolvedRoot
-      : assertWithinRoot(resolvedRoot, overrides.cwd);
+    overrides.cwd === undefined ? resolvedRoot : assertWithinRoot(resolvedRoot, overrides.cwd);
   return {
     root: resolvedRoot,
     cwd,

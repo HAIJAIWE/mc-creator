@@ -78,7 +78,17 @@ describe('buildMrpackPlan', () => {
   });
   it('产物可通过 validateModrinthIndex', () => {
     const plan = buildMrpackPlan(
-      spec({ mods: [{ name: 'X', projectId: 'p', versionId: 'v', fileName: 'x.jar', downloadUrl: 'https://x/y.jar' }] }),
+      spec({
+        mods: [
+          {
+            name: 'X',
+            projectId: 'p',
+            versionId: 'v',
+            fileName: 'x.jar',
+            downloadUrl: 'https://x/y.jar',
+          },
+        ],
+      }),
     );
     expect(validateModrinthIndex(plan.indexJson).ok).toBe(true);
   });

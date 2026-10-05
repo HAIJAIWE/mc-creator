@@ -48,16 +48,20 @@ describe('pickBestVersion', () => {
 
 describe('lockVersionToEntry', () => {
   it('锁定哈希与版本元数据', () => {
-    const e = lockVersionToEntry('proj-a', 'Mod A', meta({
-      id: 'ver-1',
-      versionNumber: '2.0',
-      fileName: 'mod-a.jar',
-      sha512: 'abc',
-      sha1: 'def',
-      gameVersions: ['1.21.1'],
-      loaders: ['fabric'],
-      dependencies: [{ projectId: 'dep-1', dependencyType: 'required' }],
-    }));
+    const e = lockVersionToEntry(
+      'proj-a',
+      'Mod A',
+      meta({
+        id: 'ver-1',
+        versionNumber: '2.0',
+        fileName: 'mod-a.jar',
+        sha512: 'abc',
+        sha1: 'def',
+        gameVersions: ['1.21.1'],
+        loaders: ['fabric'],
+        dependencies: [{ projectId: 'dep-1', dependencyType: 'required' }],
+      }),
+    );
     expect(e.versionId).toBe('ver-1');
     expect(e.versionNumber).toBe('2.0');
     expect(e.sha512).toBe('abc');
@@ -76,7 +80,13 @@ describe('resolveFromMetadata', () => {
     const result = resolveFromMetadata(
       { mods: [{ projectId: 'a' }, { projectId: 'b' }], mcVersion: '1.21.1', loader: 'fabric' },
       {
-        a: [meta({ id: 'va', versionNumber: '1.0', dependencies: [{ projectId: 'b', dependencyType: 'required' }] })],
+        a: [
+          meta({
+            id: 'va',
+            versionNumber: '1.0',
+            dependencies: [{ projectId: 'b', dependencyType: 'required' }],
+          }),
+        ],
         b: [meta({ id: 'vb', versionNumber: '1.0' })],
       },
       { a: 'Mod A', b: 'Mod B' },

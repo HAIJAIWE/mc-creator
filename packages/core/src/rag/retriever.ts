@@ -148,9 +148,7 @@ export function formatRagSection(
   hits: Array<Pick<RagHit, 'title' | 'snippet' | 'source'>>,
 ): string {
   if (hits.length === 0) return '';
-  const lines = hits.map(
-    (h, i) => `${i + 1}. 【${h.title}】（来源：${h.source}）\n${h.snippet}`,
-  );
+  const lines = hits.map((h, i) => `${i + 1}. 【${h.title}】（来源：${h.source}）\n${h.snippet}`);
   return [
     '## 本地知识库参考（RAG 检索 top' + hits.length + '，仅供参考）',
     ...lines,

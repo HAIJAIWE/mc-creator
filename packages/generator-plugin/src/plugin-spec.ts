@@ -55,10 +55,12 @@ export const PluginSpecSchema = z.object({
   /** 主类简单名（如 MyPlugin），须大写字母开头。 */
   mainClass: z.string().regex(/^[A-Z][A-Za-z0-9]*$/, 'mainClass 须为合法 Java 类名（大写开头）'),
   /** Java 包名（如 com.example.myplugin）。 */
-  namespace: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/, 'namespace 须为合法 Java 包名（含至少一个 .）'),
+  namespace: z
+    .string()
+    .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/, 'namespace 须为合法 Java 包名（含至少一个 .）'),
 });
 
-export interface PluginSpec extends z.infer<typeof PluginSpecSchema> {}
+export type PluginSpec = z.infer<typeof PluginSpecSchema>;
 
 /**
  * apiVersion 格式占位（§0.5）。

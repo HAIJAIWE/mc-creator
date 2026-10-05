@@ -68,7 +68,14 @@ export const CONTENT_FAMILIES = {
     'server-backup',
     'server-task',
   ],
-  dev: ['mod-project', 'plugin-project', 'build-artifact', 'dev-toolchain', 'mapping-set', 'test-harness'],
+  dev: [
+    'mod-project',
+    'plugin-project',
+    'build-artifact',
+    'dev-toolchain',
+    'mapping-set',
+    'test-harness',
+  ],
 } as const satisfies Record<string, readonly ContentKind[]>;
 
 export interface EditionCapability {

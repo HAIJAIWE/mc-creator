@@ -21,10 +21,7 @@ export async function sha256File(filePath: string): Promise<string> {
 }
 
 /** 由文件路径 + kind 构造对外可见的 ArtifactRef（含哈希，§0.5#5）。 */
-export async function makeArtifactRef(
-  filePath: string,
-  kind: ContentKind,
-): Promise<ArtifactRef> {
+export async function makeArtifactRef(filePath: string, kind: ContentKind): Promise<ArtifactRef> {
   const sha256 = await sha256File(filePath);
   return { path: filePath, sha256, kind };
 }

@@ -37,27 +37,14 @@ export type OpKey =
   | 'op.launch';
 
 /** X 类弹窗确认文案键（§10.6 执行须弹窗）。 */
-export type ConfirmKey =
-  | 'confirm.build'
-  | 'confirm.deploy'
-  | 'confirm.restart'
-  | 'confirm.launch';
+export type ConfirmKey = 'confirm.build' | 'confirm.deploy' | 'confirm.restart' | 'confirm.launch';
 
 /** 任务状态文案键。 */
 export type TaskKey =
-  | 'task.queued'
-  | 'task.running'
-  | 'task.succeeded'
-  | 'task.failed'
-  | 'task.cancelled';
+  'task.queued' | 'task.running' | 'task.succeeded' | 'task.failed' | 'task.cancelled';
 
 /** 全量消息键。 */
-export type MessageKey =
-  | ErrorCategoryKey
-  | FileErrorKey
-  | OpKey
-  | ConfirmKey
-  | TaskKey;
+export type MessageKey = ErrorCategoryKey | FileErrorKey | OpKey | ConfirmKey | TaskKey;
 
 /** 全部消息键（运行时枚举，供全覆盖测试与完整性校验用）。 */
 export const ALL_KEYS: readonly MessageKey[] = [

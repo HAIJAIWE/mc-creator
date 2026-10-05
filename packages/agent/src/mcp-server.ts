@@ -237,11 +237,11 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
   }
 
   /**
- * get_capabilities / get_context_pack 按 edition 参数改道，其余按 MCP_READ_ROUTES。
- * get_context_pack 额外兜一层：没显式给 edition 时用「有 serverId 走 server 内核」
- * 推断 —— 服务端是 context_pack 的主场景（§7），而 server 内核要求 serverId、
- * java 内核要求 instanceId，猜错就是一条无意义的 validation。
- */
+   * get_capabilities / get_context_pack 按 edition 参数改道，其余按 MCP_READ_ROUTES。
+   * get_context_pack 额外兜一层：没显式给 edition 时用「有 serverId 走 server 内核」
+   * 推断 —— 服务端是 context_pack 的主场景（§7），而 server 内核要求 serverId、
+   * java 内核要求 instanceId，猜错就是一条无意义的 validation。
+   */
   function pickKernel(name: string, payload: Record<string, unknown>): KernelContract {
     if (name === 'get_capabilities' || name === 'get_context_pack') {
       const edition = payload['edition'];
@@ -250,7 +250,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
       if (edition === 'java') return javaKernel;
       if (name === 'get_context_pack') {
         const hasServer = typeof payload['serverId'] === 'string' && payload['serverId'] !== '';
-        const hasInstance = typeof payload['instanceId'] === 'string' && payload['instanceId'] !== '';
+        const hasInstance =
+          typeof payload['instanceId'] === 'string' && payload['instanceId'] !== '';
         if (hasServer && !hasInstance) return serverKernel;
       }
       return javaKernel;
@@ -267,14 +268,22 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     if (def.permission === 'W' || def.permission === 'X') return refuse(def);
     if (MCP_READ_ROUTES[name] === undefined) return unimplemented(def);
     if (args !== undefined && (typeof args !== 'object' || args === null || Array.isArray(args))) {
-      throw new JsonRpcError(-32602, `Invalid params for tool ${name}: arguments must be an object`);
+      throw new JsonRpcError(
+        -32602,
+        `Invalid params for tool ${name}: arguments must be an object`,
+      );
     }
     const payload = (args ?? {}) as Record<string, unknown>;
     let result: TaskResult;
     try {
-      result = await pickKernel(name, payload).dispatch({ id: randomUUID(), kind: name, payload }).result();
+      result = await pickKernel(name, payload)
+        .dispatch({ id: randomUUID(), kind: name, payload })
+        .result();
     } catch (e) {
-      throw new JsonRpcError(-32603, `Tool ${name} failed: ${e instanceof Error ? e.message : String(e)}`);
+      throw new JsonRpcError(
+        -32603,
+        `Tool ${name} failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
     if (result.ok) {
       // get_context_pack（§10.4）：内核给事实，这里按 token 预算拼装成可直接
@@ -353,16 +362,31 @@ export function parseLine(line: string): ParsedLine {
     };
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    return { kind: 'error', code: -32600, message: 'Invalid Request: batch requests are not supported', id: null };
+    return {
+      kind: 'error',
+      code: -32600,
+      message: 'Invalid Request: batch requests are not supported',
+      id: null,
+    };
   }
   const obj = parsed as Record<string, unknown>;
   if (typeof obj['method'] !== 'string') {
     const rawId = obj['id'];
-    return { kind: 'error', code: -32600, message: 'Invalid Request: missing method', id: isId(rawId) ? rawId : null };
+    return {
+      kind: 'error',
+      code: -32600,
+      message: 'Invalid Request: missing method',
+      id: isId(rawId) ? rawId : null,
+    };
   }
   const rawId = obj['id'];
   if (rawId !== undefined && !isId(rawId)) {
-    return { kind: 'error', code: -32600, message: 'Invalid Request: id must be string | number | null', id: null };
+    return {
+      kind: 'error',
+      code: -32600,
+      message: 'Invalid Request: id must be string | number | null',
+      id: null,
+    };
   }
   const request: JsonRpcRequest = { jsonrpc: '2.0', method: obj['method'] };
   if (rawId !== undefined) request.id = rawId;
@@ -376,7 +400,12 @@ export function formatResponse(id: string | number | null, result: unknown): str
 }
 
 /** 错误响应行（不带换行，由调用方加 \n）。 */
-export function formatError(id: string | number | null, code: number, message: string, data?: unknown): string {
+export function formatError(
+  id: string | number | null,
+  code: number,
+  message: string,
+  data?: unknown,
+): string {
   const error: { code: number; message: string; data?: unknown } = { code, message };
   if (data !== undefined) error.data = data;
   return JSON.stringify({ jsonrpc: '2.0', id, error });
@@ -386,7 +415,10 @@ export function formatError(id: string | number | null, code: number, message: s
  * 处理单条 MCP 方法（纯逻辑，可测，不触流）：
  * initialize / notifications/initialized（无返回）/ tools/list / tools/call。
  */
-export async function handleRequest(server: McpServer, req: JsonRpcRequest): Promise<JsonRpcResponse | null> {
+export async function handleRequest(
+  server: McpServer,
+  req: JsonRpcRequest,
+): Promise<JsonRpcResponse | null> {
   const id = req.id ?? null;
   const isNotification = req.id === undefined;
   switch (req.method) {
@@ -408,13 +440,18 @@ export async function handleRequest(server: McpServer, req: JsonRpcRequest): Pro
     case 'tools/call': {
       if (isNotification) return null;
       const params =
-        typeof req.params === 'object' && req.params !== null ? (req.params as Record<string, unknown>) : {};
+        typeof req.params === 'object' && req.params !== null
+          ? (req.params as Record<string, unknown>)
+          : {};
       const toolName = params['name'];
       if (typeof toolName !== 'string' || toolName.length === 0) {
         return {
           jsonrpc: '2.0',
           id,
-          error: { code: -32602, message: 'Invalid params: tools/call requires { name: string, arguments?: object }' },
+          error: {
+            code: -32602,
+            message: 'Invalid params: tools/call requires { name: string, arguments?: object }',
+          },
         };
       }
       const toolArgs = params['arguments'] ?? params['args'] ?? {};
@@ -423,16 +460,27 @@ export async function handleRequest(server: McpServer, req: JsonRpcRequest): Pro
         return { jsonrpc: '2.0', id, result };
       } catch (e) {
         if (e instanceof JsonRpcError) {
-          const error: { code: number; message: string; data?: unknown } = { code: e.code, message: e.message };
+          const error: { code: number; message: string; data?: unknown } = {
+            code: e.code,
+            message: e.message,
+          };
           if (e.data !== undefined) error.data = e.data;
           return { jsonrpc: '2.0', id, error };
         }
-        return { jsonrpc: '2.0', id, error: { code: -32603, message: e instanceof Error ? e.message : String(e) } };
+        return {
+          jsonrpc: '2.0',
+          id,
+          error: { code: -32603, message: e instanceof Error ? e.message : String(e) },
+        };
       }
     }
     default:
       if (isNotification) return null;
-      return { jsonrpc: '2.0', id, error: { code: -32601, message: `Method not found: ${req.method}` } };
+      return {
+        jsonrpc: '2.0',
+        id,
+        error: { code: -32601, message: `Method not found: ${req.method}` },
+      };
   }
 }
 

@@ -277,7 +277,10 @@ function summarizeServerProps(props: Record<string, string>): string {
 }
 
 function propertiesEscape(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/[\r\n]+/g, ' ').replace(/([=:#])/g, '\\$1');
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/([=:#])/g, '\\$1');
 }
 
 /**
@@ -435,7 +438,10 @@ export class ServerKernel implements KernelContract {
   private writeRoot(): string {
     if (this.mode === 'sandbox') {
       if (this.sandboxDir === undefined || this.sandboxDir === '') {
-        verr('mode=sandbox 但未配置 sandboxDir，拒绝写入（§13.4 沙箱隔离）', 'SANDBOX_ROOT_MISSING');
+        verr(
+          'mode=sandbox 但未配置 sandboxDir，拒绝写入（§13.4 沙箱隔离）',
+          'SANDBOX_ROOT_MISSING',
+        );
       }
       return this.sandboxDir;
     }
@@ -449,7 +455,11 @@ export class ServerKernel implements KernelContract {
     try {
       return assertWithinRoot(root, target);
     } catch (e) {
-      throw cerr('validation', `目标路径越界（${root} 之外）: ${target}（${(e as Error).message}）`, 'SANDBOX_ESCAPE');
+      throw cerr(
+        'validation',
+        `目标路径越界（${root} 之外）: ${target}（${(e as Error).message}）`,
+        'SANDBOX_ESCAPE',
+      );
     }
   }
 
@@ -513,8 +523,11 @@ export class ServerKernel implements KernelContract {
           .sort((a, b) => b.mtimeMs - a.mtimeMs);
         const newest = records[0];
         if (newest !== undefined) {
-          const parsed = JSON.parse(readFileSync(join(recordDir, newest.f), 'utf8')) as { sha256?: unknown };
-          if (typeof parsed.sha256 === 'string' && parsed.sha256 !== '') lastBuildHash = parsed.sha256;
+          const parsed = JSON.parse(readFileSync(join(recordDir, newest.f), 'utf8')) as {
+            sha256?: unknown;
+          };
+          if (typeof parsed.sha256 === 'string' && parsed.sha256 !== '')
+            lastBuildHash = parsed.sha256;
         }
       } catch {
         lastBuildHash = undefined;
@@ -550,7 +563,10 @@ export class ServerKernel implements KernelContract {
     }
     // EULA 必须由用户显式接受：Minecraft EULA 要求不得代替用户勾选。
     if (optBoolean(p, 'acceptEula') !== true) {
-      verr('未接受 EULA：创建服务端需 payload.acceptEula === true（不得代用户同意）', 'EULA_NOT_ACCEPTED');
+      verr(
+        '未接受 EULA：创建服务端需 payload.acceptEula === true（不得代用户同意）',
+        'EULA_NOT_ACCEPTED',
+      );
     }
     step(0);
     if (name.includes('..') || /[\\/]/.test(name)) {
@@ -690,13 +706,16 @@ export class ServerKernel implements KernelContract {
     if (!build.success) {
       // 构建失败归 validation（可读日志摘要）并带稳定 code，便于上层回灌修复（§10.3）。
       const tail = build.log.trim().split('\n').slice(-20).join(' | ');
-      const detail = build.timedOut ? `构建超时（timeoutMs=${timeoutMs ?? '默认'}）` : `退出码 ${build.exitCode ?? '未知'}`;
+      const detail = build.timedOut
+        ? `构建超时（timeoutMs=${timeoutMs ?? '默认'}）`
+        : `退出码 ${build.exitCode ?? '未知'}`;
       verr(`构建失败: ${detail}; 日志摘要: ${tail || '(空)'}`, 'BUILD_FAILED');
     }
 
     step(2);
     const jarName = optString(p, 'jarName');
-    const jarPath = jarName === undefined ? build.jarPath : join(projectDir, 'build', 'libs', jarName);
+    const jarPath =
+      jarName === undefined ? build.jarPath : join(projectDir, 'build', 'libs', jarName);
     if (jarPath === null || jarPath === undefined || !existsSync(jarPath)) {
       verr('构建成功但未找到 build/libs/*.jar 产物', 'ARTIFACT_NOT_FOUND');
     }
@@ -739,7 +758,8 @@ export class ServerKernel implements KernelContract {
       verr(`插件产物必须是 .jar: ${artifactPath}`, 'UNSUPPORTED_FORMAT');
     }
     const pluginsDir = this.guard(root, join(serverId, 'plugins'));
-    if (!existsSync(pluginsDir)) verr(`服务端缺少 plugins/ 目录: ${pluginsDir}`, 'PLUGINS_DIR_MISSING');
+    if (!existsSync(pluginsDir))
+      verr(`服务端缺少 plugins/ 目录: ${pluginsDir}`, 'PLUGINS_DIR_MISSING');
 
     const jarName = artifactPath.split(/[\\/]/).pop() as string;
     const dest = this.guard(root, join(serverId, 'plugins', jarName));
@@ -765,7 +785,10 @@ export class ServerKernel implements KernelContract {
     if (existsSync(dest)) {
       const liveSha = await sha256File(dest);
       if (liveSha !== sha256) {
-        await writeFileAtomic(join(recordDir, `${jarName}.${liveSha.slice(0, 12)}.jar`), readFileSync(dest));
+        await writeFileAtomic(
+          join(recordDir, `${jarName}.${liveSha.slice(0, 12)}.jar`),
+          readFileSync(dest),
+        );
       }
     }
     await writeFileAtomic(dest, bytes);
@@ -829,7 +852,10 @@ export class ServerKernel implements KernelContract {
     if (!existsSync(dir)) verr(`服务端不存在: ${serverId}（${dir}）`, 'SERVER_NOT_FOUND');
     const propsPath = join(dir, 'server.properties');
     if (!existsSync(propsPath)) {
-      verr(`服务端缺少 server.properties，无法确认其为合法服务端: ${propsPath}`, 'SERVER_CONFIG_MISSING');
+      verr(
+        `服务端缺少 server.properties，无法确认其为合法服务端: ${propsPath}`,
+        'SERVER_CONFIG_MISSING',
+      );
     }
     if (action === 'restart_server') {
       step(1);
@@ -877,7 +903,9 @@ export class ServerKernel implements KernelContract {
     } catch (e) {
       verr(`部署记录解析失败: ${(e as Error).message}`, 'RECORD_INVALID');
     }
-    const targetSha = previousSha256 ?? (typeof record.previousSha256 === 'string' ? record.previousSha256 : undefined);
+    const targetSha =
+      previousSha256 ??
+      (typeof record.previousSha256 === 'string' ? record.previousSha256 : undefined);
     if (targetSha === undefined || targetSha === null || targetSha === '') {
       verr(`无历史产物可回滚: ${jarName}（部署记录中没有上一版 sha256）`, 'NO_HISTORY');
     }
@@ -890,7 +918,10 @@ export class ServerKernel implements KernelContract {
     const dest = this.guard(root, join(serverId, 'plugins', jarName));
     if (existsSync(dest)) {
       const currentSha = await sha256File(dest);
-      await writeFileAtomic(join(recordDir, `${jarName}.${currentSha.slice(0, 12)}.jar`), readFileSync(dest));
+      await writeFileAtomic(
+        join(recordDir, `${jarName}.${currentSha.slice(0, 12)}.jar`),
+        readFileSync(dest),
+      );
     }
     const restoredBytes = readFileSync(backupPath);
     await writeFileAtomic(dest, restoredBytes);
@@ -928,7 +959,12 @@ export class ServerKernel implements KernelContract {
     let approved = false;
     try {
       approved = Boolean(
-        await this.confirm({ kind, payload, summary: confirmSummary(kind, payload), risk: riskOf(kind) }),
+        await this.confirm({
+          kind,
+          payload,
+          summary: confirmSummary(kind, payload),
+          risk: riskOf(kind),
+        }),
       );
     } catch {
       approved = false;
@@ -973,7 +1009,12 @@ export class ServerKernel implements KernelContract {
       if (e instanceof ZipSafetyError) {
         return {
           ok: false,
-          error: { category: 'validation', message: e.message, code: `ZIP_${e.code}`, retryable: false },
+          error: {
+            category: 'validation',
+            message: e.message,
+            code: `ZIP_${e.code}`,
+            retryable: false,
+          },
         };
       }
       if (isClassifiedError(e)) return { ok: false, error: e };
@@ -1018,8 +1059,10 @@ export class ServerKernel implements KernelContract {
               return { ok: true, data: { capabilities } };
             case 'read_logs': {
               const serverId = serverIdOf(payload);
-              if (!serverId) return validation('缺少合法 serverId（payload.serverId），无法定位日志');
-              if (!dataDir) return validation(`数据目录未配置，日志不可读: ${serverId}/logs/latest.log`);
+              if (!serverId)
+                return validation('缺少合法 serverId（payload.serverId），无法定位日志');
+              if (!dataDir)
+                return validation(`数据目录未配置，日志不可读: ${serverId}/logs/latest.log`);
               const file = join(dataDir, serverId, 'logs', 'latest.log');
               if (!existsSync(file)) return validation(`日志文件不存在: ${file}`);
               const tail = readFileSync(file, 'utf8').split('\n').slice(-200);
@@ -1027,8 +1070,10 @@ export class ServerKernel implements KernelContract {
             }
             case 'read_config': {
               const serverId = serverIdOf(payload);
-              if (!serverId) return validation('缺少合法 serverId（payload.serverId），无法定位配置');
-              if (!dataDir) return validation(`数据目录未配置，配置不可读: ${serverId}/server.properties`);
+              if (!serverId)
+                return validation('缺少合法 serverId（payload.serverId），无法定位配置');
+              if (!dataDir)
+                return validation(`数据目录未配置，配置不可读: ${serverId}/server.properties`);
               const file = join(dataDir, serverId, 'server.properties');
               if (!existsSync(file)) return validation(`配置文件不存在: ${file}`);
               const text = readFileSync(file, 'utf8');
@@ -1037,7 +1082,9 @@ export class ServerKernel implements KernelContract {
             case 'get_context_pack': {
               const serverId = serverIdOf(payload);
               if (serverId === undefined) {
-                return validation('缺少合法 serverId（payload.serverId），无法定位状态注入目标（§10.4）');
+                return validation(
+                  '缺少合法 serverId（payload.serverId），无法定位状态注入目标（§10.4）',
+                );
               }
               const root = dataDir;
               if (root === undefined || root === '') {

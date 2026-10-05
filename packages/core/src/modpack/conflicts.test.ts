@@ -50,7 +50,15 @@ describe('detectConflicts', () => {
   });
   it('mc 越界报 mc-out-of-range', () => {
     const conflicts = detectConflicts(
-      [entry({ projectId: 'a', versionId: 'v1', name: 'A', gameVersions: ['1.20.1'], loaders: ['fabric'] })],
+      [
+        entry({
+          projectId: 'a',
+          versionId: 'v1',
+          name: 'A',
+          gameVersions: ['1.20.1'],
+          loaders: ['fabric'],
+        }),
+      ],
       '1.21.1',
       'fabric',
     );
@@ -92,7 +100,13 @@ describe('detectConflicts', () => {
   it('健康包零冲突', () => {
     const conflicts = detectConflicts(
       [
-        entry({ projectId: 'a', versionId: 'v1', name: 'A', gameVersions: ['1.21.1'], loaders: ['fabric'] }),
+        entry({
+          projectId: 'a',
+          versionId: 'v1',
+          name: 'A',
+          gameVersions: ['1.21.1'],
+          loaders: ['fabric'],
+        }),
       ],
       '1.21.1',
       'fabric',

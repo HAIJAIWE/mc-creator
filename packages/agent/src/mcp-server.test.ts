@@ -16,7 +16,10 @@ import {
   serveStdio,
 } from './mcp-server.js';
 
-function bodyOf(res: { structuredContent?: unknown }): { ok: boolean; error?: { category: string } } {
+function bodyOf(res: { structuredContent?: unknown }): {
+  ok: boolean;
+  error?: { category: string };
+} {
   return res.structuredContent as { ok: boolean; error?: { category: string } };
 }
 
@@ -39,8 +42,14 @@ describe('listTools（§10.2 25 个工具）', () => {
   });
 
   it('最小实用的 properties 点名（宽松为主，required 为空）', () => {
-    const byName = new Map(createMcpServer({}).listTools().map((t) => [t.name, t] as const));
-    expect(Object.keys(byName.get('read_logs')?.inputSchema.properties ?? {})).toContain('serverId');
+    const byName = new Map(
+      createMcpServer({})
+        .listTools()
+        .map((t) => [t.name, t] as const),
+    );
+    expect(Object.keys(byName.get('read_logs')?.inputSchema.properties ?? {})).toContain(
+      'serverId',
+    );
     const gen = byName.get('generate_content')?.inputSchema.properties ?? {};
     expect(Object.keys(gen)).toEqual(expect.arrayContaining(['prompt', 'kind']));
     const deploy = byName.get('deploy_plugin')?.inputSchema.properties ?? {};
@@ -112,7 +121,10 @@ describe('callTool 路由（R 透传 / W-X 拒绝 / 未知 -32601）', () => {
   });
 
   it('X 工具 generate_content 被拒（生成执行须弹窗）', async () => {
-    const res = await createMcpServer({}).callTool('generate_content', { prompt: 'hi', kind: 'datapack' });
+    const res = await createMcpServer({}).callTool('generate_content', {
+      prompt: 'hi',
+      kind: 'datapack',
+    });
     expect(res.isError).toBe(true);
     expect(bodyOf(res).ok).toBe(false);
   });
@@ -124,7 +136,9 @@ describe('callTool 路由（R 透传 / W-X 拒绝 / 未知 -32601）', () => {
   });
 
   it('非法 arguments（非对象）→ -32602', async () => {
-    await expect(createMcpServer({}).callTool('get_capabilities', 'nope')).rejects.toMatchObject({ code: -32602 });
+    await expect(createMcpServer({}).callTool('get_capabilities', 'nope')).rejects.toMatchObject({
+      code: -32602,
+    });
   });
 });
 
@@ -143,12 +157,19 @@ describe('JSON-RPC 握手与方法（initialize / tools/list / tools/call）', (
   });
 
   it('notifications/initialized 无返回', async () => {
-    const res = await handleRequest(createMcpServer({}), { jsonrpc: '2.0', method: 'notifications/initialized' });
+    const res = await handleRequest(createMcpServer({}), {
+      jsonrpc: '2.0',
+      method: 'notifications/initialized',
+    });
     expect(res).toBeNull();
   });
 
   it('tools/list 信封返回 25 个工具', async () => {
-    const res = await handleRequest(createMcpServer({}), { jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    const res = await handleRequest(createMcpServer({}), {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list',
+    });
     const result = res?.result as { tools: unknown[] };
     expect(result.tools).toHaveLength(25);
   });
@@ -202,7 +223,11 @@ describe('行协议纯函数 parseLine / formatResponse', () => {
   });
 
   it('缺 method → -32600（可带回 id）', () => {
-    expect(parseLine('{"jsonrpc":"2.0","id":7}')).toMatchObject({ kind: 'error', code: -32600, id: 7 });
+    expect(parseLine('{"jsonrpc":"2.0","id":7}')).toMatchObject({
+      kind: 'error',
+      code: -32600,
+      id: 7,
+    });
   });
 
   it('正常请求解析出 id/method/params', () => {
@@ -215,7 +240,11 @@ describe('行协议纯函数 parseLine / formatResponse', () => {
   });
 
   it('formatResponse/formatError 编解码 round-trip', () => {
-    expect(JSON.parse(formatResponse(1, { tools: [] }))).toEqual({ jsonrpc: '2.0', id: 1, result: { tools: [] } });
+    expect(JSON.parse(formatResponse(1, { tools: [] }))).toEqual({
+      jsonrpc: '2.0',
+      id: 1,
+      result: { tools: [] },
+    });
     expect(JSON.parse(formatError(2, -32601, 'Method not found'))).toEqual({
       jsonrpc: '2.0',
       id: 2,
@@ -247,7 +276,9 @@ describe('serveStdio 内存流端到端（不碰真实 stdin）', () => {
       .join('')
       .trim()
       .split('\n')
-      .map((l) => JSON.parse(l) as { id: number | null; result?: unknown; error?: { code: number } });
+      .map(
+        (l) => JSON.parse(l) as { id: number | null; result?: unknown; error?: { code: number } },
+      );
     expect(responses).toHaveLength(3);
     expect(responses[0]?.id).toBe(1);
     expect(responses[1]?.id).toBe(2);

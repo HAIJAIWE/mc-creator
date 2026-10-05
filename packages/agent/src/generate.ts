@@ -24,12 +24,7 @@ import type { StageResult } from './pipeline.js';
  * - server-mod ← 服务端形态 Mod（Forge/NeoForge/Fabric 服务端；旧表只有客户端 mod 生成器）；
  * - client-mod ← mod（客户端 Mod；§11 阶梯最后，成本最高）。
  */
-export type GenerationKind =
-  | 'datapack'
-  | 'addon'
-  | 'server-plugin'
-  | 'server-mod'
-  | 'client-mod';
+export type GenerationKind = 'datapack' | 'addon' | 'server-plugin' | 'server-mod' | 'client-mod';
 
 export interface GeneratePromptInput {
   kind: GenerationKind;
@@ -81,8 +76,7 @@ export function buildGeneratePrompt(input: GeneratePromptInput): string {
     input.contextPack ?? '',
     userPrompt,
   ];
-  const render = (): string =>
-    [head, ...titles.map((t, i) => `${t}\n${bodies[i]}`)].join('\n');
+  const render = (): string => [head, ...titles.map((t, i) => `${t}\n${bodies[i]}`)].join('\n');
 
   let text = render();
   // 截断优先级从低到高：apiTypes(1) → contextPack(2) → versionContext(0)；用户需求(3)永不截断。
@@ -144,16 +138,16 @@ export interface FixAttemptPlan {
  *   与 nextStep 的 diagnose 失败 → abort 一致，避免无效循环烧 token）；
  * - 其余 → retry-fix（错误回灌后重试，对应 §10.3 fix→validate）。
  */
-export function planFixAttempt(
-  history: StageResult[],
-  maxAttempts: number,
-): FixAttemptPlan {
+export function planFixAttempt(history: StageResult[], maxAttempts: number): FixAttemptPlan {
   if (history.length === 0) {
     return { action: 'retry-fix', reason: '首轮尝试，直接进入生成/修复（§10.3）' };
   }
   const last = history[history.length - 1] as StageResult;
   if (last.ok) {
-    return { action: 'abort-to-human', reason: '已成功无需修复：最后一步已成功，闭环结束，转人工确认' };
+    return {
+      action: 'abort-to-human',
+      reason: '已成功无需修复：最后一步已成功，闭环结束，转人工确认',
+    };
   }
   const failures = history.filter((h) => !h.ok).length;
   if (failures >= maxAttempts) {
@@ -163,9 +157,15 @@ export function planFixAttempt(
     };
   }
   if (history.some((h) => h.stage === 'diagnose' && !h.ok)) {
-    return { action: 'abort-to-human', reason: '诊断阶段失败，无法定位原因，转人工（避免无效循环，§10.3）' };
+    return {
+      action: 'abort-to-human',
+      reason: '诊断阶段失败，无法定位原因，转人工（避免无效循环，§10.3）',
+    };
   }
-  return { action: 'retry-fix', reason: `错误回灌后第 ${failures + 1} 次修复尝试（§10.3 fix→validate）` };
+  return {
+    action: 'retry-fix',
+    reason: `错误回灌后第 ${failures + 1} 次修复尝试（§10.3 fix→validate）`,
+  };
 }
 
 /**
@@ -176,7 +176,9 @@ export function criterionFor(kind: GenerationKind): string {
   const table: Record<string, string | undefined> = VALIDATION_CRITERIA;
   const criterion = table[kind];
   if (criterion === undefined) {
-    throw new Error(`未知生成类别（kind）“${kind as string}”：缺少机器可判定的成功判据，闭环无法收敛（§10.3）`);
+    throw new Error(
+      `未知生成类别（kind）“${kind as string}”：缺少机器可判定的成功判据，闭环无法收敛（§10.3）`,
+    );
   }
   return criterion;
 }

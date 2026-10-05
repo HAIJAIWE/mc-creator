@@ -50,9 +50,7 @@ export const EnchantmentSpec = z.object({
 
 /** 物品工具属性（可挖掘方块类型 / 挖掘等级 / 挖掘速度） */
 export const ToolSpec = z.object({
-  type: z
-    .enum(['none', 'pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'shears'])
-    .default('none'),
+  type: z.enum(['none', 'pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'shears']).default('none'),
   miningLevel: z.number().int().min(0).max(10).default(0), // 0=木 1=石 2=铁 3=钻 4=下界合金
   speed: z.number().min(0).default(1), // 挖掘速度倍率
 });

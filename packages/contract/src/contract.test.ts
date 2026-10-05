@@ -9,16 +9,40 @@ import {
 import type { ContentKind } from './contract.js';
 
 const EXPECTED_34: ContentKind[] = [
-  'game-version', 'java-runtime',
-  'account', 'cape',
-  'instance', 'world', 'world-template',
-  'modpack', 'mod', 'resourcepack', 'shader', 'datapack',
-  'addon', 'skinpack', 'texturepack',
-  'skin', 'soundpack', 'languagepack', 'font', 'structure',
-  'server', 'server-config', 'server-plugin', 'proxy', 'proxy-plugin',
-  'proxy-config', 'server-backup', 'server-task',
-  'mod-project', 'plugin-project', 'build-artifact',
-  'dev-toolchain', 'mapping-set', 'test-harness',
+  'game-version',
+  'java-runtime',
+  'account',
+  'cape',
+  'instance',
+  'world',
+  'world-template',
+  'modpack',
+  'mod',
+  'resourcepack',
+  'shader',
+  'datapack',
+  'addon',
+  'skinpack',
+  'texturepack',
+  'skin',
+  'soundpack',
+  'languagepack',
+  'font',
+  'structure',
+  'server',
+  'server-config',
+  'server-plugin',
+  'proxy',
+  'proxy-plugin',
+  'proxy-config',
+  'server-backup',
+  'server-task',
+  'mod-project',
+  'plugin-project',
+  'build-artifact',
+  'dev-toolchain',
+  'mapping-set',
+  'test-harness',
 ];
 
 describe('contract §3 薄契约', () => {
@@ -35,10 +59,18 @@ describe('contract §3 薄契约', () => {
   });
 
   it('四内核 capabilities() 互不相同（§2.2 禁止为对称而抽象）', () => {
-    const java = capabilitiesFor('java').filter((c) => c.supported).map((c) => c.kind);
-    const bedrock = capabilitiesFor('bedrock').filter((c) => c.supported).map((c) => c.kind);
-    const server = capabilitiesFor('server').filter((c) => c.supported).map((c) => c.kind);
-    const devkit = capabilitiesFor('devkit').filter((c) => c.supported).map((c) => c.kind);
+    const java = capabilitiesFor('java')
+      .filter((c) => c.supported)
+      .map((c) => c.kind);
+    const bedrock = capabilitiesFor('bedrock')
+      .filter((c) => c.supported)
+      .map((c) => c.kind);
+    const server = capabilitiesFor('server')
+      .filter((c) => c.supported)
+      .map((c) => c.kind);
+    const devkit = capabilitiesFor('devkit')
+      .filter((c) => c.supported)
+      .map((c) => c.kind);
     // java 必装，其余可选（§2.2）
     expect(java).toContain('instance');
     expect(bedrock).toContain('addon');

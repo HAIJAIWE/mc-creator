@@ -9,7 +9,14 @@
  * 纯函数模块，零依赖。
  */
 import { en } from './en.js';
-import type { ConfirmKey, ErrorCategoryKey, FileErrorKey, MessageKey, OpKey, TaskKey } from './keys.js';
+import type {
+  ConfirmKey,
+  ErrorCategoryKey,
+  FileErrorKey,
+  MessageKey,
+  OpKey,
+  TaskKey,
+} from './keys.js';
 import { ALL_KEYS } from './keys.js';
 import { zh } from './zh.js';
 

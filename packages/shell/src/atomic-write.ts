@@ -83,7 +83,5 @@ export async function writeFileAtomic(
     throw e;
   }
 
-  return hash
-    ? { path: resolved, sha256: sha256Hex(data, encoding) }
-    : { path: resolved };
+  return hash ? { path: resolved, sha256: sha256Hex(data, encoding) } : { path: resolved };
 }

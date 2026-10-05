@@ -44,10 +44,14 @@ export function validatePluginStructure(files: FileNode[]): PluginStructureValid
   const paper = byPath.get(PAPER_MANIFEST_PATH);
   const legacy = byPath.get(LEGACY_MANIFEST_PATH);
   if (paper === undefined) {
-    errors.push(`缺少 ${PAPER_MANIFEST_PATH}（§7.3 要求 paper-plugin.yml 与 plugin.yml 共存于同一 JAR）`);
+    errors.push(
+      `缺少 ${PAPER_MANIFEST_PATH}（§7.3 要求 paper-plugin.yml 与 plugin.yml 共存于同一 JAR）`,
+    );
   }
   if (legacy === undefined) {
-    errors.push(`缺少 ${LEGACY_MANIFEST_PATH}（§7.3 要求 paper-plugin.yml 与 plugin.yml 共存于同一 JAR）`);
+    errors.push(
+      `缺少 ${LEGACY_MANIFEST_PATH}（§7.3 要求 paper-plugin.yml 与 plugin.yml 共存于同一 JAR）`,
+    );
   }
 
   // 2. api-version 格式（兼容 26.1.2）+ 双清单一致。
@@ -61,14 +65,18 @@ export function validatePluginStructure(files: FileNode[]): PluginStructureValid
     if (api === null || api === '') {
       errors.push(`${label} 缺少 api-version（§7.3 必填，调用方须运行时拉取值）`);
     } else if (!API_VERSION_PATTERN.test(api)) {
-      errors.push(`${label} 的 api-version "${api}" 格式非法，应为 <主>.<次>[.<修订>]（如 1.21 / 26.1.2）`);
+      errors.push(
+        `${label} 的 api-version "${api}" 格式非法，应为 <主>.<次>[.<修订>]（如 1.21 / 26.1.2）`,
+      );
     } else {
       apiVersions.set(label, api);
     }
   }
   const distinctApis = new Set(apiVersions.values());
   if (distinctApis.size > 1) {
-    errors.push(`两份清单的 api-version 不一致：${[...apiVersions].map(([k, v]) => `${k}=${v}`).join('，')}`);
+    errors.push(
+      `两份清单的 api-version 不一致：${[...apiVersions].map(([k, v]) => `${k}=${v}`).join('，')}`,
+    );
   }
 
   // 3. Folia 硬开关（§7.3）：folia 目标必须声明 folia-supported: true。

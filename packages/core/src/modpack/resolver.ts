@@ -7,12 +7,7 @@
  */
 
 import type { ModEntry } from '@mc-creator/shared';
-import type {
-  DependencyGraph,
-  ResolveInput,
-  ResolveResult,
-  VersionMetadata,
-} from './types.js';
+import type { DependencyGraph, ResolveInput, ResolveResult, VersionMetadata } from './types.js';
 import { buildDependencyGraph } from './graph.js';
 import { detectConflicts } from './conflicts.js';
 
@@ -137,7 +132,9 @@ export function resolveFromMetadata(
       warnings.push(`未解析 ${mod.projectId}：无匹配 loader=${input.loader} 的版本`);
       continue;
     }
-    const loaderHit = best.loaders.map((l) => l.toLowerCase()).includes(normalizeLoader(input.loader));
+    const loaderHit = best.loaders
+      .map((l) => l.toLowerCase())
+      .includes(normalizeLoader(input.loader));
     const mcHit = best.gameVersions.includes(input.mcVersion);
     if (loaderHit && !mcHit && best.gameVersions.length > 0) {
       warnings.push(

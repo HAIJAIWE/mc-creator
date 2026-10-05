@@ -92,7 +92,12 @@ export function buildContextPack(
 
   // 头部自身超预算：极端情况，从末尾截断头部
   if (head.length >= budget) {
-    return { target, text: `${head.slice(0, budget - 14)}\n[truncated]`, truncated: true, budgetChars: budget };
+    return {
+      target,
+      text: `${head.slice(0, budget - 14)}\n[truncated]`,
+      truncated: true,
+      budgetChars: budget,
+    };
   }
 
   let text = head;

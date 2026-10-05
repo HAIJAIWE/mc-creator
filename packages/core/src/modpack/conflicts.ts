@@ -22,10 +22,7 @@ export interface ConflictDetectOptions {
   metadataByProject?: Map<string, VersionMetadata[]> | Record<string, VersionMetadata[]>;
 }
 
-function getMeta(
-  opts: ConflictDetectOptions | undefined,
-  projectId: string,
-): VersionMetadata[] {
+function getMeta(opts: ConflictDetectOptions | undefined, projectId: string): VersionMetadata[] {
   if (!opts?.metadataByProject) return [];
   const m = opts.metadataByProject;
   if (m instanceof Map) return m.get(projectId) ?? [];

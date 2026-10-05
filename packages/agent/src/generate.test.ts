@@ -101,7 +101,9 @@ describe('buildGeneratePrompt 预算截断（§10.5：用户需求永不截断�
   });
 
   it('空白 prompt 同样抛错', () => {
-    expect(() => buildGeneratePrompt({ ...baseInput(), userPrompt: '   \n  ' })).toThrow(/不能为空/);
+    expect(() => buildGeneratePrompt({ ...baseInput(), userPrompt: '   \n  ' })).toThrow(
+      /不能为空/,
+    );
   });
 });
 

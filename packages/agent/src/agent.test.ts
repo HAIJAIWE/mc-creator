@@ -29,11 +29,23 @@ describe('tools.ts MCP 工具清单（§10.2 / §10.6）', () => {
   it('§10.2 点名工具存在（含 v3.1 补齐的读现状/回滚类）', () => {
     const names = MCP_TOOL_DEFS.map((t) => t.name);
     for (const n of [
-      'get_capabilities', 'get_target_state', 'get_context_pack',
-      'install_modpack', 'install_mod', 'install_addon', 'import_package',
-      'apply_skin', 'uninstall_content', 'launch_instance', 'build_project',
-      'deploy_plugin', 'restart_server', 'stop_server', 'rollback_build',
-      'generate_content', 'validate_content',
+      'get_capabilities',
+      'get_target_state',
+      'get_context_pack',
+      'install_modpack',
+      'install_mod',
+      'install_addon',
+      'import_package',
+      'apply_skin',
+      'uninstall_content',
+      'launch_instance',
+      'build_project',
+      'deploy_plugin',
+      'restart_server',
+      'stop_server',
+      'rollback_build',
+      'generate_content',
+      'validate_content',
     ]) {
       expect(names).toContain(n);
     }
@@ -145,7 +157,9 @@ describe('pipeline.ts 生成闭环状态机（§10.3 成功判据）', () => {
     expect(nextStep({ stage: 'validate', ok: false }, 3, 3).action).toBe('abort');
     expect(nextStep({ stage: 'fix', ok: false }, 5, 3).action).toBe('abort');
     // validate 已成功即使轮次耗尽也 succeed
-    expect(nextStep({ stage: 'validate', ok: true, kind: 'datapack' }, 9, 3).action).toBe('succeed');
+    expect(nextStep({ stage: 'validate', ok: true, kind: 'datapack' }, 9, 3).action).toBe(
+      'succeed',
+    );
   });
 
   it('diagnose 自身失败 → abort 转人工（避免无效循环）', () => {

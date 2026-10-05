@@ -88,9 +88,8 @@ function toClassifiedError(err: unknown, userSignal?: AbortSignal): ClassifiedEr
   if (isClassified(err)) return err;
   if (err instanceof Error) {
     // AbortSignal.timeout 抛出的错误在不同环境下 name 可能为 'AbortError'、'TimeoutError' 或 'AbortError: The operation was aborted due to timeout'
-    const isTimeoutAbort = err.name === 'AbortError' ||
-      err.name === 'TimeoutError' ||
-      /timeout/i.test(err.message);
+    const isTimeoutAbort =
+      err.name === 'AbortError' || err.name === 'TimeoutError' || /timeout/i.test(err.message);
     if (isTimeoutAbort) {
       if (userSignal?.aborted) {
         return networkError('下载已取消', false, 'ABORTED');
@@ -277,11 +276,7 @@ async function attemptOnce(
       throw err;
     }
     if (isRetryableStatus(res.status)) {
-      throw networkError(
-        `服务器错误（HTTP ${res.status}）: ${url}`,
-        true,
-        `HTTP_${res.status}`,
-      );
+      throw networkError(`服务器错误（HTTP ${res.status}）: ${url}`, true, `HTTP_${res.status}`);
     }
     if (!res.ok) {
       const err: ClassifiedError = {

@@ -7,17 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import {
-  detectJavaVersion,
-  javaVersionFor,
-  resolveJavaHome,
-} from './jdk.js';
-import {
-  findBuiltJar,
-  findJarInLog,
-  runGradleBuild,
-  verifyDistribution,
-} from './gradle.js';
+import { detectJavaVersion, javaVersionFor, resolveJavaHome } from './jdk.js';
+import { findBuiltJar, findJarInLog, runGradleBuild, verifyDistribution } from './gradle.js';
 import { assertWithinRoot, buildSandboxOptions } from './sandbox.js';
 import { makeArtifactRef, sha256File } from './artifact.js';
 
@@ -68,8 +59,12 @@ describe('jdk.ts 版本映射（§5：1.20.x→17，1.21.x→21，26.x→25）',
   });
 
   it('detectJavaVersion：保留 core 正则逻辑（21.0.3 与裸 25 均命中）', async () => {
-    await expect(detectJavaVersion(async () => 'openjdk version "21.0.3" 2024-04-16')).resolves.toBe(21);
-    await expect(detectJavaVersion(async () => 'openjdk version "25" 2025-09-16')).resolves.toBe(25);
+    await expect(
+      detectJavaVersion(async () => 'openjdk version "21.0.3" 2024-04-16'),
+    ).resolves.toBe(21);
+    await expect(detectJavaVersion(async () => 'openjdk version "25" 2025-09-16')).resolves.toBe(
+      25,
+    );
   });
 
   it('detectJavaVersion：无匹配/抛错 → null', async () => {
@@ -110,9 +105,9 @@ describe('sandbox.ts 路径监狱（§13.1 zip-slip 防护）', () => {
   });
 
   it('buildSandboxOptions：cwd 越界同样拒绝', () => {
-    expect(() =>
-      buildSandboxOptions(IS_WIN ? 'D:\\srv\\s1' : '/srv/s1', { cwd: '..' }),
-    ).toThrow(/escapes root/);
+    expect(() => buildSandboxOptions(IS_WIN ? 'D:\\srv\\s1' : '/srv/s1', { cwd: '..' })).toThrow(
+      /escapes root/,
+    );
   });
 });
 
@@ -203,9 +198,7 @@ describe('gradle.ts 改进版（相对 core 反面教材：超时+磁盘扫描�
   it('runGradleBuild：超时杀死慢进程（timedOut=true）', async () => {
     // 注：不用 timeout.exe——其 stdin 被管道重定向时直接报错退出；
     // ping -n 倒数是无 stdin 依赖的经典 sleep 替代。
-    const script = IS_WIN
-      ? '@echo off\r\nping -n 30 127.0.0.1 >nul\r\n'
-      : '#!/bin/sh\nsleep 30\n';
+    const script = IS_WIN ? '@echo off\r\nping -n 30 127.0.0.1 >nul\r\n' : '#!/bin/sh\nsleep 30\n';
     const dir = await makeFakeProject(script);
     try {
       const started = Date.now();
@@ -220,9 +213,7 @@ describe('gradle.ts 改进版（相对 core 反面教材：超时+磁盘扫描�
   });
 
   it('runGradleBuild：用户 signal 取消（timedOut=false）', async () => {
-    const script = IS_WIN
-      ? '@echo off\r\nping -n 30 127.0.0.1 >nul\r\n'
-      : '#!/bin/sh\nsleep 30\n';
+    const script = IS_WIN ? '@echo off\r\nping -n 30 127.0.0.1 >nul\r\n' : '#!/bin/sh\nsleep 30\n';
     const dir = await makeFakeProject(script);
     try {
       const c = new AbortController();

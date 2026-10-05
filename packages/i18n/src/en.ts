@@ -8,10 +8,13 @@ import type { MessageKey } from './keys.js';
 
 export const en: Record<MessageKey, string> = {
   'error.category.network': 'Network error. Check your connection and try again.',
-  'error.category.validation': 'Validation failed. The downloaded content may be corrupted; please download it again.',
+  'error.category.validation':
+    'Validation failed. The downloaded content may be corrupted; please download it again.',
   'error.category.version': 'Version mismatch. Confirm the version and try again.',
-  'error.category.disk': 'Disk error: insufficient space or write failure. Free up disk space and try again.',
-  'error.category.permission': 'Insufficient permission. Re-run with sufficient privileges and try again.',
+  'error.category.disk':
+    'Disk error: insufficient space or write failure. Free up disk space and try again.',
+  'error.category.permission':
+    'Insufficient permission. Re-run with sufficient privileges and try again.',
   'error.category.unknown': 'An unknown error occurred. Check the logs and try again.',
   'error.file.not_found': 'File not found',
   'error.file.permission': 'Permission denied',

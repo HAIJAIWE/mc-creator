@@ -97,17 +97,28 @@ describe('BedrockKernel dispatch 只读任务（get_target_state / get_capabilit
     const result = await new BedrockKernel()
       .dispatch({ id: 't3', kind: 'get_target_state', payload: null })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', retryable: false } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', retryable: false },
+    });
     expect(result.error?.message).toMatch(/降级/);
   });
 
   it('cancel 可调不抛错', () => {
-    const handle = new BedrockKernel().dispatch({ id: 'x1', kind: 'get_target_state', payload: null });
+    const handle = new BedrockKernel().dispatch({
+      id: 'x1',
+      kind: 'get_target_state',
+      payload: null,
+    });
     expect(() => handle.cancel()).not.toThrow();
   });
 
   it('progress 为空 AsyncIterable（立即 done）', async () => {
-    const handle = new BedrockKernel().dispatch({ id: 'x2', kind: 'get_target_state', payload: null });
+    const handle = new BedrockKernel().dispatch({
+      id: 'x2',
+      kind: 'get_target_state',
+      payload: null,
+    });
     const seen: unknown[] = [];
     for await (const e of handle.progress) seen.push(e);
     expect(seen).toEqual([]);

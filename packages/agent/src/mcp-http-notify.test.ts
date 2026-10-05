@@ -535,6 +535,26 @@ describe('SessionStore 持久化（内存后端，跨实例）', () => {
     expect(store.has('new')).toBe(true);
   });
 
+  it('连续变更的落盘顺序：每次变更一次快照，最后一次快照即终态', () => {
+    // 并发写的取舍：json 文件后端是**同步**写（无 await 交错），所以快照严格按
+    // 变更先后落盘；测试固定「最后一次落盘 = 终态」这条不变式 ——
+    // 将来换成异步后端时，这条测试会替我们守住顺序不被破坏。
+    const m = memBackend();
+    const store = new SessionStore({ newSessionId: idSeq(), persistence: m.backend });
+    store.create(); // sw-1
+    store.create(); // sw-1, sw-2
+    store.delete('sw-1');
+    store.create(); // sw-2, sw-3
+    expect(m.saves).toHaveLength(4);
+    expect(m.saves.map((s) => s.map((r) => r.id))).toEqual([
+      ['sw-1'],
+      ['sw-1', 'sw-2'],
+      ['sw-2'],
+      ['sw-2', 'sw-3'],
+    ]);
+    expect(m.peek().map((r) => r.id)).toEqual(['sw-2', 'sw-3']);
+  });
+
   it('ttlMs<=0（永不过期）→ 启动时连旧条目一起载入', () => {
     const store = new SessionStore({
       now: () => 10_000_000,
@@ -692,6 +712,102 @@ describe('createJsonFilePersistence（真落盘，临时目录）', () => {
     } finally {
       await second.close();
     }
+  });
+});
+
+/** 可断言的 session-id 生成器（不注入就拿不到具体值）。 */
+function idSeq(prefix = 'sw'): () => string {
+  let n = 0;
+  return () => {
+    n += 1;
+    return `${prefix}-${n}`;
+  };
+}
+
+describe('过期会话清扫（sweepExpired —— 与持久化的交互）', () => {
+  /** 可推进的固定时钟（不 sleep）。 */
+  function clock(start = 1_000_000): { now: () => number; advance: (ms: number) => void } {
+    let t = start;
+    return { now: () => t, advance: (ms: number) => void (t += ms) };
+  }
+
+  it('sweepExpired 删掉过期会话并返回条数', () => {
+    const c = clock();
+    const store = new SessionStore({ now: c.now, ttlMs: 1000, newSessionId: idSeq() });
+    store.create();
+    store.create();
+    c.advance(1001);
+    expect(store.sweepExpired()).toBe(2);
+    expect(store.size()).toBe(0);
+  });
+
+  it('未过期时返回 0 且不动存档（定时器每 tick 都写盘是纯浪费）', () => {
+    const saved: SessionRecord[][] = [];
+    const store = new SessionStore({
+      now: () => 1,
+      ttlMs: 1000,
+      newSessionId: idSeq(),
+      persistence: {
+        load: () => [],
+        save: (r) => {
+          saved.push([...r]);
+        },
+      },
+    });
+    store.create();
+    const before = saved.length;
+    expect(store.sweepExpired()).toBe(0);
+    expect(saved).toHaveLength(before);
+  });
+
+  it('清扫把死会话从持久化存档里带走（惰性清理够不到的场景）', () => {
+    // 存档里的会话在**启动加载时**还没过期（构造期丢弃逻辑不会剔除它），
+    // 此后时间推进到过期，且全程没有任何请求访问它 —— 惰性清理永远够不着，
+    // 只有 sweep 能回收它（否则它会永久留在内存 Map 与磁盘存档里）。
+    const saved: SessionRecord[][] = [];
+    const c = clock(1_000);
+    const store = new SessionStore({
+      now: c.now,
+      ttlMs: 1000,
+      newSessionId: idSeq(),
+      persistence: {
+        load: () => [{ id: 'ancient', createdAt: 1_000 }],
+        save: (r) => {
+          saved.push([...r]);
+        },
+      },
+    });
+    expect(store.size()).toBe(1);
+    expect(saved).toHaveLength(0); // 启动加载本身不落盘
+    c.advance(1001); // 过期，但没人访问它
+    expect(store.sweepExpired()).toBe(1);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toEqual([]);
+    expect(store.size()).toBe(0);
+  });
+
+  it('ttlMs<=0（永不过期）→ 清扫永不删任何东西', () => {
+    const store = new SessionStore({ now: () => 1, ttlMs: 0, newSessionId: idSeq() });
+    store.create();
+    expect(store.sweepExpired()).toBe(0);
+    expect(store.size()).toBe(1);
+  });
+
+  it('serveHttp 默认开启清扫、sweepMs:0 可关（定时器不挂住进程）', async () => {
+    const running = await serveHttp({
+      server: createMcpServer(),
+      port: 0,
+      heartbeatMs: 0,
+      sweepMs: 0,
+    });
+    // 关掉时依然能正常起停，且 close() 干净退出（无残留 interval）。
+    const res = await fetch(running.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+    });
+    expect(res.status).toBe(200);
+    await running.close();
   });
 });
 

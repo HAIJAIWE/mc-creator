@@ -20,7 +20,15 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -43,7 +51,9 @@ function mkTmp(prefix = 'java-exec-'): string {
 }
 
 /** 收集 progress 流全部事件。 */
-async function collect(handle: { progress: AsyncIterable<ProgressEvent> }): Promise<ProgressEvent[]> {
+async function collect(handle: {
+  progress: AsyncIterable<ProgressEvent>;
+}): Promise<ProgressEvent[]> {
   const out: ProgressEvent[] = [];
   for await (const e of handle.progress) out.push(e);
   return out;
@@ -136,7 +146,11 @@ function build64Png(): Buffer {
     deflateRawSync(Buffer.alloc(16)),
     Buffer.from([0, 0, 0, 0]),
   ]);
-  const iend = Buffer.concat([Buffer.from([0, 0, 0, 0]), Buffer.from('IEND', 'latin1'), Buffer.from([0, 0, 0, 0])]);
+  const iend = Buffer.concat([
+    Buffer.from([0, 0, 0, 0]),
+    Buffer.from('IEND', 'latin1'),
+    Buffer.from([0, 0, 0, 0]),
+  ]);
   return Buffer.concat([sig, ihdrFull, idat, iend]);
 }
 
@@ -180,7 +194,13 @@ describe('JavaKernel 确认闸门：未确认 → 拒绝且零副作用', () => 
   it('create_instance confirm 返回 false → 拒绝且目录未创建', async () => {
     const dataDir = mkTmp();
     let asked: string | null = null;
-    const result = await new JavaKernel({ dataDir, confirm: (req) => { asked = req.kind; return NO(); } })
+    const result = await new JavaKernel({
+      dataDir,
+      confirm: (req) => {
+        asked = req.kind;
+        return NO();
+      },
+    })
       .dispatch({ id: 'w2', kind: 'create_instance', payload: { name: 'inst-b' } })
       .result();
     expect(asked).toBe('create_instance');
@@ -220,7 +240,12 @@ describe('JavaKernel create_instance 真实现', () => {
       .dispatch({
         id: 'c1',
         kind: 'create_instance',
-        payload: { name: 'full', versionId: '1.20.1', loader: 'fabric', javaPath: 'C:/jdk/bin/java.exe' },
+        payload: {
+          name: 'full',
+          versionId: '1.20.1',
+          loader: 'fabric',
+          javaPath: 'C:/jdk/bin/java.exe',
+        },
       })
       .result();
     expect(result.ok).toBe(true);
@@ -228,7 +253,10 @@ describe('JavaKernel create_instance 真实现', () => {
     for (const sub of ['mods', 'resourcepacks', 'shaderpacks', 'config', 'saves']) {
       expect(existsSync(join(dir, sub))).toBe(true);
     }
-    const meta = JSON.parse(readFileSync(join(dir, 'instance.json'), 'utf8')) as Record<string, unknown>;
+    const meta = JSON.parse(readFileSync(join(dir, 'instance.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >;
     expect(meta).toMatchObject({
       name: 'full',
       edition: 'java',
@@ -335,7 +363,11 @@ describe('JavaKernel install_mod 真实现', () => {
     writeFileSync(src, bytes);
     const sha = createHash('sha256').update(bytes).digest('hex');
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'm1', kind: 'install_mod', payload: { instanceId: 'i1', mod: { path: src, sha256: sha } } })
+      .dispatch({
+        id: 'm1',
+        kind: 'install_mod',
+        payload: { instanceId: 'i1', mod: { path: src, sha256: sha } },
+      })
       .result();
     expect(result.ok).toBe(true);
     const dest = join(dir, 'mods', 'jei.jar');
@@ -356,7 +388,10 @@ describe('JavaKernel install_mod 真实现', () => {
         payload: { instanceId: 'i2', mod: { path: src, sha256: 'a'.repeat(64) } },
       })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'HASH_MISMATCH' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'HASH_MISMATCH' },
+    });
     expect(existsSync(join(dir, 'mods', 'bad.jar'))).toBe(false);
   });
 
@@ -364,7 +399,11 @@ describe('JavaKernel install_mod 真实现', () => {
     const dataDir = mkTmp();
     seedInstance(dataDir, 'i3');
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'm3', kind: 'install_mod', payload: { instanceId: 'i3', mod: { path: join(dataDir, 'nope.jar') } } })
+      .dispatch({
+        id: 'm3',
+        kind: 'install_mod',
+        payload: { instanceId: 'i3', mod: { path: join(dataDir, 'nope.jar') } },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -379,13 +418,20 @@ describe('JavaKernel install_mod 真实现', () => {
         payload: { instanceId: 'i4', mod: { url: 'https://cdn.modrinth.com/x/y.jar' } },
       })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'permission', code: 'NETWORK_DENIED' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'permission', code: 'NETWORK_DENIED' },
+    });
   });
 
   it('url 域名不在白名单 → permission 且说明白名单', async () => {
     const dataDir = mkTmp();
     seedInstance(dataDir, 'i5');
-    const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['example.com'] })
+    const result = await new JavaKernel({
+      dataDir,
+      confirm: YES,
+      networkAllowlist: ['example.com'],
+    })
       .dispatch({
         id: 'm5',
         kind: 'install_mod',
@@ -402,7 +448,11 @@ describe('JavaKernel install_mod 真实现', () => {
     const src = join(mkTmp(), 'ok.jar');
     writeFileSync(src, 'x');
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'm6', kind: 'install_mod', payload: { instanceId: 'i6', mod: { path: src, fileName: '../escaped.jar' } } })
+      .dispatch({
+        id: 'm6',
+        kind: 'install_mod',
+        payload: { instanceId: 'i6', mod: { path: src, fileName: '../escaped.jar' } },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
     expect(existsSync(join(dataDir, 'instances', 'escaped.jar'))).toBe(false);
@@ -413,7 +463,11 @@ describe('JavaKernel install_mod 真实现', () => {
     const src = join(mkTmp(), 'x.jar');
     writeFileSync(src, 'x');
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'm7', kind: 'install_mod', payload: { instanceId: 'nope', mod: { path: src } } })
+      .dispatch({
+        id: 'm7',
+        kind: 'install_mod',
+        payload: { instanceId: 'nope', mod: { path: src } },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -466,7 +520,10 @@ describe('JavaKernel install_addon / apply_skin / uninstall_content 真实现', 
     const result = await new JavaKernel({ dataDir, confirm: YES })
       .dispatch({ id: 's2', kind: 'apply_skin', payload: { name: 'bad', path: src } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'INVALID_PNG' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'INVALID_PNG' },
+    });
     expect(existsSync(join(dataDir, 'skins', 'bad.png'))).toBe(false);
   });
 
@@ -475,7 +532,11 @@ describe('JavaKernel install_addon / apply_skin / uninstall_content 真实现', 
     const dir = seedInstance(dataDir, 'u1');
     writeFileSync(join(dir, 'mods', 'evil.jar'), 'x');
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'u2', kind: 'uninstall_content', payload: { instanceId: 'u1', kind: 'mod', identifier: 'evil.jar' } })
+      .dispatch({
+        id: 'u2',
+        kind: 'uninstall_content',
+        payload: { instanceId: 'u1', kind: 'mod', identifier: 'evil.jar' },
+      })
       .result();
     expect(result.ok).toBe(true);
     expect(existsSync(join(dir, 'mods', 'evil.jar'))).toBe(false);
@@ -488,7 +549,11 @@ describe('JavaKernel install_addon / apply_skin / uninstall_content 真实现', 
     const victim = join(dataDir, 'evil.txt');
     writeFileSync(victim, 'keep');
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'u4', kind: 'uninstall_content', payload: { instanceId: 'u3', kind: 'mod', identifier: '../../evil.txt' } })
+      .dispatch({
+        id: 'u4',
+        kind: 'uninstall_content',
+        payload: { instanceId: 'u3', kind: 'mod', identifier: '../../evil.txt' },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
     expect(readFileSync(victim, 'utf8')).toBe('keep');
@@ -499,7 +564,11 @@ describe('JavaKernel install_addon / apply_skin / uninstall_content 真实现', 
     const dir = seedInstance(dataDir, 'u5');
     mkdirSync(join(dir, 'saves', 'World', 'datapack', 'mypack'), { recursive: true });
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'u5b', kind: 'uninstall_content', payload: { instanceId: 'u5', kind: 'datapack', identifier: 'mypack' } })
+      .dispatch({
+        id: 'u5b',
+        kind: 'uninstall_content',
+        payload: { instanceId: 'u5', kind: 'datapack', identifier: 'mypack' },
+      })
       .result();
     expect(result.ok).toBe(true);
     expect(existsSync(join(dir, 'saves', 'World', 'datapack', 'mypack'))).toBe(false);
@@ -509,7 +578,11 @@ describe('JavaKernel install_addon / apply_skin / uninstall_content 真实现', 
     const dataDir = mkTmp();
     seedInstance(dataDir, 'u6');
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'u7', kind: 'uninstall_content', payload: { instanceId: 'u6', kind: 'weird', identifier: 'x' } })
+      .dispatch({
+        id: 'u7',
+        kind: 'uninstall_content',
+        payload: { instanceId: 'u6', kind: 'weird', identifier: 'x' },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -573,9 +646,7 @@ describe('JavaKernel import_package 真实现（§13.1 zip-slip 防护）', () =
     const locals: Buffer[] = [];
     const centrals: Buffer[] = [];
     let offset = 0;
-    for (const [name, dataBuf, compBuf, method] of [
-      ['bomb.bin', big, deflated, 8],
-    ] as const) {
+    for (const [name, dataBuf, compBuf, method] of [['bomb.bin', big, deflated, 8]] as const) {
       const nameBuf = Buffer.from(name, 'utf8');
       const local = Buffer.alloc(30);
       local.writeUInt32LE(0x04034b50, 0);
@@ -622,7 +693,11 @@ describe('JavaKernel import_package 真实现（§13.1 zip-slip 防护）', () =
     const dataDir = mkTmp();
     seedInstance(dataDir, 'p9');
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'p10', kind: 'import_package', payload: { instanceId: 'p9', path: join(dataDir, 'nope.zip') } })
+      .dispatch({
+        id: 'p10',
+        kind: 'import_package',
+        payload: { instanceId: 'p9', path: join(dataDir, 'nope.zip') },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -633,7 +708,11 @@ describe('JavaKernel import_package 真实现（§13.1 zip-slip 防护）', () =
     const zipPath = join(mkTmp(), 'broken.zip');
     writeFileSync(zipPath, Buffer.alloc(64, 7));
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'p12', kind: 'import_package', payload: { instanceId: 'p11', path: zipPath } })
+      .dispatch({
+        id: 'p12',
+        kind: 'import_package',
+        payload: { instanceId: 'p11', path: zipPath },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -654,7 +733,13 @@ describe('JavaKernel install_modpack 真实现', () => {
             game: 'minecraft',
             versionId: '1.0.0',
             name: 'demo',
-            files: [{ path: 'mods/jei.jar', hashes: { sha512: '0'.repeat(128) }, downloads: ['https://cdn.modrinth.com/a/b.jar'] }],
+            files: [
+              {
+                path: 'mods/jei.jar',
+                hashes: { sha512: '0'.repeat(128) },
+                downloads: ['https://cdn.modrinth.com/a/b.jar'],
+              },
+            ],
             dependencies: { minecraft: '1.21.1' },
           }),
         },
@@ -662,7 +747,11 @@ describe('JavaKernel install_modpack 真实现', () => {
       ]),
     );
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'k2', kind: 'install_modpack', payload: { instanceId: 'k1', modpack: { source: 'modrinth', path: zipPath } } })
+      .dispatch({
+        id: 'k2',
+        kind: 'install_modpack',
+        payload: { instanceId: 'k1', modpack: { source: 'modrinth', path: zipPath } },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'permission' } });
   });
@@ -673,9 +762,16 @@ describe('JavaKernel install_modpack 真实现', () => {
     const zipPath = join(mkTmp(), 'bad.mrpack');
     writeFileSync(zipPath, buildZip([{ name: 'readme.txt', content: 'x' }]));
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'k4', kind: 'install_modpack', payload: { instanceId: 'k3', modpack: { source: 'modrinth', path: zipPath } } })
+      .dispatch({
+        id: 'k4',
+        kind: 'install_modpack',
+        payload: { instanceId: 'k3', modpack: { source: 'modrinth', path: zipPath } },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'PACK_INDEX_MISSING' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'PACK_INDEX_MISSING' },
+    });
   });
 
   it('files 列表为空 + 仅 overrides → 真实解包 overrides 到实例，ok:true', async () => {
@@ -701,12 +797,23 @@ describe('JavaKernel install_modpack 真实现', () => {
       ]),
     );
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'k6', kind: 'install_modpack', payload: { instanceId: 'k5', modpack: { source: 'modrinth', path: zipPath } } })
+      .dispatch({
+        id: 'k6',
+        kind: 'install_modpack',
+        payload: { instanceId: 'k5', modpack: { source: 'modrinth', path: zipPath } },
+      })
       .result();
     expect(result.ok).toBe(true);
     expect(readFileSync(join(dir, 'overrides', 'options.txt'), 'utf8')).toBe('lang:zh_cn');
-    expect(readFileSync(join(dir, 'server-overrides', 'config', 'bukkit.yml'), 'utf8')).toBe('settings: {}');
-    expect(result.data).toMatchObject({ mods: 0, overrideFiles: 1, serverOverrideFiles: 1, source: 'modrinth' });
+    expect(readFileSync(join(dir, 'server-overrides', 'config', 'bukkit.yml'), 'utf8')).toBe(
+      'settings: {}',
+    );
+    expect(result.data).toMatchObject({
+      mods: 0,
+      overrideFiles: 1,
+      serverOverrideFiles: 1,
+      source: 'modrinth',
+    });
   });
 
   it('overrides 含 zip-slip 条目 → validation，实例目录未被污染', async () => {
@@ -718,13 +825,24 @@ describe('JavaKernel install_modpack 真实现', () => {
       buildZip([
         {
           name: 'modrinth.index.json',
-          content: JSON.stringify({ formatVersion: 1, game: 'minecraft', versionId: '1', name: 'x', files: [], dependencies: { minecraft: '1.21.1' } }),
+          content: JSON.stringify({
+            formatVersion: 1,
+            game: 'minecraft',
+            versionId: '1',
+            name: 'x',
+            files: [],
+            dependencies: { minecraft: '1.21.1' },
+          }),
         },
         { name: 'overrides/../../escaped.txt', content: 'pwned' },
       ]),
     );
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'k8', kind: 'install_modpack', payload: { instanceId: 'k7', modpack: { source: 'modrinth', path: zipPath } } })
+      .dispatch({
+        id: 'k8',
+        kind: 'install_modpack',
+        payload: { instanceId: 'k7', modpack: { source: 'modrinth', path: zipPath } },
+      })
       .result();
     expect(result.ok).toBe(false);
     expect(result.error?.category).toBe('validation');
@@ -755,16 +873,27 @@ describe('JavaKernel install_modpack 真实现', () => {
       ]),
     );
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'k10', kind: 'install_modpack', payload: { instanceId: 'k9', modpack: { source: 'curseforge', path: zipPath } } })
+      .dispatch({
+        id: 'k10',
+        kind: 'install_modpack',
+        payload: { instanceId: 'k9', modpack: { source: 'curseforge', path: zipPath } },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'PACK_NEEDS_URL_RESOLUTION' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'PACK_NEEDS_URL_RESOLUTION' },
+    });
   });
 
   it('未知 source → validation', async () => {
     const dataDir = mkTmp();
     seedInstance(dataDir, 'k11');
     const result = await new JavaKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'k12', kind: 'install_modpack', payload: { instanceId: 'k11', modpack: { source: 'wtf', path: 'x.zip' } } })
+      .dispatch({
+        id: 'k12',
+        kind: 'install_modpack',
+        payload: { instanceId: 'k11', modpack: { source: 'wtf', path: 'x.zip' } },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -833,7 +962,11 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
   it('url 下载成功 → 落到 mods/ + mod ArtifactRef(sha256) + data 透传 source=url', async () => {
     const dataDir = mkTmp();
     const dir = seedInstance(dataDir, 'u1');
-    const handle = new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['127.0.0.1'] }).dispatch({
+    const handle = new JavaKernel({
+      dataDir,
+      confirm: YES,
+      networkAllowlist: ['127.0.0.1'],
+    }).dispatch({
       id: 'u1',
       kind: 'install_mod',
       payload: { instanceId: 'u1', mod: { url: `${dlBase}/mod.jar`, fileName: 'from-url.jar' } },
@@ -896,7 +1029,10 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
       fileName: 'mismatch.jar',
       sha256: 'a'.repeat(64),
     });
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'HASH_MISMATCH' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'HASH_MISMATCH' },
+    });
     // 既不落目标文件，也不留 .part 半成品
     expect(modsFiles(dir)).toEqual([]);
   });
@@ -922,7 +1058,10 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
       fileName: 'sha512-bad.jar',
       sha512: 'b'.repeat(128),
     });
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'HASH_MISMATCH' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'HASH_MISMATCH' },
+    });
     expect(modsFiles(dir)).toEqual([]);
   });
 
@@ -968,10 +1107,21 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
   it('白名单 example.com 而 url 指向 127.0.0.1 → permission（反证白名单不放行）', async () => {
     const dataDir = mkTmp();
     const dir = seedInstance(dataDir, 'w1');
-    const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['example.com'] })
-      .dispatch({ id: 'w1', kind: 'install_mod', payload: { instanceId: 'w1', mod: { url: `${dlBase}/mod.jar` } } })
+    const result = await new JavaKernel({
+      dataDir,
+      confirm: YES,
+      networkAllowlist: ['example.com'],
+    })
+      .dispatch({
+        id: 'w1',
+        kind: 'install_mod',
+        payload: { instanceId: 'w1', mod: { url: `${dlBase}/mod.jar` } },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'permission', code: 'NETWORK_DENIED' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'permission', code: 'NETWORK_DENIED' },
+    });
     expect(result.error?.message).toMatch(/白名单/);
     expect(dlHits).toEqual([]); // 白名单没过，根本没发请求
     expect(modsFiles(dir)).toEqual([]);
@@ -981,9 +1131,16 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
     const dataDir = mkTmp();
     seedInstance(dataDir, 'w2');
     const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['0.0.1'] })
-      .dispatch({ id: 'w2', kind: 'install_mod', payload: { instanceId: 'w2', mod: { url: `${dlBase}/mod.jar` } } })
+      .dispatch({
+        id: 'w2',
+        kind: 'install_mod',
+        payload: { instanceId: 'w2', mod: { url: `${dlBase}/mod.jar` } },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'permission', code: 'NETWORK_DENIED' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'permission', code: 'NETWORK_DENIED' },
+    });
     expect(dlHits).toEqual([]);
   });
 
@@ -991,9 +1148,16 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
     const dataDir = mkTmp();
     seedInstance(dataDir, 'w3');
     const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['0.0.0.1'] })
-      .dispatch({ id: 'w3', kind: 'install_mod', payload: { instanceId: 'w3', mod: { url: `${dlBase}/mod.jar` } } })
+      .dispatch({
+        id: 'w3',
+        kind: 'install_mod',
+        payload: { instanceId: 'w3', mod: { url: `${dlBase}/mod.jar` } },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'permission', code: 'NETWORK_DENIED' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'permission', code: 'NETWORK_DENIED' },
+    });
     expect(dlHits).toEqual([]);
   });
 
@@ -1001,10 +1165,21 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
     const dataDir = mkTmp();
     seedInstance(dataDir, 'w4');
     const port = new URL(dlBase).port;
-    const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: [`127.0.0.1:${port}`] })
-      .dispatch({ id: 'w4', kind: 'install_mod', payload: { instanceId: 'w4', mod: { url: `${dlBase}/mod.jar` } } })
+    const result = await new JavaKernel({
+      dataDir,
+      confirm: YES,
+      networkAllowlist: [`127.0.0.1:${port}`],
+    })
+      .dispatch({
+        id: 'w4',
+        kind: 'install_mod',
+        payload: { instanceId: 'w4', mod: { url: `${dlBase}/mod.jar` } },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'permission', code: 'NETWORK_DENIED' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'permission', code: 'NETWORK_DENIED' },
+    });
     expect(dlHits).toEqual([]);
   });
 
@@ -1012,17 +1187,32 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
     const dataDir = mkTmp();
     seedInstance(dataDir, 'w5');
     const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['', '   '] })
-      .dispatch({ id: 'w5', kind: 'install_mod', payload: { instanceId: 'w5', mod: { url: `${dlBase}/mod.jar` } } })
+      .dispatch({
+        id: 'w5',
+        kind: 'install_mod',
+        payload: { instanceId: 'w5', mod: { url: `${dlBase}/mod.jar` } },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'permission', code: 'NETWORK_DENIED' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'permission', code: 'NETWORK_DENIED' },
+    });
     expect(dlHits).toEqual([]);
   });
 
   it('白名单项首尾有空白 → trim 后放行（127.0.0.1 命中）', async () => {
     const dataDir = mkTmp();
     const dir = seedInstance(dataDir, 'w6');
-    const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['  127.0.0.1  '] })
-      .dispatch({ id: 'w6', kind: 'install_mod', payload: { instanceId: 'w6', mod: { url: `${dlBase}/mod.jar`, fileName: 'trim.jar' } } })
+    const result = await new JavaKernel({
+      dataDir,
+      confirm: YES,
+      networkAllowlist: ['  127.0.0.1  '],
+    })
+      .dispatch({
+        id: 'w6',
+        kind: 'install_mod',
+        payload: { instanceId: 'w6', mod: { url: `${dlBase}/mod.jar`, fileName: 'trim.jar' } },
+      })
       .result();
     expect(result.ok).toBe(true);
     expect(existsSync(join(dir, 'mods', 'trim.jar'))).toBe(true);
@@ -1033,7 +1223,14 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
     const dir = seedInstance(dataDir, 'w7');
     const port = new URL(dlBase).port;
     const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['localhost'] })
-      .dispatch({ id: 'w7', kind: 'install_mod', payload: { instanceId: 'w7', mod: { url: `http://localhost:${port}/mod.jar`, fileName: 'lh.jar' } } })
+      .dispatch({
+        id: 'w7',
+        kind: 'install_mod',
+        payload: {
+          instanceId: 'w7',
+          mod: { url: `http://localhost:${port}/mod.jar`, fileName: 'lh.jar' },
+        },
+      })
       .result();
     expect(result.ok).toBe(true);
     expect(readFileSync(join(dir, 'mods', 'lh.jar')).equals(DL_BYTES)).toBe(true);
@@ -1054,8 +1251,16 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
             versionId: '1.0.0',
             name: 'dl',
             files: [
-              { path: 'mods/jei.jar', hashes: { sha512: DL_SHA512 }, downloads: [`${dlBase}/jei.jar`] },
-              { path: 'mods/sodium.jar', hashes: { sha512: DL_SHA512 }, downloads: [`${dlBase}/sodium.jar`] },
+              {
+                path: 'mods/jei.jar',
+                hashes: { sha512: DL_SHA512 },
+                downloads: [`${dlBase}/jei.jar`],
+              },
+              {
+                path: 'mods/sodium.jar',
+                hashes: { sha512: DL_SHA512 },
+                downloads: [`${dlBase}/sodium.jar`],
+              },
             ],
             dependencies: { minecraft: '1.21.1' },
           }),
@@ -1064,14 +1269,23 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
       ]),
     );
     const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['127.0.0.1'] })
-      .dispatch({ id: 'kp1', kind: 'install_modpack', payload: { instanceId: 'kp1', modpack: { source: 'modrinth', path: zipPath } } })
+      .dispatch({
+        id: 'kp1',
+        kind: 'install_modpack',
+        payload: { instanceId: 'kp1', modpack: { source: 'modrinth', path: zipPath } },
+      })
       .result();
     expect(result.ok).toBe(true);
     expect(dlHits.sort()).toEqual(['/jei.jar', '/sodium.jar']);
     expect(readFileSync(join(dir, 'mods', 'jei.jar')).equals(DL_BYTES)).toBe(true);
     expect(readFileSync(join(dir, 'mods', 'sodium.jar')).equals(DL_BYTES)).toBe(true);
     expect(readFileSync(join(dir, 'overrides', 'config', 'options.txt'), 'utf8')).toBe('fov:80');
-    expect(result.data).toMatchObject({ mods: 2, overrideFiles: 1, serverOverrideFiles: 0, source: 'modrinth' });
+    expect(result.data).toMatchObject({
+      mods: 2,
+      overrideFiles: 1,
+      serverOverrideFiles: 0,
+      source: 'modrinth',
+    });
     // 并发下载下 artifacts 顺序不保证，只断言数量与哈希（§0.5 产物哈希对外可见）
     expect(result.artifacts?.length).toBe(2);
     expect(result.artifacts?.every((a) => a.kind === 'mod' && a.sha256 === DL_SHA256)).toBe(true);
@@ -1091,7 +1305,13 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
             game: 'minecraft',
             versionId: '1.0.0',
             name: 'bad',
-            files: [{ path: 'mods/bad.jar', hashes: { sha512: '0'.repeat(128) }, downloads: [`${dlBase}/bad.jar`] }],
+            files: [
+              {
+                path: 'mods/bad.jar',
+                hashes: { sha512: '0'.repeat(128) },
+                downloads: [`${dlBase}/bad.jar`],
+              },
+            ],
             dependencies: { minecraft: '1.21.1' },
           }),
         },
@@ -1099,9 +1319,16 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
       ]),
     );
     const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['127.0.0.1'] })
-      .dispatch({ id: 'kp2', kind: 'install_modpack', payload: { instanceId: 'kp2', modpack: { source: 'modrinth', path: zipPath } } })
+      .dispatch({
+        id: 'kp2',
+        kind: 'install_modpack',
+        payload: { instanceId: 'kp2', modpack: { source: 'modrinth', path: zipPath } },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'HASH_MISMATCH' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'HASH_MISMATCH' },
+    });
     expect(modsFiles(dir)).toEqual([]);
     expect(existsSync(join(dir, 'overrides'))).toBe(false);
   });
@@ -1120,16 +1347,33 @@ describe('JavaKernel 真实 url 下载成功路径（本地 server + §10.6 白�
             game: 'minecraft',
             versionId: '1.0.0',
             name: 'dl2',
-            files: [{ path: 'mods/jei.jar', hashes: { sha512: DL_SHA512 }, downloads: [`${dlBase}/jei.jar`] }],
+            files: [
+              {
+                path: 'mods/jei.jar',
+                hashes: { sha512: DL_SHA512 },
+                downloads: [`${dlBase}/jei.jar`],
+              },
+            ],
             dependencies: { minecraft: '1.21.1' },
           }),
         },
       ]),
     );
-    const result = await new JavaKernel({ dataDir, confirm: YES, networkAllowlist: ['example.com'] })
-      .dispatch({ id: 'kp3', kind: 'install_modpack', payload: { instanceId: 'kp3', modpack: { source: 'modrinth', path: zipPath } } })
+    const result = await new JavaKernel({
+      dataDir,
+      confirm: YES,
+      networkAllowlist: ['example.com'],
+    })
+      .dispatch({
+        id: 'kp3',
+        kind: 'install_modpack',
+        payload: { instanceId: 'kp3', modpack: { source: 'modrinth', path: zipPath } },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'permission', code: 'NETWORK_DENIED' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'permission', code: 'NETWORK_DENIED' },
+    });
     expect(dlHits).toEqual([]);
     expect(modsFiles(dir)).toEqual([]);
   });
@@ -1247,7 +1491,10 @@ describe('JavaKernel sandbox 模式隔离（§13.4）', () => {
     const result = await new JavaKernel({ dataDir, mode: 'sandbox', confirm: YES })
       .dispatch({ id: 'sb2', kind: 'create_instance', payload: { name: 'iso2' } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'SANDBOX_ROOT_MISSING' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SANDBOX_ROOT_MISSING' },
+    });
     expect(existsSync(join(dataDir, 'instances', 'iso2'))).toBe(false);
   });
 
@@ -1256,7 +1503,9 @@ describe('JavaKernel sandbox 模式隔离（§13.4）', () => {
     const sandboxDir = mkTmp();
     seedInstance(sandboxDir, 'in-sb');
     const kernel = new JavaKernel({ dataDir, sandboxDir, mode: 'sandbox', confirm: YES });
-    const result = await kernel.dispatch({ id: 'sb3', kind: 'list_instances', payload: null }).result();
+    const result = await kernel
+      .dispatch({ id: 'sb3', kind: 'list_instances', payload: null })
+      .result();
     expect(result.data).toEqual({ instances: ['in-sb'] });
   });
 });
@@ -1272,9 +1521,16 @@ describe('JavaKernel ConfirmRequest 形状（§10.6 弹窗确认）', () => {
         return false;
       },
     });
-    await kernel.dispatch({ id: 'cr1', kind: 'create_instance', payload: { name: 'demo' } }).result();
+    await kernel
+      .dispatch({ id: 'cr1', kind: 'create_instance', payload: { name: 'demo' } })
+      .result();
     expect(captured).not.toBeNull();
-    const req = captured as unknown as { kind: string; payload: unknown; summary: string; risk: string };
+    const req = captured as unknown as {
+      kind: string;
+      payload: unknown;
+      summary: string;
+      risk: string;
+    };
     expect(req.kind).toBe('create_instance');
     expect(req.payload).toEqual({ name: 'demo' });
     expect(req.risk).toBe('execute');
@@ -1292,7 +1548,11 @@ describe('JavaKernel ConfirmRequest 形状（§10.6 弹窗确认）', () => {
         return false;
       },
     })
-      .dispatch({ id: 'cr2', kind: 'install_mod', payload: { instanceId: 'i', mod: { path: 'a.jar' } } })
+      .dispatch({
+        id: 'cr2',
+        kind: 'install_mod',
+        payload: { instanceId: 'i', mod: { path: 'a.jar' } },
+      })
       .result();
     expect(risk).toBe('write');
   });
@@ -1326,7 +1586,9 @@ describe('JavaKernel R 类任务在确认闸门引入后行为不变', () => {
     seedInstance(dataDir, 'alpha');
     seedInstance(dataDir, 'beta');
     const kernel = new JavaKernel({ dataDir, confirm: YES });
-    const result = await kernel.dispatch({ id: 'r1', kind: 'list_instances', payload: null }).result();
+    const result = await kernel
+      .dispatch({ id: 'r1', kind: 'list_instances', payload: null })
+      .result();
     expect(result.data).toEqual({ instances: ['alpha', 'beta'] });
   });
 

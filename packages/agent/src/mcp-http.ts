@@ -52,6 +52,16 @@ export const DEFAULT_SESSION_TTL_MS = 30 * 60 * 1000;
 export const DEFAULT_SSE_HEARTBEAT_MS = 30_000;
 /** GET 建立 SSE 流后立刻下发的注释帧（注释帧被 EventSource 忽略，仅保活/探活）。 */
 export const SSE_OPEN_FRAME = ': mc-creator mcp stream open\n\n';
+/**
+ * 过期会话定期清扫间隔（60s；0 = 关闭）。
+ *
+ * 为什么需要它：过期判定是**惰性**的（has() 命中才算），所以「建了会话就再没被
+ * 访问过」的记录只会在被访问时才被删。开了持久化后这还有个副作用 —— 内存 Map 与
+ * 磁盘存档都会长期留着这些死会话（存档只在变更时落盘，没人访问就不算变更）。
+ * 定期清扫把「没人碰的过期会话」也回收掉。默认 60s，close() 会清掉该定时器
+ * （且已 unref，不挡进程退出），设 0 即回到纯惰性清理。
+ */
+export const DEFAULT_SESSION_SWEEP_MS = 60_000;
 
 /**
  * 服务端自定义错误码（JSON-RPC 保留 -32099..-32000 给实现方自定义）。
@@ -360,6 +370,26 @@ export class SessionStore {
   clear(): void {
     this.#byId.clear();
     this.#flush();
+  }
+
+  /**
+   * 定期清扫过期会话（配合 serveHttp 的 sweepMs 定时器）。
+   * 返回被删掉的条数；只在真的删了东西时才落盘 —— 定时器每 tick 都写盘是纯浪费。
+   *
+   * 注意：调用方必须注入/使用稳定时钟才能断言本方法的效果（测试用 now 推进）。
+   */
+  sweepExpired(): number {
+    // 自己判过期而**不**复用 has()：has() 内部对每次过期删除都会落盘，
+    // 那样一个清扫 tick 会写盘 N 次；这里只批量删、最后落一次。
+    let removed = 0;
+    for (const [id, record] of [...this.#byId]) {
+      if (this.#ttlMs > 0 && this.#now() - record.createdAt > this.#ttlMs) {
+        this.#byId.delete(id);
+        removed += 1;
+      }
+    }
+    if (removed > 0) this.#flush();
+    return removed;
   }
 }
 
@@ -941,6 +971,8 @@ export interface ServeHttpOptions {
   acceptChecker?: (accept: string | undefined, method: string) => boolean;
   /** 会话存档路径；给了则跨重启持久化会话（见 createJsonFilePersistence）。 */
   sessionStorePath?: string;
+  /** 过期会话清扫间隔，0 = 关闭（默认 DEFAULT_SESSION_SWEEP_MS）。 */
+  sweepMs?: number;
 }
 
 export interface RunningHttpServer {
@@ -1020,6 +1052,18 @@ export async function serveHttp(opts: ServeHttpOptions): Promise<RunningHttpServ
 
   const streams = new Set<ServerResponse>();
   const timers = new Set<NodeJS.Timeout>();
+  // 过期会话清扫：见 DEFAULT_SESSION_SWEEP_MS 的取舍说明。
+  // 时钟来自 sessions 内部注入的 now()（真机是 Date.now），所以注入 fake 时钟的
+  // 测试也能断言清扫行为；定时器本身按真实时间走，不受 fake 时钟影响。
+  const sweepMs = opts.sweepMs ?? DEFAULT_SESSION_SWEEP_MS;
+  if (sweepMs > 0) {
+    const sweepTimer = setInterval(() => {
+      const removed = sessions.sweepExpired();
+      if (removed > 0) log(`清扫过期会话 ${removed} 条`);
+    }, sweepMs);
+    sweepTimer.unref?.();
+    timers.add(sweepTimer);
+  }
   /** 每条 SSE 流对应一个推送目标（按会话 id 登记；无会话 id 的匿名流不进 Hub）。 */
   const hub = new NotificationHub();
   /** res → 会话 id，供关闭时反查注销。 */

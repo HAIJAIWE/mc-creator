@@ -56,9 +56,7 @@ export async function findBuiltJar(projectPath: string): Promise<string | null> 
   } catch {
     return null;
   }
-  const jar = entries
-    .filter((e) => e.endsWith('.jar') && !JAR_EXCLUDE.test(e))
-    .sort()[0];
+  const jar = entries.filter((e) => e.endsWith('.jar') && !JAR_EXCLUDE.test(e)).sort()[0];
   return jar === undefined ? null : path.join(projectPath, 'build', 'libs', jar);
 }
 
@@ -188,7 +186,13 @@ export async function runGradleBuild(
     });
     proc.on('error', (err: Error) => {
       // 如 gradlew 缺失（ENOENT）：直接失败，不等待 close
-      finish({ success: false, jarPath: null, log: `spawn error: ${err.message}`, exitCode: null, timedOut });
+      finish({
+        success: false,
+        jarPath: null,
+        log: `spawn error: ${err.message}`,
+        exitCode: null,
+        timedOut,
+      });
     });
     proc.on('exit', (code: number | null) => {
       exitCode = code;

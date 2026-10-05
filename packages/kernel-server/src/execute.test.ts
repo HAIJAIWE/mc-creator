@@ -15,7 +15,15 @@
  * 10. sandbox 模式写sandboxDir 而非 dataDir。
  */
 
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -34,7 +42,9 @@ function mkTmp(prefix = 'server-exec-'): string {
   return d;
 }
 
-async function collect(handle: { progress: AsyncIterable<ProgressEvent> }): Promise<ProgressEvent[]> {
+async function collect(handle: {
+  progress: AsyncIterable<ProgressEvent>;
+}): Promise<ProgressEvent[]> {
   const out: ProgressEvent[] = [];
   for await (const e of handle.progress) out.push(e);
   return out;
@@ -94,7 +104,9 @@ function fakeFailScript(): string {
 
 /** 假脚本：exit 0 但不产出任何 jar。 */
 function fakeEmptyScript(): string {
-  return IS_WIN ? '@echo off\r\necho BUILD SUCCESSFUL\r\nexit /b 0\r\n' : '#!/bin/sh\necho BUILD SUCCESSFUL\nexit 0\n';
+  return IS_WIN
+    ? '@echo off\r\necho BUILD SUCCESSFUL\r\nexit /b 0\r\n'
+    : '#!/bin/sh\necho BUILD SUCCESSFUL\nexit 0\n';
 }
 
 const CREATE_PAYLOAD = {
@@ -139,10 +151,20 @@ describe('ServerKernel 确认闸门：未确认 → 拒绝且零副作用', () =
   it('未确认时 build_project / deploy_plugin / stop_server / rollback_build 全拒绝', async () => {
     const dataDir = mkTmp();
     const kernel = new ServerKernel({ dataDir });
-    const kinds = ['build_project', 'deploy_plugin', 'stop_server', 'restart_server', 'rollback_build'] as const;
+    const kinds = [
+      'build_project',
+      'deploy_plugin',
+      'stop_server',
+      'restart_server',
+      'rollback_build',
+    ] as const;
     for (const kind of kinds) {
       const result = await kernel
-        .dispatch({ id: `x-${kind}`, kind, payload: { serverId: 's', projectDir: '.', artifactPath: 'a.jar', projectRef: 'a.jar' } })
+        .dispatch({
+          id: `x-${kind}`,
+          kind,
+          payload: { serverId: 's', projectDir: '.', artifactPath: 'a.jar', projectRef: 'a.jar' },
+        })
         .result();
       expect(result.error?.category).toBe('permission');
     }
@@ -153,7 +175,11 @@ describe('ServerKernel create_instance 真实现', () => {
   it('confirm true → 目录结构 + server.properties/eula/启动脚本/ops/whitelist 全部落地', async () => {
     const dataDir = mkTmp();
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'cr1', kind: 'create_instance', payload: { ...CREATE_PAYLOAD, motd: 'Hello World' } })
+      .dispatch({
+        id: 'cr1',
+        kind: 'create_instance',
+        payload: { ...CREATE_PAYLOAD, motd: 'Hello World' },
+      })
       .result();
     expect(result.ok).toBe(true);
     const dir = join(dataDir, 'srv1');
@@ -179,9 +205,16 @@ describe('ServerKernel create_instance 真实现', () => {
   it('未接受 EULA → validation，且不创建任何目录', async () => {
     const dataDir = mkTmp();
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'cr2', kind: 'create_instance', payload: { ...CREATE_PAYLOAD, acceptEula: false } })
+      .dispatch({
+        id: 'cr2',
+        kind: 'create_instance',
+        payload: { ...CREATE_PAYLOAD, acceptEula: false },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'EULA_NOT_ACCEPTED' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'EULA_NOT_ACCEPTED' },
+    });
     expect(existsSync(join(dataDir, 'srv1'))).toBe(false);
   });
 
@@ -194,13 +227,20 @@ describe('ServerKernel create_instance 真实现', () => {
         payload: { name: 'srv2', runtime: 'paper', versionId: '1.21.1' },
       })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'EULA_NOT_ACCEPTED' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'EULA_NOT_ACCEPTED' },
+    });
   });
 
   it('runtime 非法 → validation', async () => {
     const dataDir = mkTmp();
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'cr4', kind: 'create_instance', payload: { ...CREATE_PAYLOAD, runtime: 'bukkit' } })
+      .dispatch({
+        id: 'cr4',
+        kind: 'create_instance',
+        payload: { ...CREATE_PAYLOAD, runtime: 'bukkit' },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -220,7 +260,10 @@ describe('ServerKernel create_instance 真实现', () => {
     const result = await new ServerKernel({ dataDir, confirm: YES })
       .dispatch({ id: 'cr6', kind: 'create_instance', payload: CREATE_PAYLOAD })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'SERVER_EXISTS' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SERVER_EXISTS' },
+    });
     expect(readFileSync(join(dir, 'server.properties'), 'utf8')).toBe('motd=sentinel\n');
   });
 
@@ -245,7 +288,11 @@ describe('ServerKernel create_instance 真实现', () => {
   it('gamemode 非法 → validation', async () => {
     const dataDir = mkTmp();
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'cr8', kind: 'create_instance', payload: { ...CREATE_PAYLOAD, gamemode: 'chaos' } })
+      .dispatch({
+        id: 'cr8',
+        kind: 'create_instance',
+        payload: { ...CREATE_PAYLOAD, gamemode: 'chaos' },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -253,7 +300,11 @@ describe('ServerKernel create_instance 真实现', () => {
   it('name 含路径分隔符 → validation（路径穿越防护）', async () => {
     const dataDir = mkTmp();
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'cr9', kind: 'create_instance', payload: { ...CREATE_PAYLOAD, name: '../evil' } })
+      .dispatch({
+        id: 'cr9',
+        kind: 'create_instance',
+        payload: { ...CREATE_PAYLOAD, name: '../evil' },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -267,7 +318,11 @@ describe('ServerKernel create_instance 真实现', () => {
     });
     const eventsPromise = collect(handle);
     await handle.result();
-    expect((await eventsPromise).map((e) => e.stage)).toEqual(['validating', 'writing', 'complete']);
+    expect((await eventsPromise).map((e) => e.stage)).toEqual([
+      'validating',
+      'writing',
+      'complete',
+    ]);
   });
 });
 
@@ -315,9 +370,16 @@ describe('ServerKernel build_project 真实现', () => {
   it('工程目录不存在 → validation（不臆造构建成功）', async () => {
     const dataDir = mkTmp();
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'bp1', kind: 'build_project', payload: { projectDir: join(dataDir, 'no-such-project') } })
+      .dispatch({
+        id: 'bp1',
+        kind: 'build_project',
+        payload: { projectDir: join(dataDir, 'no-such-project') },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'PROJECT_DIR_NOT_FOUND' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'PROJECT_DIR_NOT_FOUND' },
+    });
   });
 
   it('缺 projectDir → validation', async () => {
@@ -334,7 +396,10 @@ describe('ServerKernel build_project 真实现', () => {
     const result = await new ServerKernel({ dataDir, confirm: YES })
       .dispatch({ id: 'bp3', kind: 'build_project', payload: { projectDir: outside } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'SANDBOX_ESCAPE' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SANDBOX_ESCAPE' },
+    });
   });
 
   it('无 gradlew 的目录 → 构建失败归 validation + code=BUILD_FAILED', async () => {
@@ -359,7 +424,13 @@ describe('ServerKernel build_project 真实现', () => {
     expect(result.ok).toBe(true);
     expect(result.artifacts?.[0]).toMatchObject({ kind: 'build-artifact' });
     expect(result.artifacts?.[0]?.sha256).toMatch(/^[0-9a-f]{64}$/);
-    const data = result.data as { jarPath: string; sha256: string; exitCode: number; sandboxed: boolean; note: string };
+    const data = result.data as {
+      jarPath: string;
+      sha256: string;
+      exitCode: number;
+      sandboxed: boolean;
+      note: string;
+    };
     expect(data.jarPath.replace(/\\/g, '/')).toMatch(/build\/libs\/demo-1\.0\.jar$/);
     expect(data.jarPath).toBe(join(projectDir, 'build', 'libs', 'demo-1.0.jar'));
     expect(data.exitCode).toBe(0);
@@ -385,7 +456,9 @@ describe('ServerKernel build_project 真实现', () => {
       })
       .result();
     expect(result.ok).toBe(true);
-    expect((result.data as { jarPath: string }).jarPath).toBe(join(projectDir, 'build', 'libs', 'custom-2.0.jar'));
+    expect((result.data as { jarPath: string }).jarPath).toBe(
+      join(projectDir, 'build', 'libs', 'custom-2.0.jar'),
+    );
   });
 
   it('未指定 jarName → 自动挑一个非附属 jar（-sources 被排除，custom 排序在前）', async () => {
@@ -399,7 +472,9 @@ describe('ServerKernel build_project 真实现', () => {
       .dispatch({ id: 'bp7', kind: 'build_project', payload: { projectDir, timeoutMs: 20000 } })
       .result();
     expect(result.ok).toBe(true);
-    expect((result.data as { jarPath: string }).jarPath).toBe(join(projectDir, 'build', 'libs', 'custom-2.0.jar'));
+    expect((result.data as { jarPath: string }).jarPath).toBe(
+      join(projectDir, 'build', 'libs', 'custom-2.0.jar'),
+    );
   });
 
   it('jarName 指定但文件不存在 → validation + ARTIFACT_NOT_FOUND', async () => {
@@ -412,7 +487,10 @@ describe('ServerKernel build_project 真实现', () => {
         payload: { projectDir, jarName: 'nope-9.9.jar', timeoutMs: 20000 },
       })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'ARTIFACT_NOT_FOUND' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'ARTIFACT_NOT_FOUND' },
+    });
   });
 
   it('编译失败（exit 1）→ BUILD_FAILED 且 message 带日志摘要', async () => {
@@ -435,7 +513,10 @@ describe('ServerKernel build_project 真实现', () => {
     const result = await new ServerKernel({ dataDir, confirm: YES })
       .dispatch({ id: 'bp10', kind: 'build_project', payload: { projectDir, timeoutMs: 20000 } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'ARTIFACT_NOT_FOUND' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'ARTIFACT_NOT_FOUND' },
+    });
     expect(result.artifacts).toBeUndefined();
   });
 
@@ -466,7 +547,10 @@ describe('ServerKernel build_project 真实现', () => {
     const result = await new ServerKernel({ dataDir, sandboxDir, mode: 'sandbox', confirm: YES })
       .dispatch({ id: 'bp12', kind: 'build_project', payload: { projectDir, timeoutMs: 20000 } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'SANDBOX_ESCAPE' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SANDBOX_ESCAPE' },
+    });
     expect(existsSync(join(projectDir, 'build'))).toBe(false);
   });
 });
@@ -478,12 +562,18 @@ describe('ServerKernel deploy_plugin 真实现', () => {
     const jar = join(mkTmp(), 'MyPlugin.jar');
     writeFileSync(jar, 'jar-bytes-v1');
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'dp1', kind: 'deploy_plugin', payload: { serverId: 'srv1', artifactPath: jar } })
+      .dispatch({
+        id: 'dp1',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'srv1', artifactPath: jar },
+      })
       .result();
     expect(result.ok).toBe(true);
     const dest = join(dir, 'plugins', 'MyPlugin.jar');
     expect(readFileSync(dest, 'utf8')).toBe('jar-bytes-v1');
-    const record = JSON.parse(readFileSync(join(dir, 'plugins', '.deployed', 'MyPlugin.jar.json'), 'utf8')) as Record<string, unknown>;
+    const record = JSON.parse(
+      readFileSync(join(dir, 'plugins', '.deployed', 'MyPlugin.jar.json'), 'utf8'),
+    ) as Record<string, unknown>;
     expect(record['jar']).toBe('MyPlugin.jar');
     expect(String(record['sha256'])).toMatch(/^[0-9a-f]{64}$/);
     expect(record['previousSha256']).toBeNull();
@@ -497,11 +587,23 @@ describe('ServerKernel deploy_plugin 真实现', () => {
     const jar = join(mkTmp(), 'P.jar');
     writeFileSync(jar, 'v1');
     const kernel = new ServerKernel({ dataDir, confirm: YES });
-    await kernel.dispatch({ id: 'dp2a', kind: 'deploy_plugin', payload: { serverId: 'srv2', artifactPath: jar } }).result();
-    const second = await kernel
-      .dispatch({ id: 'dp2b', kind: 'deploy_plugin', payload: { serverId: 'srv2', artifactPath: jar } })
+    await kernel
+      .dispatch({
+        id: 'dp2a',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'srv2', artifactPath: jar },
+      })
       .result();
-    const record = JSON.parse(readFileSync(join(dir, 'plugins', '.deployed', 'P.jar.json'), 'utf8')) as Record<string, unknown>;
+    const second = await kernel
+      .dispatch({
+        id: 'dp2b',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'srv2', artifactPath: jar },
+      })
+      .result();
+    const record = JSON.parse(
+      readFileSync(join(dir, 'plugins', '.deployed', 'P.jar.json'), 'utf8'),
+    ) as Record<string, unknown>;
     expect(second.ok).toBe(true);
     expect(record['previousSha256']).toBe(String(record['sha256']));
     expect((second.data as { changed: boolean }).changed).toBe(false);
@@ -513,7 +615,11 @@ describe('ServerKernel deploy_plugin 真实现', () => {
     const jar = join(mkTmp(), 'Hot.jar');
     writeFileSync(jar, 'hot');
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'dp3', kind: 'deploy_plugin', payload: { serverId: 'srv3', artifactPath: jar, hotReload: true } })
+      .dispatch({
+        id: 'dp3',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'srv3', artifactPath: jar, hotReload: true },
+      })
       .result();
     expect(result.ok).toBe(true);
     const data = result.data as { reloadCommand: string; note: string };
@@ -530,18 +636,32 @@ describe('ServerKernel deploy_plugin 真实现', () => {
     const file = join(mkTmp(), 'plugin.zip');
     writeFileSync(file, 'x');
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'dp4', kind: 'deploy_plugin', payload: { serverId: 'srv4', artifactPath: file } })
+      .dispatch({
+        id: 'dp4',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'srv4', artifactPath: file },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'UNSUPPORTED_FORMAT' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'UNSUPPORTED_FORMAT' },
+    });
   });
 
   it('产物不存在 → validation', async () => {
     const dataDir = mkTmp();
     seedServer(dataDir, 'srv5');
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'dp5', kind: 'deploy_plugin', payload: { serverId: 'srv5', artifactPath: join(dataDir, 'nope.jar') } })
+      .dispatch({
+        id: 'dp5',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'srv5', artifactPath: join(dataDir, 'nope.jar') },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'SOURCE_NOT_FOUND' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SOURCE_NOT_FOUND' },
+    });
   });
 
   it('服务端不存在 → validation', async () => {
@@ -549,7 +669,11 @@ describe('ServerKernel deploy_plugin 真实现', () => {
     const jar = join(mkTmp(), 'X.jar');
     writeFileSync(jar, 'x');
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'dp6', kind: 'deploy_plugin', payload: { serverId: 'ghost', artifactPath: jar } })
+      .dispatch({
+        id: 'dp6',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'ghost', artifactPath: jar },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -562,9 +686,16 @@ describe('ServerKernel deploy_plugin 真实现', () => {
     const jar = join(mkTmp(), 'Y.jar');
     writeFileSync(jar, 'y');
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'dp7', kind: 'deploy_plugin', payload: { serverId: 'noplug', artifactPath: jar } })
+      .dispatch({
+        id: 'dp7',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'noplug', artifactPath: jar },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'PLUGINS_DIR_MISSING' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'PLUGINS_DIR_MISSING' },
+    });
   });
 });
 
@@ -573,10 +704,18 @@ describe('ServerKernel restart_server / stop_server（§7.1 不做进程托管�
     const dataDir = mkTmp();
     const dir = seedServer(dataDir, 'run1');
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'ct1', kind: 'stop_server', payload: { serverId: 'run1', gracefulMs: 45000 } })
+      .dispatch({
+        id: 'ct1',
+        kind: 'stop_server',
+        payload: { serverId: 'run1', gracefulMs: 45000 },
+      })
       .result();
     expect(result.ok).toBe(true);
-    expect(result.data).toMatchObject({ action: 'stop_server', gracefulMs: 45000, controlCommand: 'stop' });
+    expect(result.data).toMatchObject({
+      action: 'stop_server',
+      gracefulMs: 45000,
+      controlCommand: 'stop',
+    });
     expect((result.data as { serverDir: string }).serverDir).toBe(dir);
     expect((result.data as { note: string }).note).toMatch(/进程生命周期由外壳服务管理/);
   });
@@ -587,7 +726,11 @@ describe('ServerKernel restart_server / stop_server（§7.1 不做进程托管�
     const result = await new ServerKernel({ dataDir, confirm: YES })
       .dispatch({ id: 'ct2', kind: 'restart_server', payload: { serverId: 'run2' } })
       .result();
-    expect(result.data).toMatchObject({ action: 'restart_server', gracefulMs: 30000, controlCommand: 'restart' });
+    expect(result.data).toMatchObject({
+      action: 'restart_server',
+      gracefulMs: 30000,
+      controlCommand: 'restart',
+    });
   });
 
   it('服务端目录不存在 → validation（不臆造控制指令）', async () => {
@@ -604,7 +747,10 @@ describe('ServerKernel restart_server / stop_server（§7.1 不做进程托管�
     const result = await new ServerKernel({ dataDir, confirm: YES })
       .dispatch({ id: 'ct4', kind: 'restart_server', payload: { serverId: 'bare' } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'SERVER_CONFIG_MISSING' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SERVER_CONFIG_MISSING' },
+    });
   });
 
   it('gracefulMs 非法 → validation', async () => {
@@ -622,9 +768,16 @@ describe('ServerKernel rollback_build 真实现', () => {
     const dataDir = mkTmp();
     seedServer(dataDir, 'rb1');
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'rb2', kind: 'rollback_build', payload: { serverId: 'rb1', projectRef: 'Nope.jar' } })
+      .dispatch({
+        id: 'rb2',
+        kind: 'rollback_build',
+        payload: { serverId: 'rb1', projectRef: 'Nope.jar' },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'NO_HISTORY' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'NO_HISTORY' },
+    });
     expect(result.error?.message).toMatch(/无历史产物可回滚|无部署记录/);
   });
 
@@ -638,9 +791,16 @@ describe('ServerKernel rollback_build 真实现', () => {
       JSON.stringify({ jar: 'A.jar', sha256: 'a'.repeat(64), previousSha256: null }),
     );
     const result = await new ServerKernel({ dataDir, confirm: YES })
-      .dispatch({ id: 'rb4', kind: 'rollback_build', payload: { serverId: 'rb3', projectRef: 'A.jar' } })
+      .dispatch({
+        id: 'rb4',
+        kind: 'rollback_build',
+        payload: { serverId: 'rb3', projectRef: 'A.jar' },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'NO_HISTORY' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'NO_HISTORY' },
+    });
   });
 
   it('指定 previousSha256 且备份存在 → 恢复上一版并更新账本', async () => {
@@ -649,15 +809,35 @@ describe('ServerKernel rollback_build 真实现', () => {
     const kernel = new ServerKernel({ dataDir, confirm: YES });
     const jarV1 = join(mkTmp(), 'B.jar');
     writeFileSync(jarV1, 'version-one');
-    await kernel.dispatch({ id: 'rb5a', kind: 'deploy_plugin', payload: { serverId: 'rb5', artifactPath: jarV1 } }).result();
-    const v1Sha = (JSON.parse(readFileSync(join(dir, 'plugins', '.deployed', 'B.jar.json'), 'utf8')) as { sha256: string }).sha256;
+    await kernel
+      .dispatch({
+        id: 'rb5a',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'rb5', artifactPath: jarV1 },
+      })
+      .result();
+    const v1Sha = (
+      JSON.parse(readFileSync(join(dir, 'plugins', '.deployed', 'B.jar.json'), 'utf8')) as {
+        sha256: string;
+      }
+    ).sha256;
     const jarV2 = join(mkTmp(), 'B.jar');
     writeFileSync(jarV2, 'version-two');
-    await kernel.dispatch({ id: 'rb5b', kind: 'deploy_plugin', payload: { serverId: 'rb5', artifactPath: jarV2 } }).result();
+    await kernel
+      .dispatch({
+        id: 'rb5b',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'rb5', artifactPath: jarV2 },
+      })
+      .result();
     expect(readFileSync(join(dir, 'plugins', 'B.jar'), 'utf8')).toBe('version-two');
 
     const rollback = await kernel
-      .dispatch({ id: 'rb5c', kind: 'rollback_build', payload: { serverId: 'rb5', projectRef: 'B.jar', previousSha256: v1Sha } })
+      .dispatch({
+        id: 'rb5c',
+        kind: 'rollback_build',
+        payload: { serverId: 'rb5', projectRef: 'B.jar', previousSha256: v1Sha },
+      })
       .result();
     expect(rollback.ok).toBe(true);
     // 回滚恢复上一版字节，并给出可再次回滚的哈希
@@ -671,15 +851,35 @@ describe('ServerKernel rollback_build 真实现', () => {
     const kernel = new ServerKernel({ dataDir, confirm: YES });
     const j1 = join(mkTmp(), 'C.jar');
     writeFileSync(j1, 'one');
-    await kernel.dispatch({ id: 'rb6a', kind: 'deploy_plugin', payload: { serverId: 'rb6', artifactPath: j1 } }).result();
-    const sha1 = (JSON.parse(readFileSync(join(dir, 'plugins', '.deployed', 'C.jar.json'), 'utf8')) as { sha256: string }).sha256;
+    await kernel
+      .dispatch({
+        id: 'rb6a',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'rb6', artifactPath: j1 },
+      })
+      .result();
+    const sha1 = (
+      JSON.parse(readFileSync(join(dir, 'plugins', '.deployed', 'C.jar.json'), 'utf8')) as {
+        sha256: string;
+      }
+    ).sha256;
     const j2 = join(mkTmp(), 'C.jar');
     writeFileSync(j2, 'two');
-    await kernel.dispatch({ id: 'rb6b', kind: 'deploy_plugin', payload: { serverId: 'rb6', artifactPath: j2 } }).result();
+    await kernel
+      .dispatch({
+        id: 'rb6b',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'rb6', artifactPath: j2 },
+      })
+      .result();
     expect(readFileSync(join(dir, 'plugins', 'C.jar'), 'utf8')).toBe('two');
 
     const rollback = await kernel
-      .dispatch({ id: 'rb6c', kind: 'rollback_build', payload: { serverId: 'rb6', projectRef: 'C.jar', previousSha256: sha1 } })
+      .dispatch({
+        id: 'rb6c',
+        kind: 'rollback_build',
+        payload: { serverId: 'rb6', projectRef: 'C.jar', previousSha256: sha1 },
+      })
       .result();
     expect(rollback.ok).toBe(true);
     expect(readFileSync(join(dir, 'plugins', 'C.jar'), 'utf8')).toBe('one');
@@ -706,7 +906,9 @@ describe('ServerKernel sandbox 模式隔离（§13.4）', () => {
     const dataDir = mkTmp();
     const sandboxDir = mkTmp();
     const kernel = new ServerKernel({ dataDir, sandboxDir, mode: 'sandbox', confirm: YES });
-    const result = await kernel.dispatch({ id: 'sb1', kind: 'create_instance', payload: CREATE_PAYLOAD }).result();
+    const result = await kernel
+      .dispatch({ id: 'sb1', kind: 'create_instance', payload: CREATE_PAYLOAD })
+      .result();
     expect(result.ok).toBe(true);
     expect(existsSync(join(sandboxDir, 'srv1', 'server.properties'))).toBe(true);
     expect(existsSync(join(dataDir, 'srv1'))).toBe(false);
@@ -718,7 +920,10 @@ describe('ServerKernel sandbox 模式隔离（§13.4）', () => {
     const result = await new ServerKernel({ dataDir, mode: 'sandbox', confirm: YES })
       .dispatch({ id: 'sb2', kind: 'create_instance', payload: CREATE_PAYLOAD })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'SANDBOX_ROOT_MISSING' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SANDBOX_ROOT_MISSING' },
+    });
   });
 
   it('sandbox 模式下 deploy_plugin 也只落沙箱', async () => {
@@ -729,7 +934,11 @@ describe('ServerKernel sandbox 模式隔离（§13.4）', () => {
     writeFileSync(jar, 's');
     const kernel = new ServerKernel({ dataDir, sandboxDir, mode: 'sandbox', confirm: YES });
     const result = await kernel
-      .dispatch({ id: 'sb3', kind: 'deploy_plugin', payload: { serverId: 'sbsrv', artifactPath: jar } })
+      .dispatch({
+        id: 'sb3',
+        kind: 'deploy_plugin',
+        payload: { serverId: 'sbsrv', artifactPath: jar },
+      })
       .result();
     expect(result.ok).toBe(true);
     expect(existsSync(join(sandboxDir, 'sbsrv', 'plugins', 'S.jar'))).toBe(true);
@@ -750,10 +959,14 @@ describe('ServerKernel R 类任务行为不变 + 确认请求形状', () => {
       },
     });
     writeFileSync(join(dataDir, 'r1', 'logs', 'latest.log'), '[boot] Done\n', 'utf8');
-    const logs = await kernel.dispatch({ id: 'r2', kind: 'read_logs', payload: { serverId: 'r1' } }).result();
+    const logs = await kernel
+      .dispatch({ id: 'r2', kind: 'read_logs', payload: { serverId: 'r1' } })
+      .result();
     expect(logs.ok).toBe(true);
     expect((logs.data as { tail: string[] }).tail[0]).toBe('[boot] Done');
-    const cfg = await kernel.dispatch({ id: 'r3', kind: 'read_config', payload: { serverId: 'r1' } }).result();
+    const cfg = await kernel
+      .dispatch({ id: 'r3', kind: 'read_config', payload: { serverId: 'r1' } })
+      .result();
     expect((cfg.data as { text: string }).text).toContain('motd=test');
     expect(called).toBe(0);
   });

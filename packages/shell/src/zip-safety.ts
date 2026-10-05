@@ -86,7 +86,11 @@ export function assertSafeEntry(name: string, opts: { isSymlink?: boolean } = {}
     throw new ZipSafetyError('SYMLINK', `${ZIP_SAFETY_ZH.SYMLINK}：${name}`, name);
   }
   if (name === '' || name.includes('\0')) {
-    throw new ZipSafetyError('TRAVERSAL', `${ZIP_SAFETY_ZH.TRAVERSAL}：${JSON.stringify(name)}`, name);
+    throw new ZipSafetyError(
+      'TRAVERSAL',
+      `${ZIP_SAFETY_ZH.TRAVERSAL}：${JSON.stringify(name)}`,
+      name,
+    );
   }
   if (name.startsWith('/') || name.startsWith('\\') || /^[a-zA-Z]:/.test(name)) {
     throw new ZipSafetyError('ABSOLUTE_PATH', `${ZIP_SAFETY_ZH.ABSOLUTE_PATH}：${name}`, name);

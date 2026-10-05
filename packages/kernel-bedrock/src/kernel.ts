@@ -123,7 +123,14 @@ function comMojangCandidates(): string[] {
   const localAppData = process.env['LOCALAPPDATA'];
   if (localAppData) {
     candidates.push(
-      join(localAppData, 'Packages', 'Microsoft.MinecraftUWP_8wekyb3d8bbwe', 'LocalState', 'games', 'com.mojang'),
+      join(
+        localAppData,
+        'Packages',
+        'Microsoft.MinecraftUWP_8wekyb3d8bbwe',
+        'LocalState',
+        'games',
+        'com.mojang',
+      ),
     );
   }
   return candidates;
@@ -273,9 +280,17 @@ function pickGenerator(kind: GenerateKind): {
 } {
   switch (kind) {
     case 'addon':
-      return { generator: new BehaviorPackGenerator(), generatorName: 'behavior_pack', note: undefined };
+      return {
+        generator: new BehaviorPackGenerator(),
+        generatorName: 'behavior_pack',
+        note: undefined,
+      };
     case 'texturepack':
-      return { generator: new BehaviorItemGenerator(), generatorName: 'behavior_item', note: undefined };
+      return {
+        generator: new BehaviorItemGenerator(),
+        generatorName: 'behavior_item',
+        note: undefined,
+      };
     case 'skinpack':
       return {
         generator: new BehaviorEntityGenerator(),
@@ -299,7 +314,19 @@ function safeRelPath(rel: string): string {
 }
 
 /** 二进制扩展名：FileNode.content 为 base64，落盘前必须解码为字节。 */
-const BINARY_EXT = new Set(['.png', '.jpg', '.jpeg', '.tga', '.mcpack', '.mcaddon', '.mcworld', '.mctemplate', '.zip', '.nbt', '.mcstructure']);
+const BINARY_EXT = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.tga',
+  '.mcpack',
+  '.mcaddon',
+  '.mcworld',
+  '.mctemplate',
+  '.zip',
+  '.nbt',
+  '.mcstructure',
+]);
 
 /* ------------------------------------------------------------------ *
  * manifest 校验（§6.2 导入前校验 / §6.3 manifest 字段）
@@ -323,7 +350,10 @@ function isSemverString(value: unknown): boolean {
 function toTriple(value: unknown): [number, number, number] | null {
   if (isVersionTriple(value)) return value as [number, number, number];
   if (isSemverString(value)) {
-    const parts = String(value).trim().split('.').map((n) => Number.parseInt(n, 10));
+    const parts = String(value)
+      .trim()
+      .split('.')
+      .map((n) => Number.parseInt(n, 10));
     return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
   }
   return null;
@@ -420,7 +450,13 @@ export class BedrockKernel implements KernelContract {
       description: '包描述',
       packFormat: 2,
       mcVersion: [1, 21, 0],
-      header: { name: 'My Pack', description: 'desc', uuid: '可省略（自动生成 v4）', version: [1, 0, 0], min_engine_version: [1, 21, 0] },
+      header: {
+        name: 'My Pack',
+        description: 'desc',
+        uuid: '可省略（自动生成 v4）',
+        version: [1, 0, 0],
+        min_engine_version: [1, 21, 0],
+      },
       dependencies: [],
     };
     switch (kind) {
@@ -428,8 +464,20 @@ export class BedrockKernel implements KernelContract {
         return {
           ...base,
           entities: [{ identifier: 'my_pack:zombie', components: {}, events: {} }],
-          recipes: [{ identifier: 'my_pack:recipe', type: 'shaped_crafting', result: 'minecraft:stick', count: 1 }],
-          lootTables: [{ path: 'entities/zombie', pools: [{ rolls: 1, entries: [{ name: 'minecraft:rotten_flesh' }] }] }],
+          recipes: [
+            {
+              identifier: 'my_pack:recipe',
+              type: 'shaped_crafting',
+              result: 'minecraft:stick',
+              count: 1,
+            },
+          ],
+          lootTables: [
+            {
+              path: 'entities/zombie',
+              pools: [{ rolls: 1, entries: [{ name: 'minecraft:rotten_flesh' }] }],
+            },
+          ],
         };
       case 'texturepack':
         return {
@@ -467,13 +515,17 @@ export class BedrockKernel implements KernelContract {
   }
 
   /** R 类：manifest 结构校验（§6.2 导入前校验、§6.3 manifest 字段）。 */
-  private validateContent(payload: unknown, step: (index: number, message?: string) => void): TaskResult {
+  private validateContent(
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): TaskResult {
     const p = asRecord(payload);
     const path = optString(p, 'path');
     if (path === undefined) verr('缺少参数 payload.path（包根目录）');
     step(0);
     if (!exists(path)) verr(`包目录不存在: ${path}`, 'PACK_DIR_NOT_FOUND');
-    if (!statSync(path).isDirectory()) verr(`payload.path 必须是目录（包根目录）: ${path}`, 'PACK_DIR_NOT_FOUND');
+    if (!statSync(path).isDirectory())
+      verr(`payload.path 必须是目录（包根目录）: ${path}`, 'PACK_DIR_NOT_FOUND');
 
     const errors: string[] = [];
     const manifestPath = join(path, 'manifest.json');
@@ -488,7 +540,10 @@ export class BedrockKernel implements KernelContract {
           'MANIFEST_MISSING',
         );
       }
-      verr(`包根目录缺少 manifest.json: ${manifestPath}（§6.3 导入前必须有 manifest）`, 'MANIFEST_MISSING');
+      verr(
+        `包根目录缺少 manifest.json: ${manifestPath}（§6.3 导入前必须有 manifest）`,
+        'MANIFEST_MISSING',
+      );
     }
 
     let manifest: Record<string, unknown>;
@@ -498,22 +553,27 @@ export class BedrockKernel implements KernelContract {
       verr(`manifest.json 不是合法 JSON: ${(e as Error).message}`, 'MANIFEST_INVALID_JSON');
     }
 
-    const header = typeof manifest['header'] === 'object' && manifest['header'] !== null
-      ? (manifest['header'] as Record<string, unknown>)
-      : {};
+    const header =
+      typeof manifest['header'] === 'object' && manifest['header'] !== null
+        ? (manifest['header'] as Record<string, unknown>)
+        : {};
 
     const uuid = header['uuid'];
     if (typeof uuid !== 'string' || uuid === '') errors.push('manifest.header.uuid 缺失');
-    else if (!UUID_RE.test(uuid)) errors.push(`manifest.header.uuid 格式非法: ${uuid}（应为 32/36 位十六进制或带连字符 UUID）`);
+    else if (!UUID_RE.test(uuid))
+      errors.push(`manifest.header.uuid 格式非法: ${uuid}（应为 32/36 位十六进制或带连字符 UUID）`);
 
     const version = header['version'];
     if (version === undefined) errors.push('manifest.header.version 缺失');
     else if (toTriple(version) === null) {
-      errors.push(`manifest.header.version 格式非法: ${JSON.stringify(version)}（需 [int,int,int] 数组或语义化字符串）`);
+      errors.push(
+        `manifest.header.version 格式非法: ${JSON.stringify(version)}（需 [int,int,int] 数组或语义化字符串）`,
+      );
     }
 
     const minEngine = header['min_engine_version'];
-    if (minEngine === undefined) errors.push('manifest.header.min_engine_version 缺失（§6.2 兼容性校验需要）');
+    if (minEngine === undefined)
+      errors.push('manifest.header.min_engine_version 缺失（§6.2 兼容性校验需要）');
     else if (toTriple(minEngine) === null) {
       errors.push(`manifest.header.min_engine_version 格式非法: ${JSON.stringify(minEngine)}`);
     }
@@ -554,7 +614,9 @@ export class BedrockKernel implements KernelContract {
       const want = toTriple(requestedRaw);
       const min = toTriple(minEngine);
       if (want === null) {
-        errors.push(`payload.version 格式非法: ${JSON.stringify(requestedRaw)}（需 [int,int,int] 或语义化字符串）`);
+        errors.push(
+          `payload.version 格式非法: ${JSON.stringify(requestedRaw)}（需 [int,int,int] 或语义化字符串）`,
+        );
       } else if (min !== null && compareTriple(want, min) < 0) {
         // 简单大小比较提示不兼容（§6.2 兼容性）。
         const msg = `目标版本 ${want.join('.')} 低于包min_engine_version ${min.join('.')}，可能不兼容（§6.2）`;
@@ -594,7 +656,12 @@ export class BedrockKernel implements KernelContract {
     }
     const kind = kindRaw as GenerateKind;
     const specRaw = p['spec'];
-    if (specRaw === undefined || specRaw === null || typeof specRaw !== 'object' || Array.isArray(specRaw)) {
+    if (
+      specRaw === undefined ||
+      specRaw === null ||
+      typeof specRaw !== 'object' ||
+      Array.isArray(specRaw)
+    ) {
       // 本内核无 LLM 能力：spec 必须由上层（agent 推理层，§10.0）先生成。
       // 拒绝时把形状示例放进 data，上层可直接据此让 LLM 补齐（§10.0 闭环）。
       return {
@@ -607,7 +674,11 @@ export class BedrockKernel implements KernelContract {
           code: 'SPEC_REQUIRED',
           retryable: false,
         },
-        data: { kind, specShape: this.specShapeHint(kind), generator: pickGenerator(kind).generatorName },
+        data: {
+          kind,
+          specShape: this.specShapeHint(kind),
+          generator: pickGenerator(kind).generatorName,
+        },
       };
     }
     const spec = specRaw as Record<string, unknown>;
@@ -669,7 +740,9 @@ export class BedrockKernel implements KernelContract {
         warnings: result.warnings,
         manifestPresent: manifestDirect,
         mode: this.mode,
-        note: picked.note ?? '产物已写入沙箱目录，需用户在确认后自行导入游戏（§6.1 UWP 受保护目录不可直写）',
+        note:
+          picked.note ??
+          '产物已写入沙箱目录，需用户在确认后自行导入游戏（§6.1 UWP 受保护目录不可直写）',
       },
     };
   }
@@ -687,7 +760,10 @@ export class BedrockKernel implements KernelContract {
     // spec 缺失时把形状示例挂进摘要，避免上层拿到拒绝却不知缺什么。
     if (kind === 'generate_content') {
       const p = asRecord(payload);
-      if (p['spec'] === undefined && (GENERATE_KINDS as readonly string[]).includes(String(p['kind']))) {
+      if (
+        p['spec'] === undefined &&
+        (GENERATE_KINDS as readonly string[]).includes(String(p['kind']))
+      ) {
         summary = `${summary}（缺 payload.spec，需上层先生成）`;
       }
     }

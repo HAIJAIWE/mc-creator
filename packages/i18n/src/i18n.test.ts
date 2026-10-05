@@ -83,7 +83,9 @@ describe('t()', () => {
   });
 
   it('en 返回英文', () => {
-    expect(t('error.category.network', 'en')).toBe('Network error. Check your connection and try again.');
+    expect(t('error.category.network', 'en')).toBe(
+      'Network error. Check your connection and try again.',
+    );
     expect(t('task.succeeded', 'en')).toBe('Task succeeded');
   });
 
@@ -141,7 +143,13 @@ describe('opConfirm()', () => {
   });
 
   it('W 类与无专属文案的 X 类工具返回 null', () => {
-    for (const tool of ['install_mod', 'uninstall_content', 'generate_content', 'stop_server', 'create_instance']) {
+    for (const tool of [
+      'install_mod',
+      'uninstall_content',
+      'generate_content',
+      'stop_server',
+      'create_instance',
+    ]) {
       expect(opConfirm(tool), tool).toBeNull();
     }
   });

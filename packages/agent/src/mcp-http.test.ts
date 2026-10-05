@@ -48,7 +48,9 @@ function fakeClock(start = 1_000_000): { now: () => number; advance: (ms: number
   return { now: () => t, advance: (ms: number) => void (t += ms) };
 }
 
-function req(partial: Partial<HttpRequestLike> & { method: string; body?: string }): HttpRequestLike {
+function req(
+  partial: Partial<HttpRequestLike> & { method: string; body?: string },
+): HttpRequestLike {
   return {
     method: partial.method,
     url: partial.url ?? DEFAULT_MCP_PATH,
@@ -57,7 +59,12 @@ function req(partial: Partial<HttpRequestLike> & { method: string; body?: string
   };
 }
 
-function parseRpc(body: string): { jsonrpc: '2.0'; id: string | number | null; result?: any; error?: { code: number; message: string } } {
+function parseRpc(body: string): {
+  jsonrpc: '2.0';
+  id: string | number | null;
+  result?: any;
+  error?: { code: number; message: string };
+} {
   return JSON.parse(body) as never;
 }
 
@@ -91,7 +98,9 @@ describe('parseHttpPayload（batch 支持 —— 规范要求，stdio 层不支�
   });
 
   it('单请求解析出 method/id/params', () => {
-    const p = parseHttpPayload(rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { a: 1 } }));
+    const p = parseHttpPayload(
+      rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { a: 1 } }),
+    );
     expect(p.kind).toBe('single');
     if (p.kind === 'single') {
       expect(p.entry).toMatchObject({ ok: true });
@@ -103,7 +112,12 @@ describe('parseHttpPayload（batch 支持 —— 规范要求，stdio 层不支�
   });
 
   it('批量数组逐条解析（数组本身不是 -32600）', () => {
-    const p = parseHttpPayload(rpcLine([{ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { jsonrpc: '2.0', method: 'ping' }]));
+    const p = parseHttpPayload(
+      rpcLine([
+        { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+        { jsonrpc: '2.0', method: 'ping' },
+      ]),
+    );
     expect(p.kind).toBe('batch');
     if (p.kind === 'batch') expect(p.entries).toHaveLength(2);
   });
@@ -143,7 +157,10 @@ describe('POST 单请求（§10.1 JSON-RPC 语义优先于 HTTP 状态码）', (
   it('notification（无 id）→ 202 空 body', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', method: 'notifications/initialized' }) }),
+      req({
+        method: 'POST',
+        body: rpcLine({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+      }),
     );
     expect(res.status).toBe(202);
     expect(res.body).toBe('');
@@ -159,7 +176,10 @@ describe('POST 单请求（§10.1 JSON-RPC 语义优先于 HTTP 状态码）', (
   });
 
   it('非法 JSON body → 400 + -32700', async () => {
-    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'POST', body: '{not json' }));
+    const res = await handleHttpRequest(
+      createMcpServer({}),
+      req({ method: 'POST', body: '{not json' }),
+    );
     expect(res.status).toBe(400);
     expect(parseRpc(res.body).error?.code).toBe(-32700);
   });
@@ -171,7 +191,10 @@ describe('POST 单请求（§10.1 JSON-RPC 语义优先于 HTTP 状态码）', (
   });
 
   it('缺 method → 400 + -32600', async () => {
-    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 3 }) }));
+    const res = await handleHttpRequest(
+      createMcpServer({}),
+      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 3 }) }),
+    );
     expect(res.status).toBe(400);
     expect(parseRpc(res.body).error?.code).toBe(-32600);
   });
@@ -179,7 +202,11 @@ describe('POST 单请求（§10.1 JSON-RPC 语义优先于 HTTP 状态码）', (
   it('query string 不影响端点匹配', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', url: '/mcp?session=1', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        url: '/mcp?session=1',
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
     );
     expect(res.status).toBe(200);
   });
@@ -187,7 +214,11 @@ describe('POST 单请求（§10.1 JSON-RPC 语义优先于 HTTP 状态码）', (
   it('自定义 path 生效', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', url: '/rpc', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        url: '/rpc',
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
       { path: '/rpc' },
     );
     expect(res.status).toBe(200);
@@ -249,7 +280,10 @@ describe('batch 请求（数组）', () => {
       createMcpServer({}),
       req({
         method: 'POST',
-        body: rpcLine([{ jsonrpc: '2.0', id: 1 }, { jsonrpc: '2.0', id: 2, method: 'tools/list' }]),
+        body: rpcLine([
+          { jsonrpc: '2.0', id: 1 },
+          { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+        ]),
       }),
     );
     const parsed = JSON.parse(res.body) as Array<{ id: number; error?: { code: number } }>;
@@ -264,7 +298,10 @@ describe('会话管理（§10.1 生产需要 Mcp-Session-Id）', () => {
     const sessions = new SessionStore({ now: () => 1, newSessionId: idFactory() });
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) }),
+      req({
+        method: 'POST',
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+      }),
       { sessions },
     );
     expect(res.status).toBe(200);
@@ -293,7 +330,11 @@ describe('会话管理（§10.1 生产需要 Mcp-Session-Id）', () => {
     const sid = init.headers['Mcp-Session-Id'] as string;
     const next = await handleHttpRequest(
       server,
-      req({ method: 'POST', headers: { 'mcp-session-id': sid }, body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        headers: { 'mcp-session-id': sid },
+        body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+      }),
       { sessions },
     );
     expect(next.status).toBe(200);
@@ -304,7 +345,11 @@ describe('会话管理（§10.1 生产需要 Mcp-Session-Id）', () => {
     const sessions = new SessionStore({ newSessionId: idFactory() });
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', headers: { 'mcp-session-id': 'nope' }, body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        headers: { 'mcp-session-id': 'nope' },
+        body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+      }),
       { sessions },
     );
     expect(res.status).toBe(404);
@@ -315,16 +360,24 @@ describe('会话管理（§10.1 生产需要 Mcp-Session-Id）', () => {
     const clock = fakeClock();
     const sessions = new SessionStore({ now: clock.now, ttlMs: 1000, newSessionId: idFactory() });
     const server = createMcpServer({});
-    const init = await handleHttpRequest(server, req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }), {
-      sessions,
-    });
+    const init = await handleHttpRequest(
+      server,
+      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }),
+      {
+        sessions,
+      },
+    );
     const sid = init.headers['Mcp-Session-Id'] as string;
     clock.advance(500);
     expect(
       (
         await handleHttpRequest(
           server,
-          req({ method: 'POST', headers: { 'mcp-session-id': sid }, body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) }),
+          req({
+            method: 'POST',
+            headers: { 'mcp-session-id': sid },
+            body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+          }),
           { sessions },
         )
       ).status,
@@ -332,7 +385,11 @@ describe('会话管理（§10.1 生产需要 Mcp-Session-Id）', () => {
     clock.advance(501);
     const expired = await handleHttpRequest(
       server,
-      req({ method: 'POST', headers: { 'mcp-session-id': sid }, body: rpcLine({ jsonrpc: '2.0', id: 3, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        headers: { 'mcp-session-id': sid },
+        body: rpcLine({ jsonrpc: '2.0', id: 3, method: 'tools/list' }),
+      }),
       { sessions },
     );
     expect(expired.status).toBe(404);
@@ -343,14 +400,22 @@ describe('会话管理（§10.1 生产需要 Mcp-Session-Id）', () => {
     const clock = fakeClock();
     const sessions = new SessionStore({ now: clock.now, ttlMs: 0, newSessionId: idFactory() });
     const server = createMcpServer({});
-    const init = await handleHttpRequest(server, req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }), {
-      sessions,
-    });
+    const init = await handleHttpRequest(
+      server,
+      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }),
+      {
+        sessions,
+      },
+    );
     const sid = init.headers['Mcp-Session-Id'] as string;
     clock.advance(10_000_000);
     const res = await handleHttpRequest(
       server,
-      req({ method: 'POST', headers: { 'mcp-session-id': sid }, body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        headers: { 'mcp-session-id': sid },
+        body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+      }),
       { sessions },
     );
     expect(res.status).toBe(200);
@@ -359,24 +424,38 @@ describe('会话管理（§10.1 生产需要 Mcp-Session-Id）', () => {
   it('DELETE /mcp → 204 且会话失效（后续请求 404）', async () => {
     const sessions = new SessionStore({ now: () => 1, newSessionId: idFactory() });
     const server = createMcpServer({});
-    const init = await handleHttpRequest(server, req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }), {
-      sessions,
-    });
+    const init = await handleHttpRequest(
+      server,
+      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }),
+      {
+        sessions,
+      },
+    );
     const sid = init.headers['Mcp-Session-Id'] as string;
-    const del = await handleHttpRequest(server, req({ method: 'DELETE', headers: { 'mcp-session-id': sid } }), { sessions });
+    const del = await handleHttpRequest(
+      server,
+      req({ method: 'DELETE', headers: { 'mcp-session-id': sid } }),
+      { sessions },
+    );
     expect(del.status).toBe(204);
     expect(del.body).toBe('');
     expect(sessions.has(sid)).toBe(false);
     const after = await handleHttpRequest(
       server,
-      req({ method: 'POST', headers: { 'mcp-session-id': sid }, body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        headers: { 'mcp-session-id': sid },
+        body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+      }),
       { sessions },
     );
     expect(after.status).toBe(404);
   });
 
   it('DELETE 不带 session 头也 204（幂等终止）', async () => {
-    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'DELETE' }), { sessions: new SessionStore() });
+    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'DELETE' }), {
+      sessions: new SessionStore(),
+    });
     expect(res.status).toBe(204);
   });
 
@@ -405,11 +484,18 @@ describe('会话管理（§10.1 生产需要 Mcp-Session-Id）', () => {
   });
 
   it('resetSessions 清模块级默认存储（无 ctx 也能测）', async () => {
-    await handleHttpRequest(createMcpServer({}), req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }));
+    await handleHttpRequest(
+      createMcpServer({}),
+      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }),
+    );
     resetSessions();
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', headers: { 'mcp-session-id': 'whatever' }, body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        headers: { 'mcp-session-id': 'whatever' },
+        body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+      }),
     );
     expect(res.status).toBe(404);
   });
@@ -424,20 +510,28 @@ describe('HTTP 方法与端点路由', () => {
   });
 
   it('PATCH → 405', async () => {
-    expect((await handleHttpRequest(createMcpServer({}), req({ method: 'PATCH' }))).status).toBe(405);
+    expect((await handleHttpRequest(createMcpServer({}), req({ method: 'PATCH' }))).status).toBe(
+      405,
+    );
   });
 
   it('未知 path → 404 + ERR_ENDPOINT_NOT_FOUND', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', url: '/other', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        url: '/other',
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
     );
     expect(res.status).toBe(404);
     expect(parseRpc(res.body).error?.code).toBe(ERR_ENDPOINT_NOT_FOUND);
   });
 
   it('方法小写也识别（大小写不敏感）', async () => {
-    expect((await handleHttpRequest(createMcpServer({}), req({ method: 'delete' }))).status).toBe(204);
+    expect((await handleHttpRequest(createMcpServer({}), req({ method: 'delete' }))).status).toBe(
+      204,
+    );
   });
 
   it('GET → 200 text/event-stream + 握手注释帧（行为固定）', async () => {
@@ -451,19 +545,31 @@ describe('HTTP 方法与端点路由', () => {
   it('GET 带有效 session 头回显', async () => {
     const sessions = new SessionStore({ now: () => 1, newSessionId: idFactory() });
     const server = createMcpServer({});
-    const init = await handleHttpRequest(server, req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }), {
-      sessions,
-    });
+    const init = await handleHttpRequest(
+      server,
+      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'initialize' }) }),
+      {
+        sessions,
+      },
+    );
     const sid = init.headers['Mcp-Session-Id'] as string;
-    const res = await handleHttpRequest(server, req({ method: 'GET', headers: { 'Mcp-Session-Id': sid } }), { sessions });
+    const res = await handleHttpRequest(
+      server,
+      req({ method: 'GET', headers: { 'Mcp-Session-Id': sid } }),
+      { sessions },
+    );
     expect(res.status).toBe(200);
     expect(res.headers['Mcp-Session-Id']).toBe(sid);
   });
 
   it('GET 带未知 session → 404（先校验会话再开流）', async () => {
-    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'GET', headers: { 'mcp-session-id': 'zz' } }), {
-      sessions: new SessionStore(),
-    });
+    const res = await handleHttpRequest(
+      createMcpServer({}),
+      req({ method: 'GET', headers: { 'mcp-session-id': 'zz' } }),
+      {
+        sessions: new SessionStore(),
+      },
+    );
     expect(res.status).toBe(404);
   });
 
@@ -490,7 +596,11 @@ describe('Origin 校验（MCP 规范强制的 DNS rebinding 防护）', () => {
   it('恶意 origin → 403 + ERR_FORBIDDEN_ORIGIN', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', headers: { origin: 'https://evil.example' }, body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        headers: { origin: 'https://evil.example' },
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
     );
     expect(res.status).toBe(403);
     expect(parseRpc(res.body).error?.code).toBe(ERR_FORBIDDEN_ORIGIN);
@@ -517,14 +627,21 @@ describe('Origin 校验（MCP 规范强制的 DNS rebinding 防护）', () => {
   it('自定义钩子覆盖默认策略', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', headers: { origin: 'https://evil.example' }, body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        headers: { origin: 'https://evil.example' },
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
       { validateOrigin: () => true },
     );
     expect(res.status).toBe(200);
   });
 
   it('Origin 校验早于会话/方法判定（不合法 origin 连 405 都不给）', async () => {
-    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'PUT', headers: { origin: 'https://evil.example' } }));
+    const res = await handleHttpRequest(
+      createMcpServer({}),
+      req({ method: 'PUT', headers: { origin: 'https://evil.example' } }),
+    );
     expect(res.status).toBe(403);
   });
 });
@@ -553,7 +670,11 @@ describe('authorize 钩子（§10.1 生产接 OAuth/token，本轮只留钩子�
   it('支持 async 钩子（生产 OAuth 校验是异步的）', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', headers: { authorization: 'Bearer t' }, body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        headers: { authorization: 'Bearer t' },
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
       {
         authorize: async (r) => headerValue(r.headers, 'authorization') === 'Bearer t',
       },
@@ -565,7 +686,11 @@ describe('authorize 钩子（§10.1 生产接 OAuth/token，本轮只留钩子�
     let seen: HttpRequestLike | undefined;
     await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', url: '/mcp?x=1', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }),
+      req({
+        method: 'POST',
+        url: '/mcp?x=1',
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      }),
       {
         authorize: (r) => {
           seen = r;
@@ -585,29 +710,64 @@ describe('authorize 钩子（§10.1 生产接 OAuth/token，本轮只留钩子�
 
 describe('body 上限', () => {
   it('超上限 → 413 + ERR_PAYLOAD_TOO_LARGE', async () => {
-    const big = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { pad: 'x'.repeat(2000) } });
-    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'POST', body: big }), { maxBodyBytes: 100 });
+    const big = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list',
+      params: { pad: 'x'.repeat(2000) },
+    });
+    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'POST', body: big }), {
+      maxBodyBytes: 100,
+    });
     expect(res.status).toBe(413);
     expect(parseRpc(res.body).error?.code).toBe(ERR_PAYLOAD_TOO_LARGE);
   });
 
   it('恰好等于上限不拒', async () => {
     const body = rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
-    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'POST', body }), { maxBodyBytes: Buffer.byteLength(body) });
+    const res = await handleHttpRequest(createMcpServer({}), req({ method: 'POST', body }), {
+      maxBodyBytes: Buffer.byteLength(body),
+    });
     expect(res.status).toBe(200);
   });
 
   it('GET/DELETE 不受 body 限额影响', async () => {
-    expect((await handleHttpRequest(createMcpServer({}), req({ method: 'GET', body: 'x'.repeat(500) }), { maxBodyBytes: 10 })).status).toBe(200);
-    expect((await handleHttpRequest(createMcpServer({}), req({ method: 'DELETE', body: 'x' }), { maxBodyBytes: 10 })).status).toBe(204);
+    expect(
+      (
+        await handleHttpRequest(
+          createMcpServer({}),
+          req({ method: 'GET', body: 'x'.repeat(500) }),
+          { maxBodyBytes: 10 },
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await handleHttpRequest(createMcpServer({}), req({ method: 'DELETE', body: 'x' }), {
+          maxBodyBytes: 10,
+        })
+      ).status,
+    ).toBe(204);
   });
 });
 
 describe('§10.6 通道权限铁律在 HTTP 通道同样生效（回归防线）', () => {
-  async function callToolOverHttp(name: string, args: unknown, sessions = new SessionStore()): Promise<any> {
+  async function callToolOverHttp(
+    name: string,
+    args: unknown,
+    sessions = new SessionStore(),
+  ): Promise<any> {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) }),
+      req({
+        method: 'POST',
+        body: rpcLine({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name, arguments: args },
+        }),
+      }),
       { sessions },
     );
     expect(res.status).toBe(200);
@@ -647,10 +807,24 @@ describe('§10.6 通道权限铁律在 HTTP 通道同样生效（回归防线）
   it('W/X 一律拒绝：25 个工具里 W+X 全部 permission 错误', async () => {
     const server = createMcpServer({});
     const tools = server.listTools();
-    const wOrX = ['install_modpack', 'install_mod', 'install_addon', 'import_package', 'apply_skin', 'uninstall_content'];
+    const wOrX = [
+      'install_modpack',
+      'install_mod',
+      'install_addon',
+      'import_package',
+      'apply_skin',
+      'uninstall_content',
+    ];
     for (const name of wOrX) {
       expect(tools.map((t) => t.name)).toContain(name);
-      const result = await callToolOverHttp(name, { file: 'f', mod: 'm', addon: 'a', skin: 's', contentId: 'c', instanceId: 'i' });
+      const result = await callToolOverHttp(name, {
+        file: 'f',
+        mod: 'm',
+        addon: 'a',
+        skin: 's',
+        contentId: 'c',
+        instanceId: 'i',
+      });
       expect(result.isError).toBe(true);
       expect(JSON.parse(result.content[0].text).error.category).toBe('permission');
     }
@@ -666,13 +840,23 @@ describe('§10.6 通道权限铁律在 HTTP 通道同样生效（回归防线）
 
   it('R 类 get_capabilities edition=server 改道 server 内核', async () => {
     const result = await callToolOverHttp('get_capabilities', { edition: 'server' });
-    expect(result.structuredContent.capabilities.map((c: { kind: string }) => c.kind)).toContain('server-plugin');
+    expect(result.structuredContent.capabilities.map((c: { kind: string }) => c.kind)).toContain(
+      'server-plugin',
+    );
   });
 
   it('未知工具 → JSON-RPC -32601（HTTP 200）', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'drop_database' } }) }),
+      req({
+        method: 'POST',
+        body: rpcLine({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'drop_database' },
+        }),
+      }),
     );
     expect(res.status).toBe(200);
     expect(parseRpc(res.body).error?.code).toBe(-32601);
@@ -681,7 +865,10 @@ describe('§10.6 通道权限铁律在 HTTP 通道同样生效（回归防线）
   it('tools/call 缺 name → -32602', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: {} }) }),
+      req({
+        method: 'POST',
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: {} }),
+      }),
     );
     expect(parseRpc(res.body).error?.code).toBe(-32602);
   });
@@ -689,7 +876,15 @@ describe('§10.6 通道权限铁律在 HTTP 通道同样生效（回归防线）
   it('tools/call arguments 非对象 → -32602', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_capabilities', arguments: 'nope' } }) }),
+      req({
+        method: 'POST',
+        body: rpcLine({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'get_capabilities', arguments: 'nope' },
+        }),
+      }),
     );
     expect(parseRpc(res.body).error?.code).toBe(-32602);
   });
@@ -697,7 +892,14 @@ describe('§10.6 通道权限铁律在 HTTP 通道同样生效（回归防线）
   it('tools/call notification → 202（无返回）', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
-      req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', method: 'tools/call', params: { name: 'get_capabilities' } }) }),
+      req({
+        method: 'POST',
+        body: rpcLine({
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: { name: 'get_capabilities' },
+        }),
+      }),
     );
     expect(res.status).toBe(202);
   });
@@ -763,12 +965,20 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
       const call = await fetch(running.url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'mcp-session-id': sid ?? '' },
-        body: rpcLine({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'get_capabilities', arguments: {} } }),
+        body: rpcLine({
+          jsonrpc: '2.0',
+          id: 3,
+          method: 'tools/call',
+          params: { name: 'get_capabilities', arguments: {} },
+        }),
       });
       const callBody = (await call.json()) as any;
       expect(Array.isArray(callBody.result.structuredContent.capabilities)).toBe(true);
 
-      const del = await fetch(running.url, { method: 'DELETE', headers: { 'mcp-session-id': sid ?? '' } });
+      const del = await fetch(running.url, {
+        method: 'DELETE',
+        headers: { 'mcp-session-id': sid ?? '' },
+      });
       expect(del.status).toBe(204);
 
       const after = await fetch(running.url, {
@@ -793,7 +1003,11 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
       expect(notif.status).toBe(202);
       expect(await notif.text()).toBe('');
 
-      const bad = await fetch(running.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{oops' });
+      const bad = await fetch(running.url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{oops',
+      });
       expect(bad.status).toBe(400);
       expect(((await bad.json()) as any).error.code).toBe(-32700);
 
@@ -801,7 +1015,10 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
       expect(put.status).toBe(405);
       expect(put.headers.get('allow')).toBe(ALLOWED_METHODS);
 
-      const nf = await fetch(`http://127.0.0.1:${running.port}/nope`, { method: 'POST', body: '{}' });
+      const nf = await fetch(`http://127.0.0.1:${running.port}/nope`, {
+        method: 'POST',
+        body: '{}',
+      });
       expect(nf.status).toBe(404);
 
       const evil = await fetch(running.url, {
@@ -816,7 +1033,11 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
   });
 
   it('真机：authorize false → 401 + WWW-Authenticate', async () => {
-    const running = await serveHttp({ server: createMcpServer({}), port: 0, authorize: () => false });
+    const running = await serveHttp({
+      server: createMcpServer({}),
+      port: 0,
+      authorize: () => false,
+    });
     try {
       const res = await fetch(running.url, {
         method: 'POST',
@@ -836,7 +1057,12 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
       const res: Response | Error = await fetch(running.url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { pad: 'x'.repeat(500) } }),
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/list',
+          params: { pad: 'x'.repeat(500) },
+        }),
       }).then(
         (r) => r,
         (e: unknown) => (e instanceof Error ? e : new Error(String(e))),
@@ -860,7 +1086,12 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
       const res = await fetch(running.url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'install_mod', arguments: { mod: 'jei' } } }),
+        body: rpcLine({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'install_mod', arguments: { mod: 'jei' } },
+        }),
       });
       const body = (await res.json()) as any;
       expect(body.result.isError).toBe(true);
@@ -875,7 +1106,11 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
     const running = await serveHttp({ server: createMcpServer({}), port: 0, heartbeatMs: 0 });
     const ac = new AbortController();
     try {
-      const res = await fetch(running.url, { method: 'GET', headers: { accept: 'text/event-stream' }, signal: ac.signal });
+      const res = await fetch(running.url, {
+        method: 'GET',
+        headers: { accept: 'text/event-stream' },
+        signal: ac.signal,
+      });
       expect(res.status).toBe(200);
       expect(res.headers.get('content-type')).toBe('text/event-stream');
       const reader = (res.body as ReadableStream<Uint8Array>).getReader();
@@ -888,7 +1123,12 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
   });
 
   it('真机：自定义 path 与 host 生效（连 127.0.0.1 环回）', async () => {
-    const running = await serveHttp({ server: createMcpServer({}), port: 0, host: '127.0.0.1', path: '/rpc' });
+    const running = await serveHttp({
+      server: createMcpServer({}),
+      port: 0,
+      host: '127.0.0.1',
+      path: '/rpc',
+    });
     try {
       expect(running.url).toBe(`http://127.0.0.1:${running.port}/rpc`);
       const ok = await fetch(running.url, {
@@ -897,11 +1137,13 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
         body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
       });
       expect(ok.status).toBe(200);
-      const miss = await fetch(`http://127.0.0.1:${running.port}/mcp`, { method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });
+      const miss = await fetch(`http://127.0.0.1:${running.port}/mcp`, {
+        method: 'POST',
+        body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      });
       expect(miss.status).toBe(404);
     } finally {
       await running.close();
     }
   });
 });
-

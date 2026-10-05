@@ -165,9 +165,10 @@ describe('downloadFile', () => {
   });
 
   it('404 不重试：只请求 1 次且 retryable=false', async () => {
-    await expect(
-      downloadFile(`${base}/missing`, dest(), { retries: 2 }),
-    ).rejects.toMatchObject({ retryable: false, code: 'HTTP_404' });
+    await expect(downloadFile(`${base}/missing`, dest(), { retries: 2 })).rejects.toMatchObject({
+      retryable: false,
+      code: 'HTTP_404',
+    });
     expect(hitCount).toBe(1);
   });
 

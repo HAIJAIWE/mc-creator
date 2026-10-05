@@ -75,11 +75,13 @@ export async function fetchContextState(
   payload: { instanceId?: string; serverId?: string } = {},
 ): Promise<RawContextState | null> {
   try {
-    const result: TaskResult = await kernel.dispatch({
-      id: randomUUID(),
-      kind: 'get_context_pack',
-      payload,
-    }).result();
+    const result: TaskResult = await kernel
+      .dispatch({
+        id: randomUUID(),
+        kind: 'get_context_pack',
+        payload,
+      })
+      .result();
     if (!result.ok) return null;
     return normalizeContextState(result.data);
   } catch {
@@ -133,10 +135,6 @@ export async function buildContextPackFromKernel(
   if (options.apiTypes !== undefined && options.apiTypes !== '') parts.apiTypes = options.apiTypes;
   if (options.extra !== undefined && options.extra !== '') parts.extra = options.extra;
 
-  const pack = buildContextPack(
-    target,
-    parts,
-    options.budgetChars ?? DEFAULT_CONTEXT_BUDGET_CHARS,
-  );
+  const pack = buildContextPack(target, parts, options.budgetChars ?? DEFAULT_CONTEXT_BUDGET_CHARS);
   return { pack, fromKernel: raw !== null };
 }

@@ -150,7 +150,9 @@ describe('errors 文案映射', () => {
     expect(mapFsCodeToFileError('ENAMETOOLONG')).toBe('INVALID_PATH');
     expect(fileErrorToCategory('DISK_FULL')).toBe('disk');
     expect(fileErrorToCategory('PERMISSION')).toBe('permission');
-    expect(toFileError(Object.assign(new Error('x'), { code: 'ENOENT' }), 'p').code).toBe('NOT_FOUND');
+    expect(toFileError(Object.assign(new Error('x'), { code: 'ENOENT' }), 'p').code).toBe(
+      'NOT_FOUND',
+    );
   });
 
   it('桌面端旧码兼容与重试策略', () => {

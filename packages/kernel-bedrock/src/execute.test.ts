@@ -31,7 +31,9 @@ function mkTmp(prefix = 'bedrock-exec-'): string {
   return d;
 }
 
-async function collect(handle: { progress: AsyncIterable<ProgressEvent> }): Promise<ProgressEvent[]> {
+async function collect(handle: {
+  progress: AsyncIterable<ProgressEvent>;
+}): Promise<ProgressEvent[]> {
   const out: ProgressEvent[] = [];
   for await (const e of handle.progress) out.push(e);
   return out;
@@ -44,7 +46,10 @@ const NO = () => false;
 function seedPack(parent: string, name: string, manifest: unknown): string {
   const dir = join(parent, name);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'manifest.json'), typeof manifest === 'string' ? manifest : JSON.stringify(manifest, null, 2));
+  writeFileSync(
+    join(dir, 'manifest.json'),
+    typeof manifest === 'string' ? manifest : JSON.stringify(manifest, null, 2),
+  );
   return dir;
 }
 
@@ -68,7 +73,11 @@ const BEHAVIOR_PACK_SPEC = {
   mcVersion: [1, 21, 0],
   header: { uuid: '3f2b1a44-9c8e-4f21-8a1b-1234567890ab' },
   entities: [
-    { identifier: 'demo_pack:zombie', components: { 'minecraft:health': { value: 20 } }, events: {} },
+    {
+      identifier: 'demo_pack:zombie',
+      components: { 'minecraft:health': { value: 20 } },
+      events: {},
+    },
   ],
   recipes: [
     { identifier: 'demo_pack:stick', type: 'shaped_crafting', result: 'minecraft:stick', count: 1 },
@@ -121,7 +130,11 @@ describe('BedrockKernel generate_content 确认闸门', () => {
   it('未传 confirm → permission + confirmRequired，沙箱未产生任何目录', async () => {
     const sandboxDir = mkTmp();
     const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox' })
-      .dispatch({ id: 'g1', kind: 'generate_content', payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC } })
+      .dispatch({
+        id: 'g1',
+        kind: 'generate_content',
+        payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC },
+      })
       .result();
     expect(result.ok).toBe(false);
     expect(result.error?.category).toBe('permission');
@@ -132,7 +145,11 @@ describe('BedrockKernel generate_content 确认闸门', () => {
   it('confirm 返回 false → 拒绝且沙箱未落盘', async () => {
     const sandboxDir = mkTmp();
     const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: NO })
-      .dispatch({ id: 'g2', kind: 'generate_content', payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC } })
+      .dispatch({
+        id: 'g2',
+        kind: 'generate_content',
+        payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC },
+      })
       .result();
     expect(result.error?.category).toBe('permission');
     expect(existsSync(join(sandboxDir, 'packs', 'demo_pack'))).toBe(false);
@@ -151,7 +168,11 @@ describe('BedrockKernel generate_content 确认闸门', () => {
         return false;
       },
     })
-      .dispatch({ id: 'g3', kind: 'generate_content', payload: { prompt: '做一个火焰剑', kind: 'addon', spec: BEHAVIOR_PACK_SPEC } })
+      .dispatch({
+        id: 'g3',
+        kind: 'generate_content',
+        payload: { prompt: '做一个火焰剑', kind: 'addon', spec: BEHAVIOR_PACK_SPEC },
+      })
       .result();
     expect(risk).toBe('execute');
     expect(summary).toContain('addon');
@@ -168,7 +189,11 @@ describe('BedrockKernel generate_content 确认闸门', () => {
         throw new Error('nope');
       },
     })
-      .dispatch({ id: 'g4', kind: 'generate_content', payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC } })
+      .dispatch({
+        id: 'g4',
+        kind: 'generate_content',
+        payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC },
+      })
       .result();
     expect(result.error?.category).toBe('permission');
     expect(existsSync(join(sandboxDir, 'packs'))).toBe(false);
@@ -191,24 +216,39 @@ describe('BedrockKernel generate_content 真实现', () => {
     expect(existsSync(join(outDir, 'entities', 'zombie.json'))).toBe(true);
     expect(existsSync(join(outDir, 'recipes', 'stick.json'))).toBe(true);
     // manifest 直挂包根（§5.7 层级陷阱）
-    const manifest = JSON.parse(readFileSync(join(outDir, 'manifest.json'), 'utf8')) as Record<string, unknown>;
+    const manifest = JSON.parse(readFileSync(join(outDir, 'manifest.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >;
     expect(manifest).toHaveProperty('header');
     expect(result.artifacts?.length).toBeGreaterThanOrEqual(3);
-    expect(result.artifacts?.every((a) => a.kind === 'addon' && /^[0-9a-f]{64}$/.test(a.sha256))).toBe(true);
+    expect(
+      result.artifacts?.every((a) => a.kind === 'addon' && /^[0-9a-f]{64}$/.test(a.sha256)),
+    ).toBe(true);
     expect((result.data as { manifestPresent: boolean }).manifestPresent).toBe(true);
     expect((result.data as { generator: string }).generator).toBe('behavior_pack');
-    expect((await eventsPromise).map((e) => e.stage)).toEqual(['validating', 'generating', 'verifying']);
+    expect((await eventsPromise).map((e) => e.stage)).toEqual([
+      'validating',
+      'generating',
+      'verifying',
+    ]);
   });
 
   it('texturepack → BehaviorItemGenerator，PNG 以base64 解码为真实二进制', async () => {
     const sandboxDir = mkTmp();
     const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: YES })
-      .dispatch({ id: 'gc2', kind: 'generate_content', payload: { prompt: 'item', kind: 'texturepack', spec: ITEM_SPEC } })
+      .dispatch({
+        id: 'gc2',
+        kind: 'generate_content',
+        payload: { prompt: 'item', kind: 'texturepack', spec: ITEM_SPEC },
+      })
       .result();
     expect(result.ok).toBe(true);
     const outDir = join(sandboxDir, 'packs', 'item_pack');
     const png = readFileSync(join(outDir, 'textures', 'items', 'ruby_sword.png'));
-    expect(png.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    expect(png.subarray(0, 8)).toEqual(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
     expect(existsSync(join(outDir, 'items', 'ruby_sword.json'))).toBe(true);
     expect(existsSync(join(outDir, 'texts', 'zh_CN.lang'))).toBe(true);
     expect((result.data as { generator: string }).generator).toBe('behavior_item');
@@ -217,14 +257,20 @@ describe('BedrockKernel generate_content 真实现', () => {
   it('skinpack → 兜底 BehaviorEntityGenerator 且data.note 说明原因', async () => {
     const sandboxDir = mkTmp();
     const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: YES })
-      .dispatch({ id: 'gc3', kind: 'generate_content', payload: { prompt: 'beast', kind: 'skinpack', spec: ENTITY_SPEC } })
+      .dispatch({
+        id: 'gc3',
+        kind: 'generate_content',
+        payload: { prompt: 'beast', kind: 'skinpack', spec: ENTITY_SPEC },
+      })
       .result();
     expect(result.ok).toBe(true);
     const data = result.data as { generator: string; note: string };
     expect(data.generator).toBe('behavior_entity');
     expect(data.note).toMatch(/skinpack/);
     expect(existsSync(join(sandboxDir, 'packs', 'entity_pack', 'manifest.json'))).toBe(true);
-    expect(existsSync(join(sandboxDir, 'packs', 'entity_pack', 'entities', 'my_beast.behavior.json'))).toBe(true);
+    expect(
+      existsSync(join(sandboxDir, 'packs', 'entity_pack', 'entities', 'my_beast.behavior.json')),
+    ).toBe(true);
   });
 
   it('缺 spec → validation 且 data.specShape 给出形状示例（不臆造 spec）', async () => {
@@ -243,7 +289,11 @@ describe('BedrockKernel generate_content 真实现', () => {
   it('缺 spec 时 specShape 随 kind 变化（texturepack 给 items）', async () => {
     const sandboxDir = mkTmp();
     const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: YES })
-      .dispatch({ id: 'gc5', kind: 'generate_content', payload: { prompt: 'p', kind: 'texturepack' } })
+      .dispatch({
+        id: 'gc5',
+        kind: 'generate_content',
+        payload: { prompt: 'p', kind: 'texturepack' },
+      })
       .result();
     const shape = (result.data as { specShape: Record<string, unknown> }).specShape;
     expect(shape).toHaveProperty('items');
@@ -252,7 +302,11 @@ describe('BedrockKernel generate_content 真实现', () => {
   it('kind 非法 → validation', async () => {
     const sandboxDir = mkTmp();
     const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: YES })
-      .dispatch({ id: 'gc6', kind: 'generate_content', payload: { prompt: 'p', kind: 'datapack', spec: BEHAVIOR_PACK_SPEC } })
+      .dispatch({
+        id: 'gc6',
+        kind: 'generate_content',
+        payload: { prompt: 'p', kind: 'datapack', spec: BEHAVIOR_PACK_SPEC },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -260,7 +314,11 @@ describe('BedrockKernel generate_content 真实现', () => {
   it('缺 prompt → validation', async () => {
     const sandboxDir = mkTmp();
     const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: YES })
-      .dispatch({ id: 'gc7', kind: 'generate_content', payload: { kind: 'addon', spec: BEHAVIOR_PACK_SPEC } })
+      .dispatch({
+        id: 'gc7',
+        kind: 'generate_content',
+        payload: { kind: 'addon', spec: BEHAVIOR_PACK_SPEC },
+      })
       .result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
@@ -274,7 +332,11 @@ describe('BedrockKernel generate_content 真实现', () => {
         payload: {
           prompt: 'p',
           kind: 'addon',
-          spec: { packId: 'empty_pack', packName: 'Empty', header: { uuid: '3f2b1a44-9c8e-4f21-8a1b-1234567890ae' } },
+          spec: {
+            packId: 'empty_pack',
+            packName: 'Empty',
+            header: { uuid: '3f2b1a44-9c8e-4f21-8a1b-1234567890ae' },
+          },
         },
       })
       .result();
@@ -300,15 +362,26 @@ describe('BedrockKernel generate_content 真实现', () => {
 
   it('mode=sandbox 未配sandboxDir/dataDir → validation', async () => {
     const result = await new BedrockKernel({ mode: 'sandbox', confirm: YES })
-      .dispatch({ id: 'gc10', kind: 'generate_content', payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC } })
+      .dispatch({
+        id: 'gc10',
+        kind: 'generate_content',
+        payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC },
+      })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'SANDBOX_ROOT_MISSING' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'SANDBOX_ROOT_MISSING' },
+    });
   });
 
   it('dataDir 退路：sandbox 模式无 sandboxDir 时写入 dataDir，且不写 com.mojang', async () => {
     const dataDir = mkTmp();
     const result = await new BedrockKernel({ dataDir, mode: 'sandbox', confirm: YES })
-      .dispatch({ id: 'gc11', kind: 'generate_content', payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC } })
+      .dispatch({
+        id: 'gc11',
+        kind: 'generate_content',
+        payload: { prompt: 'p', kind: 'addon', spec: BEHAVIOR_PACK_SPEC },
+      })
       .result();
     expect(result.ok).toBe(true);
     expect(existsSync(join(dataDir, 'packs', 'demo_pack', 'manifest.json'))).toBe(true);
@@ -319,9 +392,17 @@ describe('BedrockKernel generate_content 真实现', () => {
   it('同一包名重复生成 → 覆盖写且 sha256 稳定（幂等）', async () => {
     const sandboxDir = mkTmp();
     const kernel = new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: YES });
-    const payload = { prompt: 'p', kind: 'addon' as const, spec: { ...BEHAVIOR_PACK_SPEC, header: { uuid: '3f2b1a44-9c8e-4f21-8a1b-1234567890ab' } } };
-    const first = await kernel.dispatch({ id: 'gc12a', kind: 'generate_content', payload }).result();
-    const second = await kernel.dispatch({ id: 'gc12b', kind: 'generate_content', payload }).result();
+    const payload = {
+      prompt: 'p',
+      kind: 'addon' as const,
+      spec: { ...BEHAVIOR_PACK_SPEC, header: { uuid: '3f2b1a44-9c8e-4f21-8a1b-1234567890ab' } },
+    };
+    const first = await kernel
+      .dispatch({ id: 'gc12a', kind: 'generate_content', payload })
+      .result();
+    const second = await kernel
+      .dispatch({ id: 'gc12b', kind: 'generate_content', payload })
+      .result();
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
     const a = (first.data as { files: { path: string; sha256: string }[] }).files;
@@ -345,7 +426,12 @@ describe('BedrockKernel validate_content（R 类免确认真实现）', () => {
       .dispatch({ id: 'v1', kind: 'validate_content', payload: { path: dir } })
       .result();
     expect(result.ok).toBe(true);
-    const data = result.data as { uuid: string; version: number[]; modules: number; errors: string[] };
+    const data = result.data as {
+      uuid: string;
+      version: number[];
+      modules: number;
+      errors: string[];
+    };
     expect(data.uuid).toBe(VALID_MANIFEST.header.uuid);
     expect(data.version).toEqual([1, 0, 0]);
     expect(data.modules).toBe(1);
@@ -359,7 +445,10 @@ describe('BedrockKernel validate_content（R 类免确认真实现）', () => {
     const result = await new BedrockKernel()
       .dispatch({ id: 'v2', kind: 'validate_content', payload: { path: dir } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'MANIFEST_MISSING' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'MANIFEST_MISSING' },
+    });
   });
 
   it('§5.7 多套一层（manifest 在子目录）→ validation 并明确层级陷阱', async () => {
@@ -381,7 +470,10 @@ describe('BedrockKernel validate_content（R 类免确认真实现）', () => {
     const result = await new BedrockKernel()
       .dispatch({ id: 'v4', kind: 'validate_content', payload: { path: dir } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'MANIFEST_INVALID_JSON' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'MANIFEST_INVALID_JSON' },
+    });
   });
 
   it('uuid 格式非法 → validation 且 errors 含中文说明', async () => {
@@ -466,7 +558,11 @@ describe('BedrockKernel validate_content（R 类免确认真实现）', () => {
     const parent = mkTmp();
     const dir = seedPack(parent, 'compat', VALID_MANIFEST);
     const result = await new BedrockKernel()
-      .dispatch({ id: 'v11', kind: 'validate_content', payload: { path: dir, version: [1, 16, 0] } })
+      .dispatch({
+        id: 'v11',
+        kind: 'validate_content',
+        payload: { path: dir, version: [1, 16, 0] },
+      })
       .result();
     const data = result.data as { compatWarning: string | null; requestedVersion: number[] };
     expect(data.compatWarning).toMatch(/不兼容/);
@@ -478,7 +574,11 @@ describe('BedrockKernel validate_content（R 类免确认真实现）', () => {
     const parent = mkTmp();
     const dir = seedPack(parent, 'compat2', VALID_MANIFEST);
     const result = await new BedrockKernel()
-      .dispatch({ id: 'v12', kind: 'validate_content', payload: { path: dir, version: [1, 21, 0] } })
+      .dispatch({
+        id: 'v12',
+        kind: 'validate_content',
+        payload: { path: dir, version: [1, 21, 0] },
+      })
       .result();
     expect(result.ok).toBe(true);
     expect((result.data as { compatWarning: string | null }).compatWarning).toBeNull();
@@ -489,7 +589,10 @@ describe('BedrockKernel validate_content（R 类免确认真实现）', () => {
     const result = await new BedrockKernel()
       .dispatch({ id: 'v13', kind: 'validate_content', payload: { path: join(parent, 'ghost') } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'PACK_DIR_NOT_FOUND' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'PACK_DIR_NOT_FOUND' },
+    });
   });
 
   it('path 指向文件而非目录 → validation', async () => {

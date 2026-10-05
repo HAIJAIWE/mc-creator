@@ -24,7 +24,9 @@ export const LEGACY_MANIFEST_PATH = 'src/main/resources/plugin.yml';
  * - spigot 目标强制 false（Spigot 无区域化线程模型，不声明 Folia 支持）；
  * - paper 目标透传调用方的 foliaSupported。
  */
-export function resolveFoliaSupported(spec: Pick<PluginSpec, 'target' | 'foliaSupported'>): boolean {
+export function resolveFoliaSupported(
+  spec: Pick<PluginSpec, 'target' | 'foliaSupported'>,
+): boolean {
   if (spec.target === 'folia') return true;
   if (spec.target === 'spigot') return false;
   return spec.foliaSupported;
@@ -202,7 +204,8 @@ java {
 function renderReadme(spec: PluginSpec): string {
   const criterion = VALIDATION_CRITERIA['server-plugin'] ?? '';
   const folia = resolveFoliaSupported(spec);
-  const commandList = spec.commands.length === 0 ? '（无）' : spec.commands.map((c) => `/${c.name}`).join('、');
+  const commandList =
+    spec.commands.length === 0 ? '（无）' : spec.commands.map((c) => `/${c.name}`).join('、');
   return `# ${spec.name}
 
 Paper 插件工程（生成目标：${spec.target}，folia-supported: ${folia ? 'true' : 'false'}，api-version: ${spec.apiVersion}）。
@@ -230,7 +233,7 @@ ${commandList}
 
 ## Folia 说明
 
-${spec.target === 'folia' ? '本工程目标为 Folia：清单已强制声明 \`folia-supported: true\`，主类在运行时检测 RegionizedServer 并走 regionised scheduler 分支。' : spec.target === 'paper' ? '本工程目标为 Paper：folia 支持按生成参数透传（当前为 ' + (folia ? 'true' : 'false') + '）；如需上 Folia，须重新生成并声明支持（§7.3 硬开关）。' : '本工程目标为 Spigot：不声明 Folia 支持，不可在 Folia 上运行。'}
+${spec.target === 'folia' ? '本工程目标为 Folia：清单已强制声明 `folia-supported: true`，主类在运行时检测 RegionizedServer 并走 regionised scheduler 分支。' : spec.target === 'paper' ? '本工程目标为 Paper：folia 支持按生成参数透传（当前为 ' + (folia ? 'true' : 'false') + '）；如需上 Folia，须重新生成并声明支持（§7.3 硬开关）。' : '本工程目标为 Spigot：不声明 Folia 支持，不可在 Folia 上运行。'}
 `;
 }
 

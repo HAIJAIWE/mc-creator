@@ -42,11 +42,7 @@ export interface NextDecision {
  * - 失败：generate/validate/fix → diagnose（读日志定位）；
  *   diagnose 自身失败 → abort（连原因都定位不到，避免无效循环烧 token）。
  */
-export function nextStep(
-  result: StageResult,
-  attempts: number,
-  maxAttempts: number,
-): NextDecision {
+export function nextStep(result: StageResult, attempts: number, maxAttempts: number): NextDecision {
   if (result.ok) {
     switch (result.stage) {
       case 'generate':

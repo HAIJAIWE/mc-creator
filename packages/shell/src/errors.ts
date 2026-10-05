@@ -16,12 +16,7 @@
 
 /** §14 六分类（与 contract ClassifiedError.category 一致）。 */
 export type ErrorCategory =
-  | 'network'
-  | 'validation'
-  | 'version'
-  | 'disk'
-  | 'permission'
-  | 'unknown';
+  'network' | 'validation' | 'version' | 'disk' | 'permission' | 'unknown';
 
 /** 与 contract ClassifiedError 同构的分类错误。 */
 export interface ShellClassifiedError {
@@ -36,12 +31,7 @@ export interface ShellClassifiedError {
  * 桌面端 file-error.ts 用 `PERMISSION_DENIED`，此处收敛为 `PERMISSION`。
  */
 export type FileErrorCode =
-  | 'NOT_FOUND'
-  | 'PERMISSION'
-  | 'CONFLICT'
-  | 'DISK_FULL'
-  | 'INVALID_PATH'
-  | 'UNKNOWN';
+  'NOT_FOUND' | 'PERMISSION' | 'CONFLICT' | 'DISK_FULL' | 'INVALID_PATH' | 'UNKNOWN';
 
 export interface FileErrorDetail {
   code: FileErrorCode;

@@ -61,16 +61,17 @@ describe('ServerKernel dispatch 只读任务（read_logs / read_config / get_cap
     const result = await kernel
       .dispatch({ id: 'r2', kind: 'read_logs', payload: { serverId: 'ghost' } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', retryable: false } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', retryable: false },
+    });
     expect(typeof result.error?.message).toBe('string');
   });
 
   it('read_logs 缺 serverId → ok:false + validation 分类', async () => {
     const dataDir = mkTmp();
     const kernel = new ServerKernel({ dataDir });
-    const result = await kernel
-      .dispatch({ id: 'r3', kind: 'read_logs', payload: {} })
-      .result();
+    const result = await kernel.dispatch({ id: 'r3', kind: 'read_logs', payload: {} }).result();
     expect(result).toMatchObject({ ok: false, error: { category: 'validation' } });
   });
 
@@ -102,7 +103,10 @@ describe('ServerKernel dispatch 只读任务（read_logs / read_config / get_cap
     const result = await kernel
       .dispatch({ id: 'g2', kind: 'read_config', payload: { serverId: 'empty' } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', retryable: false } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', retryable: false },
+    });
   });
 
   it('cancel 可调不抛错，progress 为空', async () => {
@@ -139,8 +143,13 @@ describe('ServerKernel get_context_pack（§10.4 状态注入，只读 R 类）'
   ): string => {
     const dir = join(dataDir, serverId);
     mkdirSync(join(dir, 'plugins'), { recursive: true });
-    if (opts.records !== undefined) mkdirSync(join(dir, 'plugins', '.deployed'), { recursive: true });
-    writeFileSync(join(dir, 'server.properties'), opts.props ?? 'motd=x\nserver-port=25565\n', 'utf8');
+    if (opts.records !== undefined)
+      mkdirSync(join(dir, 'plugins', '.deployed'), { recursive: true });
+    writeFileSync(
+      join(dir, 'server.properties'),
+      opts.props ?? 'motd=x\nserver-port=25565\n',
+      'utf8',
+    );
     for (const p of opts.plugins ?? []) writeFileSync(join(dir, 'plugins', p), 'x');
     for (const [name, body] of Object.entries(opts.records ?? {})) {
       writeFileSync(join(dir, 'plugins', '.deployed', name), JSON.stringify(body), 'utf8');
@@ -195,7 +204,8 @@ describe('ServerKernel get_context_pack（§10.4 状态注入，只读 R 类）'
       .dispatch({ id: 'cp3', kind: 'get_context_pack', payload: { serverId: 's3' } })
       .result();
     expect(result.ok).toBe(true);
-    const summary = (result.data as { parts: { serverConfigSummary?: string } }).parts.serverConfigSummary ?? '';
+    const summary =
+      (result.data as { parts: { serverConfigSummary?: string } }).parts.serverConfigSummary ?? '';
     expect(summary).toContain('server-port=25577');
     expect(summary).toContain('gamemode=creative');
     expect(summary).toContain('view-distance=12');
@@ -215,7 +225,9 @@ describe('ServerKernel get_context_pack（§10.4 状态注入，只读 R 类）'
       .result();
     expect(result.ok).toBe(true);
     expect(result.data).toMatchObject({ parts: { plugins: ['A.jar'] } });
-    expect((result.data as { parts: { lastBuildHash?: string } }).parts.lastBuildHash).toBeUndefined();
+    expect(
+      (result.data as { parts: { lastBuildHash?: string } }).parts.lastBuildHash,
+    ).toBeUndefined();
   });
 
   it('无 plugins/ 与账本 → ok:true 且 parts 为空对象（不臆造内容）', async () => {

@@ -64,7 +64,9 @@ describe('JavaKernel dispatch 只读任务（list_instances / get_capabilities�
     rmSync(join(dataDir, 'instances'), { recursive: true, force: true });
     writeFileSync(join(dataDir, 'instances'), 'not-a-dir');
     const kernel = new JavaKernel({ dataDir });
-    const result = await kernel.dispatch({ id: 'l3', kind: 'list_instances', payload: null }).result();
+    const result = await kernel
+      .dispatch({ id: 'l3', kind: 'list_instances', payload: null })
+      .result();
     expect(result.ok).toBe(false);
     expect(result.error?.category).toBe('disk');
     expect(typeof result.error?.message).toBe('string');
@@ -161,7 +163,10 @@ describe('JavaKernel get_context_pack（§10.4 状态注入，只读 R 类）', 
     const result = await new JavaKernel({ dataDir })
       .dispatch({ id: 'cp4', kind: 'get_context_pack', payload: { instanceId: 'ghost' } })
       .result();
-    expect(result).toMatchObject({ ok: false, error: { category: 'validation', code: 'INSTANCE_NOT_FOUND' } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { category: 'validation', code: 'INSTANCE_NOT_FOUND' },
+    });
   });
 
   it('未配置 dataDir → validation，不抛裸异常', async () => {

@@ -4,11 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { FileNode } from '@mc-creator/shared';
-import {
-  API_VERSION_PLACEHOLDER,
-  PluginSpecSchema,
-  type PluginSpec,
-} from './plugin-spec.js';
+import { API_VERSION_PLACEHOLDER, PluginSpecSchema, type PluginSpec } from './plugin-spec.js';
 import {
   LEGACY_MANIFEST_PATH,
   PAPER_MANIFEST_PATH,
@@ -45,7 +41,9 @@ function manifestOf(files: FileNode[], path: string): string {
 
 describe('generatePlugin 文件清单', () => {
   it('产出 6 个文件，路径清单快照一致', () => {
-    const paths = generatePlugin(baseSpec()).map((f) => f.path).sort();
+    const paths = generatePlugin(baseSpec())
+      .map((f) => f.path)
+      .sort();
     expect(paths).toEqual(
       [
         'README.md',
@@ -174,7 +172,13 @@ describe('validatePluginStructure', () => {
   it('apiVersion 非法则失败', () => {
     const files = generatePlugin(baseSpec()).map((f) =>
       f.path === PAPER_MANIFEST_PATH || f.path === LEGACY_MANIFEST_PATH
-        ? { ...f, content: f.content.replace(`api-version: ${API_VERSION_PLACEHOLDER}`, 'api-version: abc') }
+        ? {
+            ...f,
+            content: f.content.replace(
+              `api-version: ${API_VERSION_PLACEHOLDER}`,
+              'api-version: abc',
+            ),
+          }
         : f,
     );
     const r = validatePluginStructure(files);
@@ -196,7 +200,13 @@ describe('validatePluginStructure', () => {
   it('main 类路径与清单不一致则失败', () => {
     const files = generatePlugin(baseSpec()).map((f) =>
       f.path === PAPER_MANIFEST_PATH || f.path === LEGACY_MANIFEST_PATH
-        ? { ...f, content: f.content.replace('com.example.hello.HelloPlugin', 'com.example.hello.Renamed') }
+        ? {
+            ...f,
+            content: f.content.replace(
+              'com.example.hello.HelloPlugin',
+              'com.example.hello.Renamed',
+            ),
+          }
         : f,
     );
     const r = validatePluginStructure(files);
