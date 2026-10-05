@@ -5,6 +5,9 @@
 export * from './jdk.js';
 export * from './jdk-download.js';
 export * from './gradle.js';
+// 生成器只写 gradle-wrapper.properties，不写 gradlew/gradlew.bat/wrapper.jar：
+// 构建前补齐这一步，否则 spawn gradlew 必 ENOENT（见该文件头的实测证据）。
+export * from './gradle-bootstrap.js';
 export * from './sandbox.js';
 // §8.3 进程级隔离的实施者：把 sandbox.ts 的声明式契约接到真实进程隔离上。
 // 在此之前 buildSandboxOptions 是死代码，envAllowlist 从未被执行过。

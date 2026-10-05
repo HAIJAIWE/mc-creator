@@ -8,6 +8,9 @@
  *    （readdir build/libs，排除 -sources/-javadoc），日志正则仅作回退；
  * 3. 增加 distributionSha256 占位校验 verifyDistribution（node:crypto 实现，
  *    期望哈希的来源——官方 manifest/服务端签名，见 §13.3——由调用方传入）。
+ * 4. spawn 之前先 ensureGradleWrapper（./gradle-bootstrap.ts）：生成器不写
+ *    gradlew/gradlew.bat/wrapper.jar，不补这一步就是 ENOENT。该步幂等（启动脚本
+ *    已存在直接返回），失败时按既有失败语义返回 success=false + 日志。
  *
  * 说明：真正的“沙箱”（cwd jail / 无网络 / 资源上限）见 ./sandbox.ts，
  * 此处 cwd=projectPath 已是第一道约束；网络隔离需进程/容器级手段，
@@ -18,6 +21,7 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { sha256File } from './artifact.js';
+import { ensureGradleWrapper } from './gradle-bootstrap.js';
 
 export interface GradleBuildOptions {
   /** 构建超时毫秒数，默认 10 分钟。超时杀进程并置 timedOut。 */
@@ -38,6 +42,20 @@ export interface GradleBuildOptions {
   offline?: boolean;
   /** 为子进程设置 JAVA_HOME（见 ./jdk.ts resolveJavaHome）。 */
   javaHome?: string;
+  /**
+   * 构建前确保 gradlew/gradlew.bat 存在（默认 true）。
+   *
+   * 为什么默认开：生成器只写 gradle/wrapper/gradle-wrapper.properties，
+   * 不写 gradlew/gradlew.bat/gradle-wrapper.jar，而下面 spawn 的就是 gradlew(.bat)
+   * → 干净机器上必 ENOENT。ensureGradleWrapper 是幂等的（启动脚本已存在就直接返回），
+   * 所以对既有工程是零成本；不需要该行为时可显式关掉。
+   */
+  ensureWrapper?: boolean;
+  /**
+   * wrapper 自举用的工具链缓存目录（发行版落在 <cacheDir>/gradle/<version>/），
+   * 缺省 ~/.mc-creator/cache。
+   */
+  wrapperCacheDir?: string;
 }
 
 export interface GradleBuildResult {
@@ -99,8 +117,32 @@ export async function runGradleBuild(
   const env = { ...process.env };
   if (opts.javaHome !== undefined) env['JAVA_HOME'] = opts.javaHome;
 
+  // 构建前确保 wrapper 存在（生成器不写 gradlew/gradlew.bat → 否则 spawn 必 ENOENT）。
+  // 幂等：已存在时零开销。失败走**既有**失败路径（success=false + exitCode=null +
+  // timedOut=false + 日志），不新增错误语义。
+  let log = '';
+  if (opts.ensureWrapper ?? true) {
+    const boot = await ensureGradleWrapper({
+      projectPath,
+      ...(opts.wrapperCacheDir === undefined ? {} : { cacheDir: opts.wrapperCacheDir }),
+      ...(opts.javaHome === undefined ? {} : { javaHome: opts.javaHome }),
+      ...(opts.signal === undefined ? {} : { signal: opts.signal }),
+      timeoutMs,
+    });
+    if (!boot.ok) {
+      return {
+        success: false,
+        jarPath: null,
+        log: `gradle wrapper bootstrap failed: ${boot.error}`,
+        exitCode: null,
+        timedOut: false,
+      };
+    }
+    // created=true 才透出过程日志（热路径 boot.log 为空，不必拼）
+    if (boot.created) log = `${boot.log}\n`;
+  }
+
   return new Promise<GradleBuildResult>((resolve) => {
-    let log = '';
     let timedOut = false;
     let killedByUs = false;
     let exitCode: number | null = null;
