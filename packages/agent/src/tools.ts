@@ -27,6 +27,9 @@ const DEFS: Array<[name: string, description: string]> = [
   ['list_instances', '列出客户端实例'],
   ['list_servers', '列出服务端'],
   ['get_context_pack', '获取状态注入包（见 ./context-pack.ts，§10.4）'],
+  ['list_backups', '列出服务端快照清单（§7.4 快照备份）'],
+  ['list_tasks', '列出定时任务账本，可按 serverId 过滤（§7.4 定时任务）'],
+  ['run_due_tasks', '推进到期定时任务，只读到期清单+账本推进，不直接启停进程（§7.4）'],
   // 内容装配 —— 写实例目录
   ['install_modpack', '安装整合包（CurseForge zip / .mrpack，§5.4）'],
   ['install_mod', '安装 Java Mod（§5.3）'],
@@ -43,6 +46,11 @@ const DEFS: Array<[name: string, description: string]> = [
   ['restart_server', '重启服务端（hot reload 优先，§17 场景 A）'],
   ['stop_server', '停止服务端（优雅停机，§7.4）'],
   ['rollback_build', '回滚构建产物'],
+  ['backup_server', '为服务端创建快照备份（§7.4 快照备份，运维类）'],
+  ['restore_backup', '从快照恢复服务端（§7.4 快照备份，运维类）'],
+  ['prune_backups', '按保留数裁剪旧快照（§7.4 快照备份，运维类）'],
+  ['schedule_task', '调度服务端定时任务（§7.4 定时任务，运维类）'],
+  ['cancel_task', '取消定时任务（§7.4 定时任务，运维类）'],
   // 生成与校验
   ['generate_content', '生成内容（prompt+kind+edition+version，§10.3）'],
   ['validate_content', '校验内容（机器可判定成功信号，§10.3）'],

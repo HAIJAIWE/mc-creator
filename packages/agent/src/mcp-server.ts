@@ -98,6 +98,9 @@ export const MCP_READ_ROUTES: Record<string, KernelRoute> = {
   // §10.4 状态注入：java/server 内核已实现 get_context_pack；bedrock 尚未，
   // 故按 edition 改道（见 pickKernel）。
   get_context_pack: 'java',
+  list_backups: 'server',
+  list_tasks: 'server',
+  run_due_tasks: 'server',
 };
 
 const STRING = { type: 'string' };
@@ -126,6 +129,20 @@ const INPUT_SCHEMAS: Record<string, Record<string, JsonSchemaProp>> = {
     instanceId: { ...STRING },
     edition: { ...STRING },
   },
+  list_backups: { serverId: { ...STRING } },
+  list_tasks: { serverId: { ...STRING, description: '可选，不过滤则列出全部' } },
+  run_due_tasks: { now: { ...STRING, description: '可选注入时间（ISO 字符串，缺省为当前时间）' } },
+  backup_server: { serverId: { ...STRING } },
+  restore_backup: { serverId: { ...STRING }, backupId: { ...STRING } },
+  prune_backups: { serverId: { ...STRING }, keepN: { type: 'number' } },
+  schedule_task: {
+    serverId: { ...STRING },
+    action: { ...STRING, description: 'backup / restart / stop / broadcast' },
+    message: { ...STRING },
+    runAt: { ...STRING, description: 'ISO 时间字符串' },
+    intervalMs: { type: 'number' },
+  },
+  cancel_task: { taskId: { ...STRING } },
   install_modpack: { file: { ...STRING }, instanceId: { ...STRING } },
   install_mod: { mod: { ...STRING }, instanceId: { ...STRING } },
   install_addon: { addon: { ...STRING }, target: { ...STRING } },

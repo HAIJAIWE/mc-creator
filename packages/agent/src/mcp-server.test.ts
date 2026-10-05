@@ -23,11 +23,11 @@ function bodyOf(res: { structuredContent?: unknown }): {
   return res.structuredContent as { ok: boolean; error?: { category: string } };
 }
 
-describe('listTools（§10.2 25 个工具）', () => {
-  it('数量 25 且与 MCP_TOOL_DEFS 同名全覆盖', () => {
+describe('listTools（§10.2 33 个工具：25 + §7.4 快照/定时 8 个）', () => {
+  it('数量 33 且与 MCP_TOOL_DEFS 同名全覆盖', () => {
     const server = createMcpServer({});
     const tools = server.listTools();
-    expect(tools).toHaveLength(25);
+    expect(tools).toHaveLength(33);
     expect(tools).toHaveLength(MCP_TOOL_DEFS.length);
     const names = new Set(tools.map((t) => t.name));
     for (const def of MCP_TOOL_DEFS) expect(names).toContain(def.name);
@@ -164,14 +164,14 @@ describe('JSON-RPC 握手与方法（initialize / tools/list / tools/call）', (
     expect(res).toBeNull();
   });
 
-  it('tools/list 信封返回 25 个工具', async () => {
+  it('tools/list 信封返回 33 个工具', async () => {
     const res = await handleRequest(createMcpServer({}), {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/list',
     });
     const result = res?.result as { tools: unknown[] };
-    expect(result.tools).toHaveLength(25);
+    expect(result.tools).toHaveLength(33);
   });
 
   it('tools/call 信封：get_capabilities 成功', async () => {

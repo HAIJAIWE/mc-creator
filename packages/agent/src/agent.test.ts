@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { MCP_TOOL_PERMISSIONS, VALIDATION_CRITERIA } from '@mc-creator/contract';
 import { MCP_TOOL_DEFS, requireConfirm } from './tools.js';
+import { MCP_READ_ROUTES, createMcpServer } from './mcp-server.js';
 import { buildContextPack } from './context-pack.js';
 import { nextStep } from './pipeline.js';
 
@@ -164,5 +165,92 @@ describe('pipeline.ts 生成闭环状态机（§10.3 成功判据）', () => {
 
   it('diagnose 自身失败 → abort 转人工（避免无效循环）', () => {
     expect(nextStep({ stage: 'diagnose', ok: false }, 0, 3).action).toBe('abort');
+  });
+});
+
+describe('§7.4 快照/定时 8 新工具（contract 33 键）', () => {
+  it('总数 33 且新 8 键全覆盖', () => {
+    const keys = Object.keys(MCP_TOOL_PERMISSIONS);
+    expect(keys).toHaveLength(33);
+    expect(MCP_TOOL_DEFS).toHaveLength(33);
+    const names = new Set(MCP_TOOL_DEFS.map((t) => t.name));
+    for (const n of [
+      'list_backups',
+      'list_tasks',
+      'run_due_tasks',
+      'backup_server',
+      'restore_backup',
+      'prune_backups',
+      'schedule_task',
+      'cancel_task',
+    ]) {
+      expect(names).toContain(n);
+    }
+  });
+
+  it('新 8 条 description 带 §7.4；run_due_tasks 注明不直接启停进程', () => {
+    const byName = new Map(MCP_TOOL_DEFS.map((t) => [t.name, t] as const));
+    for (const n of [
+      'list_backups',
+      'list_tasks',
+      'run_due_tasks',
+      'backup_server',
+      'restore_backup',
+      'prune_backups',
+      'schedule_task',
+      'cancel_task',
+    ]) {
+      expect(byName.get(n)?.description).toContain('§7.4');
+    }
+    expect(byName.get('run_due_tasks')?.description).toContain(
+      '只读到期清单+账本推进，不直接启停进程',
+    );
+  });
+
+  it('三读工具有 server 路由且 callTool 走内核（非 unimplemented 说明）', async () => {
+    expect(MCP_READ_ROUTES['list_backups']).toBe('server');
+    expect(MCP_READ_ROUTES['list_tasks']).toBe('server');
+    expect(MCP_READ_ROUTES['run_due_tasks']).toBe('server');
+    const server = createMcpServer({});
+    // 无 dataDir 时内核报 validation（DATA_DIR_MISSING），关键是已走路由：
+    // 错误分类为 validation 而非 unimplemented 的 unknown。
+    for (const [name, args] of [
+      ['list_backups', { serverId: 'ghost' }],
+      ['list_tasks', {}],
+      ['run_due_tasks', {}],
+    ] as const) {
+      const res = await server.callTool(name, args);
+      expect(res.isError).toBe(true);
+      const body = res.structuredContent as { ok: boolean; error?: { category: string } };
+      expect(body.ok).toBe(false);
+      expect(body.error?.category).toBe('validation');
+      expect(res.content[0]?.text ?? '').not.toContain('暂无内核支持');
+    }
+    // run_due_tasks 的 now 可选注入字段在 inputSchema 中存在
+    const byName = new Map(server.listTools().map((t) => [t.name, t] as const));
+    expect(Object.keys(byName.get('run_due_tasks')?.inputSchema.properties ?? {})).toContain('now');
+  });
+
+  it('W 新工具 5 个被 refuse（confirmRequired true，未执行）', async () => {
+    const server = createMcpServer({});
+    for (const [name, args] of [
+      ['backup_server', { serverId: 's1' }],
+      ['restore_backup', { serverId: 's1', backupId: 'b1' }],
+      ['prune_backups', { serverId: 's1', keepN: 5 }],
+      ['schedule_task', { serverId: 's1', action: 'backup' }],
+      ['cancel_task', { taskId: 'task-1' }],
+    ] as const) {
+      const res = await server.callTool(name, args);
+      expect(res.isError).toBe(true);
+      const raw = JSON.parse(res.content[0]?.text ?? '{}') as {
+        ok: boolean;
+        permission: string;
+        confirmRequired: boolean;
+      };
+      expect(raw.ok).toBe(false);
+      expect(raw.permission).toBe('W');
+      expect(raw.confirmRequired).toBe(true);
+      expect(res.content[0]?.text ?? '').toContain('本通道不执行');
+    }
   });
 });
