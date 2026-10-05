@@ -574,6 +574,22 @@ describe('ServerKernel build_project 真实现', () => {
     });
     expect(existsSync(join(projectDir, 'build'))).toBe(false);
   });
+
+  it('两次 build_project 串行成功且 data.isolation 仍在（§8.2 队列未破坏返回形状）', async () => {
+    const dataDir = mkTmp();
+    const projectDir = makeFakeProject(dataDir, 'proj', fakeBuildScript(['demo-1.0.jar']));
+    const kernel = new ServerKernel({ dataDir, confirm: YES });
+    for (const id of ['bp-q1', 'bp-q2']) {
+      const result = await kernel
+        .dispatch({ id, kind: 'build_project', payload: { projectDir, timeoutMs: 20000 } })
+        .result();
+      expect(result.ok).toBe(true);
+      const iso = (result.data as { isolation?: Record<string, unknown> }).isolation;
+      expect(iso).toBeDefined();
+      expect(iso?.network).toBe(false);
+      expect(iso?.source === 'job-object' || iso?.source === 'unisolated').toBe(true);
+    }
+  });
 });
 
 describe('ServerKernel deploy_plugin 真实现', () => {

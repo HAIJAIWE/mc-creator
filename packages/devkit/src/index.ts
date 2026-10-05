@@ -10,3 +10,4 @@ export * from './sandbox.js';
 export * from './sandbox-exec.js';
 export * from './run-validation.js';
 export * from './artifact.js';
+export * from './build-queue.js';
