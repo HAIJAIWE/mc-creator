@@ -28,6 +28,14 @@ export interface GradleBuildOptions {
   args?: string[];
   /** 是否追加 --quiet，默认 true。 */
   quiet?: boolean;
+  /**
+   * 离线构建（追加 '--offline'，默认 false）。
+   *
+   * §8.1#3 要求“首次构建后应能断网工作”：依赖已进本地缓存（默认 ~/.gradle，
+   * 本模块不改 GRADLE_USER_HOME，Gradle 自己的缺省即共享缓存）时可用。
+   * 默认关闭 —— 首次构建必须联网拉依赖，默认 offline 会让新工程必败。
+   */
+  offline?: boolean;
   /** 为子进程设置 JAVA_HOME（见 ./jdk.ts resolveJavaHome）。 */
   javaHome?: string;
 }
@@ -75,6 +83,13 @@ export async function runGradleBuild(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_GRADLE_TIMEOUT_MS;
   const args = [...(opts.args ?? ['build'])];
   if (opts.quiet ?? true) args.push('--quiet');
+  if (opts.offline === true) args.push('--offline');
+  // §8.2 常驻 daemon：wrapper 缺省即 daemon，但 gradle.properties 里一句
+  // org.gradle.daemon=false 就能关掉。显式 pin 住，要求只有一个——调用方
+  // 明确传了 --daemon/--no-daemon 时尊重调用方，不覆盖。
+  if (!args.includes('--daemon') && !args.includes('--no-daemon')) {
+    args.push('--daemon');
+  }
 
   // Windows 下只有 gradlew.bat（core C-2 修复：./gradlew 会 ENOENT）；
   // .bat 必须经由 shell 启动，posix 保持 shell:false。

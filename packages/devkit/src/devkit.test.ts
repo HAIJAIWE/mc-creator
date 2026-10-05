@@ -225,4 +225,49 @@ describe('gradle.ts 改进版（相对 core 反面教材：超时+磁盘扫描�
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  // §8.2 daemon pin + offline 开关：假 gradlew 把收到的参数原样写进 args.txt，
+  // 断言读的是“子进程实际收到的”，不是拼 args 数组的中间变量。
+  async function runAndReadArgs(extraOpts: Record<string, unknown> = {}): Promise<string[]> {
+    const script = IS_WIN
+      ? '@echo off\r\necho %* > args.txt\r\nexit /b 0\r\n'
+      : '#!/bin/sh\necho "$@" > args.txt\n';
+    const dir = await makeTempDir('devkit-args-');
+    try {
+      if (IS_WIN) {
+        await writeFile(path.join(dir, 'gradlew.bat'), script, 'utf8');
+      } else {
+        const p = path.join(dir, 'gradlew');
+        await writeFile(p, script, { encoding: 'utf8', mode: 0o755 });
+        await chmod(p, 0o755);
+      }
+      const r = await runGradleBuild(dir, { timeoutMs: 15_000, ...extraOpts });
+      expect(r.success).toBe(true);
+      const { readFile } = await import('node:fs/promises');
+      return (await readFile(path.join(dir, 'args.txt'), 'utf8')).trim().split(/\s+/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('runGradleBuild：默认追加 --daemon（§8.2 常驻，不默认 offline）', async () => {
+    const argv = await runAndReadArgs();
+    expect(argv).toContain('build');
+    expect(argv).toContain('--quiet');
+    expect(argv).toContain('--daemon');
+    expect(argv).not.toContain('--offline');
+    expect(argv).not.toContain('--no-daemon');
+  });
+
+  it('runGradleBuild：offline=true 追加 --offline', async () => {
+    const argv = await runAndReadArgs({ offline: true });
+    expect(argv).toContain('--offline');
+    expect(argv).toContain('--daemon');
+  });
+
+  it('runGradleBuild：调用方显式 --no-daemon 时不覆盖', async () => {
+    const argv = await runAndReadArgs({ args: ['build', '--no-daemon'] });
+    expect(argv).toContain('--no-daemon');
+    expect(argv).not.toContain('--daemon');
+  });
 });
