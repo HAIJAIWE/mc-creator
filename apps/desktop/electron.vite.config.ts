@@ -28,6 +28,11 @@ const workspacePkgs = [
   '@mc-creator/agent',
   '@mc-creator/contract',
   '@mc-creator/core',
+  // devkit 进白名单是为了让主进程能直接调 ensureGradleWrapper（构建前补齐
+  // gradlew/gradlew.bat）。它内部的 sandbox-exec 仍走运行时 require 解析
+  // jobobject（见下方 runtimeOnlyModules），所以这里内联 devkit 不会把 .node
+  // 拖进 bundle —— 依赖链上 kernel-server 早就在用 devkit，风险面没变。
+  '@mc-creator/devkit',
   '@mc-creator/kernel-bedrock',
   '@mc-creator/kernel-java',
   '@mc-creator/kernel-server',
@@ -56,6 +61,7 @@ export default defineConfig({
         '@mc-creator/agent': resolve(__dirname, '../../packages/agent/src'),
         '@mc-creator/contract': resolve(__dirname, '../../packages/contract/src'),
         '@mc-creator/core': resolve(__dirname, '../../packages/core/src'),
+        '@mc-creator/devkit': resolve(__dirname, '../../packages/devkit/src'),
         '@mc-creator/kernel-bedrock': resolve(__dirname, '../../packages/kernel-bedrock/src'),
         '@mc-creator/kernel-java': resolve(__dirname, '../../packages/kernel-java/src'),
         '@mc-creator/kernel-server': resolve(__dirname, '../../packages/kernel-server/src'),

@@ -26,6 +26,7 @@
     "@mc-creator/agent": "workspace:*",
     "@mc-creator/contract": "workspace:*",
     "@mc-creator/core": "workspace:*",
+    "@mc-creator/devkit": "workspace:*",
     "@mc-creator/kernel-bedrock": "workspace:*",
     "@mc-creator/kernel-java": "workspace:*",
     "@mc-creator/kernel-server": "workspace:*",

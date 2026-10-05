@@ -80,6 +80,7 @@ import {
   assertWithinRoot,
   buildSandboxOptions,
   createBuildQueue,
+  ensureGradleWrapper,
   ensureJdk as downloadJdk,
   filterEnv,
   findBuiltJar,
@@ -882,6 +883,36 @@ export class ServerKernel implements KernelContract {
       const limits = {
         ...(timeoutMs === undefined ? {} : { timeoutMs }),
       };
+      // Gradle wrapper 自举（§8.1 同族准备）：生成器不写 gradlew/gradlew.bat，
+      // 下面 runSandboxed / runGradleBuild 拉起的正是它们 → 不补这一步必 ENOENT。
+      //
+      // 位置是**有意的**：放在沙箱**之外**、JDK 之后。自举是我方可信的一步
+      // （下载发行版 + 跑 wrapper 任务），而构建产物才是不可信的那一半 ——
+      // 顺序反过来等于把 bootstrap 也关进 job 里，它需要联网写缓存，必然失败。
+      // 幂等：工程已有 wrapper 时零开销（函数第一行就短路）。
+      const boot = await ensureGradleWrapper({
+        projectPath: projectDir,
+        ...(effectiveJavaHome === undefined ? {} : { javaHome: effectiveJavaHome }),
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      });
+      if (!boot.ok) {
+        return {
+          success: false,
+          jarPath: null,
+          log: `Gradle wrapper 准备失败: ${boot.error}`,
+          exitCode: null,
+          timedOut: false,
+          // 沿用上方 PATH 缺失那段的写法：沙箱尚未介入，按 unisolated 如实上报。
+          enforcedIsolation: {
+            source: 'unisolated',
+            memory: false,
+            cpu: false,
+            network: false,
+            treeKill: false,
+            reason: `Gradle wrapper 准备失败: ${boot.error}`,
+          },
+        };
+      }
       // env 交给 filterEnv 按白名单裁剪。来源必须是完整 process.env ——
       // 只塞 JAVA_HOME 会让 PATH 实际缺失，.bat 里的 node 找不到，
       // 构建「成功」却什么都没跑（实测 alloc.js 从未执行、build_project ok=true）。

@@ -80,6 +80,9 @@ importers:
       '@mc-creator/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@mc-creator/devkit':
+        specifier: workspace:*
+        version: link:../../packages/devkit
       '@mc-creator/kernel-bedrock':
         specifier: workspace:*
         version: link:../../packages/kernel-bedrock
@@ -257,6 +260,9 @@ importers:
       '@ai-sdk/openai':
         specifier: ^1.3.24
         version: 1.3.24(zod@3.25.76)
+      '@mc-creator/devkit':
+        specifier: workspace:*
+        version: link:../devkit
       '@mc-creator/generator-bedrock':
         specifier: workspace:*
         version: link:../generator-bedrock

@@ -13,6 +13,7 @@ import {
   BuildFixer,
   Filesystem,
 } from '@mc-creator/core';
+import { ensureGradleWrapper } from '@mc-creator/devkit';
 import type { McVersion } from '@mc-creator/shared';
 import { javaVersionFor } from '@mc-creator/shared';
 import { assertWithin } from '../ipc-utils.js';
@@ -188,6 +189,20 @@ ${req.buildLog}
   ipcMain.handle(BUILD_STREAM, async (e, raw: unknown) => {
     const req = BuildStreamRequest.parse(raw);
     const cwd = req.projectPath;
+    // 构建前确保 gradlew/gradlew.bat 存在：生成器只写 gradle-wrapper.properties，
+    // 不写启动脚本，而下面 spawn 的正是它们 → 干净机器上必 ENOENT（实测阻断）。
+    // 幂等：已有 wrapper 时零开销。失败**不 spawn**，把原因作为一条 stderr 推给
+    // 渲染层 —— 流式通道的语义是「用户看日志」，静默失败比报错更糟。
+    const boot = await ensureGradleWrapper({ projectPath: cwd });
+    if (!boot.ok) {
+      e.sender.send(BUILD_STREAM_CHUNK, {
+        type: 'stderr',
+        text: `[mc-creator] Gradle wrapper 准备失败：${boot.error}\n`,
+        done: true,
+        requestId: req.requestId,
+      });
+      return;
+    }
     // Windows 用 gradlew.bat，Unix 用 ./gradlew；避免 shell:true 降低命令注入风险
     const cmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
     const child = spawn(cmd, ['build'], { cwd });

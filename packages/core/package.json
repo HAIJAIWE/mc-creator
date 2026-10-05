@@ -17,6 +17,7 @@
     "@ai-sdk/openai": "^1.3.24",
     "@mc-creator/generator-bedrock": "workspace:*",
     "@mc-creator/generator-datapack": "workspace:*",
+    "@mc-creator/devkit": "workspace:*",
     "@mc-creator/generator-mod": "workspace:*",
     "@mc-creator/kernel-java": "workspace:*",
     "@mc-creator/shared": "workspace:*",
