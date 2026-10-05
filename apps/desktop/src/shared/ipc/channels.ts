@@ -47,3 +47,13 @@ export const PROCESS_LOG_EVENT = 'process:logEvent';
 // 状态变更事件（**通知**，非命令）：自动重启有 1s 起退避，轮询会丢掉崩溃瞬间的
 // 告警时机。渲染层只消费 —— 点火权仍在主进程 confirm 闸门（§10.6）。
 export const PROCESS_STATE_EVENT = 'process:stateEvent';
+
+// === 内核（外壳 ↔ 内核，§4.2 / §10）===
+// 通道名风格沿用 `project:*` / `launcher:*` 的「域:动作」驼峰写法。
+//
+// 只有下列**只读（R 类）**通道会进 preload 的 contextBridge 白名单。
+// `kernel:execute`（W/X 类写实例 / 执行进程）**刻意不进白名单**：内核的确认闸门
+// 与错误呈现还没在 UI 上验证完，先只在主进程侧可达。依据见 ./kernel.ts 的注释。
+export const KERNEL_LIST_KINDS = 'kernel:listKinds';
+export const KERNEL_READ = 'kernel:read';
+export const KERNEL_EXECUTE = 'kernel:execute';

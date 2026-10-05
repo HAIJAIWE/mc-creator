@@ -42,6 +42,9 @@ const panelLoaders: Record<string, () => Promise<{ default: React.ComponentType<
     import('../components/NbtEditor.js').then((m) => ({
       default: m.NbtEditor as React.ComponentType<unknown>,
     })),
+  // 内核面板（§18 阶段 10）：只读链路验证屏。放在 middle 分组 —— 它既不是领域编辑器，
+  // 也不是左侧活动栏里的基础设施项，与 preview/resources/nbt 同级。
+  kernel: () => import('../components/KernelPanel.js').then((m) => ({ default: m.KernelPanel })),
 };
 
 /** 所有面板的统一配置 */
@@ -135,6 +138,15 @@ const allPanelConfigs: Omit<PanelRegistration, 'component'>[] = [
     order: 120,
   },
   { id: 'nbt', title: 'activityBar.nbt', icon: createShellIcon('box'), kind: 'middle', order: 130 },
+  // 内核（§10 只读链路）。刻意不占左侧活动栏：它目前是「链路通了没」的验证屏，
+  // 不是日常高频入口；等 W/X 门控 UI 落地后再考虑提级。
+  {
+    id: 'kernel',
+    title: '内核',
+    icon: createMcIcon('pixel', 'gen-skin', 20),
+    kind: 'middle',
+    order: 140,
+  },
   // 设置（始终在底部）
   {
     id: 'settings',

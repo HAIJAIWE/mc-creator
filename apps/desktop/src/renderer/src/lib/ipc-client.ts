@@ -37,6 +37,9 @@ import type {
   ImportResourceFilesRes,
   LargeFileMetaT,
   RagSearchRes,
+  KernelListKindsRes,
+  KernelReadReq,
+  KernelTaskResultT,
 } from '../../../shared/ipc-channels.js';
 
 /**
@@ -701,6 +704,20 @@ export const ipcClient = {
 
     return { success: true, files: results };
   },
+
+  // ============================================================
+  // 内核只读通道（§4.2 / §10.2）
+  // ============================================================
+  //
+  // 只有 R 类（只读免确认）。W/X 类走 preload 的 `kernel:execute`，而那条通道
+  // **刻意没有进 contextBridge 白名单**（确认弹窗的 UI 还没验证），所以这里也没有
+  // 对应方法 —— 类型层面就不给「以为能调」的错觉。
+
+  /** 内核 kind 自描述表（kind → 内核 / R·W·X 分级 / 风险 / 是否对 UI 可达）。 */
+  kernelListKinds: (): Promise<KernelListKindsRes> => window.mcApi.kernelListKinds(),
+
+  /** 调一个只读内核 kind；kind 不在白名单时主进程会直接拒（ZodError）。 */
+  kernelRead: (req: KernelReadReq): Promise<KernelTaskResultT> => window.mcApi.kernelRead(req),
 
   /**
    * 监听项目变更

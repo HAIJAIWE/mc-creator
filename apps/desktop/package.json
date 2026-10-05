@@ -23,7 +23,11 @@
     "test:e2e:install": "playwright install"
   },
   "dependencies": {
+    "@mc-creator/contract": "workspace:*",
     "@mc-creator/core": "workspace:*",
+    "@mc-creator/kernel-bedrock": "workspace:*",
+    "@mc-creator/kernel-java": "workspace:*",
+    "@mc-creator/kernel-server": "workspace:*",
     "@mc-creator/shared": "workspace:*",
     "@mc-creator/shell": "workspace:*",
     "@mc-creator/ui": "workspace:*",
@@ -53,7 +57,7 @@
     "@playwright/test": "^1.55.0",
     "@testing-library/jest-dom": "^6.4.0",
     "@testing-library/react": "^15.0.0",
-    "@types/node": "^20.19.0",
+    "@types/node": "^26.1.1",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/react-window": "1.8.8",

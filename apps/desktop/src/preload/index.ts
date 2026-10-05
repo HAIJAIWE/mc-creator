@@ -90,6 +90,11 @@ import {
   PROCESS_LOGS,
   PROCESS_LOG_EVENT,
   PROCESS_STATE_EVENT,
+  KERNEL_LIST_KINDS,
+  KERNEL_READ,
+  type KernelListKindsRes,
+  type KernelTaskResultT,
+  type KernelReadReq,
 } from '../shared/ipc-channels.js';
 
 /**
@@ -433,6 +438,15 @@ const api = {
     ipcRenderer.on(PROCESS_STATE_EVENT, wrapper);
     return () => ipcRenderer.removeListener(PROCESS_STATE_EVENT, wrapper);
   },
+
+  // === 内核（外壳 ↔ 内核，§4.2 / §10）===
+  // 白名单里**只有只读（R 类）通道**：列 kind 的自描述表 + 一个 kind 受 zod enum
+  // 约束的读通道。刻意不暴露 KERNEL_EXECUTE（W/X 类写实例 / 执行进程）：
+  // 它的确认弹窗与错误呈现在 UI 上还没验证过，闸门接线留待后续阶段补齐。
+  // 这里给渲染层的是 `window.mcApi.kernel.*`，仍然只有 invoke，没有任何 fs/进程能力。
+  kernelListKinds: () => ipcRenderer.invoke(KERNEL_LIST_KINDS) as Promise<KernelListKindsRes>,
+  kernelRead: (req: KernelReadReq) =>
+    ipcRenderer.invoke(KERNEL_READ, req) as Promise<KernelTaskResultT>,
 
   // === 大文件流式传输 ===
 

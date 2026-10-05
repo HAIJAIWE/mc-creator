@@ -18,3 +18,4 @@ export * from './ipc/node-graph.js';
 export * from './ipc/sandbox.js';
 export * from './ipc/rag.js';
 export * from './ipc/process-supervisor.js';
+export * from './ipc/kernel.js';

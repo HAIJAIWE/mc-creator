@@ -46,6 +46,10 @@ const CiCdPanel = lazy(() => import('./CiCdPanel.js').then((m) => ({ default: m.
 const GameLauncherPanel = lazy(() =>
   import('./GameLauncherPanel.js').then((m) => ({ default: m.GameLauncherPanel })),
 );
+// 内核只读链路验证屏（§18 阶段 10）
+const KernelPanel = lazy(() =>
+  import('./KernelPanel.js').then((m) => ({ default: m.KernelPanel })),
+);
 
 function PanelLoading() {
   return (
@@ -185,6 +189,13 @@ export function MainPanelView({ activePanel }: { activePanel: string }) {
       return (
         <Suspense fallback={<PanelLoading />}>
           <NbtEditor />
+        </Suspense>
+      );
+
+    case 'kernel':
+      return (
+        <Suspense fallback={<PanelLoading />}>
+          <KernelPanel />
         </Suspense>
       );
 

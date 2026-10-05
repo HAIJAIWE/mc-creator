@@ -3,6 +3,8 @@ import { join } from 'path';
 import { registerIpcHandlers, createDefaultOrchestrator } from './ipc.js';
 import { getProcessSupervisor } from './ipc/process-supervisor.js';
 import { runStartupRecovery, formatRecoveryReport } from './startup-recovery.js';
+import { getKernelRuntime, initKernelRuntime, resolveKernelRoot } from './kernel-runtime.js';
+import { createNativeConfirm } from './kernel-confirm.js';
 
 // 受限环境（无 GPU / 沙箱代理）下禁用 GPU，避免 Chromium GPU 进程崩溃。
 // 代价：WebGL 不可用，skinview3d 等 3D 预览会加载失败（实测 SwiftShader
@@ -115,24 +117,27 @@ function createChineseMenu(): Menu {
  * 放在 IPC 注册之前：让渲染进程第一次 list_projects / 触发任何内核调用时，
  * 磁盘已经是干净的，不需要每个读路径各自防御一遍。
  *
- * kernelRoot 传 undefined —— 注意这不是「忘了传一个参数」，而是**内核层尚未接入
- * desktop**（设计文档 §18 阶段 10「产品体验层」尚未开始）：
- *   - apps/desktop/package.json 只依赖 core / shared / shell / ui，
- *     不依赖 kernel-java / kernel-server / kernel-bedrock / agent；
- *   - 内核唯一的生产构造点是 packages/agent 的 createMcpServer，
- *     而它当前只被测试调用，没有生产宿主；
- *   - 因此 desktop 进程内不存在任何「内核数据根目录」概念可传。
+ * kernelRoot 传**内核宿主的 dataDir 本身**（`getKernelRuntime()!.dataDir`），不是
+ * 另算一个路径：
+ *   - `runStartupRecovery` 的 `scanInstanceRoot` 扫 `<kernelRoot>/instances/`；
+ *   - kernel-java 的 `list_instances` / `create_instance` 读写的是
+ *     `<dataDir>/instances/`。
+ *   两者一旦各算各的，启动扫描就会去扫一个内核永远不碰的目录：崩在写
+ *   instance.json 之前的半成品实例照样出现在 UI 列表里、照样启动不了
+ *   （详见 packages/kernel-java/src/kernel.ts 的 list_instances 分支）。
+ *   kernel-runtime.test.ts 有一条断言专门守这件事：`runtime.dataDir` 必须与
+ *   传给 runStartupRecovery 的 kernelRoot 是**同一个字符串**。
  *
- * 所以现在生效的只有 userData/projects 的 *.tmp 残留清理。实例级扫描逻辑
- * （有目录无 instance.json → 改名隔离）已在 startup-recovery.ts 落地并测透，
- * 阶段 10 把内核接进 desktop 时，把 kernelRoot 指向内核 dataDir 即可，
- * 无需改动本函数与 scanInstanceRoot。
+ * 取值理由（为什么是 userData/mc-creator/kernel）见 kernel-runtime.ts 文件头注释。
+ * 初始化必须在本函数之前完成 —— 拿不到 dataDir 就没法给出正确的 kernelRoot。
  */
 function runStartupRecoveryScan(): void {
   try {
+    // 内核未初始化时传 undefined：此时只有 userData/projects 的 *.tmp 清理生效，
+    // 与本函数改造前的行为完全一致（清理是尽力而为，绝不拦住启动）。
     const report = runStartupRecovery({
       userDataDir: app.getPath('userData'),
-      kernelRoot: undefined,
+      kernelRoot: getKernelRuntime()?.dataDir,
       apply: true,
     });
     const line = formatRecoveryReport(report);
@@ -144,7 +149,24 @@ function runStartupRecoveryScan(): void {
   }
 }
 
+/**
+ * 初始化内核宿主（§4.2）。
+ *
+ * 放在 `app.whenReady()` 之后：dataDir 依赖 `app.getPath('userData')`，且内核
+ * 构造本身不做任何 I/O（只是 new 三个持有路径的对象），所以**不引入启动阻塞**。
+ * 三个内核共用同一个 dataDir —— 理由与代价见 kernel-runtime.ts 文件头注释。
+ *
+ * confirm 闸门接原生对话框（§10.6）。**永远显式传**，不省略：内核在缺 confirm 时
+ * 一律拒绝 W/X，省略会把「闸门接好了」和「闸门根本没接」变成同一个现象。
+ */
+function initKernels(): void {
+  const dataDir = resolveKernelRoot(app.getPath('userData'));
+  initKernelRuntime({ dataDir, confirm: createNativeConfirm() });
+  console.log(`[§10 内核] 已装配 java / server / bedrock，dataDir=${dataDir}`);
+}
+
 app.whenReady().then(() => {
+  initKernels();
   runStartupRecoveryScan();
   registerIpcHandlers(createDefaultOrchestrator);
   Menu.setApplicationMenu(createChineseMenu());
@@ -165,6 +187,10 @@ app.on('window-all-closed', () => {
  * 用一次 preventDefault + 标志位来等异步停机：直接依赖 before-quit 的异步回调
  * 不会阻塞退出，Minecraft 服务端会变孤儿进程。停机本身有上限
  * （shutdownGracefulMs + 强杀后兜底各 2s），不会无限挂住退出。
+ *
+ * 内核宿主的 release 也挂在这条链上：先停机（内核产物派生的进程必须先收），
+ * 再 dispose 内核宿主。这样即使将来给内核加上后台任务，也不会在进程还活着时
+ * 被提前释放。
  */
 let supervisorShutdownDone = false;
 app.on('before-quit', (event) => {
@@ -174,5 +200,8 @@ app.on('before-quit', (event) => {
   void getProcessSupervisor()
     .shutdownAll()
     .catch(() => undefined)
-    .finally(() => app.quit());
+    .finally(() => {
+      getKernelRuntime()?.dispose();
+      app.quit();
+    });
 });
