@@ -119,116 +119,113 @@ export function MiddlePanel() {
   }, []);
 
   // 构建命令列表
-  const commands = useMemo<Command[]>(
-    () => {
-      const cmds: Command[] = [];
+  const commands = useMemo<Command[]>(() => {
+    const cmds: Command[] = [];
 
-      cmds.push({
-        id: 'save-file',
-        label: '保存当前文件',
-        description: '将当前选中文件另存到本地',
-        shortcut: 'Ctrl+S',
-        run: async () => {
-          const s = useModStore.getState();
-          const f = s.files.find((x) => x.path === s.selectedFile);
-          if (!f) return;
-          const res = await ipcClient.saveFile({
-            path: f.path,
-            content: f.content,
-            defaultName: f.path.split('/').pop() || 'file.txt',
-          });
-          if (res.ok) s.markFileClean(f.path);
-        },
-      });
-
-      cmds.push({
-        id: 'save-all',
-        label: '保存全部文件到目录',
-        description: '选择一个目录后保存所有文件',
-        run: async () => {
-          const s = useModStore.getState();
-          if (s.files.length === 0) return;
-          const res = await ipcClient.saveAllFiles({ files: s.files });
-          if (res.ok) s.markAllClean();
-        },
-      });
-
-      cmds.push({
-        id: 'export-zip',
-        label: '导出为 ZIP',
-        description: '打包所有文件为 zip',
-        run: async () => {
-          const s = useModStore.getState();
-          if (s.files.length === 0) return;
-          await ipcClient.exportZip({
-            files: withUnimplementedMd(s.files, s.unimplemented),
-            defaultName: `${s.generatorType}-export.zip`,
-          });
-        },
-      });
-
-      cmds.push({
-        id: 'new-file',
-        label: '新建文件',
-        description: '在根目录创建新文件',
-        run: () => {
-          const name = prompt('请输入文件名（含扩展名）', 'new-file.json');
-          if (name) useModStore.getState().createFile(name, '');
-        },
-      });
-
-      for (const tab of MIDDLE_TABS) {
-        const labelMap: Record<MiddleTab, string> = {
-          preview: '预览',
-          lowcode: '低代码',
-          resources: '资源',
-          nbt: 'NBT',
-          code: '代码',
-        };
-        cmds.push({
-          id: `tab-${tab}`,
-          label: `切换到${labelMap[tab]}视图`,
-          run: () => setMiddleTab(tab),
+    cmds.push({
+      id: 'save-file',
+      label: '保存当前文件',
+      description: '将当前选中文件另存到本地',
+      shortcut: 'Ctrl+S',
+      run: async () => {
+        const s = useModStore.getState();
+        const f = s.files.find((x) => x.path === s.selectedFile);
+        if (!f) return;
+        const res = await ipcClient.saveFile({
+          path: f.path,
+          content: f.content,
+          defaultName: f.path.split('/').pop() || 'file.txt',
         });
-      }
+        if (res.ok) s.markFileClean(f.path);
+      },
+    });
 
+    cmds.push({
+      id: 'save-all',
+      label: '保存全部文件到目录',
+      description: '选择一个目录后保存所有文件',
+      run: async () => {
+        const s = useModStore.getState();
+        if (s.files.length === 0) return;
+        const res = await ipcClient.saveAllFiles({ files: s.files });
+        if (res.ok) s.markAllClean();
+      },
+    });
+
+    cmds.push({
+      id: 'export-zip',
+      label: '导出为 ZIP',
+      description: '打包所有文件为 zip',
+      run: async () => {
+        const s = useModStore.getState();
+        if (s.files.length === 0) return;
+        await ipcClient.exportZip({
+          files: withUnimplementedMd(s.files, s.unimplemented),
+          defaultName: `${s.generatorType}-export.zip`,
+        });
+      },
+    });
+
+    cmds.push({
+      id: 'new-file',
+      label: '新建文件',
+      description: '在根目录创建新文件',
+      run: () => {
+        const name = prompt('请输入文件名（含扩展名）', 'new-file.json');
+        if (name) useModStore.getState().createFile(name, '');
+      },
+    });
+
+    for (const tab of MIDDLE_TABS) {
+      const labelMap: Record<MiddleTab, string> = {
+        preview: '预览',
+        lowcode: '低代码',
+        resources: '资源',
+        nbt: 'NBT',
+        code: '代码',
+      };
       cmds.push({
-        id: 'clear-files',
-        label: '清空所有文件',
-        description: '清空当前生成的文件列表',
-        run: () => {
-          if (confirm('确定清空所有文件？')) {
-            useModStore.getState().setFiles([]);
-          }
-        },
+        id: `tab-${tab}`,
+        label: `切换到${labelMap[tab]}视图`,
+        run: () => setMiddleTab(tab),
       });
+    }
 
-      cmds.push({
-        id: 'toggle-split',
-        label: '切换分栏编辑',
-        description: '打开/关闭右侧分栏面板',
-        run: () => {
-          const s = useModStore.getState();
-          if (s.splitFile) {
-            s.setSplitFile(null);
-          } else {
-            const other = s.files.find((f) => f.path !== s.selectedFile);
-            if (other) s.setSplitFile(other.path);
-          }
-        },
-      });
+    cmds.push({
+      id: 'clear-files',
+      label: '清空所有文件',
+      description: '清空当前生成的文件列表',
+      run: () => {
+        if (confirm('确定清空所有文件？')) {
+          useModStore.getState().setFiles([]);
+        }
+      },
+    });
 
-      cmds.push({
-        id: 'shortcut-help',
-        label: '快捷键帮助',
-        description: '查看全项目所有快捷键列表',
-        run: () => setShortcutHelpOpen(true),
-      });
+    cmds.push({
+      id: 'toggle-split',
+      label: '切换分栏编辑',
+      description: '打开/关闭右侧分栏面板',
+      run: () => {
+        const s = useModStore.getState();
+        if (s.splitFile) {
+          s.setSplitFile(null);
+        } else {
+          const other = s.files.find((f) => f.path !== s.selectedFile);
+          if (other) s.setSplitFile(other.path);
+        }
+      },
+    });
 
-      return cmds;
-    },
-    [setMiddleTab, setShortcutHelpOpen],
-  );
+    cmds.push({
+      id: 'shortcut-help',
+      label: '快捷键帮助',
+      description: '查看全项目所有快捷键列表',
+      run: () => setShortcutHelpOpen(true),
+    });
+
+    return cmds;
+  }, [setMiddleTab, setShortcutHelpOpen]);
 
   const handleOpenPalette = useCallback(() => setPaletteOpen(true), []);
 
@@ -237,9 +234,10 @@ export function MiddlePanel() {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
         const idx = MIDDLE_TABS.indexOf(middleTab as MiddleTab);
-        const next = e.key === 'ArrowRight'
-          ? MIDDLE_TABS[(idx + 1) % MIDDLE_TABS.length]
-          : MIDDLE_TABS[(idx - 1 + MIDDLE_TABS.length) % MIDDLE_TABS.length];
+        const next =
+          e.key === 'ArrowRight'
+            ? MIDDLE_TABS[(idx + 1) % MIDDLE_TABS.length]
+            : MIDDLE_TABS[(idx - 1 + MIDDLE_TABS.length) % MIDDLE_TABS.length];
         setMiddleTab(next);
         const nextBtn = document.getElementById(`middle-tab-${next}`);
         nextBtn?.focus();

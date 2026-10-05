@@ -85,7 +85,11 @@ export function migrateV1EnvelopeToV2(obj: Record<string, unknown>): {
     graphObj.edges = [];
     migrated = true;
   }
-  if (!('subgraphs' in graphObj) || typeof graphObj.subgraphs !== 'object' || graphObj.subgraphs === null) {
+  if (
+    !('subgraphs' in graphObj) ||
+    typeof graphObj.subgraphs !== 'object' ||
+    graphObj.subgraphs === null
+  ) {
     (graphObj as Record<string, unknown>).subgraphs = {};
     migrated = true;
   }

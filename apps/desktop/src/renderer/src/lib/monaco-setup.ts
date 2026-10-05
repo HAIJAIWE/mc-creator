@@ -7,9 +7,24 @@
  * 做法：把 monaco 与各语言 worker 交给 Vite 打包成同源资源，用
  * `loader.config({ monaco })` 让 react 包装层直接使用已打包的实例。
  *
- * 本模块是「副作用模块」：应用侧通过动态 import 引入（见 App.tsx 的惰性面板加载），
- * 因此 monaco 及其 worker 不会被塞进主包，只在首次打开代码视图时才加载。
- * 单元测试直接引入面板组件、不经过该入口，故不会在 jsdom 中求值 monaco。
+ * 本模块是「副作用模块」，只有两件事：
+ *   1. 挂 `MonacoEnvironment.getWorker` —— 把 editor/json/ts 三种 worker 映射到
+ *      同源打包产物（否则 worker 会去找 CDN 路径，同样被 CSP 拦掉）；
+ *   2. `loader.config({ monaco })` —— 让 react 包装层直接用已打包实例。
+ *   （语言贡献 / 主题 / JSON schema 不在这里：它们走各自组件的 `onMount` 回调，
+ *     在编辑器实例化之后按需注册，与本模块无关。）
+ *
+ * ## 引入方式：只能动态 import，且必须在任何 <Editor> 挂载之前
+ *
+ * 历史写法是在 App.tsx 根部静态 `import './lib/monaco-setup.js'`。那会让
+ * monaco（~5MB）连同 3 个 worker 全部进主 chunk，把懒加载彻底抵消。
+ * 现在统一由 `lib/lazy-monaco.ts` 的 `withMonacoSetup()` 串在**可能渲染编辑器的
+ * 惰性加载器**上（App 的 AgentPanel、MainPanelView 的 CodePreview/MiddlePanel、
+ * 面板注册表的 preview 加载器），于是首次打开代码视图时才加载，且配置必定先于使用。
+ *
+ * 之所以必须动态：`monaco-editor` 的 clipboard contribution 需要
+ * `document.queryCommandSupported`，jsdom 没有 —— 本模块一旦被单测 import 到就抛错。
+ * 因此它不能成为任何被单测直接 import 的组件的静态依赖。
  */
 
 import * as monaco from 'monaco-editor';

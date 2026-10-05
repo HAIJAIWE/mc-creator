@@ -36,8 +36,12 @@ describe('collab-transport', () => {
   it('双端互通且过滤自身消息', async () => {
     const receivedA: CollabMessage[] = [];
     const receivedB: CollabMessage[] = [];
-    const a: CollabTransport | null = createCollabTransport('test-doc', 'peer-a', (m) => receivedA.push(m));
-    const b: CollabTransport | null = createCollabTransport('test-doc', 'peer-b', (m) => receivedB.push(m));
+    const a: CollabTransport | null = createCollabTransport('test-doc', 'peer-a', (m) =>
+      receivedA.push(m),
+    );
+    const b: CollabTransport | null = createCollabTransport('test-doc', 'peer-b', (m) =>
+      receivedB.push(m),
+    );
     expect(a).not.toBeNull();
     expect(b).not.toBeNull();
     try {

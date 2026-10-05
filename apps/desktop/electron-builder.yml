@@ -35,38 +35,35 @@ asar: true
 #   而且它会误伤——实测 jszip 因为一个无扩展名的 .jekyll-metadata 被判为二进制，
 #   整包 jszip（约 60 个文件）被无谓解包。显式列出既精确又不依赖猜测。
 asarUnpack:
-  # isolated-vm：主进程沙箱渲染 Mustache（src/main/ipc/generate.ts require('isolated-vm')）。
-  #   非 N-API（binding.gyp 无 node_api.h），.node 绑定 V8 ABI，必须实文件路径。
-  #   降级行为：require 失败时 catch 住，走纯 JS Mustache 渲染器，不阻断生成流程。
-  - '**/node_modules/isolated-vm/**'
   # node-pty：集成终端面板（src/main/ipc/terminal.ts require('node-pty')）。
   #   需整包解包：不止 pty.node，还有 conpty.dll / winpty.dll / OpenConsole.exe /
   #   winpty-agent.exe —— 这些是 .node 在运行时按同级相对路径加载的伴生二进制，
   #   只解 .node 会导致加载 .node 成功但创建 PTY 失败。
   #   降级行为：require 失败时 catch 住，终端 IPC 返回结构化错误，其余功能不受影响。
   - '**/node_modules/node-pty/**'
-# ABI 重建取舍（三个选项的关系，基于本机实测结论）
-#   npmRebuild: false —— 必须显式关闭（electron-builder 默认 true）。
-#     实测：保持默认 true 时 `electron-builder --dir` 直接构建失败：
-#       isolated-vm@7.0.1 会被 @electron/rebuild 用 Electron 44.4.3 的 V8 头文件重编，
-#       源码与该 V8 版本不兼容，编译报错
-#       C2660: 'v8::External::New' 函数不接受 2 个参数（src/isolate/external.h:23）
-#       C2660: 'v8::External::Value' 函数不接受 0 个参数（src/module/callback.cc:140）
-#       => MSBuild exit code 1，整个打包流程中断。
-#     关闭 rebuild 对两个原生模块都不损失功能：
-#       - node-pty 是 N-API 模块（binding.gyp 依赖 node-addon-api，预编译文件名不带 abi 标签），
-#         N-API 跨 Node/Electron ABI 稳定，其 prebuilds/win32-x64/pty.node 可直接用，无需 rebuild。
-#       - isolated-vm 不是 N-API，其预编译只有 abi137(Node24)/abi147(Node26)，
-#         而 Electron 44 的 ABI 是 149 —— 不匹配；且实测无法针对 Electron 44 编译成功。
-#         也就是说 isolated-vm 在 Electron 44 上「rebuild 也用不上」，只会让打包失败。
-#     代价与降级：isolated-vm 在 Electron 44 下 require 必然失败，
-#     由 src/main/ipc/generate.ts 的 try/catch 兜住，回退到纯 JS Mustache 渲染器，
-#     生成流程不中断（P0 安全沙箱失效，但功能可用）。
-#     若将来升级到 isolated-vm 支持的 Electron 版本，需重新打开 npmRebuild 并验证编译通过。
-#   buildDependenciesFromSource: 保持不配置（默认 false）。
-#     它只在「没有匹配 Electron 的预编译」时才需要从源码重编，代价是本机必须有完整
-#     C++ 工具链且耗时数分钟。当前即使打开也救不了 isolated-vm（见上，源码不兼容），
-#     反而会在无工具链的机器/CI 上让打包直接失败，因此不启用。
+# isolated-vm 已从依赖中移除（原先 asarUnpack 里的 isolated-vm 一并删除）。
+#   它曾被用来「沙箱化」Mustache 渲染，但沙箱里跑的是**我们自己写的约 100 行
+#   渲染器**，template/fields 只作为 ExternalCopy 数据注入、从不当代码执行。
+#   于是它唯一的作用是「同一套渲染逻辑写两遍」，任何安全修复都要做两遍，
+#   漏一处就是漏洞 —— 实测两条路径确实同构地带着全部 4 个缺陷。
+#   而且它在 Electron 44 上**从来没生效过一次**，有两条独立的硬证据：
+#     1) ABI：预编译只有 abi137/abi147，Electron 44 是 abi149，require 必抛
+#        "No native build was found for platform=win32 arch=x64 runtime=electron abi=149"；
+#        源码也编不过（V8 头文件不兼容，C2660 ×2 => MSBuild exit 1）。
+#     2) 与 ABI 无关：那段沙箱脚本字符串本身是 TypeScript（`x as Record<...>`、
+#        `let condVal: unknown;`），即便原生模块能加载，compileScript 也必然抛
+#        SyntaxError（实测 "Unexpected identifier 'as'"）然后静默回退。
+#   威胁本身不需要 V8 级隔离：真正的风险是「恶意输入打爆主进程」，靠输入校验
+#   就够。现为纯 TS 实现 + 完整预算/深度/迭代/原型链防护
+#   （见 src/main/ipc/sandboxed-mustache.ts）。
+#
+# ABI 重建取舍
+#   npmRebuild: false —— 显式关闭（electron-builder 默认 true）。
+#     当前唯一的原生模块 node-pty 是 N-API 模块（binding.gyp 依赖 node-addon-api，
+#     预编译文件名不带 abi 标签），N-API 跨 Node/Electron ABI 稳定，其
+#     prebuilds/win32-x64/pty.node 可直接用，rebuild 对它是纯负担 ——
+#     在无 MSVC 工具链的机器与 CI 上开着会让打包直接失败。
+#   buildDependenciesFromSource: 保持不配置（默认 false）。同上。
 npmRebuild: false
 compression: maximum
 win:

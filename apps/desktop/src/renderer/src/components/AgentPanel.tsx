@@ -579,9 +579,9 @@ export function AgentPanel() {
                       }`}
                     >
                       <div className="whitespace-pre-wrap text-mc-text">{m.text}</div>
-                      {m.role === 'assistant' &&
-                        m.sources &&
-                        m.sources.length > 0 && <RagSourcesList hits={m.sources} />}
+                      {m.role === 'assistant' && m.sources && m.sources.length > 0 && (
+                        <RagSourcesList hits={m.sources} />
+                      )}
                       {m.role === 'assistant' &&
                         sending &&
                         i === messages.length - 1 &&

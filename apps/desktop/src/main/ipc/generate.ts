@@ -1,5 +1,5 @@
 import { app, ipcMain } from 'electron';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import {
@@ -13,7 +13,7 @@ import {
   formatRagSection,
   type SpecType,
 } from '@mc-creator/core';
-import type { ModSpec } from '@mc-creator/shared';
+import type { ModSpec, UnimplementedItem } from '@mc-creator/shared';
 import {
   loadModelConfig,
   saveModelConfig,
@@ -58,6 +58,7 @@ import {
   type GenerateFilesRes,
 } from '../../shared/ipc-channels.js';
 import { FileManager } from '../file-manager.js';
+import { renderMustacheHardened } from './sandboxed-mustache.js';
 
 /** RAG 检索条数（需求：topK=5） */
 const RAG_TOP_K = 5;
@@ -73,7 +74,16 @@ function describeSpecForRag(spec: unknown, generatorType: string): string {
   };
   if (spec !== null && typeof spec === 'object') {
     const obj = spec as Record<string, unknown>;
-    for (const key of ['modId', 'packId', 'packName', 'name', 'description', 'serverName', 'launcherName', 'playerName']) {
+    for (const key of [
+      'modId',
+      'packId',
+      'packName',
+      'name',
+      'description',
+      'serverName',
+      'launcherName',
+      'playerName',
+    ]) {
       pushStr(obj[key]);
     }
     for (const value of Object.values(obj)) {
@@ -93,7 +103,13 @@ function describeSpecForRag(spec: unknown, generatorType: string): string {
 }
 
 /** RAG 检索永不抛错：失败返回空命中，保证不影响主流程 */
-function safeRagSearch(query: string, generatorType?: string): { hits: Array<{ title: string; snippet: string; source: string; url?: string; score: number }>; cached: boolean } {
+function safeRagSearch(
+  query: string,
+  generatorType?: string,
+): {
+  hits: Array<{ title: string; snippet: string; source: string; url?: string; score: number }>;
+  cached: boolean;
+} {
   try {
     return searchKnowledge(query, { topK: RAG_TOP_K, generatorType });
   } catch {
@@ -159,8 +175,14 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
     let result: {
       files: Array<{ path: string; content: string }>;
       warnings: string[];
-      unimplemented?: any[];
-      buildStats?: { total: number; cached: number; regenerated: number; filesTotal: number; filesUnchanged: number };
+      unimplemented?: UnimplementedItem[];
+      buildStats?: {
+        total: number;
+        cached: number;
+        regenerated: number;
+        filesTotal: number;
+        filesUnchanged: number;
+      };
     };
     if (gen instanceof ModGenerator) {
       const cacheDir = buildCacheDir();
@@ -209,7 +231,7 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
 
         // 将大文件写入项目工作区（如果有 projectId）
         if (projectWorkspace) {
-          const fullPath = require('node:path').resolve(projectWorkspace, file.path);
+          const fullPath = resolve(projectWorkspace, file.path);
           await fm.writeBinary(fullPath, buffer);
         }
         // 大文件不包含在普通 files 中，渲染侧需流式下载
@@ -225,7 +247,10 @@ export function registerGenerateHandlers(getOrchestrator: () => Orchestrator): v
     };
 
     // RAG：按 spec 内容自动检索（确定性生成器不用 LLM，但来源供 UI 展示；同时预热 LRU）
-    const filesRag = safeRagSearch(describeSpecForRag(req.spec, req.generatorType), req.generatorType);
+    const filesRag = safeRagSearch(
+      describeSpecForRag(req.spec, req.generatorType),
+      req.generatorType,
+    );
     if (filesRag.hits.length > 0) response.ragSources = filesRag.hits;
 
     if (result.buildStats) {
@@ -418,450 +443,30 @@ ${req.code}
   });
 }
 
-/** Pure JS Mustache 渲染器（isolated-vm 不可用时的回退实现） */
-function renderMustachePure(template: string, fields: Record<string, unknown>): string {
-  const TOKEN_PATTERN = /\{\{[^{}]+\}\}/g;
-
-  function tokenize(tpl: string) {
-    const tokens = [];
-    let lastIndex = 0;
-    const re = new RegExp(TOKEN_PATTERN);
-    let match;
-    while ((match = re.exec(tpl)) !== null) {
-      if (match.index > lastIndex) {
-        tokens.push({ type: 'text', value: tpl.slice(lastIndex, match.index) });
-      }
-      const raw = match[0];
-      const tag = raw.slice(2, -2).trim();
-      if (tag.startsWith('#if ')) {
-        tokens.push({ type: 'if', key: tag.slice(4).trim(), raw });
-      } else if (tag.startsWith('#each ')) {
-        tokens.push({ type: 'each', key: tag.slice(6).trim(), raw });
-      } else if (tag === 'else') {
-        tokens.push({ type: 'else', raw });
-      } else if (tag === '/if') {
-        tokens.push({ type: 'endif', raw });
-      } else if (tag === '/each') {
-        tokens.push({ type: 'endeach', raw });
-      } else if (tag === 'this') {
-        tokens.push({ type: 'this', raw });
-      } else if (tag.startsWith('this.')) {
-        tokens.push({ type: 'thisField', key: tag.slice(5).trim(), raw });
-      } else if (tag.startsWith('field:')) {
-        tokens.push({ type: 'field', key: tag.slice(6).trim(), raw });
-      } else {
-        tokens.push({ type: 'unknown', raw });
-      }
-      lastIndex = re.lastIndex;
-    }
-    if (lastIndex < tpl.length) {
-      tokens.push({ type: 'text', value: tpl.slice(lastIndex) });
-    }
-    return tokens;
-  }
-
-  function isTruthy(v: unknown): boolean {
-    if (v === null || v === undefined) return false;
-    if (typeof v === 'boolean') return v;
-    if (typeof v === 'number') return v !== 0;
-    if (typeof v === 'string') return v.length > 0;
-    if (Array.isArray(v)) return v.length > 0;
-    if (typeof v === 'object') return Object.keys(v).length > 0;
-    return Boolean(v);
-  }
-
-  function renderValue(v: unknown): string {
-    if (v === null || v === undefined) return '';
-    if (typeof v === 'object') {
-      try {
-        return JSON.stringify(v);
-      } catch {
-        return String(v);
-      }
-    }
-    return String(v);
-  }
-
-  function escapeJavaStringLiteral(s: string): string {
-    if (typeof s !== 'string') return String(s);
-    return s
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
-  }
-
-  interface Token {
-    type: string;
-    value?: string;
-    key?: string;
-    raw?: string;
-  }
-  function findBlockEnd(tokens: Token[], startIdx: number, blockType: string) {
-    const closeType = blockType === 'if' ? 'endif' : 'endeach';
-    let depth = 1;
-    let elseIdx = -1;
-    for (let j = startIdx + 1; j < tokens.length; j++) {
-      const t = tokens[j];
-      if (t.type === blockType) depth++;
-      else if (t.type === closeType) {
-        depth--;
-        if (depth === 0) return { closeIndex: j, elseIndex: elseIdx };
-      } else if (t.type === 'else' && blockType === 'if' && depth === 1 && elseIdx === -1) {
-        elseIdx = j;
-      }
-    }
-    return { closeIndex: -1, elseIndex: -1 };
-  }
-
-  function renderTokens(
-    tokens: Token[],
-    fields: Record<string, unknown>,
-    currentThis: unknown,
-  ): string {
-    let result = '';
-    let i = 0;
-    while (i < tokens.length) {
-      const tok = tokens[i];
-      switch (tok.type) {
-        case 'text':
-          result += tok.value;
-          i++;
-          break;
-        case 'field':
-          if (tok.key === undefined || !(tok.key in fields)) {
-            result += tok.raw;
-          } else {
-            result += escapeJavaStringLiteral(renderValue(fields[tok.key]));
-          }
-          i++;
-          break;
-        case 'this':
-          result += escapeJavaStringLiteral(renderValue(currentThis));
-          i++;
-          break;
-        case 'thisField': {
-          const obj =
-            currentThis !== null && typeof currentThis === 'object'
-              ? (currentThis as Record<string, unknown>)
-              : null;
-          if (tok.key !== undefined && obj && tok.key in obj) {
-            result += escapeJavaStringLiteral(renderValue(obj[tok.key]));
-          } else {
-            result += tok.raw;
-          }
-          i++;
-          break;
-        }
-        case 'if':
-        case 'each': {
-          const { closeIndex, elseIndex } = findBlockEnd(tokens, i, tok.type);
-          if (closeIndex === -1) {
-            result += tok.raw;
-            i++;
-            break;
-          }
-          const bodyTokens =
-            elseIndex === -1 ? tokens.slice(i + 1, closeIndex) : tokens.slice(i + 1, elseIndex);
-          const elseTokens = elseIndex === -1 ? [] : tokens.slice(elseIndex + 1, closeIndex);
-
-          if (tok.type === 'if') {
-            const thisObj =
-              currentThis !== null && typeof currentThis === 'object'
-                ? (currentThis as Record<string, unknown>)
-                : null;
-            let condVal: unknown;
-            if (tok.key !== undefined && thisObj && tok.key in thisObj) condVal = thisObj[tok.key];
-            else if (tok.key !== undefined && tok.key in fields) condVal = fields[tok.key];
-            else condVal = undefined;
-            if (isTruthy(condVal)) result += renderTokens(bodyTokens, fields, currentThis);
-            else result += renderTokens(elseTokens, fields, currentThis);
-          } else {
-            const thisObj =
-              currentThis !== null && typeof currentThis === 'object'
-                ? (currentThis as Record<string, unknown>)
-                : null;
-            const arr =
-              tok.key !== undefined && thisObj && tok.key in thisObj
-                ? thisObj[tok.key]
-                : tok.key !== undefined && tok.key in fields
-                  ? fields[tok.key]
-                  : undefined;
-            let items = [];
-            if (Array.isArray(arr)) items = arr;
-            else if (arr !== null && arr !== undefined) items = [arr];
-            for (const item of items) result += renderTokens(bodyTokens, fields, item);
-          }
-          i = closeIndex + 1;
-          break;
-        }
-        case 'else':
-        case 'endif':
-        case 'endeach':
-        case 'unknown':
-          result += tok.raw;
-          i++;
-          break;
-      }
-    }
-    return result;
-  }
-
-  const tokens = tokenize(template);
-  return renderTokens(tokens, fields, undefined);
-}
-
-/** isolated-vm 可用性检测 */
-interface IsolatedVmIsolate {
-  new (options: { memoryLimit: number }): {
-    createContext: (
-      options: Record<string, unknown>,
-    ) => Promise<{ global: { set: (key: string, value: unknown) => Promise<void> } }>;
-    compileScript: (source: string) => Promise<{
-      run: (
-        context: { global: { set: (key: string, value: unknown) => Promise<void> } },
-        options: { timeout: number },
-      ) => Promise<unknown>;
-    }>;
-  };
-}
-interface IsolatedVmExternalCopy {
-  new (value: unknown): { copyInto: (options: Record<string, unknown>) => unknown };
-}
-
-let isolatedVmAvailable = false;
-let Isolate: IsolatedVmIsolate | undefined;
-let ExternalCopy: IsolatedVmExternalCopy | undefined;
-try {
-  // 主进程打包为 CJS，不支持顶层 await：同步 require 做可选依赖探测即可
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = require('isolated-vm') as {
-    Isolate: unknown;
-    ExternalCopy: unknown;
-  };
-  // isolated-vm 的类型与我们的接口不完全兼容，使用类型断言
-  Isolate = mod.Isolate as unknown as IsolatedVmIsolate;
-  ExternalCopy = mod.ExternalCopy as unknown as IsolatedVmExternalCopy;
-  isolatedVmAvailable = true;
-} catch {
-  isolatedVmAvailable = false;
-}
-
+/**
+ * 注册沙箱化 Mustache 渲染通道。
+ *
+ * 渲染实现在 `sandboxed-mustache.ts`（**唯一一份**）。此前这里是两份同构实现：
+ * 一个 `renderMustachePure` 闭包 + 一份抄进 isolated-vm 沙箱脚本字符串的同样逻辑。
+ * 重复实现本身就是最需要消除的结构性缺陷 —— 任何安全修复都要做两遍，漏一处
+ * 就是漏洞。现在收敛为一份 + 严格输入校验。
+ *
+ * 关于 isolated-vm：已删除，理由见 sandboxed-mustache.ts 顶部注释
+ * （沙箱里跑的是我们自己的渲染器而非用户代码；且它在 Electron 44 上实测
+ * 必然 require 失败，因此从来没真正生效过）。
+ */
 export function registerSandboxedMustacheHandler(): void {
   // === 沙箱化 Mustache 渲染（P0 安全：防止自定义节点模板注入）===
   ipcMain.handle(
     SANDBOXED_MUSTACHE_RENDER,
     async (_e, raw: unknown): Promise<SandboxedMustacheRenderResponse> => {
       const req = SandboxedMustacheRenderRequest.parse(raw);
-      const { template, fields } = req;
-
-      // 基础校验
-      if (typeof template !== 'string' || template.length > 50000) {
-        return { ok: false, error: '模板长度超限（最大 50KB）' };
+      const outcome = renderMustacheHardened(req.template, req.fields);
+      if (outcome.ok) {
+        return { ok: true, result: outcome.result };
       }
-      if (typeof fields !== 'object' || fields === null) {
-        return { ok: false, error: 'fields 必须为对象' };
-      }
-      if (Object.keys(fields).length > 100) {
-        return { ok: false, error: 'fields 字段数超限（最大 100 个）' };
-      }
-
-      // 优先尝试 isolated-vm 沙箱渲染
-      if (isolatedVmAvailable && Isolate && ExternalCopy) {
-        try {
-          const isolate = new Isolate({ memoryLimit: 64 }); // 64MB 内存限制
-          const context = await isolate.createContext({});
-          const jail = context.global;
-
-          // 注入安全的全局对象
-          await jail.set('template', new ExternalCopy(template).copyInto({}));
-          await jail.set('fields', new ExternalCopy(fields).copyInto({}));
-
-          // 注入安全的工具函数
-          await jail.set('escapeJavaStringLiteral', (s: string) => {
-            if (typeof s !== 'string') return String(s);
-            return s
-              .replace(/\\/g, '\\\\')
-              .replace(/"/g, '\\"')
-              .replace(/\n/g, '\\n')
-              .replace(/\r/g, '\\r')
-              .replace(/\t/g, '\\t');
-          });
-
-          // 在沙箱中运行渲染逻辑
-          const script = await isolate.compileScript(`
-(function() {
-  const TOKEN_PATTERN = /\\{\\{[^{}]+\\}\\}/g;
-
-  function tokenize(template) {
-    const tokens = [];
-    let lastIndex = 0;
-    const re = new RegExp(TOKEN_PATTERN);
-    let match;
-    while ((match = re.exec(template)) !== null) {
-      if (match.index > lastIndex) {
-        tokens.push({ type: 'text', value: template.slice(lastIndex, match.index) });
-      }
-      const raw = match[0];
-      const tag = raw.slice(2, -2).trim();
-      if (tag.startsWith('#if ')) {
-        tokens.push({ type: 'if', key: tag.slice(4).trim(), raw });
-      } else if (tag.startsWith('#each ')) {
-        tokens.push({ type: 'each', key: tag.slice(6).trim(), raw });
-      } else if (tag === 'else') {
-        tokens.push({ type: 'else', raw });
-      } else if (tag === '/if') {
-        tokens.push({ type: 'endif', raw });
-      } else if (tag === '/each') {
-        tokens.push({ type: 'endeach', raw });
-      } else if (tag === 'this') {
-        tokens.push({ type: 'this', raw });
-      } else if (tag.startsWith('this.')) {
-        tokens.push({ type: 'thisField', key: tag.slice(5).trim(), raw });
-      } else if (tag.startsWith('field:')) {
-        tokens.push({ type: 'field', key: tag.slice(6).trim(), raw });
-      } else {
-        tokens.push({ type: 'unknown', raw });
-      }
-      lastIndex = re.lastIndex;
-    }
-    if (lastIndex < template.length) {
-      tokens.push({ type: 'text', value: template.slice(lastIndex) });
-    }
-    return tokens;
-  }
-
-  function isTruthy(v) {
-    if (v === null || v === undefined) return false;
-    if (typeof v === 'boolean') return v;
-    if (typeof v === 'number') return v !== 0;
-    if (typeof v === 'string') return v.length > 0;
-    if (Array.isArray(v)) return v.length > 0;
-    if (typeof v === 'object') return Object.keys(v).length > 0;
-    return Boolean(v);
-  }
-
-  function renderValue(v) {
-    if (v === null || v === undefined) return '';
-    if (typeof v === 'object') {
-      try { return JSON.stringify(v); } catch { return String(v); }
-    }
-    return String(v);
-  }
-
-  function findBlockEnd(tokens, startIdx, blockType) {
-    const closeType = blockType === 'if' ? 'endif' : 'endeach';
-    let depth = 1;
-    let elseIdx = -1;
-    for (let j = startIdx + 1; j < tokens.length; j++) {
-      const t = tokens[j];
-      if (t.type === blockType) depth++;
-      else if (t.type === closeType) {
-        depth--;
-        if (depth === 0) return { closeIndex: j, elseIndex: elseIdx };
-      } else if (t.type === 'else' && blockType === 'if' && depth === 1 && elseIdx === -1) {
-        elseIdx = j;
-      }
-    }
-    return { closeIndex: -1, elseIndex: -1 };
-  }
-
-  function renderTokens(tokens, fields, currentThis) {
-    let result = '';
-    let i = 0;
-    while (i < tokens.length) {
-      const tok = tokens[i];
-      switch (tok.type) {
-        case 'text':
-          result += tok.value;
-          i++;
-          break;
-        case 'field':
-          if (!(tok.key in fields)) {
-            result += tok.raw;
-          } else {
-            result += escapeJavaStringLiteral(renderValue(fields[tok.key]));
-          }
-          i++;
-          break;
-        case 'this':
-          result += escapeJavaStringLiteral(renderValue(currentThis));
-          i++;
-          break;
-        case 'thisField':
-          const obj = currentThis !== null && typeof currentThis === 'object' ? (currentThis as Record<string, unknown>) : null;
-          if (obj && tok.key in obj) {
-            result += escapeJavaStringLiteral(renderValue(obj[tok.key]));
-          } else {
-            result += tok.raw;
-          }
-          i++;
-          break;
-        case 'if':
-        case 'each': {
-          const { closeIndex, elseIndex } = findBlockEnd(tokens, i, tok.type);
-          if (closeIndex === -1) {
-            result += tok.raw;
-            i++;
-            break;
-          }
-          const bodyTokens = elseIndex === -1 ? tokens.slice(i + 1, closeIndex) : tokens.slice(i + 1, elseIndex);
-          const elseTokens = elseIndex === -1 ? [] : tokens.slice(elseIndex + 1, closeIndex);
-
-          if (tok.type === 'if') {
-            const thisObj = currentThis !== null && typeof currentThis === 'object' ? (currentThis as Record<string, unknown>) : null;
-            let condVal: unknown;
-            if (thisObj && tok.key in thisObj) condVal = thisObj[tok.key];
-            else if (tok.key in fields) condVal = fields[tok.key];
-            else condVal = undefined;
-            if (isTruthy(condVal)) result += renderTokens(bodyTokens, fields, currentThis);
-            else result += renderTokens(elseTokens, fields, currentThis);
-          } else {
-            const thisObj = currentThis !== null && typeof currentThis === 'object' ? (currentThis as Record<string, unknown>) : null;
-            const arr = thisObj && tok.key in thisObj ? thisObj[tok.key] : tok.key in fields ? fields[tok.key] : undefined;
-            let items = [];
-            if (Array.isArray(arr)) items = arr;
-            else if (arr !== null && arr !== undefined) items = [arr];
-            for (const item of items) result += renderTokens(bodyTokens, fields, item);
-          }
-          i = closeIndex + 1;
-          break;
-        }
-        case 'else':
-        case 'endif':
-        case 'endeach':
-        case 'unknown':
-          result += tok.raw;
-          i++;
-          break;
-      }
-    }
-    return result;
-  }
-
-  const tokens = tokenize(template);
-  return renderTokens(tokens, fields, undefined);
-})()
-`);
-
-          const result = await script.run(context, { timeout: 1000 }); // 1秒超时
-          return { ok: true, result: result as string };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          // 沙箱失败时回退到纯 JS 渲染
-          console.warn('[sandboxed-mustache] isolated-vm 渲染失败，回退到纯 JS:', msg);
-        }
-      }
-
-      // 回退：纯 JS Mustache 渲染（无沙箱隔离，但通过校验规避注入风险）
-      try {
-        const result = renderMustachePure(template, fields);
-        return { ok: true, result };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { ok: false, error: '纯 JS 渲染失败：' + msg };
-      }
+      // 结构化错误：code 便于调用方/programmatic 判断，message 供日志展示
+      return { ok: false, error: `[${outcome.code}] ${outcome.error}` };
     },
   );
 }

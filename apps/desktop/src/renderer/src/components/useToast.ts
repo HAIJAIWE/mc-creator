@@ -26,7 +26,11 @@ export interface ToastItem {
 }
 
 export interface ToastContextValue {
-  toast: (message: string, type?: ToastType, options?: { actions?: ToastAction[]; persistent?: boolean }) => void;
+  toast: (
+    message: string,
+    type?: ToastType,
+    options?: { actions?: ToastAction[]; persistent?: boolean },
+  ) => void;
   success: (message: string) => void;
   error: (message: string) => void;
   warning: (message: string) => void;

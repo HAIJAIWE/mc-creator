@@ -236,10 +236,18 @@ function propError(prop: BlockProperty, index: number, all: BlockProperty[]): st
     return 'bool 默认值须为 true / false';
   }
   if (prop.type === 'int') {
-    if (prop.minText !== undefined && prop.minText.trim() !== '' && !Number.isInteger(Number(prop.minText))) {
+    if (
+      prop.minText !== undefined &&
+      prop.minText.trim() !== '' &&
+      !Number.isInteger(Number(prop.minText))
+    ) {
       return 'min 必须为整数（留空则不限）';
     }
-    if (prop.maxText !== undefined && prop.maxText.trim() !== '' && !Number.isInteger(Number(prop.maxText))) {
+    if (
+      prop.maxText !== undefined &&
+      prop.maxText.trim() !== '' &&
+      !Number.isInteger(Number(prop.maxText))
+    ) {
       return 'max 必须为整数（留空则不限）';
     }
   }
@@ -337,7 +345,9 @@ export function BlockEditor() {
   const frictionCheck = draft ? validateNum(draft.friction, '摩擦', 0) : null;
   const miningLevelCheck = draft ? validateInt(draft.miningLevel, '挖掘等级', 0, 10) : null;
   const dropItemError =
-    draft && !draft.dropSelf && !draft.dropItem.trim() ? '关闭自行掉落时掉落物品为空（将无掉落）' : null;
+    draft && !draft.dropSelf && !draft.dropItem.trim()
+      ? '关闭自行掉落时掉落物品为空（将无掉落）'
+      : null;
 
   const commitId = () => {
     if (!draft || !selected) return;
@@ -406,7 +416,11 @@ export function BlockEditor() {
               <Plus size={14} /> 新建方块
             </button>
             {selected && (
-              <button className="mc-btn-ghost" onClick={() => removeBlock(selected.id)} title="删除当前方块">
+              <button
+                className="mc-btn-ghost"
+                onClick={() => removeBlock(selected.id)}
+                title="删除当前方块"
+              >
                 删除当前
               </button>
             )}
@@ -443,7 +457,10 @@ export function BlockEditor() {
             <div>
               <GroupTitle>基础属性</GroupTitle>
               <div className="space-y-2">
-                <Field label="ID（小写字母/数字/下划线，失焦保存；非法自动转合法）" error={idCheck?.error}>
+                <Field
+                  label="ID（小写字母/数字/下划线，失焦保存；非法自动转合法）"
+                  error={idCheck?.error}
+                >
                   <input
                     className="mc-input w-full font-mono"
                     value={draft.idText}
@@ -472,14 +489,19 @@ export function BlockEditor() {
                     name={draft.assetName}
                     onScopeChange={(s) => {
                       const names = listAssets(s);
-                      const effective = names.includes(draft.assetName) ? draft.assetName : (names[0] ?? '');
+                      const effective = names.includes(draft.assetName)
+                        ? draft.assetName
+                        : (names[0] ?? '');
                       applyDraft(
                         { scope: s, assetName: effective },
                         effective ? { texturePath: formatTexturePath(s, effective) } : undefined,
                       );
                     }}
                     onNameChange={(n) =>
-                      applyDraft({ assetName: n }, { texturePath: formatTexturePath(draft.scope, n) })
+                      applyDraft(
+                        { assetName: n },
+                        { texturePath: formatTexturePath(draft.scope, n) },
+                      )
                     }
                   />
                 </Field>
@@ -546,7 +568,11 @@ export function BlockEditor() {
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <Field label="硬度 hardness（≥0）" error={hardnessCheck?.error} hint="0=瞬间破坏，数值越大越难挖">
+                    <Field
+                      label="硬度 hardness（≥0）"
+                      error={hardnessCheck?.error}
+                      hint="0=瞬间破坏，数值越大越难挖"
+                    >
                       <input
                         type="number"
                         className="mc-input w-full"
@@ -555,7 +581,10 @@ export function BlockEditor() {
                         step={0.5}
                         onChange={(e) => {
                           const v = validateNum(e.target.value, '硬度', 0);
-                          applyDraft({ hardness: e.target.value }, v.value === null ? undefined : { hardness: v.value });
+                          applyDraft(
+                            { hardness: e.target.value },
+                            v.value === null ? undefined : { hardness: v.value },
+                          );
                         }}
                       />
                     </Field>
@@ -570,7 +599,10 @@ export function BlockEditor() {
                         step={1}
                         onChange={(e) => {
                           const v = validateNum(e.target.value, '抗爆', 0);
-                          applyDraft({ resistance: e.target.value }, v.value === null ? undefined : { resistance: v.value });
+                          applyDraft(
+                            { resistance: e.target.value },
+                            v.value === null ? undefined : { resistance: v.value },
+                          );
                         }}
                       />
                     </Field>
@@ -635,7 +667,10 @@ export function BlockEditor() {
                       value={Number(draft.lightLevel) || 0}
                       onChange={(e) => {
                         const v = validateInt(e.target.value, '光照等级', 0, 15);
-                        applyDraft({ lightLevel: e.target.value }, v.value === null ? undefined : { lightLevel: v.value });
+                        applyDraft(
+                          { lightLevel: e.target.value },
+                          v.value === null ? undefined : { lightLevel: v.value },
+                        );
                       }}
                       className="flex-1 accent-mc-accent"
                     />
@@ -647,7 +682,10 @@ export function BlockEditor() {
                       max={15}
                       onChange={(e) => {
                         const v = validateInt(e.target.value, '光照等级', 0, 15);
-                        applyDraft({ lightLevel: e.target.value }, v.value === null ? undefined : { lightLevel: v.value });
+                        applyDraft(
+                          { lightLevel: e.target.value },
+                          v.value === null ? undefined : { lightLevel: v.value },
+                        );
                       }}
                     />
                   </div>
@@ -672,7 +710,11 @@ export function BlockEditor() {
                     </Field>
                   </div>
                   <div className="flex-1">
-                    <Field label="摩擦 friction（≥0）" error={frictionCheck?.error} hint="默认 0.6，冰约 0.98">
+                    <Field
+                      label="摩擦 friction（≥0）"
+                      error={frictionCheck?.error}
+                      hint="默认 0.6，冰约 0.98"
+                    >
                       <input
                         type="number"
                         className="mc-input w-full"
@@ -681,7 +723,10 @@ export function BlockEditor() {
                         step={0.01}
                         onChange={(e) => {
                           const v = validateNum(e.target.value, '摩擦', 0);
-                          applyDraft({ friction: e.target.value }, v.value === null ? undefined : { friction: v.value });
+                          applyDraft(
+                            { friction: e.target.value },
+                            v.value === null ? undefined : { friction: v.value },
+                          );
                         }}
                       />
                     </Field>
@@ -691,7 +736,9 @@ export function BlockEditor() {
                   <select
                     className="mc-select w-full"
                     value={draft.mapColor}
-                    onChange={(e) => applyDraft({ mapColor: e.target.value }, { mapColor: e.target.value })}
+                    onChange={(e) =>
+                      applyDraft({ mapColor: e.target.value }, { mapColor: e.target.value })
+                    }
                   >
                     {mapColorOptions.map((c) => (
                       <option key={c} value={c}>
@@ -725,12 +772,18 @@ export function BlockEditor() {
                   label="掉落自身"
                 />
                 {!draft.dropSelf && (
-                  <Field label="掉落物品 ID" error={dropItemError} hint="引用 spec.items 中的物品 id">
+                  <Field
+                    label="掉落物品 ID"
+                    error={dropItemError}
+                    hint="引用 spec.items 中的物品 id"
+                  >
                     <input
                       className="mc-input w-full font-mono"
                       value={draft.dropItem}
                       list="block-drop-items"
-                      onChange={(e) => applyDraft({ dropItem: e.target.value }, { dropItem: e.target.value })}
+                      onChange={(e) =>
+                        applyDraft({ dropItem: e.target.value }, { dropItem: e.target.value })
+                      }
                       placeholder="如 ruby"
                     />
                     <datalist id="block-drop-items">
@@ -775,7 +828,9 @@ export function BlockEditor() {
                       {draft.props.map((prop, idx) => {
                         const err = propError(prop, idx, draft.props);
                         const setProp = (patch: Partial<BlockProperty>) => {
-                          const next = draft.props.map((p, i) => (i === idx ? { ...p, ...patch } : p));
+                          const next = draft.props.map((p, i) =>
+                            i === idx ? { ...p, ...patch } : p,
+                          );
                           pushProps(next);
                         };
                         return (
@@ -836,7 +891,11 @@ export function BlockEditor() {
                                         .filter(Boolean),
                                     })
                                   }
-                                  placeholder={prop.type === 'int' ? '可选值（逗号分隔，如 1,2,3）' : '可选值（逗号分隔）'}
+                                  placeholder={
+                                    prop.type === 'int'
+                                      ? '可选值（逗号分隔，如 1,2,3）'
+                                      : '可选值（逗号分隔）'
+                                  }
                                   title="可选值（逗号分隔）"
                                 />
                                 <input

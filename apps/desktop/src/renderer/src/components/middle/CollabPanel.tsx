@@ -28,7 +28,12 @@ function colorForPeer(peerId: string): string {
   return PEER_COLORS[h % PEER_COLORS.length] ?? '#2ba8a0';
 }
 
-export function CollabPanel({ docId, playerName, getSnapshot, onRemoteSnapshot }: CollabPanelProps) {
+export function CollabPanel({
+  docId,
+  playerName,
+  getSnapshot,
+  onRemoteSnapshot,
+}: CollabPanelProps) {
   const [peerId] = useState(() => createPeerId());
   const [peers, setPeers] = useState<Map<string, CollabPresence>>(new Map());
   const [revision, setRevision] = useState(1);
@@ -77,13 +82,10 @@ export function CollabPanel({ docId, playerName, getSnapshot, onRemoteSnapshot }
   applyIncomingSnapRef.current = applyIncomingSnap;
 
   // 全通道广播（本机 BC + 跨机中继，两个都连上时都会收到，去重靠 LWW）
-  const postToAll = useCallback(
-    (msg: Parameters<CollabTransport['post']>[0]) => {
-      transportRef.current?.post(msg);
-      relayRef.current?.post(msg);
-    },
-    [],
-  );
+  const postToAll = useCallback((msg: Parameters<CollabTransport['post']>[0]) => {
+    transportRef.current?.post(msg);
+    relayRef.current?.post(msg);
+  }, []);
   const postToAllRef = useRef(postToAll);
   postToAllRef.current = postToAll;
 
@@ -344,10 +346,15 @@ export function CollabPanel({ docId, playerName, getSnapshot, onRemoteSnapshot }
                         className="flex items-center gap-1.5 rounded-mc border border-mc-border bg-mc-surface-3 px-1.5 py-1 text-[10px] text-mc-text"
                         title={p.peerId}
                       >
-                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: p.color }}
+                        />
                         <span className="min-w-0 flex-1 truncate">{p.playerName}</span>
                         {rtcState === 'open' ? (
-                          <span className="shrink-0 text-green-400" title="DataChannel 已直连">直连中</span>
+                          <span className="shrink-0 text-green-400" title="DataChannel 已直连">
+                            直连中
+                          </span>
                         ) : rtcState === 'connecting' ? (
                           <span className="shrink-0 text-mc-accent">连接中…</span>
                         ) : (
@@ -393,7 +400,11 @@ export function CollabPanel({ docId, playerName, getSnapshot, onRemoteSnapshot }
                         : 'border-mc-border bg-mc-surface-3 text-mc-dim hover:text-mc-text'
                   }`}
                 >
-                  {relayStatus === 'on' ? '断开' : relayStatus === 'connecting' ? '连接中…' : '连接'}
+                  {relayStatus === 'on'
+                    ? '断开'
+                    : relayStatus === 'connecting'
+                      ? '连接中…'
+                      : '连接'}
                 </button>
               </div>
               <div className="mt-1.5 truncate text-[10px] text-mc-mute" title={lastEvent}>

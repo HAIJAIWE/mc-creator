@@ -63,9 +63,15 @@ describe('collab-ws-transport', () => {
     const receivedA: CollabMessage[] = [];
     const receivedB: CollabMessage[] = [];
     const receivedC: CollabMessage[] = [];
-    const a = createCollabWsTransport(url, 'room1', 'peer-a', { onMessage: (m) => receivedA.push(m) });
-    const b = createCollabWsTransport(url, 'room1', 'peer-b', { onMessage: (m) => receivedB.push(m) });
-    const c = createCollabWsTransport(url, 'room2', 'peer-c', { onMessage: (m) => receivedC.push(m) });
+    const a = createCollabWsTransport(url, 'room1', 'peer-a', {
+      onMessage: (m) => receivedA.push(m),
+    });
+    const b = createCollabWsTransport(url, 'room1', 'peer-b', {
+      onMessage: (m) => receivedB.push(m),
+    });
+    const c = createCollabWsTransport(url, 'room2', 'peer-c', {
+      onMessage: (m) => receivedC.push(m),
+    });
     expect(a).not.toBeNull();
     expect(b).not.toBeNull();
     expect(c).not.toBeNull();

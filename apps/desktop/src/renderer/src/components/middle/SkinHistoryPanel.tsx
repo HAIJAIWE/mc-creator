@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { History, Trash2, RotateCcw, Save } from 'lucide-react';
-import { loadHistory, commitVersion, deleteVersion, clearHistory, type SkinVersion, type HistoryScope } from './skin-history';
+import {
+  loadHistory,
+  commitVersion,
+  deleteVersion,
+  clearHistory,
+  type SkinVersion,
+  type HistoryScope,
+} from './skin-history';
 
 interface SkinHistoryPanelProps {
   playerName: string;
@@ -105,7 +112,8 @@ export function SkinHistoryPanel({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[11px] text-mc-text" title={v.message}>
-                      {i === 0 ? '● ' : ''}{v.message}
+                      {i === 0 ? '● ' : ''}
+                      {v.message}
                     </div>
                     <div className="text-[10px] text-mc-mute">{formatTime(v.createdAt)}</div>
                   </div>

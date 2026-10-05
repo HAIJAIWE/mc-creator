@@ -102,7 +102,9 @@ export function SplitCodeEditor() {
                   serverMeta: conflict.serverMeta,
                   localMeta: conflict.localMeta,
                   onAcceptServer: async () => {
-                    await useModStore.getState().forceWriteFile(conflict.path, conflict.serverMeta.hash);
+                    await useModStore
+                      .getState()
+                      .forceWriteFile(conflict.path, conflict.serverMeta.hash);
                     toast.success('已接受服务器版本');
                   },
                   onKeepLocal: async () => {
@@ -110,9 +112,13 @@ export function SplitCodeEditor() {
                     toast.success('已保留本地版本');
                   },
                   onViewDiff: async () => {
-                    const serverContent = await useModStore.getState().readServerFileContent(conflict.path);
+                    const serverContent = await useModStore
+                      .getState()
+                      .readServerFileContent(conflict.path);
                     if (serverContent !== null) {
-                      useModStore.getState().openConflictDiff(conflict.path, serverContent, file.content);
+                      useModStore
+                        .getState()
+                        .openConflictDiff(conflict.path, serverContent, file.content);
                     } else {
                       toast.error('无法读取服务器版本内容');
                     }

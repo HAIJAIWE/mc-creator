@@ -2,14 +2,18 @@ import { registerPanel, createPanelLoader, createShellIcon, DOMAIN_PANEL_IDS } f
 import type { PanelRegistration } from './panels.js';
 
 /** 惰性加载器映射：panelId -> import 函数 */
-const domainPanelLoaders: Record<string, () => Promise<{ default: React.ComponentType<unknown> }>> = {
-  items: () => import('../components/ItemRecipeEditor.js').then((m) => ({ default: m.ItemRecipeEditor })),
-  blocks: () => import('../components/BlockEditor.js').then((m) => ({ default: m.BlockEditor })),
-  entity: () => import('../components/EntityAiEditor.js').then((m) => ({ default: m.EntityAiEditor })),
-  audio: () => import('../components/AudioPanel.js').then((m) => ({ default: m.AudioPanel })),
-  cicd: () => import('../components/CiCdPanel.js').then((m) => ({ default: m.CiCdPanel })),
-  game: () => import('../components/GameLauncherPanel.js').then((m) => ({ default: m.GameLauncherPanel })),
-};
+const domainPanelLoaders: Record<string, () => Promise<{ default: React.ComponentType<unknown> }>> =
+  {
+    items: () =>
+      import('../components/ItemRecipeEditor.js').then((m) => ({ default: m.ItemRecipeEditor })),
+    blocks: () => import('../components/BlockEditor.js').then((m) => ({ default: m.BlockEditor })),
+    entity: () =>
+      import('../components/EntityAiEditor.js').then((m) => ({ default: m.EntityAiEditor })),
+    audio: () => import('../components/AudioPanel.js').then((m) => ({ default: m.AudioPanel })),
+    cicd: () => import('../components/CiCdPanel.js').then((m) => ({ default: m.CiCdPanel })),
+    game: () =>
+      import('../components/GameLauncherPanel.js').then((m) => ({ default: m.GameLauncherPanel })),
+  };
 
 /** 注册所有 domain 面板（领域编辑器） */
 export function registerDomainPanels(): void {

@@ -36,7 +36,13 @@ describe('plugin-node-loader 沙箱', () => {
   it('extractJsFileNames 兼容多种桥接形态', () => {
     expect(extractJsFileNames(['a.js', 'b.txt', '.hidden.js'])).toEqual(['a.js']);
     expect(
-      extractJsFileNames({ success: true, data: [{ name: 'x.js', type: 'file' }, { name: 'dir', type: 'directory' }] }),
+      extractJsFileNames({
+        success: true,
+        data: [
+          { name: 'x.js', type: 'file' },
+          { name: 'dir', type: 'directory' },
+        ],
+      }),
     ).toEqual(['x.js']);
     expect(extractJsFileNames({ success: false, error: 'nope' })).toEqual([]);
   });

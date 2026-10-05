@@ -33,8 +33,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     const config = DEFAULT_PROJECT_CONFIG;
     const currentProfile = config.currentProfile;
     const currentProfileConfig = config.profiles[currentProfile] ?? config.profiles.mc_creator;
-    const currentProjectName =
-      projects.find((p) => p.id === currentProjectId)?.name ?? 'untitled';
+    const currentProjectName = projects.find((p) => p.id === currentProjectId)?.name ?? 'untitled';
     const resolvePath = (template: string, projectName?: string) =>
       template.replace('{projectName}', projectName ?? currentProjectName);
     return {

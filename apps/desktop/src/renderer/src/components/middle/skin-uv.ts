@@ -50,23 +50,23 @@ const CLASSIC_UV_MAP: Record<BodyPartId, TextureRect> = {
   // Head (8x8x8) at (8,8) - 6 faces
   head: { x: 8, y: 8, width: 8, height: 8 },
   headOverlay: { x: 40, y: 8, width: 8, height: 8 },
-  
+
   // Body (12x8x4) front at (20,20) - 8x12
   body: { x: 20, y: 20, width: 8, height: 12 },
   bodyOverlay: { x: 20, y: 36, width: 8, height: 12 },
-  
+
   // Right Arm (12x4x4) front at (44,20) - 4x12 (classic)
   rightArm: { x: 44, y: 20, width: 4, height: 12 },
   rightArmOverlay: { x: 52, y: 20, width: 4, height: 12 },
-  
+
   // Left Arm (12x4x4) front at (36,52) - 4x12 (classic)
   leftArm: { x: 36, y: 52, width: 4, height: 12 },
   leftArmOverlay: { x: 48, y: 52, width: 4, height: 12 },
-  
+
   // Right Leg (12x4x4) front at (4,20) - 4x12
   rightLeg: { x: 4, y: 20, width: 4, height: 12 },
   rightLegOverlay: { x: 4, y: 36, width: 4, height: 12 },
-  
+
   // Left Leg (12x4x4) front at (20,52) - 4x12
   leftLeg: { x: 20, y: 52, width: 4, height: 12 },
   leftLegOverlay: { x: 20, y: 36, width: 4, height: 12 },
@@ -77,32 +77,38 @@ const SLIM_UV_MAP: Record<BodyPartId, TextureRect> = {
   // Head (same as classic)
   head: { x: 8, y: 8, width: 8, height: 8 },
   headOverlay: { x: 40, y: 8, width: 8, height: 8 },
-  
+
   // Body (same as classic)
   body: { x: 20, y: 20, width: 8, height: 12 },
   bodyOverlay: { x: 20, y: 36, width: 8, height: 12 },
-  
+
   // Right Arm (12x3x4) front at (44,20) - 3x12 (slim)
   rightArm: { x: 44, y: 20, width: 3, height: 12 },
   rightArmOverlay: { x: 51, y: 20, width: 3, height: 12 },
-  
+
   // Left Arm (12x3x4) front at (37,52) - 3x12 (slim) - note: 37 not 36
   leftArm: { x: 37, y: 52, width: 3, height: 12 },
   leftArmOverlay: { x: 49, y: 52, width: 3, height: 12 },
-  
+
   // Right Leg (same as classic)
   rightLeg: { x: 4, y: 20, width: 4, height: 12 },
   rightLegOverlay: { x: 4, y: 36, width: 4, height: 12 },
-  
+
   // Left Leg (same as classic)
   leftLeg: { x: 20, y: 52, width: 4, height: 12 },
   leftLegOverlay: { x: 20, y: 36, width: 4, height: 12 },
 };
 
 /** 获取部位矩形 */
-export function getBodyPartRect(model: ModelType, partId: BodyPartId, isOverlay = false): TextureRect {
+export function getBodyPartRect(
+  model: ModelType,
+  partId: BodyPartId,
+  isOverlay = false,
+): TextureRect {
   const map = model === 'slim' ? SLIM_UV_MAP : CLASSIC_UV_MAP;
-  const key = (isOverlay && !partId.endsWith('Overlay') ? `${partId}Overlay` : partId) as BodyPartId;
+  const key = (
+    isOverlay && !partId.endsWith('Overlay') ? `${partId}Overlay` : partId
+  ) as BodyPartId;
   return map[key];
 }
 
@@ -208,12 +214,18 @@ export const BODY_PART_INFOS: Record<BodyPartId, BodyPartInfo> = {
 
 /** 部位显示顺序 */
 export const BODY_PART_DISPLAY_ORDER: BodyPartId[] = [
-  'head', 'headOverlay',
-  'body', 'bodyOverlay',
-  'rightArm', 'rightArmOverlay',
-  'leftArm', 'leftArmOverlay',
-  'rightLeg', 'rightLegOverlay',
-  'leftLeg', 'leftLegOverlay',
+  'head',
+  'headOverlay',
+  'body',
+  'bodyOverlay',
+  'rightArm',
+  'rightArmOverlay',
+  'leftArm',
+  'leftArmOverlay',
+  'rightLeg',
+  'rightLegOverlay',
+  'leftLeg',
+  'leftLegOverlay',
 ];
 
 /** UV 坐标转换：纹理像素 (0-63) -> UV (0-1) */
@@ -266,7 +278,7 @@ function getClassicBodyPartAt(x: number, y: number): BodyPartId | null {
   if (x >= 4 && x < 8 && y >= 52 && y < 64) return 'leftLegOverlay';
   // Left leg
   if (x >= 20 && x < 24 && y >= 52 && y < 64) return 'leftLeg';
-  
+
   return null;
 }
 
@@ -296,7 +308,7 @@ function getSlimBodyPartAt(x: number, y: number): BodyPartId | null {
   if (x >= 4 && x < 8 && y >= 52 && y < 64) return 'leftLegOverlay';
   // Left leg
   if (x >= 20 && x < 24 && y >= 52 && y < 64) return 'leftLeg';
-  
+
   return null;
 }
 
@@ -305,18 +317,18 @@ export function mirrorCoordinate(
   model: ModelType,
   partId: BodyPartId,
   x: number,
-  y: number
+  y: number,
 ): { x: number; y: number } {
   const rect = getBodyPartRect(model, partId, false);
   const overlayRect = getBodyPartRect(model, partId, true);
-  
+
   // 计算相对于部位的局部坐标
   const localX = x - rect.x;
-  
+
   // 镜像：在部位矩形内水平翻转
   const mirroredLocalX = rect.width - 1 - localX;
   const mirroredX = rect.x + mirroredLocalX;
-  
+
   // 如果有 overlay，也镜像 overlay 区域（仅当点击点本身在 overlay 区域内）
   if (overlayRect && pointInRect(x, y, overlayRect)) {
     const overlayLocalX = x - overlayRect.x;
@@ -326,15 +338,21 @@ export function mirrorCoordinate(
       y: y,
     };
   }
-  
+
   return { x: mirroredX, y: y };
 }
 
 /** 检查坐标是否在部位内（用于部位隔离） */
-export function isInBodyPart(model: ModelType, partId: BodyPartId, x: number, y: number, includeOverlay = true): boolean {
+export function isInBodyPart(
+  model: ModelType,
+  partId: BodyPartId,
+  x: number,
+  y: number,
+  includeOverlay = true,
+): boolean {
   const rect = getBodyPartRect(model, partId, false);
   if (pointInRect(x, y, rect)) return true;
-  
+
   if (includeOverlay) {
     const overlayRect = getBodyPartRect(model, partId, true);
     if (pointInRect(x, y, overlayRect)) return true;

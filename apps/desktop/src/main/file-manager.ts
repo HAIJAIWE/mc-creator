@@ -4,7 +4,15 @@ import { pipeline } from 'node:stream/promises';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { dialog } from 'electron';
 import { PATH_MANAGER, ensureDir, isSafePath, PROJECT_SCOPED } from './path-manager.js';
-import { FileError, Result, ok, err, mapFsError, LARGE_FILE_THRESHOLD, CHUNK_SIZE } from './file-error.js';
+import {
+  FileError,
+  Result,
+  ok,
+  err,
+  mapFsError,
+  LARGE_FILE_THRESHOLD,
+  CHUNK_SIZE,
+} from './file-error.js';
 import type { FileMetaWithHash } from './file-error.js';
 
 // ============================================================
@@ -139,13 +147,16 @@ export class FileManager {
         const content = await fs.readFile(path);
         return ok(content);
       }
-    } catch (e: any) {
-      return err(mapFsError(e, path));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, path));
     }
   }
 
   /** 写入文件内容（自动分片大文件） */
-  private async writeFileContent(path: string, content: Buffer | Uint8Array): Promise<Result<void, FileError>> {
+  private async writeFileContent(
+    path: string,
+    content: Buffer | Uint8Array,
+  ): Promise<Result<void, FileError>> {
     try {
       await ensureDir(dirname(path));
       if (content.length > LARGE_FILE_THRESHOLD) {
@@ -165,8 +176,8 @@ export class FileManager {
         await fs.writeFile(path, content);
       }
       return ok(undefined);
-    } catch (e: any) {
-      return err(mapFsError(e, path));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, path));
     }
   }
 
@@ -212,15 +223,18 @@ export class FileManager {
         entries.sort((a, b) => {
           if (a.type === b.type) return a.name.localeCompare(b.name);
           return a.type === 'directory' ? -1 : 1;
-        })
+        }),
       );
-    } catch (e: any) {
-      return err(mapFsError(e, fullPath));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, fullPath));
     }
   }
 
   /** 列出目录树（递归，支持深度限制） */
-  public async listDirTree(path: string, maxDepth: number = -1): Promise<Result<DirEntry[], FileError>> {
+  public async listDirTree(
+    path: string,
+    maxDepth: number = -1,
+  ): Promise<Result<DirEntry[], FileError>> {
     const safeCheck = this.checkSafePath(path);
     if (!safeCheck.ok) return safeCheck;
 
@@ -265,13 +279,17 @@ export class FileManager {
       };
 
       return ok(await walk(fullPath, 0));
-    } catch (e: any) {
-      return err(mapFsError(e, fullPath));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, fullPath));
     }
   }
 
   /** 列出项目目录树（递归，支持深度限制） */
-  public async listProjectTree(projectId: string, relPath: string = '', maxDepth: number = -1): Promise<Result<DirEntry[], FileError>> {
+  public async listProjectTree(
+    projectId: string,
+    relPath: string = '',
+    maxDepth: number = -1,
+  ): Promise<Result<DirEntry[], FileError>> {
     const fullPath = resolve(PROJECT_SCOPED.workspace(projectId), relPath);
     return this.listDirTree(fullPath, maxDepth);
   }
@@ -281,7 +299,10 @@ export class FileManager {
   // ============================================================
 
   /** 读取文本文件 */
-  public async readText(path: string, encoding: ReadEncoding = 'utf8'): Promise<Result<string, FileError>> {
+  public async readText(
+    path: string,
+    encoding: ReadEncoding = 'utf8',
+  ): Promise<Result<string, FileError>> {
     const safeCheck = this.checkSafePath(path);
     if (!safeCheck.ok) return safeCheck;
 
@@ -290,9 +311,10 @@ export class FileManager {
     if (!result.ok) return result;
 
     try {
-      const text = encoding === null || encoding === 'base64'
-        ? result.value.toString('base64')
-        : result.value.toString(encoding);
+      const text =
+        encoding === null || encoding === 'base64'
+          ? result.value.toString('base64')
+          : result.value.toString(encoding);
       return ok(text);
     } catch {
       return err({ code: 'UNKNOWN', message: 'Failed to decode file content' });
@@ -312,7 +334,11 @@ export class FileManager {
   }
 
   /** 写入文本文件（自动建目录） */
-  public async writeText(path: string, content: string, encoding: ReadEncoding = 'utf8'): Promise<Result<void, FileError>> {
+  public async writeText(
+    path: string,
+    content: string,
+    encoding: ReadEncoding = 'utf8',
+  ): Promise<Result<void, FileError>> {
     const safeCheck = this.checkSafePath(path);
     if (!safeCheck.ok) return safeCheck;
 
@@ -333,7 +359,10 @@ export class FileManager {
   }
 
   /** 写入二进制文件（自动建目录） */
-  public async writeBinary(path: string, buffer: Buffer | Uint8Array): Promise<Result<void, FileError>> {
+  public async writeBinary(
+    path: string,
+    buffer: Buffer | Uint8Array,
+  ): Promise<Result<void, FileError>> {
     const safeCheck = this.checkSafePath(path);
     if (!safeCheck.ok) return safeCheck;
 
@@ -364,7 +393,7 @@ export class FileManager {
   public async writeLargeFile(
     path: string,
     stream: NodeJS.ReadableStream,
-    options: WriteLargeFileOptions = {}
+    options: WriteLargeFileOptions = {},
   ): Promise<Result<FileMetaWithHash, FileError>> {
     const safeCheck = this.checkSafePath(path);
     if (!safeCheck.ok) return safeCheck;
@@ -400,7 +429,10 @@ export class FileManager {
       // 校验 MD5
       const computedHash = hash.digest('hex');
       if (options.expectedHash && computedHash !== options.expectedHash) {
-        return err({ code: 'UNKNOWN', message: `MD5 校验失败: 期望 ${options.expectedHash}, 实际 ${computedHash}` });
+        return err({
+          code: 'UNKNOWN',
+          message: `MD5 校验失败: 期望 ${options.expectedHash}, 实际 ${computedHash}`,
+        });
       }
 
       const stats = await fs.stat(fullPath);
@@ -410,8 +442,8 @@ export class FileManager {
         isDirectory: false,
         hash: computedHash,
       });
-    } catch (e: any) {
-      return err(mapFsError(e, fullPath));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, fullPath));
     }
   }
 
@@ -425,7 +457,7 @@ export class FileManager {
   public async readLargeFile(
     path: string,
     onChunk: (chunk: Buffer) => void | Promise<void>,
-    options: ReadLargeFileOptions = {}
+    options: ReadLargeFileOptions = {},
   ): Promise<Result<FileMetaWithHash, FileError>> {
     const safeCheck = this.checkSafePath(path);
     if (!safeCheck.ok) return safeCheck;
@@ -463,8 +495,8 @@ export class FileManager {
         isDirectory: false,
         hash: hash.digest('hex'),
       });
-    } catch (e: any) {
-      return err(mapFsError(e, fullPath));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, fullPath));
     }
   }
 
@@ -476,7 +508,7 @@ export class FileManager {
    */
   public async *readLargeFileIterable(
     path: string,
-    options: ReadLargeFileOptions = {}
+    options: ReadLargeFileOptions = {},
   ): AsyncIterable<Buffer> {
     const safeCheck = this.checkSafePath(path);
     if (!safeCheck.ok) throw safeCheck.error;
@@ -537,8 +569,8 @@ export class FileManager {
         isDirectory: false,
         hash,
       });
-    } catch (e: any) {
-      return err(mapFsError(e, fullPath));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, fullPath));
     }
   }
 
@@ -551,7 +583,7 @@ export class FileManager {
     path: string,
     content: string,
     expectedMeta?: FileMetaWithHash,
-    encoding: ReadEncoding = 'utf8'
+    encoding: ReadEncoding = 'utf8',
   ): Promise<Result<FileMetaWithHash, FileError>> {
     const safeCheck = this.checkSafePath(path);
     if (!safeCheck.ok) return safeCheck;
@@ -570,8 +602,9 @@ export class FileManager {
           isDirectory: false,
           hash,
         };
-      } catch (e: any) {
-        if (e.code === 'ENOENT') {
+      } catch (e) {
+        const eno = e as NodeJS.ErrnoException;
+        if (eno.code === 'ENOENT') {
           // 文件不存在，构造一个表示“不存在”的元数据
           serverMeta = {
             size: 0,
@@ -580,7 +613,7 @@ export class FileManager {
             hash: 'd41d8cd98f00b204e9800998ecf8427e', // empty file MD5
           };
         } else {
-          return err(mapFsError(e, fullPath));
+          return err(mapFsError(e as NodeJS.ErrnoException, fullPath));
         }
       }
 
@@ -640,8 +673,8 @@ export class FileManager {
     try {
       await fs.mkdir(fullPath, { recursive: true });
       return ok({ success: true, path: fullPath });
-    } catch (e: any) {
-      return err(mapFsError(e, fullPath));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, fullPath));
     }
   }
 
@@ -671,11 +704,12 @@ export class FileManager {
       await fs.access(fullPath);
       await fs.rm(fullPath, { recursive: false, force: true });
       return ok({ success: true, path: fullPath });
-    } catch (e: any) {
-      if (e.code === 'ENOENT') {
+    } catch (e) {
+      const eno = e as NodeJS.ErrnoException;
+      if (eno.code === 'ENOENT') {
         return ok({ success: false, path: fullPath, error: 'Path does not exist' });
       }
-      return err(mapFsError(e, fullPath));
+      return err(mapFsError(e as NodeJS.ErrnoException, fullPath));
     }
   }
 
@@ -690,11 +724,12 @@ export class FileManager {
       await fs.access(fullPath);
       await fs.rm(fullPath, { recursive: true, force: true });
       return ok({ success: true, path: fullPath });
-    } catch (e: any) {
-      if (e.code === 'ENOENT') {
+    } catch (e) {
+      const eno = e as NodeJS.ErrnoException;
+      if (eno.code === 'ENOENT') {
         return ok({ success: false, path: fullPath, error: 'Path does not exist' });
       }
-      return err(mapFsError(e, fullPath));
+      return err(mapFsError(e as NodeJS.ErrnoException, fullPath));
     }
   }
 
@@ -722,8 +757,8 @@ export class FileManager {
 
       await fs.rename(fromFull, toFull);
       return ok({ success: true, from: fromFull, to: toFull });
-    } catch (e: any) {
-      return err(mapFsError(e, fromFull));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, fromFull));
     }
   }
 
@@ -743,9 +778,26 @@ export class FileManager {
   }
 
   /** 从 Mod 目录列出 Mod 清单 */
-  public async listMods(): Promise<Result<{ id: string; name: string; version: string; loader: 'fabric' | 'neoforge' | 'unknown'; path: string }[], FileError>> {
+  public async listMods(): Promise<
+    Result<
+      {
+        id: string;
+        name: string;
+        version: string;
+        loader: 'fabric' | 'neoforge' | 'unknown';
+        path: string;
+      }[],
+      FileError
+    >
+  > {
     const modsDir = PATH_MANAGER.mods();
-    const result: Array<{ id: string; name: string; version: string; loader: 'fabric' | 'neoforge' | 'unknown'; path: string }> = [];
+    const result: Array<{
+      id: string;
+      name: string;
+      version: string;
+      loader: 'fabric' | 'neoforge' | 'unknown';
+      path: string;
+    }> = [];
 
     try {
       await fs.access(modsDir);
@@ -793,8 +845,8 @@ export class FileManager {
         }
       }
       return ok(result.sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (e: any) {
-      return err(mapFsError(e, modsDir));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, modsDir));
     }
   }
 
@@ -806,7 +858,9 @@ export class FileManager {
   }
 
   /** 导入 Mod 文件（通过对话框选择） */
-  public async importMod(): Promise<Result<{ success: boolean; path: string; error?: string }, FileError>> {
+  public async importMod(): Promise<
+    Result<{ success: boolean; path: string; error?: string }, FileError>
+  > {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       title: '选择 Mod 文件',
@@ -825,15 +879,26 @@ export class FileManager {
       const content = await fs.readFile(selectedPath);
       await fs.writeFile(targetPath, content);
       return ok({ success: true, path: targetPath });
-    } catch (e: any) {
-      return err(mapFsError(e, selectedPath));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, selectedPath));
     }
   }
 
   /** 列出 Modpack 清单 */
-  public async listModpacks(): Promise<Result<Array<{ id: string; name: string; mcVersion: string; description: string; path: string }>, FileError>> {
+  public async listModpacks(): Promise<
+    Result<
+      Array<{ id: string; name: string; mcVersion: string; description: string; path: string }>,
+      FileError
+    >
+  > {
     const modpacksDir = PATH_MANAGER.modpacks();
-    const result: Array<{ id: string; name: string; mcVersion: string; description: string; path: string }> = [];
+    const result: Array<{
+      id: string;
+      name: string;
+      mcVersion: string;
+      description: string;
+      path: string;
+    }> = [];
 
     try {
       await fs.access(modpacksDir);
@@ -878,13 +943,17 @@ export class FileManager {
         }
       }
       return ok(result.sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (e: any) {
-      return err(mapFsError(e, modpacksDir));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, modpacksDir));
     }
   }
 
   /** 创建新 Modpack */
-  public async createModpack(name: string, mcVersion: string, description: string = ''): Promise<Result<MakeDirResult, FileError>> {
+  public async createModpack(
+    name: string,
+    mcVersion: string,
+    description: string = '',
+  ): Promise<Result<MakeDirResult, FileError>> {
     const modpacksDir = PATH_MANAGER.modpacks();
     const newDir = resolve(modpacksDir, name);
 
@@ -900,7 +969,9 @@ export class FileManager {
   }
 
   /** 列出资源包 */
-  public async listResourcePacks(): Promise<Result<Array<{ name: string; path: string; mcVersion?: string }>, FileError>> {
+  public async listResourcePacks(): Promise<
+    Result<Array<{ name: string; path: string; mcVersion?: string }>, FileError>
+  > {
     const dir = PATH_MANAGER.resourcePacks();
     const result: Array<{ name: string; path: string; mcVersion?: string }> = [];
 
@@ -923,13 +994,15 @@ export class FileManager {
         }
       }
       return ok(result.sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (e: any) {
-      return err(mapFsError(e, dir));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, dir));
     }
   }
 
   /** 导入资源包 */
-  public async importResourcePack(): Promise<Result<{ success: boolean; path: string; error?: string }, FileError>> {
+  public async importResourcePack(): Promise<
+    Result<{ success: boolean; path: string; error?: string }, FileError>
+  > {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       title: '选择资源包 (.zip)',
@@ -948,8 +1021,8 @@ export class FileManager {
       const content = await fs.readFile(selectedPath);
       await fs.writeFile(targetPath, content);
       return ok({ success: true, path: targetPath });
-    } catch (e: any) {
-      return err(mapFsError(e, selectedPath));
+    } catch (e) {
+      return err(mapFsError(e as NodeJS.ErrnoException, selectedPath));
     }
   }
 
@@ -963,25 +1036,40 @@ export class FileManager {
   }
 
   /** 列出项目目录（相对路径） */
-  public async listProjectDir(projectId: string, relPath: string = ''): Promise<Result<DirEntry[], FileError>> {
+  public async listProjectDir(
+    projectId: string,
+    relPath: string = '',
+  ): Promise<Result<DirEntry[], FileError>> {
     const fullPath = resolve(PROJECT_SCOPED.workspace(projectId), relPath);
     return this.listDir(fullPath);
   }
 
   /** 读取项目文件（相对路径） */
-  public async readProjectFile(projectId: string, relPath: string, encoding?: ReadEncoding): Promise<Result<string, FileError>> {
+  public async readProjectFile(
+    projectId: string,
+    relPath: string,
+    encoding?: ReadEncoding,
+  ): Promise<Result<string, FileError>> {
     const fullPath = resolve(PROJECT_SCOPED.workspace(projectId), relPath);
     return this.readText(fullPath, encoding);
   }
 
   /** 写入项目文件（相对路径，自动建目录） */
-  public async writeProjectFile(projectId: string, relPath: string, content: string, encoding?: ReadEncoding): Promise<Result<void, FileError>> {
+  public async writeProjectFile(
+    projectId: string,
+    relPath: string,
+    content: string,
+    encoding?: ReadEncoding,
+  ): Promise<Result<void, FileError>> {
     const fullPath = resolve(PROJECT_SCOPED.workspace(projectId), relPath);
     return this.writeText(fullPath, content, encoding);
   }
 
   /** 获取项目文件元数据（相对路径） */
-  public async getProjectFileMeta(projectId: string, relPath: string): Promise<Result<FileMetaWithHash, FileError>> {
+  public async getProjectFileMeta(
+    projectId: string,
+    relPath: string,
+  ): Promise<Result<FileMetaWithHash, FileError>> {
     const fullPath = resolve(PROJECT_SCOPED.workspace(projectId), relPath);
     return this.getFileMeta(fullPath);
   }
@@ -992,20 +1080,26 @@ export class FileManager {
     relPath: string,
     content: string,
     expectedMeta?: FileMetaWithHash,
-    encoding?: ReadEncoding
+    encoding?: ReadEncoding,
   ): Promise<Result<FileMetaWithHash, FileError>> {
     const fullPath = resolve(PROJECT_SCOPED.workspace(projectId), relPath);
     return this.writeTextWithMeta(fullPath, content, expectedMeta, encoding);
   }
 
   /** 创建项目目录（相对路径） */
-  public async makeProjectDir(projectId: string, relPath: string): Promise<Result<MakeDirResult, FileError>> {
+  public async makeProjectDir(
+    projectId: string,
+    relPath: string,
+  ): Promise<Result<MakeDirResult, FileError>> {
     const fullPath = resolve(PROJECT_SCOPED.workspace(projectId), relPath);
     return this.makeDir(fullPath);
   }
 
   /** 删除项目文件/目录（相对路径） */
-  public async deleteProjectItem(projectId: string, relPath: string): Promise<Result<DeleteResult, FileError>> {
+  public async deleteProjectItem(
+    projectId: string,
+    relPath: string,
+  ): Promise<Result<DeleteResult, FileError>> {
     const fullPath = resolve(PROJECT_SCOPED.workspace(projectId), relPath);
     return this.deleteItem(fullPath);
   }

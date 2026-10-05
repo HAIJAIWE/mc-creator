@@ -46,7 +46,16 @@ export interface JointAngles {
 /** v1.1 滤镜节点 */
 export interface FilterNode {
   id: string;
-  type: 'brightness' | 'contrast' | 'hue' | 'saturation' | 'noise' | 'sharpen' | 'sepia' | 'grayscale' | 'invert';
+  type:
+    | 'brightness'
+    | 'contrast'
+    | 'hue'
+    | 'saturation'
+    | 'noise'
+    | 'sharpen'
+    | 'sepia'
+    | 'grayscale'
+    | 'invert';
   params: Record<string, number>;
   enabled: boolean;
 }
@@ -86,7 +95,7 @@ export interface Layer {
   type: LayerType;
   visible: boolean;
   locked: boolean;
-  opacity: number;        // 0-100
+  opacity: number; // 0-100
   blendMode: BlendMode;
   canvas: HTMLCanvasElement; // 64×64 离屏 canvas
 }
@@ -145,11 +154,31 @@ const ZOOMS = [6, 8, 12] as const;
 
 /** 默认调色板：肤色 / 发色 / MC 常用色 */
 const DEFAULT_PALETTE = [
-  '#ffffff', '#c8c8c8', '#8a8a8a', '#3a3a3a', '#141414',
-  '#e8b07d', '#c89870', '#9c6b4a', '#5a3a28', '#2a1a12',
-  '#3a2a1a', '#d97b2e', '#e8d878', '#7a5aa8', '#1a1a1a',
-  '#2ba8a0', '#4a8aff', '#4040c8', '#5aa85a', '#e84a4a',
-  '#d89030', '#e8e84a', '#8a6a3a', '#5a4a2a', '#4a3a2a',
+  '#ffffff',
+  '#c8c8c8',
+  '#8a8a8a',
+  '#3a3a3a',
+  '#141414',
+  '#e8b07d',
+  '#c89870',
+  '#9c6b4a',
+  '#5a3a28',
+  '#2a1a12',
+  '#3a2a1a',
+  '#d97b2e',
+  '#e8d878',
+  '#7a5aa8',
+  '#1a1a1a',
+  '#2ba8a0',
+  '#4a8aff',
+  '#4040c8',
+  '#5aa85a',
+  '#e84a4a',
+  '#d89030',
+  '#e8e84a',
+  '#8a6a3a',
+  '#5a4a2a',
+  '#4a3a2a',
 ];
 
 const CUSTOM_PALETTE_KEY = 'mc-creator-skin-custom-palette';
@@ -213,44 +242,53 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       return c;
     }, []);
 
-    const createBaseLayer = useCallback((): Layer => ({
-      id: 'base',
-      name: '底层',
-      type: 'base',
-      visible: true,
-      locked: false,
-      opacity: 100,
-      blendMode: 'source-over',
-      canvas: createLayerCanvas(),
-    }), [createLayerCanvas]);
+    const createBaseLayer = useCallback(
+      (): Layer => ({
+        id: 'base',
+        name: '底层',
+        type: 'base',
+        visible: true,
+        locked: false,
+        opacity: 100,
+        blendMode: 'source-over',
+        canvas: createLayerCanvas(),
+      }),
+      [createLayerCanvas],
+    );
 
-    const createOverlayLayer = useCallback((): Layer => ({
-      id: 'overlay',
-      name: '表层',
-      type: 'overlay',
-      visible: true,
-      locked: false,
-      opacity: 100,
-      blendMode: 'source-over',
-      canvas: createLayerCanvas(),
-    }), [createLayerCanvas]);
+    const createOverlayLayer = useCallback(
+      (): Layer => ({
+        id: 'overlay',
+        name: '表层',
+        type: 'overlay',
+        visible: true,
+        locked: false,
+        opacity: 100,
+        blendMode: 'source-over',
+        canvas: createLayerCanvas(),
+      }),
+      [createLayerCanvas],
+    );
 
-    const createCustomLayer = useCallback((name: string): Layer => ({
-      id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      name,
-      type: 'custom',
-      visible: true,
-      locked: false,
-      opacity: 100,
-      blendMode: 'source-over',
-      canvas: createLayerCanvas(),
-    }), [createLayerCanvas]);
+    const createCustomLayer = useCallback(
+      (name: string): Layer => ({
+        id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name,
+        type: 'custom',
+        visible: true,
+        locked: false,
+        opacity: 100,
+        blendMode: 'source-over',
+        canvas: createLayerCanvas(),
+      }),
+      [createLayerCanvas],
+    );
 
     // 初始化默认图层
-    const initLayers = useCallback((): Layer[] => [
-      createBaseLayer(),
-      createOverlayLayer(),
-    ], [createBaseLayer, createOverlayLayer]);
+    const initLayers = useCallback(
+      (): Layer[] => [createBaseLayer(), createOverlayLayer()],
+      [createBaseLayer, createOverlayLayer],
+    );
 
     // === 核心状态（仅一次声明）===
     const [tool, setTool] = useState<PixelTool>('pencil');
@@ -263,7 +301,11 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
     const [ready, setReady] = useState(false);
     const [customColors, setCustomColors] = useState<string[]>(() => loadCustomPalette());
     const [recentColors, setRecentColors] = useState<string[]>([]);
-    const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; part: string | null } | null>(null);
+    const [hoverInfo, setHoverInfo] = useState<{
+      x: number;
+      y: number;
+      part: string | null;
+    } | null>(null);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [spaceDown, setSpaceDown] = useState(false);
     const [touchStartDist, setTouchStartDist] = useState<number | null>(null);
@@ -298,21 +340,39 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
 
     // === 常量定义（仅一次）===
     const TOOL_KEYS: Record<PixelTool, string> = {
-      pencil: 'P', eraser: 'E', fill: 'F', picker: 'I', line: 'L', rect: 'R',
+      pencil: 'P',
+      eraser: 'E',
+      fill: 'F',
+      picker: 'I',
+      line: 'L',
+      rect: 'R',
     };
     const TOOL_LABELS: Record<PixelTool, string> = {
-      pencil: '画笔', eraser: '橡皮', fill: '填充', picker: '取色', line: '直线', rect: '矩形',
+      pencil: '画笔',
+      eraser: '橡皮',
+      fill: '填充',
+      picker: '取色',
+      line: '直线',
+      rect: '矩形',
     };
     const MIRROR_LABELS: Record<'off' | 'global' | 'bodypart', string> = {
-      off: '关', global: '全局', bodypart: '智能',
+      off: '关',
+      global: '全局',
+      bodypart: '智能',
     };
     const BODY_PART_LABELS: Record<string, string> = {
-      head: '头部', headOverlay: '帽子',
-      body: '身体', bodyOverlay: '外套',
-      rightArm: '右臂', rightArmOverlay: '右袖',
-      leftArm: '左臂', leftArmOverlay: '左袖',
-      rightLeg: '右腿', rightLegOverlay: '右裤',
-      leftLeg: '左腿', leftLegOverlay: '左裤',
+      head: '头部',
+      headOverlay: '帽子',
+      body: '身体',
+      bodyOverlay: '外套',
+      rightArm: '右臂',
+      rightArmOverlay: '右袖',
+      leftArm: '左臂',
+      leftArmOverlay: '左袖',
+      rightLeg: '右腿',
+      rightLegOverlay: '右裤',
+      leftLeg: '左腿',
+      leftLegOverlay: '左裤',
     };
 
     // === 绘图相关状态 ===
@@ -323,56 +383,77 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
 
     // === Canvas 上下文辅助 ===
     const activeCtx = useCallback((): CanvasRenderingContext2D | null => {
-      const layer = layers.find(l => l.id === activeLayerId);
+      const layer = layers.find((l) => l.id === activeLayerId);
       return layer?.canvas.getContext('2d') ?? null;
     }, [layers, activeLayerId]);
 
     // 获取指定图层的上下文（用于 3D 直绘）
-    const getLayerCtx = useCallback((layerId: string): CanvasRenderingContext2D | null => {
-      const layer = layers.find(l => l.id === layerId);
-      return layer?.canvas.getContext('2d') ?? null;
-    }, [layers]);
+    const getLayerCtx = useCallback(
+      (layerId: string): CanvasRenderingContext2D | null => {
+        const layer = layers.find((l) => l.id === layerId);
+        return layer?.canvas.getContext('2d') ?? null;
+      },
+      [layers],
+    );
 
     // === v1.1 滤镜引擎 ===
-    const buildFilterString = useCallback((type: FilterNode['type'], params: Record<string, number>): string => {
-      const v = params.value ?? 1;
-      switch (type) {
-        case 'brightness': return `brightness(${v})`;
-        case 'contrast': return `contrast(${v})`;
-        case 'hue': return `hue-rotate(${params.deg ?? 0}deg)`;
-        case 'saturation': return `saturate(${v})`;
-        case 'sepia': return `sepia(${v})`;
-        case 'grayscale': return `grayscale(${v})`;
-        case 'invert': return `invert(${v})`;
-        case 'sharpen': return 'contrast(1.2) brightness(1.05)';
-        case 'noise': return 'none'; // 需要 WebGL 着色器，暂不支持
-        default: return 'none';
-      }
-    }, []);
+    const buildFilterString = useCallback(
+      (type: FilterNode['type'], params: Record<string, number>): string => {
+        const v = params.value ?? 1;
+        switch (type) {
+          case 'brightness':
+            return `brightness(${v})`;
+          case 'contrast':
+            return `contrast(${v})`;
+          case 'hue':
+            return `hue-rotate(${params.deg ?? 0}deg)`;
+          case 'saturation':
+            return `saturate(${v})`;
+          case 'sepia':
+            return `sepia(${v})`;
+          case 'grayscale':
+            return `grayscale(${v})`;
+          case 'invert':
+            return `invert(${v})`;
+          case 'sharpen':
+            return 'contrast(1.2) brightness(1.05)';
+          case 'noise':
+            return 'none'; // 需要 WebGL 着色器，暂不支持
+          default:
+            return 'none';
+        }
+      },
+      [],
+    );
 
-    const applyFilters = useCallback((
-      srcCanvas: HTMLCanvasElement,
-      dstCtx: CanvasRenderingContext2D,
-      pipeline: FilterPipeline,
-      scale: number
-    ) => {
-      if (!pipeline.enabled || pipeline.filters.length === 0) {
-        dstCtx.drawImage(srcCanvas, 0, 0, srcCanvas.width * scale, srcCanvas.height * scale);
-        return;
-      }
-      const temp = document.createElement('canvas');
-      temp.width = srcCanvas.width;
-      temp.height = srcCanvas.height;
-      const tctx = temp.getContext('2d')!;
-      tctx.drawImage(srcCanvas, 0, 0);
-      pipeline.filters.filter(f => f.enabled).forEach(f => {
-        const filterStr = buildFilterString(f.type, f.params);
-        tctx.filter = filterStr;
-        tctx.drawImage(temp, 0, 0);
-        tctx.filter = 'none';
-      });
-      dstCtx.drawImage(temp, 0, 0, temp.width * scale, temp.height * scale);
-    }, [buildFilterString]);
+    const applyFilters = useCallback(
+      (
+        srcCanvas: HTMLCanvasElement,
+        dstCtx: CanvasRenderingContext2D,
+        pipeline: FilterPipeline,
+        scale: number,
+      ) => {
+        if (!pipeline.enabled || pipeline.filters.length === 0) {
+          dstCtx.drawImage(srcCanvas, 0, 0, srcCanvas.width * scale, srcCanvas.height * scale);
+          return;
+        }
+        const temp = document.createElement('canvas');
+        temp.width = srcCanvas.width;
+        temp.height = srcCanvas.height;
+        const tctx = temp.getContext('2d')!;
+        tctx.drawImage(srcCanvas, 0, 0);
+        pipeline.filters
+          .filter((f) => f.enabled)
+          .forEach((f) => {
+            const filterStr = buildFilterString(f.type, f.params);
+            tctx.filter = filterStr;
+            tctx.drawImage(temp, 0, 0);
+            tctx.filter = 'none';
+          });
+        dstCtx.drawImage(temp, 0, 0, temp.width * scale, temp.height * scale);
+      },
+      [buildFilterString],
+    );
 
     const redraw = useCallback(() => {
       const view = viewRef.current;
@@ -396,7 +477,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       const cctx = composite.getContext('2d')!;
       cctx.imageSmoothingEnabled = false;
       // 按层级顺序绘制（数组顺序 = 绘制顺序，后绘制的在上层）
-      layers.forEach(layer => {
+      layers.forEach((layer) => {
         if (!layer.visible) return;
         cctx.globalAlpha = layer.opacity / 100;
         cctx.globalCompositeOperation = layer.blendMode;
@@ -433,7 +514,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       }
       const img = new Image();
       img.onload = () => {
-        const baseLayer = layers.find(l => l.id === 'base');
+        const baseLayer = layers.find((l) => l.id === 'base');
         if (!baseLayer) {
           setReady(true);
           return;
@@ -464,7 +545,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       c.height = 64;
       const ctx = c.getContext('2d');
       if (!ctx) return '';
-      layers.forEach(l => {
+      layers.forEach((l) => {
         if (!l.visible) return;
         ctx.globalAlpha = l.opacity / 100;
         ctx.globalCompositeOperation = l.blendMode;
@@ -477,7 +558,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
 
     // === 历史记录（存储完整 layers 数组快照）===
     const snapshotLayers = useCallback((): Layer[] => {
-      return layers.map(l => ({
+      return layers.map((l) => ({
         ...l,
         canvas: (() => {
           const c = document.createElement('canvas');
@@ -506,8 +587,8 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
             done?.();
           }
         };
-        shotLayers.forEach(l => {
-          const targetLayer = layers.find(l2 => l2.id === l.id);
+        shotLayers.forEach((l) => {
+          const targetLayer = layers.find((l2) => l2.id === l.id);
           if (!targetLayer) {
             pending--;
             return;
@@ -582,70 +663,73 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
     }, [redoStack.length, redo, pushToast]);
 
     // === 绘制原语 ===
-    const dab = useCallback((ctx: CanvasRenderingContext2D, x: number, y: number) => {
-      const n = brushSize;
-      const half = Math.floor(n / 2);
-      if (tool === 'eraser') {
-        ctx.clearRect(x - half, y - half, n, n);
-      } else {
-        ctx.fillStyle = color;
-        ctx.fillRect(x - half, y - half, n, n);
-      }
-      
-      // 智能镜像：根据 mirrorMode 决定镜像行为
-      const mode = mirrorMode;
-      if (mode !== 'off') {
-        // 智能镜像：根据身体部位决定镜像位置
-        const getMirrorX = (x: number, y: number): number | null => {
-          // 根据 Y 坐标判断身体部位
-          if (y >= 0 && y < 8) return 63 - x; // 头部区域
-          if (y >= 8 && y < 20) {
-            // 头部下部
-            if (x < 8 || x >= 56) return null; // 头部两侧不镜像
-            return 63 - x;
-          }
-          if (y >= 20 && y < 32) {
-            // 身体和手臂区域
-            if (x >= 20 && x < 28) return 63 - x; // 身体
-            if (x >= 44 && x < 48) return 63 - x; // 右臂
-            if (x >= 36 && x < 40) return 63 - x; // 左臂
-          }
-          if (y >= 32 && y < 48) {
-            // 下半身
-            if (x >= 4 && x < 8) return 63 - x; // 右腿
-            if (x >= 20 && x < 24) return 63 - x; // 左腿
-          }
-          if (y >= 48 && y < 52) {
-            // 鞋子区域
-            if (x >= 4 && x < 8) return 63 - x;
-            if (x >= 20 && x < 24) return 63 - x;
-          }
-          return 63 - x; // 默认全局镜像
-        };
-        
-        if (mode === 'bodypart') {
-          const mx = getMirrorX(x, y);
-          if (mx !== null && mx !== x) {
-            if (tool === 'eraser') {
-              ctx.clearRect(mx - half, y - half, n, n);
-            } else {
-              ctx.fillStyle = color;
-              ctx.fillRect(mx - half, y - half, n, n);
+    const dab = useCallback(
+      (ctx: CanvasRenderingContext2D, x: number, y: number) => {
+        const n = brushSize;
+        const half = Math.floor(n / 2);
+        if (tool === 'eraser') {
+          ctx.clearRect(x - half, y - half, n, n);
+        } else {
+          ctx.fillStyle = color;
+          ctx.fillRect(x - half, y - half, n, n);
+        }
+
+        // 智能镜像：根据 mirrorMode 决定镜像行为
+        const mode = mirrorMode;
+        if (mode !== 'off') {
+          // 智能镜像：根据身体部位决定镜像位置
+          const getMirrorX = (x: number, y: number): number | null => {
+            // 根据 Y 坐标判断身体部位
+            if (y >= 0 && y < 8) return 63 - x; // 头部区域
+            if (y >= 8 && y < 20) {
+              // 头部下部
+              if (x < 8 || x >= 56) return null; // 头部两侧不镜像
+              return 63 - x;
             }
-          }
-        } else if (mode === 'global') {
-          const mx = 63 - x;
-          if (mx !== x) {
-            if (tool === 'eraser') {
-              ctx.clearRect(mx - half, y - half, n, n);
-            } else {
-              ctx.fillStyle = color;
-              ctx.fillRect(mx - half, y - half, n, n);
+            if (y >= 20 && y < 32) {
+              // 身体和手臂区域
+              if (x >= 20 && x < 28) return 63 - x; // 身体
+              if (x >= 44 && x < 48) return 63 - x; // 右臂
+              if (x >= 36 && x < 40) return 63 - x; // 左臂
+            }
+            if (y >= 32 && y < 48) {
+              // 下半身
+              if (x >= 4 && x < 8) return 63 - x; // 右腿
+              if (x >= 20 && x < 24) return 63 - x; // 左腿
+            }
+            if (y >= 48 && y < 52) {
+              // 鞋子区域
+              if (x >= 4 && x < 8) return 63 - x;
+              if (x >= 20 && x < 24) return 63 - x;
+            }
+            return 63 - x; // 默认全局镜像
+          };
+
+          if (mode === 'bodypart') {
+            const mx = getMirrorX(x, y);
+            if (mx !== null && mx !== x) {
+              if (tool === 'eraser') {
+                ctx.clearRect(mx - half, y - half, n, n);
+              } else {
+                ctx.fillStyle = color;
+                ctx.fillRect(mx - half, y - half, n, n);
+              }
+            }
+          } else if (mode === 'global') {
+            const mx = 63 - x;
+            if (mx !== x) {
+              if (tool === 'eraser') {
+                ctx.clearRect(mx - half, y - half, n, n);
+              } else {
+                ctx.fillStyle = color;
+                ctx.fillRect(mx - half, y - half, n, n);
+              }
             }
           }
         }
-      }
-    }, [tool, color, brushSize, mirrorMode]);
+      },
+      [tool, color, brushSize, mirrorMode],
+    );
 
     const strokeLine = useCallback(
       (ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) => {
@@ -670,19 +754,22 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
     }, []);
 
     // === 取色 / 坐标转换 / 填充 ===
-    const pickAt = useCallback((x: number, y: number) => {
-      if (x < 0 || y < 0 || x >= 64 || y >= 64) return;
-      const baseLayer = layers.find(l => l.id === 'base');
-      const overLayer = layers.find(l => l.id === 'overlay');
-      const base = baseLayer?.canvas.getContext('2d');
-      const over = overLayer?.canvas.getContext('2d');
-      if (!base || !over) return;
-      const o = over.getImageData(x, y, 1, 1).data;
-      const src = o[3] !== 0 ? o : base.getImageData(x, y, 1, 1).data;
-      if (src[3] === 0) return;
-      const hex = `#${((src[0] ?? 0) << 16 | (src[1] ?? 0) << 8 | (src[2] ?? 0)).toString(16).padStart(6, '0')}`;
-      setColor(hex);
-    }, [layers]);
+    const pickAt = useCallback(
+      (x: number, y: number) => {
+        if (x < 0 || y < 0 || x >= 64 || y >= 64) return;
+        const baseLayer = layers.find((l) => l.id === 'base');
+        const overLayer = layers.find((l) => l.id === 'overlay');
+        const base = baseLayer?.canvas.getContext('2d');
+        const over = overLayer?.canvas.getContext('2d');
+        if (!base || !over) return;
+        const o = over.getImageData(x, y, 1, 1).data;
+        const src = o[3] !== 0 ? o : base.getImageData(x, y, 1, 1).data;
+        if (src[3] === 0) return;
+        const hex = `#${(((src[0] ?? 0) << 16) | ((src[1] ?? 0) << 8) | (src[2] ?? 0)).toString(16).padStart(6, '0')}`;
+        setColor(hex);
+      },
+      [layers],
+    );
 
     const pickColor = useCallback(
       (e: React.MouseEvent) => {
@@ -706,18 +793,21 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       return { x, y };
     }, []);
 
-    const handleFloodFill = useCallback((ctx: CanvasRenderingContext2D, sx: number, sy: number) => {
-      const partName = getBodyPartAt('classic', sx, sy);
-      floodFill({
-        ctx,
-        sx,
-        sy,
-        color: color,
-        mirrorMode: partName ? mirrorMode : 'off',
-        model: 'classic',
-        partName: partName ?? 'body',
-      });
-    }, [color, mirrorMode, getBodyPartAt]);
+    const handleFloodFill = useCallback(
+      (ctx: CanvasRenderingContext2D, sx: number, sy: number) => {
+        const partName = getBodyPartAt('classic', sx, sy);
+        floodFill({
+          ctx,
+          sx,
+          sy,
+          color: color,
+          mirrorMode: partName ? mirrorMode : 'off',
+          model: 'classic',
+          partName: partName ?? 'body',
+        });
+      },
+      [color, mirrorMode, getBodyPartAt],
+    );
 
     // === 事件处理 ===
 
@@ -785,191 +875,206 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
 
     useImperativeHandle(
       ref,
-      () => ({
-        // === 3D 直绘 ===
-        paintStart(x: number, y: number, isOverlay: boolean, partKey: string) {
-          const t = tool;
-          if (t === 'picker') {
-            pickAt(x, y);
-            return;
-          }
-          const layerId = isOverlay ? 'overlay' : activeLayerId;
-          const ctx = getLayerCtx(layerId);
-          if (!ctx || x < 0 || y < 0 || x >= 64 || y >= 64) return;
-          pushHistory();
-          painting3DRef.current = true;
-          painted3DRef.current = false;
-          last3DRef.current = { x, y };
-          lastPart3DRef.current = partKey;
-          if (t === 'pencil' || t === 'eraser') {
-            dab(ctx, x, y);
-            painted3DRef.current = true;
-            redraw();
-          } else if (t === 'fill') {
-            handleFloodFill(ctx, x, y);
-            painted3DRef.current = true;
-            redraw();
-            rememberColor(color);
-            emit();
-          } else {
-            // line/rect 在 3D 下退化为单点，避免跨面拉线污染贴图
-            dab(ctx, x, y);
-            painted3DRef.current = true;
-            redraw();
-          }
-        },
-        paintMove(x: number, y: number, isOverlay: boolean, partKey: string) {
-          if (!painting3DRef.current) return;
-          const t = tool;
-          if (t !== 'pencil' && t !== 'eraser') return;
-          const layerId = isOverlay ? 'overlay' : activeLayerId;
-          const ctx = getLayerCtx(layerId);
-          if (!ctx || x < 0 || y < 0 || x >= 64 || y >= 64) return;
-          // 跨部位/跨图层：只落单点，不连线
-          if (lastPart3DRef.current !== null && lastPart3DRef.current !== partKey) {
-            dab(ctx, x, y);
-          } else {
-            const last = last3DRef.current ?? { x, y };
-            strokeLine(ctx, last.x, last.y, x, y);
-          }
-          last3DRef.current = { x, y };
-          lastPart3DRef.current = partKey;
-          painted3DRef.current = true;
-          redraw();
-        },
-        paintEnd() {
-          if (!painting3DRef.current && !painted3DRef.current) return;
-          painting3DRef.current = false;
-          last3DRef.current = null;
-          lastPart3DRef.current = null;
-          if (painted3DRef.current) {
+      () =>
+        ({
+          // === 3D 直绘 ===
+          paintStart(x: number, y: number, isOverlay: boolean, partKey: string) {
+            const t = tool;
+            if (t === 'picker') {
+              pickAt(x, y);
+              return;
+            }
+            const layerId = isOverlay ? 'overlay' : activeLayerId;
+            const ctx = getLayerCtx(layerId);
+            if (!ctx || x < 0 || y < 0 || x >= 64 || y >= 64) return;
+            pushHistory();
+            painting3DRef.current = true;
             painted3DRef.current = false;
-            rememberColor(color);
-            emit();
-          }
-        },
-        // v1.1 姿势控制
-        setPose(preset: PosePreset) {
-          setPose(preset);
-        },
-        setCustomPose(joint: keyof JointAngles, axis: 'x' | 'y' | 'z', value: number) {
-          setCustomPose(prev => ({
-            ...prev,
-            [joint]: { ...prev[joint], [axis]: value },
-          }));
-        },
-        resetPose() {
-          setPose('idle');
-          setCustomPose({
-            head: { x: 0, y: 0, z: 0 },
-            body: { x: 0, y: 0, z: 0 },
-            leftArm: { x: 0, y: 0, z: 0 },
-            rightArm: { x: 0, y: 0, z: 0 },
-            leftLeg: { x: 0, y: 0, z: 0 },
-            rightLeg: { x: 0, y: 0, z: 0 },
-          });
-        },
-        // v1.2 图层操作
-        layerOps: {
-          addLayer: (name?: string, type?: LayerType) => {
-            const newLayer = createCustomLayer(name ?? `图层 ${layers.filter(l => l.type === 'custom').length + 1}`);
-            if (type) newLayer.type = type;
-            setLayers(prev => [...prev, newLayer]);
-            setActiveLayerId(newLayer.id);
-            pushHistory();
-            return newLayer.id;
+            last3DRef.current = { x, y };
+            lastPart3DRef.current = partKey;
+            if (t === 'pencil' || t === 'eraser') {
+              dab(ctx, x, y);
+              painted3DRef.current = true;
+              redraw();
+            } else if (t === 'fill') {
+              handleFloodFill(ctx, x, y);
+              painted3DRef.current = true;
+              redraw();
+              rememberColor(color);
+              emit();
+            } else {
+              // line/rect 在 3D 下退化为单点，避免跨面拉线污染贴图
+              dab(ctx, x, y);
+              painted3DRef.current = true;
+              redraw();
+            }
           },
-          duplicateLayer: (id: string) => {
-            const src = layers.find(l => l.id === id);
-            if (!src) return '';
-            const newLayer = createCustomLayer(`${src.name} 副本`);
-            const dstCtx = newLayer.canvas.getContext('2d')!;
-            dstCtx.drawImage(src.canvas, 0, 0);
-            newLayer.opacity = src.opacity;
-            newLayer.blendMode = src.blendMode;
-            newLayer.visible = src.visible;
-            newLayer.locked = src.locked;
-            const insertIndex = layers.findIndex(l => l.id === id) + 1;
-            setLayers(prev => {
-              const next = [...prev];
-              next.splice(insertIndex, 0, newLayer);
-              return next;
-            });
-            setActiveLayerId(newLayer.id);
-            pushHistory();
-            return newLayer.id;
-          },
-          deleteLayer: (id: string) => {
-            if (layers.length <= 1) return;
-            if (id === 'base' || id === 'overlay') return; // 保护基础图层
-            setLayers(prev => prev.filter(l => l.id !== id));
-            setActiveLayerId(layers.find(l => l.id !== id)?.id ?? 'base');
-            pushHistory();
-          },
-          clearLayer: (id: string) => {
-            const layer = layers.find(l => l.id === id);
-            if (!layer) return;
-            const ctx = layer.canvas.getContext('2d')!;
-            ctx.clearRect(0, 0, 64, 64);
-            pushHistory();
+          paintMove(x: number, y: number, isOverlay: boolean, partKey: string) {
+            if (!painting3DRef.current) return;
+            const t = tool;
+            if (t !== 'pencil' && t !== 'eraser') return;
+            const layerId = isOverlay ? 'overlay' : activeLayerId;
+            const ctx = getLayerCtx(layerId);
+            if (!ctx || x < 0 || y < 0 || x >= 64 || y >= 64) return;
+            // 跨部位/跨图层：只落单点，不连线
+            if (lastPart3DRef.current !== null && lastPart3DRef.current !== partKey) {
+              dab(ctx, x, y);
+            } else {
+              const last = last3DRef.current ?? { x, y };
+              strokeLine(ctx, last.x, last.y, x, y);
+            }
+            last3DRef.current = { x, y };
+            lastPart3DRef.current = partKey;
+            painted3DRef.current = true;
             redraw();
-            emit();
           },
-          renameLayer: (id: string, name: string) => {
-            setLayers(prev => prev.map(l => l.id === id ? { ...l, name } : l));
+          paintEnd() {
+            if (!painting3DRef.current && !painted3DRef.current) return;
+            painting3DRef.current = false;
+            last3DRef.current = null;
+            lastPart3DRef.current = null;
+            if (painted3DRef.current) {
+              painted3DRef.current = false;
+              rememberColor(color);
+              emit();
+            }
           },
-          moveLayer: (fromIndex: number, toIndex: number) => {
-            setLayers(prev => {
-              const next = [...prev];
-              const [removed] = next.splice(fromIndex, 1);
-              next.splice(toIndex, 0, removed);
-              return next;
+          // v1.1 姿势控制
+          setPose(preset: PosePreset) {
+            setPose(preset);
+          },
+          setCustomPose(joint: keyof JointAngles, axis: 'x' | 'y' | 'z', value: number) {
+            setCustomPose((prev) => ({
+              ...prev,
+              [joint]: { ...prev[joint], [axis]: value },
+            }));
+          },
+          resetPose() {
+            setPose('idle');
+            setCustomPose({
+              head: { x: 0, y: 0, z: 0 },
+              body: { x: 0, y: 0, z: 0 },
+              leftArm: { x: 0, y: 0, z: 0 },
+              rightArm: { x: 0, y: 0, z: 0 },
+              leftLeg: { x: 0, y: 0, z: 0 },
+              rightLeg: { x: 0, y: 0, z: 0 },
             });
-            pushHistory();
           },
-          setLayerProps: (id: string, props: Partial<Layer>) => {
-            setLayers(prev => prev.map(l => l.id === id ? { ...l, ...props } : l));
+          // v1.2 图层操作
+          layerOps: {
+            addLayer: (name?: string, type?: LayerType) => {
+              const newLayer = createCustomLayer(
+                name ?? `图层 ${layers.filter((l) => l.type === 'custom').length + 1}`,
+              );
+              if (type) newLayer.type = type;
+              setLayers((prev) => [...prev, newLayer]);
+              setActiveLayerId(newLayer.id);
+              pushHistory();
+              return newLayer.id;
+            },
+            duplicateLayer: (id: string) => {
+              const src = layers.find((l) => l.id === id);
+              if (!src) return '';
+              const newLayer = createCustomLayer(`${src.name} 副本`);
+              const dstCtx = newLayer.canvas.getContext('2d')!;
+              dstCtx.drawImage(src.canvas, 0, 0);
+              newLayer.opacity = src.opacity;
+              newLayer.blendMode = src.blendMode;
+              newLayer.visible = src.visible;
+              newLayer.locked = src.locked;
+              const insertIndex = layers.findIndex((l) => l.id === id) + 1;
+              setLayers((prev) => {
+                const next = [...prev];
+                next.splice(insertIndex, 0, newLayer);
+                return next;
+              });
+              setActiveLayerId(newLayer.id);
+              pushHistory();
+              return newLayer.id;
+            },
+            deleteLayer: (id: string) => {
+              if (layers.length <= 1) return;
+              if (id === 'base' || id === 'overlay') return; // 保护基础图层
+              setLayers((prev) => prev.filter((l) => l.id !== id));
+              setActiveLayerId(layers.find((l) => l.id !== id)?.id ?? 'base');
+              pushHistory();
+            },
+            clearLayer: (id: string) => {
+              const layer = layers.find((l) => l.id === id);
+              if (!layer) return;
+              const ctx = layer.canvas.getContext('2d')!;
+              ctx.clearRect(0, 0, 64, 64);
+              pushHistory();
+              redraw();
+              emit();
+            },
+            renameLayer: (id: string, name: string) => {
+              setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, name } : l)));
+            },
+            moveLayer: (fromIndex: number, toIndex: number) => {
+              setLayers((prev) => {
+                const next = [...prev];
+                const [removed] = next.splice(fromIndex, 1);
+                next.splice(toIndex, 0, removed);
+                return next;
+              });
+              pushHistory();
+            },
+            setLayerProps: (id: string, props: Partial<Layer>) => {
+              setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...props } : l)));
+            },
+            mergeDown: (id: string) => {
+              const index = layers.findIndex((l) => l.id === id);
+              if (index <= 0) return;
+              const upper = layers[index];
+              const lower = layers[index - 1];
+              const lowerCtx = lower.canvas.getContext('2d')!;
+              lowerCtx.globalAlpha = upper.opacity / 100;
+              lowerCtx.globalCompositeOperation = upper.blendMode;
+              lowerCtx.drawImage(upper.canvas, 0, 0);
+              lowerCtx.globalAlpha = 1;
+              lowerCtx.globalCompositeOperation = 'source-over';
+              setLayers((prev) => prev.filter((l) => l.id !== id));
+              pushHistory();
+              redraw();
+              emit();
+            },
+            mergeVisible: () => {
+              const visibleLayers = layers.filter((l) => l.visible && l.id !== 'base');
+              if (visibleLayers.length === 0) return;
+              const baseLayer = layers.find((l) => l.id === 'base');
+              if (!baseLayer) return;
+              const baseCtx = baseLayer.canvas.getContext('2d')!;
+              visibleLayers.forEach((l) => {
+                baseCtx.globalAlpha = l.opacity / 100;
+                baseCtx.globalCompositeOperation = l.blendMode;
+                baseCtx.drawImage(l.canvas, 0, 0);
+              });
+              baseCtx.globalAlpha = 1;
+              baseCtx.globalCompositeOperation = 'source-over';
+              setLayers((prev) =>
+                prev.filter((l) => l.id === 'base' || l.id === 'overlay' || !l.visible),
+              );
+              pushHistory();
+              redraw();
+              emit();
+            },
           },
-          mergeDown: (id: string) => {
-            const index = layers.findIndex(l => l.id === id);
-            if (index <= 0) return;
-            const upper = layers[index];
-            const lower = layers[index - 1];
-            const lowerCtx = lower.canvas.getContext('2d')!;
-            lowerCtx.globalAlpha = upper.opacity / 100;
-            lowerCtx.globalCompositeOperation = upper.blendMode;
-            lowerCtx.drawImage(upper.canvas, 0, 0);
-            lowerCtx.globalAlpha = 1;
-            lowerCtx.globalCompositeOperation = 'source-over';
-            setLayers(prev => prev.filter(l => l.id !== id));
-            pushHistory();
-            redraw();
-            emit();
-          },
-          mergeVisible: () => {
-            const visibleLayers = layers.filter(l => l.visible && l.id !== 'base');
-            if (visibleLayers.length === 0) return;
-            const baseLayer = layers.find(l => l.id === 'base');
-            if (!baseLayer) return;
-            const baseCtx = baseLayer.canvas.getContext('2d')!;
-            visibleLayers.forEach(l => {
-              baseCtx.globalAlpha = l.opacity / 100;
-              baseCtx.globalCompositeOperation = l.blendMode;
-              baseCtx.drawImage(l.canvas, 0, 0);
-            });
-            baseCtx.globalAlpha = 1;
-            baseCtx.globalCompositeOperation = 'source-over';
-            setLayers(prev => prev.filter(l => l.id === 'base' || l.id === 'overlay' || !l.visible));
-            pushHistory();
-            redraw();
-            emit();
-          }
-        },
-      })
-      // @ts-expect-error: dependency array false positive
-      [dab, strokeLine, handleFloodFill, pickAt, pushHistory, rememberColor, emit, redraw, layers, activeLayerId, createCustomLayer],
+        })[
+          // @ts-expect-error: dependency array false positive
+          (dab,
+          strokeLine,
+          handleFloodFill,
+          pickAt,
+          pushHistory,
+          rememberColor,
+          emit,
+          redraw,
+          layers,
+          activeLayerId,
+          createCustomLayer)
+        ],
     );
-
 
     // === 文件上传/下载 ===
     const handleUpload = useCallback(
@@ -1041,74 +1146,110 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
     }, [color]);
 
     // === 键盘处理 ===
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-        return;
-      }
-      if ((mod && e.key.toLowerCase() === 'y') || (mod && e.shiftKey && e.key.toLowerCase() === 'z')) {
-        e.preventDefault();
-        handleRedo();
-        return;
-      }
-      if (mod) return;
-      if (e.key === ' ') {
-        e.preventDefault();
-        setSpaceDown(true);
-        return;
-      }
-      if (e.key === '?') {
-        e.preventDefault();
-        setShowHelp(true);
-        return;
-      }
-      // Shift + 键：面板切换
-      if (e.shiftKey) {
-        switch (e.key.toLowerCase()) {
-          case 'p': setShowPosePanel(v => !v); break;
-          case 'f': setShowFilterPanel(v => !v); break;
-          case 'l': setShowLayerPanel(v => !v); break;
-          default: break;
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        const mod = e.ctrlKey || e.metaKey;
+        if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          handleUndo();
+          return;
         }
-        return;
-      }
-      switch (e.key.toLowerCase()) {
-        case 'p': setTool('pencil'); break;
-        case 'e': setTool('eraser'); break;
-        case 'f': setTool('fill'); break;
-        case 'i': setTool('picker'); break;
-        case 'l': setTool('line'); break;
-        case 'r': setTool('rect'); break;
-        case 'm': setMirrorMode((v) => v === 'off' ? 'global' : v === 'global' ? 'bodypart' : 'off'); break;
-        case 'g': setShowGrid((v) => !v); break;
-        default: break;
-      }
-    }, [handleUndo, handleRedo]);
+        if (
+          (mod && e.key.toLowerCase() === 'y') ||
+          (mod && e.shiftKey && e.key.toLowerCase() === 'z')
+        ) {
+          e.preventDefault();
+          handleRedo();
+          return;
+        }
+        if (mod) return;
+        if (e.key === ' ') {
+          e.preventDefault();
+          setSpaceDown(true);
+          return;
+        }
+        if (e.key === '?') {
+          e.preventDefault();
+          setShowHelp(true);
+          return;
+        }
+        // Shift + 键：面板切换
+        if (e.shiftKey) {
+          switch (e.key.toLowerCase()) {
+            case 'p':
+              setShowPosePanel((v) => !v);
+              break;
+            case 'f':
+              setShowFilterPanel((v) => !v);
+              break;
+            case 'l':
+              setShowLayerPanel((v) => !v);
+              break;
+            default:
+              break;
+          }
+          return;
+        }
+        switch (e.key.toLowerCase()) {
+          case 'p':
+            setTool('pencil');
+            break;
+          case 'e':
+            setTool('eraser');
+            break;
+          case 'f':
+            setTool('fill');
+            break;
+          case 'i':
+            setTool('picker');
+            break;
+          case 'l':
+            setTool('line');
+            break;
+          case 'r':
+            setTool('rect');
+            break;
+          case 'm':
+            setMirrorMode((v) => (v === 'off' ? 'global' : v === 'global' ? 'bodypart' : 'off'));
+            break;
+          case 'g':
+            setShowGrid((v) => !v);
+            break;
+          default:
+            break;
+        }
+      },
+      [handleUndo, handleRedo],
+    );
 
     const handleKeyUp = useCallback((e: React.KeyboardEvent) => {
       if (e.key === ' ') setSpaceDown(false);
     }, []);
 
     // === 鼠标滚轮缩放 ===
-    const handleWheel = useCallback((e: React.WheelEvent) => {
-      e.preventDefault();
-      const canvas = viewRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      const newZoom = Math.max(1, Math.min(12, zoom * (e.deltaY > 0 ? 0.9 : 1.1))) as (typeof ZOOMS)[number];
-      const scale = newZoom / zoom;
-      setZoom(newZoom);
-      setPan(prev => ({
-        x: pan.x - (cx - rect.left) * (scale - 1),
-        y: pan.y - (cy - rect.top) * (scale - 1),
-      }));
-    }, [zoom]);
+    const handleWheel = useCallback(
+      (e: React.WheelEvent) => {
+        e.preventDefault();
+        const canvas = viewRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const newZoom = Math.max(
+          1,
+          Math.min(12, zoom * (e.deltaY > 0 ? 0.9 : 1.1)),
+        ) as (typeof ZOOMS)[number];
+        const scale = newZoom / zoom;
+        setZoom(newZoom);
+        setPan(() => ({
+          x: pan.x - (cx - rect.left) * (scale - 1),
+          y: pan.y - (cy - rect.top) * (scale - 1),
+        }));
+      },
+      [zoom],
+    );
 
     // === 触摸手势：双指捏合缩放 + 双指拖拽平移；单指落笔走 Pointer 事件 ===
     const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -1121,32 +1262,35 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       }
     }, []);
 
-    const handleTouchMove = useCallback((e: React.TouchEvent) => {
-      if (e.touches.length === 2 && touchStartDist !== null) {
-        e.preventDefault();
-        const touches = Array.from(e.touches);
-        const [t1, t2] = touches;
-        const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-        const scale = dist / (touchStartDist || 1);
-        setZoom(Math.max(1, Math.min(12, zoom * scale)) as (typeof ZOOMS)[number]);
-        setTouchStartDist(dist);
-        const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
-        if (touchMid) {
-          const dx = mid.x - touchMid.x;
-          const dy = mid.y - touchMid.y;
-          setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
+    const handleTouchMove = useCallback(
+      (e: React.TouchEvent) => {
+        if (e.touches.length === 2 && touchStartDist !== null) {
+          e.preventDefault();
+          const touches = Array.from(e.touches);
+          const [t1, t2] = touches;
+          const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+          const scale = dist / (touchStartDist || 1);
+          setZoom(Math.max(1, Math.min(12, zoom * scale)) as (typeof ZOOMS)[number]);
+          setTouchStartDist(dist);
+          const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+          if (touchMid) {
+            const dx = mid.x - touchMid.x;
+            const dy = mid.y - touchMid.y;
+            setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
+          }
+          setTouchMid(mid);
+        } else if (e.touches.length === 1 && !spaceDown) {
+          const t = e.touches[0];
+          const canvas = viewRef.current;
+          if (!canvas) return;
+          const rect = canvas.getBoundingClientRect();
+          const x = Math.max(0, Math.min(63, ((t.clientX - rect.left) / rect.width) * 64));
+          const y = Math.max(0, Math.min(63, ((t.clientY - rect.top) / rect.height) * 64));
+          setHoverInfo({ x, y, part: getBodyPartAt('classic', x, y) });
         }
-        setTouchMid(mid);
-      } else if (e.touches.length === 1 && !spaceDown) {
-        const t = e.touches[0];
-        const canvas = viewRef.current;
-        if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
-        const x = Math.max(0, Math.min(63, ((t.clientX - rect.left) / rect.width) * 64));
-        const y = Math.max(0, Math.min(63, ((t.clientY - rect.top) / rect.height) * 64));
-        setHoverInfo({ x, y, part: getBodyPartAt('classic', x, y) });
-      }
-    }, [zoom, touchStartDist, touchMid, spaceDown, setHoverInfo, getBodyPartAt]);
+      },
+      [zoom, touchStartDist, touchMid, spaceDown, setHoverInfo, getBodyPartAt],
+    );
 
     const handleTouchEnd = useCallback(() => {
       setTouchStartDist(null);
@@ -1168,7 +1312,14 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
 
     // === 渲染 ===
     return (
-      <div className="skin-pixel-editor" onKeyDown={handleKeyDown} onKeyUp={handleKeyUp} tabIndex={0} role="application" aria-label="皮肤像素编辑器">
+      <div
+        className="skin-pixel-editor"
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
+        tabIndex={0}
+        role="application"
+        aria-label="皮肤像素编辑器"
+      >
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-2">
             <span className="text-xs text-mc-mute">图层</span>
@@ -1190,7 +1341,9 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
           <div className="flex items-center gap-2">
             <span className="text-xs text-mc-mute">镜像</span>
             <button
-              onClick={() => setMirrorMode((v: any) => v === 'off' ? 'global' : v === 'global' ? 'bodypart' : 'off')}
+              onClick={() =>
+                setMirrorMode((v) => (v === 'off' ? 'global' : v === 'global' ? 'bodypart' : 'off'))
+              }
               className={`px-2 py-1 rounded-mc ${mirrorMode === 'off' ? 'bg-mc-primary text-mc-on-primary' : 'bg-mc-surface-2 text-mc-fg'}`}
               title="镜像模式: 关/全局/智能"
             >
@@ -1225,7 +1378,11 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
           ))}
           <span className="mx-1 h-4 w-px bg-mc-border" />
           <button
-            onClick={() => setMirrorMode(current => current === 'off' ? 'global' : current === 'global' ? 'bodypart' : 'off')}
+            onClick={() =>
+              setMirrorMode((current) =>
+                current === 'off' ? 'global' : current === 'global' ? 'bodypart' : 'off',
+              )
+            }
             title={`镜像模式: ${mirrorMode === 'off' ? '关闭' : mirrorMode === 'global' ? '全局镜' : '部位智能镜像'} (M)`}
             className={`flex items-center gap-0.5 rounded-mc px-2 py-1 transition-colors ${
               mirrorMode === 'off'
@@ -1262,7 +1419,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
           <span className="mx-1 h-4 w-px bg-mc-border" />
           {/* v1.1 姿势/滤镜面板切换 */}
           <button
-            onClick={() => setShowPosePanel(v => !v)}
+            onClick={() => setShowPosePanel((v) => !v)}
             title="姿势面板 (Shift+P)"
             className={`flex items-center gap-1 rounded-mc border px-2 py-1 transition-colors ${
               showPosePanel
@@ -1274,7 +1431,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
             <span className="text-[11px]">姿势</span>
           </button>
           <button
-            onClick={() => setShowFilterPanel(v => !v)}
+            onClick={() => setShowFilterPanel((v) => !v)}
             title="滤镜面板 (Shift+F)"
             className={`flex items-center gap-1 rounded-mc border px-2 py-1 transition-colors ${
               showFilterPanel
@@ -1288,7 +1445,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
           <span className="mx-1 h-4 w-px bg-mc-border" />
           {/* v1.2 图层面板切换 */}
           <button
-            onClick={() => setShowLayerPanel(v => !v)}
+            onClick={() => setShowLayerPanel((v) => !v)}
             title="图层面板 (Shift+L)"
             className={`flex items-center gap-1 rounded-mc border px-2 py-1 transition-colors ${
               showLayerPanel
@@ -1304,7 +1461,9 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
         {/* 画布 */}
         <div className="flex justify-center overflow-auto rounded-mc border border-mc-border bg-mc-surface-2/40 p-2">
           {!ready ? (
-            <div className="flex h-48 items-center justify-center text-xs text-mc-mute">载入纹理…</div>
+            <div className="flex h-48 items-center justify-center text-xs text-mc-mute">
+              载入纹理…
+            </div>
           ) : (
             <canvas
               ref={viewRef}
@@ -1344,7 +1503,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
               customPose={customPose}
               onPoseChange={setPose}
               onCustomPoseChange={(joint, axis, value) =>
-                setCustomPose(prev => ({
+                setCustomPose((prev) => ({
                   ...prev,
                   [joint]: { ...prev[joint], [axis]: value },
                 }))
@@ -1365,10 +1524,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
         )}
         {showFilterPanel && (
           <div className="absolute right-4 top-4 z-10">
-            <FilterPanel
-              pipeline={filterPipeline}
-              onPipelineChange={setFilterPipeline}
-            />
+            <FilterPanel pipeline={filterPipeline} onPipelineChange={setFilterPipeline} />
           </div>
         )}
         {showLayerPanel && (
@@ -1378,15 +1534,17 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
               activeLayerId={activeLayerId}
               onLayerSelect={setActiveLayerId}
               onLayerAdd={(name, type) => {
-                const newLayer = createCustomLayer(name ?? `图层 ${layers.filter(l => l.type === 'custom').length + 1}`);
+                const newLayer = createCustomLayer(
+                  name ?? `图层 ${layers.filter((l) => l.type === 'custom').length + 1}`,
+                );
                 if (type) newLayer.type = type;
-                setLayers(prev => [...prev, newLayer]);
+                setLayers((prev) => [...prev, newLayer]);
                 setActiveLayerId(newLayer.id);
                 pushHistory();
                 return newLayer.id;
               }}
               onLayerDuplicate={(id) => {
-                const src = layers.find(l => l.id === id);
+                const src = layers.find((l) => l.id === id);
                 if (!src) return '';
                 const newLayer = createCustomLayer(`${src.name} 副本`);
                 const dstCtx = newLayer.canvas.getContext('2d')!;
@@ -1395,8 +1553,8 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
                 newLayer.blendMode = src.blendMode;
                 newLayer.visible = src.visible;
                 newLayer.locked = src.locked;
-                const insertIndex = layers.findIndex(l => l.id === id) + 1;
-                setLayers(prev => {
+                const insertIndex = layers.findIndex((l) => l.id === id) + 1;
+                setLayers((prev) => {
                   const next = [...prev];
                   next.splice(insertIndex, 0, newLayer);
                   return next;
@@ -1407,14 +1565,14 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
               }}
               onLayerDelete={(id) => {
                 if (layers.length <= 1) return;
-                const layer = layers.find(l => l.id === id);
+                const layer = layers.find((l) => l.id === id);
                 if (layer?.type === 'base' || layer?.type === 'overlay') return;
-                setLayers(prev => prev.filter(l => l.id !== id));
-                setActiveLayerId(layers.find(l => l.id !== id)?.id ?? 'base');
+                setLayers((prev) => prev.filter((l) => l.id !== id));
+                setActiveLayerId(layers.find((l) => l.id !== id)?.id ?? 'base');
                 pushHistory();
               }}
               onLayerClear={(id) => {
-                const layer = layers.find(l => l.id === id);
+                const layer = layers.find((l) => l.id === id);
                 if (!layer) return;
                 const ctx = layer.canvas.getContext('2d')!;
                 ctx.clearRect(0, 0, 64, 64);
@@ -1423,10 +1581,10 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
                 emit();
               }}
               onLayerRename={(id, name) => {
-                setLayers(prev => prev.map(l => l.id === id ? { ...l, name } : l));
+                setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, name } : l)));
               }}
               onLayerMove={(fromIndex, toIndex) => {
-                setLayers(prev => {
+                setLayers((prev) => {
                   const next = [...prev];
                   const [removed] = next.splice(fromIndex, 1);
                   next.splice(toIndex, 0, removed);
@@ -1435,10 +1593,10 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
                 pushHistory();
               }}
               onLayerPropsChange={(id, props) => {
-                setLayers(prev => prev.map(l => l.id === id ? { ...l, ...props } : l));
+                setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...props } : l)));
               }}
               onMergeDown={(id) => {
-                const index = layers.findIndex(l => l.id === id);
+                const index = layers.findIndex((l) => l.id === id);
                 if (index <= 0) return;
                 const upper = layers[index];
                 const lower = layers[index - 1];
@@ -1448,25 +1606,27 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
                 lowerCtx.drawImage(upper.canvas, 0, 0);
                 lowerCtx.globalAlpha = 1;
                 lowerCtx.globalCompositeOperation = 'source-over';
-                setLayers(prev => prev.filter(l => l.id !== id));
+                setLayers((prev) => prev.filter((l) => l.id !== id));
                 pushHistory();
                 redraw();
                 emit();
               }}
               onMergeVisible={() => {
-                const visibleLayers = layers.filter(l => l.visible && l.id !== 'base');
+                const visibleLayers = layers.filter((l) => l.visible && l.id !== 'base');
                 if (visibleLayers.length === 0) return;
-                const baseLayer = layers.find(l => l.id === 'base');
+                const baseLayer = layers.find((l) => l.id === 'base');
                 if (!baseLayer) return;
                 const baseCtx = baseLayer.canvas.getContext('2d')!;
-                visibleLayers.forEach(l => {
+                visibleLayers.forEach((l) => {
                   baseCtx.globalAlpha = l.opacity / 100;
                   baseCtx.globalCompositeOperation = l.blendMode;
                   baseCtx.drawImage(l.canvas, 0, 0);
                 });
                 baseCtx.globalAlpha = 1;
                 baseCtx.globalCompositeOperation = 'source-over';
-                setLayers(prev => prev.filter(l => l.id === 'base' || l.id === 'overlay' || !l.visible));
+                setLayers((prev) =>
+                  prev.filter((l) => l.id === 'base' || l.id === 'overlay' || !l.visible),
+                );
                 pushHistory();
                 redraw();
                 emit();
@@ -1479,9 +1639,15 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
         <div className="flex items-center gap-4 px-2 py-1.5 text-[11px] text-mc-mute bg-mc-surface-2/60 rounded-mc border-t border-mc-border mt-1">
           <span>{hoverInfo ? `X: ${hoverInfo.x} Y: ${hoverInfo.y}` : 'X: - Y: -'}</span>
           <span className="mx-2">|</span>
-          <span>{hoverInfo?.part ? `部位: ${BODY_PART_LABELS[hoverInfo.part] || hoverInfo.part}` : '部位: -'}</span>
+          <span>
+            {hoverInfo?.part
+              ? `部位: ${BODY_PART_LABELS[hoverInfo.part] || hoverInfo.part}`
+              : '部位: -'}
+          </span>
           <span className="mx-2">|</span>
-          <span>工具: {TOOL_LABELS[tool]} {TOOL_KEYS[tool]}</span>
+          <span>
+            工具: {TOOL_LABELS[tool]} {TOOL_KEYS[tool]}
+          </span>
           <span className="mx-2">|</span>
           <span style={{ color }}>■</span>
           <span>{color}</span>
@@ -1611,7 +1777,9 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
         </div>
         {customColors.length > 0 && (
           <>
-            <div className="mb-1 mt-2 text-[10px] uppercase tracking-wider text-mc-mute">自定义</div>
+            <div className="mb-1 mt-2 text-[10px] uppercase tracking-wider text-mc-mute">
+              自定义
+            </div>
             <div className="flex flex-wrap gap-1">
               {customColors.map((c) => (
                 <button
@@ -1628,10 +1796,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
 
         {/* 导入导出 */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleSave}
-            className="mc-btn-primary !px-2.5 !py-1 !text-[11px]"
-          >
+          <button onClick={handleSave} className="mc-btn-primary !px-2.5 !py-1 !text-[11px]">
             保存到项目
           </button>
           <button
@@ -1665,11 +1830,13 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
           />
         </div>
         <div className="text-[10px] leading-relaxed text-mc-mute">
-          快捷键：P 画笔 · E 橡皮 · F 填充 · I 取色 · L 直线 · R 矩形 · M 镜像 · G 网格 · Ctrl+Z/Y 撤销重做 · Shift+P 姿势 · Shift+F 滤镜 · Shift+L 图层 · ? 帮助 · 空格+拖拽平移。表层为帽子/外套/袖子/裤子的第二层。
+          快捷键：P 画笔 · E 橡皮 · F 填充 · I 取色 · L 直线 · R 矩形 · M 镜像 · G 网格 · Ctrl+Z/Y
+          撤销重做 · Shift+P 姿势 · Shift+F 滤镜 · Shift+L 图层 · ? 帮助 ·
+          空格+拖拽平移。表层为帽子/外套/袖子/裤子的第二层。
         </div>
         <ToastStack toasts={toasts} onDismiss={dismissToast} />
         <ShortcutsHelp open={showHelp} onClose={() => setShowHelp(false)} variant="skin" />
       </div>
     );
-  }
+  },
 );

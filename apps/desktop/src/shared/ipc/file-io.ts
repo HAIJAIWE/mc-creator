@@ -95,11 +95,13 @@ export const FileReadStreamChunkResponse = z.object({
   chunkIndex: z.number().int().nonnegative(),
   data: z.string(), // base64 编码的二进制数据
   isLast: z.boolean(),
-  progress: z.object({
-    loaded: z.number(),
-    total: z.number(),
-    percentage: z.number(),
-  }).optional(),
+  progress: z
+    .object({
+      loaded: z.number(),
+      total: z.number(),
+      percentage: z.number(),
+    })
+    .optional(),
 });
 
 export type FileWriteStreamStartReq = z.infer<typeof FileWriteStreamStartRequest>;

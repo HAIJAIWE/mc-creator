@@ -72,31 +72,33 @@ beforeEach(() => {
   });
   (window as unknown as { __MC_PREVIEW__?: boolean }).__MC_PREVIEW__ = false;
 
-  const generateFiles = vi.fn(async (req: {
-    loader: string;
-    mcVersion: string;
-    spec: unknown;
-    generatorType: 'mod';
-    projectId?: string;
-  }) => {
-    // 真实本地生成（ModGenerator，无网络），仅 IPC 边界被 mock；
-    // 直引生成器文件，避开顶层 barrel（modpack 侧正在重构，barrel 暂不稳定）
-    const gen = new ModGenerator();
-    const spec = req.spec as { modId?: string; packId?: string };
-    const result = await gen.generate({
-      loader: req.loader,
-      mcVersion: req.mcVersion,
-      modId: spec.modId ?? spec.packId ?? 'demo',
-      spec: spec as never,
-      projectPath: '',
-    } as never);
-    return {
-      files: result.files,
-      warnings: result.warnings ?? [],
-      unimplemented: result.unimplemented ?? [],
-      spec: spec as Record<string, unknown>,
-    };
-  });
+  const generateFiles = vi.fn(
+    async (req: {
+      loader: string;
+      mcVersion: string;
+      spec: unknown;
+      generatorType: 'mod';
+      projectId?: string;
+    }) => {
+      // 真实本地生成（ModGenerator，无网络），仅 IPC 边界被 mock；
+      // 直引生成器文件，避开顶层 barrel（modpack 侧正在重构，barrel 暂不稳定）
+      const gen = new ModGenerator();
+      const spec = req.spec as { modId?: string; packId?: string };
+      const result = await gen.generate({
+        loader: req.loader,
+        mcVersion: req.mcVersion,
+        modId: spec.modId ?? spec.packId ?? 'demo',
+        spec: spec as never,
+        projectPath: '',
+      } as never);
+      return {
+        files: result.files,
+        warnings: result.warnings ?? [],
+        unimplemented: result.unimplemented ?? [],
+        spec: spec as Record<string, unknown>,
+      };
+    },
+  );
 
   const prepareBuildDir = vi.fn(async (files: { path: string; content: string }[]) => {
     const dir = trackDir('mc-e2e-build-');
@@ -168,9 +170,7 @@ describe('全链路 E2E：生成 → 构建 → 导出 → 启动器', () => {
     const prep = await ipcClient.prepareBuildDir(stored.files);
     expect(mcApi().prepareBuildDir).toHaveBeenCalledOnce();
     expect(existsSync(prep.projectPath)).toBe(true);
-    expect(existsSync(join(prep.projectPath, 'src/main/resources/fabric.mod.json'))).toBe(
-      true,
-    );
+    expect(existsSync(join(prep.projectPath, 'src/main/resources/fabric.mod.json'))).toBe(true);
     expect(prep.estimatedSteps).toBe(stored.files.length);
 
     // 4. 构建（mock gradle，jarPath 真实存在）+ 写回 store

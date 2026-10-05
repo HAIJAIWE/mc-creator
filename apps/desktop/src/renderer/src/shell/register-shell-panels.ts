@@ -3,14 +3,16 @@ import type { PanelRegistration } from './panels.js';
 import { getPanel } from './panels.js';
 
 /** 惰性加载器映射：panelId -> import 函数 */
-const shellPanelLoaders: Record<string, () => Promise<{ default: React.ComponentType<unknown> }>> = {
-  explorer: () => import('../components/FileTree.js').then((m) => ({ default: m.FileTree })),
-  search: () => import('../components/SearchPanel.js').then((m) => ({ default: m.SearchPanel })),
-  git: () => import('../components/GitPanel.js').then((m) => ({ default: m.GitPanel })),
-  packages: () => import('../components/PackagesPanel.js').then((m) => ({ default: m.PackagesPanel })),
-  settings: () =>
-    import('../components/SettingsPanel.js').then((m) => ({ default: m.SettingsPanel })),
-};
+const shellPanelLoaders: Record<string, () => Promise<{ default: React.ComponentType<unknown> }>> =
+  {
+    explorer: () => import('../components/FileTree.js').then((m) => ({ default: m.FileTree })),
+    search: () => import('../components/SearchPanel.js').then((m) => ({ default: m.SearchPanel })),
+    git: () => import('../components/GitPanel.js').then((m) => ({ default: m.GitPanel })),
+    packages: () =>
+      import('../components/PackagesPanel.js').then((m) => ({ default: m.PackagesPanel })),
+    settings: () =>
+      import('../components/SettingsPanel.js').then((m) => ({ default: m.SettingsPanel })),
+  };
 
 /** 注册所有 core 面板（基础设施） */
 export function registerCorePanels(): void {

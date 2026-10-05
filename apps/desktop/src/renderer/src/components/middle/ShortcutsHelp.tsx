@@ -113,10 +113,15 @@ export function ShortcutsHelp({
         <div className="space-y-3">
           {groups.map((g) => (
             <div key={g.title}>
-              <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-mc-mute">{g.title}</div>
+              <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-mc-mute">
+                {g.title}
+              </div>
               <div className="space-y-1">
                 {g.items.map((it) => (
-                  <div key={it.keys + it.desc} className="flex items-center justify-between gap-2 text-[11px]">
+                  <div
+                    key={it.keys + it.desc}
+                    className="flex items-center justify-between gap-2 text-[11px]"
+                  >
                     <span className="text-mc-dim">{it.desc}</span>
                     <kbd className="rounded border border-mc-border bg-mc-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-mc-text">
                       {it.keys}

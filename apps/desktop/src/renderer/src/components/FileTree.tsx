@@ -1,14 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
 import Fuse from 'fuse.js';
-import {
-  Folder,
-  FolderOpen,
-  FileText,
-  FileImage,
-  FileCode,
-  File as FileIcon,
-} from 'lucide-react';
+import { Folder, FolderOpen, FileText, FileImage, FileCode, File as FileIcon } from 'lucide-react';
 import { useProjectStore } from '../store/project-store.js';
 import { useModStore } from '../store/mod-store.js';
 import { ipcClient } from '../lib/ipc-client.js';
@@ -300,26 +293,23 @@ export function FileTree() {
   }, [menu]);
 
   // 懒加载某目录的子节点
-  const loadChildren = useCallback(
-    async (pid: string, dirPath: string) => {
-      try {
-        const res = (await ipcClient.fileProjectListDir(pid, dirPath)) as unknown as {
-          success?: boolean;
-          entries?: { name: string; type: string }[];
-        };
-        if (!res || !res.success || !Array.isArray(res.entries)) return;
-        const children: CacheNode[] = res.entries.map((e) => ({
-          name: e.name,
-          path: dirPath ? `${dirPath}/${e.name}` : e.name,
-          type: e.type === 'directory' || e.type === 'dir' ? 'directory' : 'file',
-        }));
-        setTree((prev) => updateNodeChildren(prev, dirPath, children));
-      } catch (error) {
-        console.error('[FileTree] Failed to load children:', error);
-      }
-    },
-    [],
-  );
+  const loadChildren = useCallback(async (pid: string, dirPath: string) => {
+    try {
+      const res = (await ipcClient.fileProjectListDir(pid, dirPath)) as unknown as {
+        success?: boolean;
+        entries?: { name: string; type: string }[];
+      };
+      if (!res || !res.success || !Array.isArray(res.entries)) return;
+      const children: CacheNode[] = res.entries.map((e) => ({
+        name: e.name,
+        path: dirPath ? `${dirPath}/${e.name}` : e.name,
+        type: e.type === 'directory' || e.type === 'dir' ? 'directory' : 'file',
+      }));
+      setTree((prev) => updateNodeChildren(prev, dirPath, children));
+    } catch (error) {
+      console.error('[FileTree] Failed to load children:', error);
+    }
+  }, []);
 
   // 展开 / 折叠
   const toggleExpand = useCallback(
@@ -357,7 +347,8 @@ export function FileTree() {
 
   const visibleRows = useMemo(() => flattenTree(tree, expandedSet), [tree, expandedSet]);
   const isSearchMode = !!debouncedQuery.trim() && searchResults !== null;
-  const rows: FlatRow[] = isSearchMode && searchResults ? searchResults.map((r) => r.item) : visibleRows;
+  const rows: FlatRow[] =
+    isSearchMode && searchResults ? searchResults.map((r) => r.item) : visibleRows;
 
   const moveFocus = useCallback(
     (index: number) => {
@@ -415,9 +406,7 @@ export function FileTree() {
         if (!store.files.some((f) => f.path === newPath)) {
           store.setFiles([...store.files, { path: newPath, content: '' }]);
         }
-        setTree((prev) =>
-          appendChild(prev, parentPath, { name, path: newPath, type: 'file' }),
-        );
+        setTree((prev) => appendChild(prev, parentPath, { name, path: newPath, type: 'file' }));
         await invalidatePathCache(projectId, parentPath);
       } catch (error) {
         console.error('[FileTree] Failed to create file:', error);
@@ -442,7 +431,9 @@ export function FileTree() {
           { mtime: 0, size: 0 } as unknown as { mtime: number; size: number; hash: string },
           undefined,
         );
-        setTree((prev) => appendChild(prev, parentPath, { name, path: dirPath, type: 'directory' }));
+        setTree((prev) =>
+          appendChild(prev, parentPath, { name, path: dirPath, type: 'directory' }),
+        );
         await invalidatePathCache(projectId, parentPath);
       } catch (error) {
         console.error('[FileTree] Failed to create folder:', error);
@@ -646,7 +637,13 @@ export function FileTree() {
           width="100%"
           itemCount={rows.length}
           itemSize={ROW_HEIGHT}
-          itemData={{ rows, focusIndex, selectedFile, onRowClick: handleRowClick, onRowContextMenu: openRowMenu }}
+          itemData={{
+            rows,
+            focusIndex,
+            selectedFile,
+            onRowClick: handleRowClick,
+            onRowContextMenu: openRowMenu,
+          }}
         >
           {Row}
         </List>

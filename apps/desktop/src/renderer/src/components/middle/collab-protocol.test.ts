@@ -40,7 +40,9 @@ function doc(over: Partial<CollabDocument> = {}): CollabDocument {
 
 describe('collab-protocol merge', () => {
   it('逐图层取新者胜出', () => {
-    const local = doc({ layers: [layer('base', 'data:A', 100, 'a'), layer('l2', 'data:X', 100, 'a')] });
+    const local = doc({
+      layers: [layer('base', 'data:A', 100, 'a'), layer('l2', 'data:X', 100, 'a')],
+    });
     const remote = doc({
       layers: [layer('base', 'data:B', 200, 'b'), layer('l2', 'data:X', 100, 'a')],
       revision: 5,
@@ -62,7 +64,9 @@ describe('collab-protocol merge', () => {
 
   it('仅远端有的图层并入，仅本地有的保留', () => {
     const local = doc({ layers: [layer('base', 'data:A', 100, 'a')] });
-    const remote = doc({ layers: [layer('base', 'data:A', 100, 'a'), layer('new', 'data:N', 150, 'b')] });
+    const remote = doc({
+      layers: [layer('base', 'data:A', 100, 'a'), layer('new', 'data:N', 150, 'b')],
+    });
     const { doc: merged, changedLayerIds } = mergeCollabDocuments(local, remote);
     expect(merged.layers.map((l) => l.id).sort()).toEqual(['base', 'new']);
     expect(changedLayerIds).toContain('new');
@@ -70,7 +74,9 @@ describe('collab-protocol merge', () => {
 
   it('tombstone 阻止已删除图层复活', () => {
     const local = doc({ layers: [layer('base', 'data:A', 100, 'a')], tombstones: { gone: 300 } });
-    const remote = doc({ layers: [layer('base', 'data:A', 100, 'a'), layer('gone', 'data:G', 200, 'b')] });
+    const remote = doc({
+      layers: [layer('base', 'data:A', 100, 'a'), layer('gone', 'data:G', 200, 'b')],
+    });
     const { doc: merged } = mergeCollabDocuments(local, remote);
     expect(merged.layers.some((l) => l.id === 'gone')).toBe(false);
     expect(merged.tombstones['gone']).toBe(300);
@@ -84,12 +90,18 @@ describe('collab-protocol merge', () => {
 
   it('diff 找出差异图层与披风', () => {
     const a = doc({ layers: [layer('base', 'data:A', 100, 'a')] });
-    const b = doc({ layers: [layer('base', 'data:B', 200, 'b')], capeDataUrl: 'data:cape', capeUpdatedAt: 1, capeUpdatedBy: 'b' });
+    const b = doc({
+      layers: [layer('base', 'data:B', 200, 'b')],
+      capeDataUrl: 'data:cape',
+      capeUpdatedAt: 1,
+      capeUpdatedBy: 'b',
+    });
     expect(diffCollabDocuments(a, b).sort()).toEqual(['__cape__', 'base']);
   });
 });
 
-describe('collab-protocol messages', () => {  it('编解码往返', () => {
+describe('collab-protocol messages', () => {
+  it('编解码往返', () => {
     const msg = { kind: 'hello', peerId: 'p1', playerName: 'Steve', revision: 3 } as const;
     expect(decodeMessage(encodeMessage(msg))).toEqual({ v: 1, ...msg });
   });
@@ -103,13 +115,21 @@ describe('collab-protocol messages', () => {  it('编解码往返', () => {
     const now = 1_000_000;
     let map = mergePresence(
       new Map(),
-      { kind: 'presence', peerId: 'p1', presence: { peerId: 'p1', playerName: 'A', color: '#fff', cursor: null, updatedAt: 0 } },
+      {
+        kind: 'presence',
+        peerId: 'p1',
+        presence: { peerId: 'p1', playerName: 'A', color: '#fff', cursor: null, updatedAt: 0 },
+      },
       now,
     );
     expect(map.has('p1')).toBe(true);
     map = mergePresence(
       map,
-      { kind: 'presence', peerId: 'p2', presence: { peerId: 'p2', playerName: 'B', color: '#000', cursor: null, updatedAt: 0 } },
+      {
+        kind: 'presence',
+        peerId: 'p2',
+        presence: { peerId: 'p2', playerName: 'B', color: '#000', cursor: null, updatedAt: 0 },
+      },
       now + 31_000,
     );
     expect(map.has('p1')).toBe(false);
@@ -134,12 +154,18 @@ describe('collab-protocol snapshots', () => {
   });
 
   it('新时间戳胜出', () => {
-    const winner = mergeSnapshots(snap({ updatedAt: 100, updatedBy: 'a' }), snap({ updatedAt: 200, updatedBy: 'b' }));
+    const winner = mergeSnapshots(
+      snap({ updatedAt: 100, updatedBy: 'a' }),
+      snap({ updatedAt: 200, updatedBy: 'b' }),
+    );
     expect(winner.updatedBy).toBe('b');
   });
 
   it('相同时间戳按 peerId 字典序决胜', () => {
-    const winner = mergeSnapshots(snap({ updatedAt: 100, updatedBy: 'b' }), snap({ updatedAt: 100, updatedBy: 'a' }));
+    const winner = mergeSnapshots(
+      snap({ updatedAt: 100, updatedBy: 'b' }),
+      snap({ updatedAt: 100, updatedBy: 'a' }),
+    );
     expect(winner.updatedBy).toBe('b');
   });
 

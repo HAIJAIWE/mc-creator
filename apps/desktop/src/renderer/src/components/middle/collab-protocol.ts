@@ -82,7 +82,10 @@ export interface CollabSnapshot {
 }
 
 /** 快照 LWW：返回胜出者（时间戳优先，相同则 peerId 字典序大者胜） */
-export function mergeSnapshots(local: CollabSnapshot | null, remote: CollabSnapshot): CollabSnapshot {
+export function mergeSnapshots(
+  local: CollabSnapshot | null,
+  remote: CollabSnapshot,
+): CollabSnapshot {
   if (!local) return remote;
   if (local.docId !== remote.docId) {
     throw new Error(`文档 ID 不一致：${local.docId} vs ${remote.docId}`);
@@ -122,7 +125,10 @@ export function createCollabDocument(input: {
 }
 
 /** 比较两个图层版本：返回 true 表示 a 比 b 新 */
-function isLayerNewer(a: Pick<CollabLayerState, 'updatedAt' | 'updatedBy'>, b: Pick<CollabLayerState, 'updatedAt' | 'updatedBy'>): boolean {
+function isLayerNewer(
+  a: Pick<CollabLayerState, 'updatedAt' | 'updatedBy'>,
+  b: Pick<CollabLayerState, 'updatedAt' | 'updatedBy'>,
+): boolean {
   if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt;
   return a.updatedBy > b.updatedBy;
 }
@@ -161,7 +167,15 @@ export function mergeCollabDocuments(
         continue;
       }
       merged.push({ ...winner });
-      if (winner === r && (r.dataUrl !== l.dataUrl || r.visible !== l.visible || r.opacity !== l.opacity || r.blendMode !== l.blendMode || r.locked !== l.locked || r.name !== l.name)) {
+      if (
+        winner === r &&
+        (r.dataUrl !== l.dataUrl ||
+          r.visible !== l.visible ||
+          r.opacity !== l.opacity ||
+          r.blendMode !== l.blendMode ||
+          r.locked !== l.locked ||
+          r.name !== l.name)
+      ) {
         changedLayerIds.push(id);
       }
     } else if (r && !l) {
@@ -183,7 +197,8 @@ export function mergeCollabDocuments(
   let capeUpdatedBy = localDoc.capeUpdatedBy;
   if (
     remoteDoc.capeUpdatedAt > localDoc.capeUpdatedAt ||
-    (remoteDoc.capeUpdatedAt === localDoc.capeUpdatedAt && remoteDoc.capeUpdatedBy > localDoc.capeUpdatedBy)
+    (remoteDoc.capeUpdatedAt === localDoc.capeUpdatedAt &&
+      remoteDoc.capeUpdatedBy > localDoc.capeUpdatedBy)
   ) {
     if (remoteDoc.capeDataUrl !== localDoc.capeDataUrl) changedLayerIds.push('__cape__');
     capeDataUrl = remoteDoc.capeDataUrl;
@@ -205,7 +220,8 @@ export function mergeCollabDocuments(
       capeUpdatedBy,
       revision: Math.max(localDoc.revision, remoteDoc.revision) + 1,
       updatedAt: Math.max(localDoc.updatedAt, remoteDoc.updatedAt),
-      updatedBy: remoteDoc.updatedAt >= localDoc.updatedAt ? remoteDoc.updatedBy : localDoc.updatedBy,
+      updatedBy:
+        remoteDoc.updatedAt >= localDoc.updatedAt ? remoteDoc.updatedBy : localDoc.updatedBy,
     },
     changedLayerIds,
   };

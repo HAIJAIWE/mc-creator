@@ -47,7 +47,6 @@
     "zustand": "^4.5.0"
   },
   "optionalDependencies": {
-    "isolated-vm": "^7.0.1",
     "node-pty": "^1.1.0"
   },
   "devDependencies": {

@@ -5,20 +5,60 @@ import {
 } from './preview-registry.js';
 
 /** 惰性加载器映射：generatorType -> import 函数 */
-const previewPanelLoaders: Record<string, () => Promise<{ default: React.ComponentType<unknown> }>> = {
-  server: () => import('../components/middle/ServerPreviewPanel.js').then((m) => ({ default: m.ServerPreviewPanel })),
-  mod: () => import('../components/middle/ModPreviewPanel.js').then((m) => ({ default: m.ModPreviewPanel })),
-  datapack: () => import('../components/middle/DatapackPreviewPanel.js').then((m) => ({ default: m.DatapackPreviewPanel })),
-  modpack: () => import('../components/middle/ModpackPreviewPanel.js').then((m) => ({ default: m.ModpackPreviewPanel })),
-  launcher: () => import('../components/middle/LauncherPreviewPanel.js').then((m) => ({ default: m.LauncherPreviewPanel })),
-  resource_pack: () => import('../components/middle/ResourcePackPreviewPanel.js').then((m) => ({ default: m.ResourcePackPreviewPanel })),
-  skin: () => import('../components/middle/SkinPreviewPanel.js').then((m) => ({ default: m.SkinPreviewPanel })),
-  kubejs: () => import('../components/middle/KubejsPreviewPanel.js').then((m) => ({ default: m.KubejsPreviewPanel })),
-  crafttweaker: () => import('../components/middle/CraftTweakerPreviewPanel.js').then((m) => ({ default: m.CraftTweakerPreviewPanel })),
-  behavior_pack: () => import('../components/middle/BehaviorPackPreviewPanel.js').then((m) => ({ default: m.BehaviorPackPreviewPanel })),
-  enchantment: () => import('../components/middle/EnchantmentPreviewPanel.js').then((m) => ({ default: m.EnchantmentPreviewPanel })),
-  behavior_item: () => import('../components/middle/BehaviorItemPreviewPanel.js').then((m) => ({ default: m.BehaviorItemPreviewPanel })),
-  behavior_entity: () => import('../components/middle/BehaviorEntityPreviewPanel.js').then((m) => ({ default: m.BehaviorEntityPreviewPanel })),
+const previewPanelLoaders: Record<
+  string,
+  () => Promise<{ default: React.ComponentType<unknown> }>
+> = {
+  server: () =>
+    import('../components/middle/ServerPreviewPanel.js').then((m) => ({
+      default: m.ServerPreviewPanel,
+    })),
+  mod: () =>
+    import('../components/middle/ModPreviewPanel.js').then((m) => ({ default: m.ModPreviewPanel })),
+  datapack: () =>
+    import('../components/middle/DatapackPreviewPanel.js').then((m) => ({
+      default: m.DatapackPreviewPanel,
+    })),
+  modpack: () =>
+    import('../components/middle/ModpackPreviewPanel.js').then((m) => ({
+      default: m.ModpackPreviewPanel,
+    })),
+  launcher: () =>
+    import('../components/middle/LauncherPreviewPanel.js').then((m) => ({
+      default: m.LauncherPreviewPanel,
+    })),
+  resource_pack: () =>
+    import('../components/middle/ResourcePackPreviewPanel.js').then((m) => ({
+      default: m.ResourcePackPreviewPanel,
+    })),
+  skin: () =>
+    import('../components/middle/SkinPreviewPanel.js').then((m) => ({
+      default: m.SkinPreviewPanel,
+    })),
+  kubejs: () =>
+    import('../components/middle/KubejsPreviewPanel.js').then((m) => ({
+      default: m.KubejsPreviewPanel,
+    })),
+  crafttweaker: () =>
+    import('../components/middle/CraftTweakerPreviewPanel.js').then((m) => ({
+      default: m.CraftTweakerPreviewPanel,
+    })),
+  behavior_pack: () =>
+    import('../components/middle/BehaviorPackPreviewPanel.js').then((m) => ({
+      default: m.BehaviorPackPreviewPanel,
+    })),
+  enchantment: () =>
+    import('../components/middle/EnchantmentPreviewPanel.js').then((m) => ({
+      default: m.EnchantmentPreviewPanel,
+    })),
+  behavior_item: () =>
+    import('../components/middle/BehaviorItemPreviewPanel.js').then((m) => ({
+      default: m.BehaviorItemPreviewPanel,
+    })),
+  behavior_entity: () =>
+    import('../components/middle/BehaviorEntityPreviewPanel.js').then((m) => ({
+      default: m.BehaviorEntityPreviewPanel,
+    })),
 };
 
 /** 注册所有预览面板 */

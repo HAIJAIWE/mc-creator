@@ -8,23 +8,36 @@ import { CodeDiffDialog } from './components/common/CodeDiffDialog.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { useProjectStore } from './store/project-store.js';
 import { useModStore } from './store/mod-store.js';
-import { useLayoutStore, selectLeftWidth, selectRightWidth, selectSetLeftWidth, selectSetRightWidth } from './shell/layout-store.js';
+import {
+  useLayoutStore,
+  selectLeftWidth,
+  selectRightWidth,
+  selectSetLeftWidth,
+  selectSetRightWidth,
+} from './shell/layout-store.js';
 import { initPanelRegistries } from './shell/index.js';
 import { getAllPanels } from './shell/panels.js';
 import { FileTree } from './components/FileTree.js';
 import { MainPanelView } from './components/MainPanelView.js';
 import { ProfileProvider } from './shell/profile-manager-provider.js';
 
-// Monaco 本地化配置必须在任何 <Editor> 挂载前完成（避免回落到 CDN 被 CSP 拦截）
-// 在应用启动时立即加载，确保 MonacoEnvironment 在任何编辑器挂载前就绪
-import './lib/monaco-setup.js';
+// Monaco 本地化配置（worker 映射 + loader.config({ monaco })）**不能**在这里静态引入：
+// monaco-setup.ts 会把 ~5MB 的 monaco-editor 拖进主 chunk，懒加载被完全抵消。
+// 改为由 withMonacoSetup() 串在「可能渲染 <Editor> 的惰性加载器」上 —— 见 lib/lazy-monaco.ts
+// 与下方 AgentPanel。铁律：任何 <Editor> 挂载前该配置必须已求值完，否则 loader.init()
+// 会永久走 CDN 分支并被 CSP 拦掉（编辑器能开但高亮/补全/TS 诊断全无）。
+import { withMonacoSetup } from './lib/lazy-monaco.js';
 
 // 重型面板按需加载（Monaco / reactflow / xterm / skinview3d 拆进独立 chunk，首次不进主包）
 const Dashboard = lazy(() =>
   import('./components/Dashboard.js').then((m) => ({ default: m.Dashboard })),
 );
-const AgentPanel = lazy(() =>
-  import('./components/AgentPanel.js').then((m) => ({ default: m.AgentPanel })),
+// AgentPanel 右侧栏在 workbench 挂载时即加载，而它内部有 <Editor>（Spec 区块），
+// 所以加载器必须先完成 Monaco 配置。
+const AgentPanel = lazy(
+  withMonacoSetup(() =>
+    import('./components/AgentPanel.js').then((m) => ({ default: m.AgentPanel })),
+  ),
 );
 
 /** 按需加载面板的 Suspense 边界 */
@@ -65,13 +78,19 @@ function Workbench() {
     }
   }, [panelIds, activeLeftPanel, setActiveLeftPanel]);
 
-  const handleLeftResize = useCallback((delta: number) => {
-    setLeftWidth(Math.max(120, Math.min(480, leftWidth + delta)));
-  }, [leftWidth, setLeftWidth]);
+  const handleLeftResize = useCallback(
+    (delta: number) => {
+      setLeftWidth(Math.max(120, Math.min(480, leftWidth + delta)));
+    },
+    [leftWidth, setLeftWidth],
+  );
 
-  const handleRightResize = useCallback((delta: number) => {
-    setRightWidth(Math.max(200, Math.min(600, rightWidth - delta)));
-  }, [rightWidth, setRightWidth]);
+  const handleRightResize = useCallback(
+    (delta: number) => {
+      setRightWidth(Math.max(200, Math.min(600, rightWidth - delta)));
+    },
+    [rightWidth, setRightWidth],
+  );
 
   return (
     <ProfileProvider>
@@ -140,7 +159,7 @@ function Workbench() {
             filePath={conflictDialog.filePath}
             serverContent={conflictDialog.serverContent}
             localContent={conflictDialog.localContent}
-            onClose={(action, mergedContent) => {
+            onClose={() => {
               useModStore.getState().closeConflictDiff();
             }}
             isOpen={conflictDialog.isOpen}

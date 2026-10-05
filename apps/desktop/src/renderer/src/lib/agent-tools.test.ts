@@ -173,14 +173,25 @@ describe('search_knowledge', () => {
 
   it('命中时返回标题+片段+来源', async () => {
     vi.mocked(ipcClient.ragSearch).mockResolvedValue({
-      hits: [{ title: '自定义附魔 enchantment', snippet: 'supported_items 片段', source: 'Minecraft Wiki', score: 3.1 }],
+      hits: [
+        {
+          title: '自定义附魔 enchantment',
+          snippet: 'supported_items 片段',
+          source: 'Minecraft Wiki',
+          score: 3.1,
+        },
+      ],
       cached: false,
     });
     const tool = findTool('search_knowledge')!;
     const result = await tool.execute({ query: '附魔', generator_type: 'datapack' });
     expect(result).toContain('自定义附魔');
     expect(result).toContain('来源');
-    expect(ipcClient.ragSearch).toHaveBeenCalledWith({ query: '附魔', generatorType: 'datapack', topK: 5 });
+    expect(ipcClient.ragSearch).toHaveBeenCalledWith({
+      query: '附魔',
+      generatorType: 'datapack',
+      topK: 5,
+    });
   });
 
   it('零命中时提示换关键词', async () => {

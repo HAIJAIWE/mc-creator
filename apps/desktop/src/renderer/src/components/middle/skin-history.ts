@@ -54,7 +54,11 @@ export function commitVersion(
   return item;
 }
 
-export function deleteVersion(playerName: string, id: string, scope: HistoryScope = 'skin'): SkinVersion[] {
+export function deleteVersion(
+  playerName: string,
+  id: string,
+  scope: HistoryScope = 'skin',
+): SkinVersion[] {
   const next = loadHistory(playerName, scope).filter((v) => v.id !== id);
   persist(playerName, next, scope);
   return next;

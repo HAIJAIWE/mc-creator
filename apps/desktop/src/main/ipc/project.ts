@@ -7,7 +7,14 @@ import { z } from 'zod';
 import JSZip from 'jszip';
 import { assertSafeEntry } from '@mc-creator/shell';
 import { assertWithin } from '../ipc-utils.js';
-import { loadProjects, saveProject, deleteProject, getProject, startProjectWatcher, projectEvents } from '../project-store.js';
+import {
+  loadProjects,
+  saveProject,
+  deleteProject,
+  getProject,
+  startProjectWatcher,
+  projectEvents,
+} from '../project-store.js';
 import {
   EXPORT_ZIP,
   ExportZipRequest,

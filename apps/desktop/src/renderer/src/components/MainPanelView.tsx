@@ -2,28 +2,54 @@ import { lazy, Suspense } from 'react';
 import { useModStore } from '../store/mod-store.js';
 import { useProjectStore } from '../store/project-store.js';
 import { McIcon } from '../assets/mc-ui/McIcon.js';
+import { withMonacoSetup } from '../lib/lazy-monaco.js';
 
-const PreviewPanel = lazy(() => import('./middle/MiddlePanel.js').then((m) => ({ default: m.MiddlePanel })));
-const CodeEditor = lazy(() => import('./CodePreview.js').then((m) => ({ default: m.CodePreview })));
-const ResourcePackPreview = lazy(() => import('./ResourcePackPreview.js').then((m) => ({ default: m.ResourcePackPreview })));
+// 下面两个面板的静态依赖里带 <Editor>（MiddlePanel → CodePreview / SplitCodeEditor /
+// LowcodeWorkspace / PurecodeWorkspace），所以加载器必须先完成 Monaco 本地化配置，
+// 否则 loader.init() 会永久走 CDN 分支被 CSP 拦掉。见 lib/lazy-monaco.ts。
+const PreviewPanel = lazy(
+  withMonacoSetup(() =>
+    import('./middle/MiddlePanel.js').then((m) => ({ default: m.MiddlePanel })),
+  ),
+);
+const CodeEditor = lazy(
+  withMonacoSetup(() => import('./CodePreview.js').then((m) => ({ default: m.CodePreview }))),
+);
+const ResourcePackPreview = lazy(() =>
+  import('./ResourcePackPreview.js').then((m) => ({ default: m.ResourcePackPreview })),
+);
 const NbtEditor = lazy(() => import('./NbtEditor.js').then((m) => ({ default: m.NbtEditor })));
-const SearchPanel = lazy(() => import('./SearchPanel.js').then((m) => ({ default: m.SearchPanel })));
+const SearchPanel = lazy(() =>
+  import('./SearchPanel.js').then((m) => ({ default: m.SearchPanel })),
+);
 const GitPanel = lazy(() => import('./GitPanel.js').then((m) => ({ default: m.GitPanel })));
-const PackagesPanel = lazy(() => import('./PackagesPanel.js').then((m) => ({ default: m.PackagesPanel })));
-const SettingsPanel = lazy(() => import('./SettingsPanel.js').then((m) => ({ default: m.SettingsPanel })));
-const ItemRecipeEditor = lazy(() => import('./ItemRecipeEditor.js').then((m) => ({ default: m.ItemRecipeEditor })));
-const BlockEditor = lazy(() => import('./BlockEditor.js').then((m) => ({ default: m.BlockEditor })));
-const EntityAiEditor = lazy(() => import('./EntityAiEditor.js').then((m) => ({ default: m.EntityAiEditor })));
-const SkinPreviewPanel = lazy(() => import('./middle/SkinPreviewPanel.js').then((m) => ({ default: m.SkinPreviewPanel })));
+const PackagesPanel = lazy(() =>
+  import('./PackagesPanel.js').then((m) => ({ default: m.PackagesPanel })),
+);
+const SettingsPanel = lazy(() =>
+  import('./SettingsPanel.js').then((m) => ({ default: m.SettingsPanel })),
+);
+const ItemRecipeEditor = lazy(() =>
+  import('./ItemRecipeEditor.js').then((m) => ({ default: m.ItemRecipeEditor })),
+);
+const BlockEditor = lazy(() =>
+  import('./BlockEditor.js').then((m) => ({ default: m.BlockEditor })),
+);
+const EntityAiEditor = lazy(() =>
+  import('./EntityAiEditor.js').then((m) => ({ default: m.EntityAiEditor })),
+);
+const SkinPreviewPanel = lazy(() =>
+  import('./middle/SkinPreviewPanel.js').then((m) => ({ default: m.SkinPreviewPanel })),
+);
 const AudioPanel = lazy(() => import('./AudioPanel.js').then((m) => ({ default: m.AudioPanel })));
 const CiCdPanel = lazy(() => import('./CiCdPanel.js').then((m) => ({ default: m.CiCdPanel })));
-const GameLauncherPanel = lazy(() => import('./GameLauncherPanel.js').then((m) => ({ default: m.GameLauncherPanel })));
+const GameLauncherPanel = lazy(() =>
+  import('./GameLauncherPanel.js').then((m) => ({ default: m.GameLauncherPanel })),
+);
 
 function PanelLoading() {
   return (
-    <div className="flex h-full items-center justify-center text-sm text-mc-mute">
-      加载面板中…
-    </div>
+    <div className="flex h-full items-center justify-center text-sm text-mc-mute">加载面板中…</div>
   );
 }
 

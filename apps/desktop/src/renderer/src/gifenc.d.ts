@@ -23,12 +23,10 @@ declare module 'gifenc' {
     bytes(): Uint8Array;
     bytesView(): Uint8Array;
     writeHeader(): void;
-    writeFrame(
-      index: Uint8Array,
-      width: number,
-      height: number,
-      opts?: GifFrameOpts,
-    ): void;
+    writeFrame(index: Uint8Array, width: number, height: number, opts?: GifFrameOpts): void;
   }
-  export default function GIFEncoder(opt?: { initialCapacity?: number; auto?: boolean }): GifEncoderInstance;
+  export default function GIFEncoder(opt?: {
+    initialCapacity?: number;
+    auto?: boolean;
+  }): GifEncoderInstance;
 }

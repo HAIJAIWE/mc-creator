@@ -26,7 +26,13 @@ import {
 import type { ModelProfile } from '../../../shared/ipc-channels.js';
 import { getLocale, setLocale, getAvailableLocales, getLocaleDisplayName } from '../i18n';
 import { useTranslation } from '../hooks/useTranslation.js';
-import { useLayoutStore, selectLeftWidth, selectRightWidth, selectSetLeftWidth, selectSetRightWidth } from '../shell/layout-store.js';
+import {
+  useLayoutStore,
+  selectLeftWidth,
+  selectRightWidth,
+  selectSetLeftWidth,
+  selectSetRightWidth,
+} from '../shell/layout-store.js';
 
 interface Preset {
   name: string;

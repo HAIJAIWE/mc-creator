@@ -73,7 +73,9 @@ export function createSandboxMcApi(): RawMcApi {
   return out;
 }
 
-function createSandboxConsole(filename: string): Pick<Console, 'log' | 'warn' | 'error' | 'info' | 'debug'> {
+function createSandboxConsole(
+  filename: string,
+): Pick<Console, 'log' | 'warn' | 'error' | 'info' | 'debug'> {
   const prefix = `[plugin:${filename}]`;
   return {
     log: (...args: unknown[]) => console.log(prefix, ...args),
@@ -148,14 +150,7 @@ export function evaluatePluginCode(code: string, filename: string): EvaluatePlug
   };
 
   try {
-    const runner = new Function(
-      'registerNode',
-      'mcApi',
-      'console',
-      'module',
-      'exports',
-      code,
-    ) as (
+    const runner = new Function('registerNode', 'mcApi', 'console', 'module', 'exports', code) as (
       registerNodeFn: (def: unknown) => string,
       mcApi: RawMcApi,
       console: unknown,

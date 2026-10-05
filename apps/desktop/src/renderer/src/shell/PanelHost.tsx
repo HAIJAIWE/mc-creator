@@ -18,17 +18,32 @@ interface PanelHostProps {
  * - 支持额外 props 透传
  * - 面板组件约定：接收 panelProps 作为单一 prop 对象
  */
-export function PanelHost({
-  panelId,
-  panelProps = {},
-  fallback,
-  notFound,
-}: PanelHostProps) {
+export function PanelHost({ panelId, panelProps = {}, fallback, notFound }: PanelHostProps) {
   const registration = useMemo(() => {
     return getPanel(panelId);
   }, [panelId]);
 
-  if (!registration) {
+  // Hook 必须无条件、且在 early return 之前调用。
+  //
+  // 为什么：`registration` 会随渲染从「有」变「无」（或反过来）——
+  // 面板可动态注册。调用方渲染 `<PanelHost panelId={state} />` 时，
+  // state 从「未注册的 id」切到「已注册的 id」，memo 重算、
+  // registration 由 undefined 变有值，hook 数量 1 → 2，React 直接抛
+  // "Rendered more hooks than during the previous render"；反向切换则抛
+  // "Rendered fewer hooks than expected ... accidental early return"，整个面板树白屏。
+  //
+  // 注意触发路径**必须换 panelId**：`registration` 的 useMemo 只依赖 [panelId]，
+  // 同一 id 的重渲染不会重查注册表，所以「同 id 下注册表增删」观察不到，
+  // 也不会改变 hook 数量。见 PanelHost.test.tsx。
+  //
+  // 所以这里对「未注册」返回 null 而不是跳过 hook，early return 挪到两个
+  // useMemo 之后 —— hook 数量恒为 2，与 registration 是否存在无关。
+  const LazyComponent = useMemo(
+    () => (registration ? lazy(registration.component) : null),
+    [registration],
+  );
+
+  if (!registration || LazyComponent === null) {
     return (
       <div className="flex flex-1 items-center justify-center bg-mc-bg text-sm text-mc-mute">
         {notFound ?? (
@@ -39,9 +54,6 @@ export function PanelHost({
       </div>
     );
   }
-
-  const { component: Loader } = registration;
-  const LazyComponent = useMemo(() => lazy(Loader), [Loader]);
 
   return (
     <Suspense fallback={fallback ?? <PanelLoadingFallback />}>

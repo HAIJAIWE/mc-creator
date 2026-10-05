@@ -7,7 +7,12 @@
  * - 无 BroadcastChannel 的环境返回 null，由调用方降级为单机模式。
  * - WebRTC/DataChannel 阶段只需实现同名接口替换本类。
  */
-import { decodeMessage, encodeMessage, type CollabMessage, type CollabPresence } from './collab-protocol';
+import {
+  decodeMessage,
+  encodeMessage,
+  type CollabMessage,
+  type CollabPresence,
+} from './collab-protocol';
 
 export function createPeerId(): string {
   return `peer-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;

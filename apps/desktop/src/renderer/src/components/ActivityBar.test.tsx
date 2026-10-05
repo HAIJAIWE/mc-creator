@@ -21,13 +21,7 @@ import { ActivityBar } from './ActivityBar.js';
  */
 
 // Shell 面板 ID（基础设施面板）
-const SHELL_PANEL_IDS = [
-  'explorer',
-  'search',
-  'git',
-  'packages',
-  'settings',
-] as const;
+const SHELL_PANEL_IDS = ['explorer', 'search', 'git', 'packages', 'settings'] as const;
 
 // 中文标签映射
 const LABEL_MAP: Record<string, string> = {
@@ -59,17 +53,52 @@ vi.mock('../hooks/useTranslation.js', () => ({
 
 // Mock the panel registry to return shell panels
 vi.mock('../shell/panels.js', async (importOriginal) => {
-  const original = await importOriginal() as typeof import('../shell/panels.js');
+  const original = (await importOriginal()) as typeof import('../shell/panels.js');
   const React = await import('react');
   const MockIcon = () => React.createElement('span', { 'data-testid': 'mock-icon' });
   return {
     ...original,
     getShellPanels: () => [
-      { id: 'explorer', icon: React.createElement(MockIcon), title: LABEL_MAP.explorer, order: 10, kind: 'shell' as const, enabled: true },
-      { id: 'search', icon: React.createElement(MockIcon), title: LABEL_MAP.search, order: 20, kind: 'shell' as const, enabled: true },
-      { id: 'git', icon: React.createElement(MockIcon), title: LABEL_MAP.git, order: 30, kind: 'shell' as const, enabled: true },
-      { id: 'packages', icon: React.createElement(MockIcon), title: LABEL_MAP.packages, order: 40, kind: 'shell' as const, enabled: true },
-      { id: 'settings', icon: React.createElement(MockIcon), title: LABEL_MAP.settings, order: 999, kind: 'shell' as const, enabled: true },
+      {
+        id: 'explorer',
+        icon: React.createElement(MockIcon),
+        title: LABEL_MAP.explorer,
+        order: 10,
+        kind: 'shell' as const,
+        enabled: true,
+      },
+      {
+        id: 'search',
+        icon: React.createElement(MockIcon),
+        title: LABEL_MAP.search,
+        order: 20,
+        kind: 'shell' as const,
+        enabled: true,
+      },
+      {
+        id: 'git',
+        icon: React.createElement(MockIcon),
+        title: LABEL_MAP.git,
+        order: 30,
+        kind: 'shell' as const,
+        enabled: true,
+      },
+      {
+        id: 'packages',
+        icon: React.createElement(MockIcon),
+        title: LABEL_MAP.packages,
+        order: 40,
+        kind: 'shell' as const,
+        enabled: true,
+      },
+      {
+        id: 'settings',
+        icon: React.createElement(MockIcon),
+        title: LABEL_MAP.settings,
+        order: 999,
+        kind: 'shell' as const,
+        enabled: true,
+      },
     ],
   };
 });

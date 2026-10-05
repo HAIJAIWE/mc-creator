@@ -176,145 +176,150 @@ export function registerModpackHandlers(): void {
   });
 
   // === 纯本地冲突检测 ===
-  ipcMain.handle(MODPACK_CHECK_CONFLICTS, async (_e, raw: unknown): Promise<ModpackCheckConflictsRes> => {
-    const req = ModpackCheckConflictsRequest.parse(raw);
-    const conflicts = detectConflicts(req.mods, req.mcVersion, req.loader);
-    return { conflicts };
-  });
+  ipcMain.handle(
+    MODPACK_CHECK_CONFLICTS,
+    async (_e, raw: unknown): Promise<ModpackCheckConflictsRes> => {
+      const req = ModpackCheckConflictsRequest.parse(raw);
+      const conflicts = detectConflicts(req.mods, req.mcVersion, req.loader);
+      return { conflicts };
+    },
+  );
 
   // === mrpack 导出 ===
-  ipcMain.handle(MODPACK_EXPORT_MRPACK, async (e, raw: unknown): Promise<ModpackExportMrpackRes> => {
-    const req = ModpackExportMrpackRequest.parse(raw);
-    const parsed = ModpackSpec.safeParse(req.spec);
-    if (!parsed.success) {
-      throw new Error(
-        `modpack Spec 校验失败：${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
-      );
-    }
-    const spec = parsed.data;
-    const plan = buildMrpackPlan(spec);
-    const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-    const defaultName =
-      req.defaultName || `${spec.packId}-${spec.packVersion}.mrpack`;
-
-    const zip = new JSZip();
-    zip.file('modrinth.index.json', JSON.stringify(plan.indexJson, null, 2));
-    // overrides/ 必需：即使为空也放 README 占位，保证解压即有目录
-    if (plan.overrideFiles.length === 0) {
-      zip.file(
-        'overrides/README.txt',
-        `此目录存放整合包的配置文件覆盖。\n整合包: ${spec.packName} v${spec.packVersion}\nMC: ${spec.mcVersion} / ${spec.loader} ${spec.loaderVersion}\n`,
-      );
-    } else {
-      for (const o of plan.overrideFiles) {
-        zip.file(`overrides/${o.path}`, o.content);
+  ipcMain.handle(
+    MODPACK_EXPORT_MRPACK,
+    async (e, raw: unknown): Promise<ModpackExportMrpackRes> => {
+      const req = ModpackExportMrpackRequest.parse(raw);
+      const parsed = ModpackSpec.safeParse(req.spec);
+      if (!parsed.success) {
+        throw new Error(
+          `modpack Spec 校验失败：${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
+        );
       }
-    }
-    if (plan.serverOverrideFiles.length > 0) {
-      zip.file(
-        'server-overrides/README.txt',
-        '服务端覆盖文件（非 mrpack 标准，随包附带，需手动分发到服务端）。\n',
-      );
-      for (const o of plan.serverOverrideFiles) {
-        zip.file(`server-overrides/${o.path}`, o.content);
-      }
-    }
+      const spec = parsed.data;
+      const plan = buildMrpackPlan(spec);
+      const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+      const defaultName = req.defaultName || `${spec.packId}-${spec.packVersion}.mrpack`;
 
-    const fileCount = Object.keys(zip.files).length;
-    const buf = await zip.generateAsync({ type: 'nodebuffer' });
-    const totalBytes = buf.length;
-    const usedStream = totalBytes > MRPACK_STREAM_THRESHOLD;
-    const sendProgress = (loaded: number, currentFile: string, done = false): void => {
-      try {
-        e.sender.send(MODPACK_EXPORT_PROGRESS, {
-          requestId,
-          loaded,
-          total: totalBytes,
-          percentage: totalBytes === 0 ? 100 : Math.round((loaded / totalBytes) * 100),
-          currentFile,
-          done,
-        });
-      } catch {
-        // 渲染窗口已关闭时忽略
-      }
-    };
-
-    // 大文件：先分片落到项目 exports 目录（复用 writeStream 分片语义并上报进度），
-    // 再弹保存对话框复制到用户所选路径；小文件直接弹框保存。
-    let stagedPath: string | null = null;
-    if (req.projectId) {
-      try {
-        const fm = FileManager.getInstance();
-        const exportsDir = fm.getProjectExportsDir(req.projectId);
-        await mkdir(exportsDir, { recursive: true });
-        stagedPath = join(exportsDir, defaultName);
-        if (usedStream) {
-          // 分片写入并上报进度（与 file:project:writeStream 相同的 512KB 分片节奏）
-          const { open } = await import('node:fs/promises');
-          const fh = await open(stagedPath, 'w');
-          try {
-            let loaded = 0;
-            for (let off = 0; off < buf.length; off += MRPACK_CHUNK) {
-              const chunk = buf.subarray(off, off + MRPACK_CHUNK);
-              await fh.write(chunk);
-              loaded += chunk.length;
-              sendProgress(loaded, defaultName, false);
-            }
-          } finally {
-            await fh.close();
-          }
-        } else {
-          await writeFileAtomic(stagedPath, buf);
-          sendProgress(totalBytes, defaultName, false);
+      const zip = new JSZip();
+      zip.file('modrinth.index.json', JSON.stringify(plan.indexJson, null, 2));
+      // overrides/ 必需：即使为空也放 README 占位，保证解压即有目录
+      if (plan.overrideFiles.length === 0) {
+        zip.file(
+          'overrides/README.txt',
+          `此目录存放整合包的配置文件覆盖。\n整合包: ${spec.packName} v${spec.packVersion}\nMC: ${spec.mcVersion} / ${spec.loader} ${spec.loaderVersion}\n`,
+        );
+      } else {
+        for (const o of plan.overrideFiles) {
+          zip.file(`overrides/${o.path}`, o.content);
         }
-      } catch {
-        stagedPath = null;
       }
-    } else if (usedStream) {
-      // 无项目时仍需进度事件：按分片节奏空转上报，保证进度条一致
-      let loaded = 0;
-      for (let off = 0; off < buf.length; off += MRPACK_CHUNK) {
-        loaded = Math.min(buf.length, off + MRPACK_CHUNK);
-        sendProgress(loaded, defaultName, false);
+      if (plan.serverOverrideFiles.length > 0) {
+        zip.file(
+          'server-overrides/README.txt',
+          '服务端覆盖文件（非 mrpack 标准，随包附带，需手动分发到服务端）。\n',
+        );
+        for (const o of plan.serverOverrideFiles) {
+          zip.file(`server-overrides/${o.path}`, o.content);
+        }
       }
-    }
 
-    const picked = await dialog.showSaveDialog({
-      defaultPath: defaultName,
-      filters: [{ name: 'Modrinth Pack', extensions: ['mrpack'] }],
-    });
-    if (picked.canceled || !picked.filePath) {
+      const fileCount = Object.keys(zip.files).length;
+      const buf = await zip.generateAsync({ type: 'nodebuffer' });
+      const totalBytes = buf.length;
+      const usedStream = totalBytes > MRPACK_STREAM_THRESHOLD;
+      const sendProgress = (loaded: number, currentFile: string, done = false): void => {
+        try {
+          e.sender.send(MODPACK_EXPORT_PROGRESS, {
+            requestId,
+            loaded,
+            total: totalBytes,
+            percentage: totalBytes === 0 ? 100 : Math.round((loaded / totalBytes) * 100),
+            currentFile,
+            done,
+          });
+        } catch {
+          // 渲染窗口已关闭时忽略
+        }
+      };
+
+      // 大文件：先分片落到项目 exports 目录（复用 writeStream 分片语义并上报进度），
+      // 再弹保存对话框复制到用户所选路径；小文件直接弹框保存。
+      let stagedPath: string | null = null;
+      if (req.projectId) {
+        try {
+          const fm = FileManager.getInstance();
+          const exportsDir = fm.getProjectExportsDir(req.projectId);
+          await mkdir(exportsDir, { recursive: true });
+          stagedPath = join(exportsDir, defaultName);
+          if (usedStream) {
+            // 分片写入并上报进度（与 file:project:writeStream 相同的 512KB 分片节奏）
+            const { open } = await import('node:fs/promises');
+            const fh = await open(stagedPath, 'w');
+            try {
+              let loaded = 0;
+              for (let off = 0; off < buf.length; off += MRPACK_CHUNK) {
+                const chunk = buf.subarray(off, off + MRPACK_CHUNK);
+                await fh.write(chunk);
+                loaded += chunk.length;
+                sendProgress(loaded, defaultName, false);
+              }
+            } finally {
+              await fh.close();
+            }
+          } else {
+            await writeFileAtomic(stagedPath, buf);
+            sendProgress(totalBytes, defaultName, false);
+          }
+        } catch {
+          stagedPath = null;
+        }
+      } else if (usedStream) {
+        // 无项目时仍需进度事件：按分片节奏空转上报，保证进度条一致
+        let loaded = 0;
+        for (let off = 0; off < buf.length; off += MRPACK_CHUNK) {
+          loaded = Math.min(buf.length, off + MRPACK_CHUNK);
+          sendProgress(loaded, defaultName, false);
+        }
+      }
+
+      const picked = await dialog.showSaveDialog({
+        defaultPath: defaultName,
+        filters: [{ name: 'Modrinth Pack', extensions: ['mrpack'] }],
+      });
+      if (picked.canceled || !picked.filePath) {
+        sendProgress(totalBytes, defaultName, true);
+        return {
+          ok: false,
+          canceled: true,
+          savedPath: null,
+          fileCount,
+          totalBytes,
+          usedStream,
+          warnings: plan.warnings,
+        };
+      }
+      // 用户选了路径：优先复用已分片落盘的暂存（避免二次大内存拷贝）
+      if (stagedPath && stagedPath !== picked.filePath) {
+        try {
+          const { copyFile } = await import('node:fs/promises');
+          await copyFile(stagedPath, picked.filePath);
+        } catch {
+          await writeFileAtomic(picked.filePath, buf);
+        }
+      } else if (!stagedPath) {
+        await writeFileAtomic(picked.filePath, buf);
+      }
       sendProgress(totalBytes, defaultName, true);
       return {
-        ok: false,
-        canceled: true,
-        savedPath: null,
+        ok: true,
+        canceled: false,
+        savedPath: picked.filePath,
         fileCount,
         totalBytes,
         usedStream,
         warnings: plan.warnings,
       };
-    }
-    // 用户选了路径：优先复用已分片落盘的暂存（避免二次大内存拷贝）
-    if (stagedPath && stagedPath !== picked.filePath) {
-      try {
-        const { copyFile } = await import('node:fs/promises');
-        await copyFile(stagedPath, picked.filePath);
-      } catch {
-        await writeFileAtomic(picked.filePath, buf);
-      }
-    } else if (!stagedPath) {
-      await writeFileAtomic(picked.filePath, buf);
-    }
-    sendProgress(totalBytes, defaultName, true);
-    return {
-      ok: true,
-      canceled: false,
-      savedPath: picked.filePath,
-      fileCount,
-      totalBytes,
-      usedStream,
-      warnings: plan.warnings,
-    };
-  });
+    },
+  );
 }

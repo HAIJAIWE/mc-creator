@@ -140,9 +140,7 @@ beforeEach(() => {
   mockMcApi = {
     fileProjectListTree: vi.fn(),
     fileProjectListDir: vi.fn(),
-    fileProjectWriteTextWithMeta: vi
-      .fn()
-      .mockResolvedValue({ mtime: 1, size: 1, hash: 'h' }),
+    fileProjectWriteTextWithMeta: vi.fn().mockResolvedValue({ mtime: 1, size: 1, hash: 'h' }),
     fileProjectWriteText: vi.fn().mockResolvedValue(undefined),
     fileProjectDeleteItem: vi.fn().mockResolvedValue(undefined),
     fileProjectGetFileMeta: vi.fn().mockResolvedValue(null),
@@ -267,9 +265,7 @@ describe('FileTree 缓存命中 / 未命中', () => {
   it('后台同步失败：保留缓存内容不白屏', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      cacheMocks.getCache.mockResolvedValue([
-        { name: 'keep.txt', path: 'keep.txt', type: 'file' },
-      ]);
+      cacheMocks.getCache.mockResolvedValue([{ name: 'keep.txt', path: 'keep.txt', type: 'file' }]);
       mockMcApi.fileProjectListTree.mockRejectedValue(new Error('net down'));
       useProjectStore.setState({ currentProjectId: 'p1' });
       render(<FileTree />);
@@ -620,7 +616,7 @@ describe('FileTree 搜索功能（Fuse.js 模糊搜索）', () => {
     await renderWithTree(standardTree());
     await screen.findByText('2.txt');
     const searchInput = screen.getByRole('searchbox');
-    
+
     // 输入查询词
     fireEvent.change(searchInput, { target: { value: '1' } });
     await waitFor(() => {
@@ -639,12 +635,12 @@ describe('FileTree 搜索功能（Fuse.js 模糊搜索）', () => {
     await renderWithTree(standardTree());
     await screen.findByText('2.txt');
     const searchInput = screen.getByRole('searchbox');
-    
+
     fireEvent.change(searchInput, { target: { value: '1' } });
     await waitFor(() => {
       expect(screen.getByText('1.txt')).toBeTruthy();
     });
-    
+
     fireEvent.change(searchInput, { target: { value: '' } });
     await waitFor(() => {
       expect(screen.getByText('1.txt')).toBeTruthy();
@@ -657,12 +653,12 @@ describe('FileTree 搜索功能（Fuse.js 模糊搜索）', () => {
     await renderWithTree(standardTree());
     await screen.findByText('2.txt');
     const searchInput = screen.getByRole('searchbox');
-    
+
     fireEvent.change(searchInput, { target: { value: '1' } });
     await waitFor(() => {
       expect(screen.getByText('1.txt')).toBeTruthy();
     });
-    
+
     fireEvent.keyDown(searchInput, { key: 'Escape' });
     await waitFor(() => {
       expect((searchInput as HTMLInputElement).value).toBe('');

@@ -307,7 +307,9 @@ function NodePaletteComponent({
         </div>
         {filteredPlugins.length === 0 ? (
           <div className="text-[10px] text-mc-dim">
-            {pluginQuery === '' ? '未加载插件节点（见 workspaces/<项目>/nodes/）' : '无匹配插件节点'}
+            {pluginQuery === ''
+              ? '未加载插件节点（见 workspaces/<项目>/nodes/）'
+              : '无匹配插件节点'}
           </div>
         ) : (
           pluginCategories.map((cat) => {
@@ -375,7 +377,8 @@ const PluginNodeItem = memo(function PluginNodeItem({ def, onAdd }: PluginNodeIt
   );
 });
 
-interface PaletteItemProps {  meta: NodeMeta;
+interface PaletteItemProps {
+  meta: NodeMeta;
   disabled: boolean | undefined;
   onDragStart: (e: React.DragEvent, kind: NodeKind) => void;
   onClick: ((kind: NodeKind) => void) | undefined;

@@ -9,6 +9,7 @@ import { McMark } from './McMark.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ProjectCreateDialog } from './ProjectCreateDialog.js';
+import type { CreateProjectData } from './ProjectCreateDialog.js';
 
 const LOADER_LABEL: Record<string, string> = {
   fabric: 'Fabric',
@@ -65,7 +66,9 @@ export function Dashboard() {
       console.log('[Dashboard] Project changed:', payload);
       loadProjects();
     });
-    return () => { unsubscribe?.(); };
+    return () => {
+      unsubscribe?.();
+    };
   }, [loadProjects]);
 
   const typeStats = useMemo(() => {
@@ -83,17 +86,17 @@ export function Dashboard() {
     [projects],
   );
 
-  const handleCreateProject = async (data: { name: string; generatorType: string; loader: string; mcVersion: string; description: string }) => {
+  const handleCreateProject = async (data: CreateProjectData) => {
     // 先保存项目到项目存储
     const projectId = await saveCurrentAsProject(data.name.trim(), {
-      generatorType: data.generatorType as any,
-      loader: data.loader as any,
-      mcVersion: data.mcVersion as any,
+      generatorType: data.generatorType,
+      loader: data.loader,
+      mcVersion: data.mcVersion,
       description: data.description,
       spec: null,
       files: [],
     });
-    
+
     // 保存成功后加载项目
     await loadProject(projectId);
   };
@@ -361,12 +364,12 @@ export function Dashboard() {
           </div>
         )}
       </main>
-    {showCreateDialog && (
-      <ProjectCreateDialog
-        onClose={() => setShowCreateDialog(false)}
-        onCreate={handleCreateProject}
-      />
-    )}
+      {showCreateDialog && (
+        <ProjectCreateDialog
+          onClose={() => setShowCreateDialog(false)}
+          onCreate={handleCreateProject}
+        />
+      )}
     </div>
   );
 }

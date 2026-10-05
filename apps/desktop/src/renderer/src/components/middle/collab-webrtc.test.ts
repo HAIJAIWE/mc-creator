@@ -102,7 +102,10 @@ describe('collab-webrtc', () => {
     expect(pcs[0]?.remote).toEqual({ type: 'answer', sdp: 'mock-answer-sdp' });
 
     // ICE 透传
-    await peer.handleSignal('peer-b', { type: 'ice', candidate: JSON.stringify({ candidate: 'c' }) });
+    await peer.handleSignal('peer-b', {
+      type: 'ice',
+      candidate: JSON.stringify({ candidate: 'c' }),
+    });
     expect(pcs[0]?.ice).toHaveLength(1);
 
     // 未 open 前发送失败

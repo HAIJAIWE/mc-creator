@@ -115,7 +115,9 @@ export function ProjectCreateDialog({ onClose, onCreate }: Props) {
           {/* 基础信息 */}
           <div className="space-y-3">
             <div>
-              <label className="text-sm text-mc-dim">{t('createDialog.name')} <span className="text-mc-redstone">*</span></label>
+              <label className="text-sm text-mc-dim">
+                {t('createDialog.name')} <span className="text-mc-redstone">*</span>
+              </label>
               <input
                 autoFocus
                 value={name}
@@ -128,7 +130,9 @@ export function ProjectCreateDialog({ onClose, onCreate }: Props) {
 
             {/* 生成器类型选择 */}
             <div>
-              <label className="text-sm text-mc-dim">{t('createDialog.type')} <span className="text-mc-redstone">*</span></label>
+              <label className="text-sm text-mc-dim">
+                {t('createDialog.type')} <span className="text-mc-redstone">*</span>
+              </label>
               <div className="grid grid-cols-2 gap-2 mt-1">
                 {GENERATOR_TYPES.map((type: GeneratorType) => {
                   const desc = GENERATOR_DESCRIPTORS[type];
@@ -171,7 +175,11 @@ export function ProjectCreateDialog({ onClose, onCreate }: Props) {
               onClick={() => setStep(step === 'basic' ? 'advanced' : 'basic')}
               className="w-full text-left text-sm text-mc-dim hover:text-mc-text transition-colors flex items-center justify-between p-2 rounded-mc hover:bg-mc-surface-2"
             >
-              <span>{step === 'basic' ? t('createDialog.advanced.show') : t('createDialog.advanced.hide')}</span>
+              <span>
+                {step === 'basic'
+                  ? t('createDialog.advanced.show')
+                  : t('createDialog.advanced.hide')}
+              </span>
               <McIcon
                 scope="pixel"
                 name={step === 'basic' ? 'chevron-down' : 'chevron-up'}
@@ -184,7 +192,9 @@ export function ProjectCreateDialog({ onClose, onCreate }: Props) {
           {/* 进阶选项 */}
           {step === 'advanced' && (
             <div className="space-y-3 p-4 rounded-mc-lg border border-mc-border bg-mc-surface/50 animate-in">
-              <h4 className="font-medium text-sm text-mc-dim">{t('createDialog.advanced.title')}</h4>
+              <h4 className="font-medium text-sm text-mc-dim">
+                {t('createDialog.advanced.title')}
+              </h4>
 
               <div>
                 <label className="text-sm text-mc-dim">{t('createDialog.loader')}</label>
@@ -194,7 +204,9 @@ export function ProjectCreateDialog({ onClose, onCreate }: Props) {
                   className="mc-input mt-1"
                 >
                   {availableLoaders.map((l: Loader) => (
-                    <option key={l} value={l}>{t('common.loader.' + l)}</option>
+                    <option key={l} value={l}>
+                      {t('common.loader.' + l)}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -204,7 +216,9 @@ export function ProjectCreateDialog({ onClose, onCreate }: Props) {
                 <div className="space-y-2 mt-1">
                   {VERSION_GROUPS.map((group) => (
                     <div key={group.key}>
-                      <label className="text-xs text-mc-mute uppercase tracking-wider">{t('common.versionGroup.' + group.key)}</label>
+                      <label className="text-xs text-mc-mute uppercase tracking-wider">
+                        {t('common.versionGroup.' + group.key)}
+                      </label>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {group.versions.map((v) => (
                           <button
@@ -246,10 +260,7 @@ export function ProjectCreateDialog({ onClose, onCreate }: Props) {
           )}
 
           <div className="mt-2 flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="mc-btn-ghost flex-1"
-            >
+            <button onClick={onClose} className="mc-btn-ghost flex-1">
               {t('common.cancel')}
             </button>
             <button

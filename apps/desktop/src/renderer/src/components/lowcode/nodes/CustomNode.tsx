@@ -41,7 +41,9 @@ function CustomNodeContentComponent({ data, selected, ports }: CustomNodeContent
         onOpenDrawer={openDrawer}
       >
         <div className="text-[10px] text-mc-mute">未知节点类型（灰显占位，不参与编译）</div>
-        <div className="font-mono text-[10px] text-yellow-400">自定义类型未注册：{data.customTypeId}</div>
+        <div className="font-mono text-[10px] text-yellow-400">
+          自定义类型未注册：{data.customTypeId}
+        </div>
       </McNodeShell>
     );
   }

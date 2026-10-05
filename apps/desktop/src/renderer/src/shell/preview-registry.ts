@@ -25,7 +25,7 @@ export function getPreviewPanel(generatorType: string): PreviewPanelRegistration
 
 /** 创建标准的预览面板惰性加载器 */
 export function createPreviewPanelLoader<T extends ComponentType<unknown>>(
-  importFn: () => Promise<{ default: T }>
+  importFn: () => Promise<{ default: T }>,
 ): () => Promise<{ default: ComponentType<unknown> }> {
   return () => importFn() as Promise<{ default: ComponentType<unknown> }>;
 }

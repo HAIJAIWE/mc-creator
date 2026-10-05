@@ -55,7 +55,10 @@ export function getCacheKey(projectId: string, rootPath: string): string {
 }
 
 /** 读取缓存 */
-export async function getFileTreeCache(projectId: string, rootPath: string): Promise<TreeNode[] | null> {
+export async function getFileTreeCache(
+  projectId: string,
+  rootPath: string,
+): Promise<TreeNode[] | null> {
   const db = await getDB();
   const key = getCacheKey(projectId, rootPath);
   const entry = await db.get('filetree', key);
@@ -72,7 +75,11 @@ export async function getFileTreeCache(projectId: string, rootPath: string): Pro
 }
 
 /** 写入缓存 */
-export async function setFileTreeCache(projectId: string, rootPath: string, tree: TreeNode[]): Promise<void> {
+export async function setFileTreeCache(
+  projectId: string,
+  rootPath: string,
+  tree: TreeNode[],
+): Promise<void> {
   const db = await getDB();
   const key = getCacheKey(projectId, rootPath);
   const entry = {

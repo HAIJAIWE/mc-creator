@@ -218,7 +218,12 @@ const searchKnowledgeTool: ToolDefinition = {
   description:
     '检索本地 Minecraft 知识库（Wiki 配方、Fabric/NeoForge API 示例、内置生成器模板）。生成配方/附魔/效果/结构/注册代码前先检索，返回标题+片段+来源；回答中引用时必须注明来源。',
   parameters: [
-    { name: 'query', type: 'string', description: '检索关键词（中文或英文，如 “下界合金锻造台升级”“附魔 supported_items”）', required: true },
+    {
+      name: 'query',
+      type: 'string',
+      description: '检索关键词（中文或英文，如 “下界合金锻造台升级”“附魔 supported_items”）',
+      required: true,
+    },
     {
       name: 'generator_type',
       type: 'string',

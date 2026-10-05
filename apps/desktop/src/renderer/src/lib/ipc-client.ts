@@ -328,8 +328,11 @@ export const ipcClient = {
   /**
    * RAG 知识库检索（主进程 TF-IDF + 内存 LRU，供“引用来源”展示与智能体工具调用）。
    */
-  ragSearch: (req: { query: string; generatorType?: string; topK?: number }): Promise<RagSearchRes> =>
-    window.mcApi.ragSearch(req),
+  ragSearch: (req: {
+    query: string;
+    generatorType?: string;
+    topK?: number;
+  }): Promise<RagSearchRes> => window.mcApi.ragSearch(req),
   /**
    * P12 chat 模式工具调用增强：chatStream 添加可选 context 参数。
    * context 由调用方（如 ChatPanel）从项目 store 提取并传入，
@@ -438,7 +441,13 @@ export const ipcClient = {
   }): Promise<ModpackCheckConflictsRes> => window.mcApi.modpackCheckConflicts(req),
   modpackExportMrpack: (
     req: { spec: unknown; projectId?: string; defaultName?: string },
-    onProgress?: (p: { loaded: number; total: number; percentage: number; currentFile: string; done: boolean }) => void,
+    onProgress?: (p: {
+      loaded: number;
+      total: number;
+      percentage: number;
+      currentFile: string;
+      done: boolean;
+    }) => void,
   ): Promise<ModpackExportMrpackRes> => {
     if (!onProgress) return window.mcApi.modpackExportMrpack(req);
     const off = window.mcApi.onModpackExportProgress((data) => onProgress(data));
@@ -520,36 +529,30 @@ export const ipcClient = {
     window.mcApi.fileProjectDeleteItem(projectId, path),
 
   /** 获取项目工作区根目录 */
-  fileProjectGetWorkspace: (projectId: string) =>
-    window.mcApi.fileProjectGetWorkspace(projectId),
+  fileProjectGetWorkspace: (projectId: string) => window.mcApi.fileProjectGetWorkspace(projectId),
 
   /** 获取项目输出目录 */
-  fileProjectGetOutputDir: (projectId: string) =>
-    window.mcApi.fileProjectGetOutputDir(projectId),
+  fileProjectGetOutputDir: (projectId: string) => window.mcApi.fileProjectGetOutputDir(projectId),
 
   /** 获取项目构建缓存目录 */
   fileProjectGetBuildCacheDir: (projectId: string) =>
     window.mcApi.fileProjectGetBuildCacheDir(projectId),
 
   /** 获取项目临时目录 */
-  fileProjectGetTempDir: (projectId: string) =>
-    window.mcApi.fileProjectGetTempDir(projectId),
+  fileProjectGetTempDir: (projectId: string) => window.mcApi.fileProjectGetTempDir(projectId),
 
   /** 获取项目资源包目录 */
   fileProjectGetResourcePacksDir: (projectId: string) =>
     window.mcApi.fileProjectGetResourcePacksDir(projectId),
 
   /** 获取项目 Mod 目录 */
-  fileProjectGetModsDir: (projectId: string) =>
-    window.mcApi.fileProjectGetModsDir(projectId),
+  fileProjectGetModsDir: (projectId: string) => window.mcApi.fileProjectGetModsDir(projectId),
 
   /** 获取项目导出目录 */
-  fileProjectGetExportsDir: (projectId: string) =>
-    window.mcApi.fileProjectGetExportsDir(projectId),
+  fileProjectGetExportsDir: (projectId: string) => window.mcApi.fileProjectGetExportsDir(projectId),
 
   /** 确保项目标准子目录存在 */
-  fileProjectEnsureDirs: (projectId: string) =>
-    window.mcApi.fileProjectEnsureDirs(projectId),
+  fileProjectEnsureDirs: (projectId: string) => window.mcApi.fileProjectEnsureDirs(projectId),
 
   // ============================================================
   // 文件元数据与冲突检测
@@ -565,9 +568,8 @@ export const ipcClient = {
     path: string,
     content: string,
     expectedMeta?: { mtime: number; size: number; hash: string },
-    encoding?: string
-  ) =>
-    window.mcApi.fileProjectWriteTextWithMeta(projectId, path, content, expectedMeta, encoding),
+    encoding?: string,
+  ) => window.mcApi.fileProjectWriteTextWithMeta(projectId, path, content, expectedMeta, encoding),
 
   // ============================================================
   // 大文件流式传输
@@ -585,8 +587,15 @@ export const ipcClient = {
     projectId: string,
     path: string,
     data: Uint8Array,
-    options?: { onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void; expectedHash?: string }
-  ): Promise<{ success: boolean; meta?: { size: number; mtime: number; hash: string }; error?: string }> => {
+    options?: {
+      onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void;
+      expectedHash?: string;
+    },
+  ): Promise<{
+    success: boolean;
+    meta?: { size: number; mtime: number; hash: string };
+    error?: string;
+  }> => {
     return window.mcApi.fileProjectWriteStream(projectId, path, data, options);
   },
 
@@ -601,15 +610,27 @@ export const ipcClient = {
   fileProjectReadStream: (
     projectId: string,
     path: string,
-    onChunk: (chunk: Uint8Array, isLast: boolean, progress: { loaded: number; total: number; percentage: number }) => void,
-    options?: { onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void; chunkSize?: number }
+    onChunk: (
+      chunk: Uint8Array,
+      isLast: boolean,
+      progress: { loaded: number; total: number; percentage: number },
+    ) => void,
+    options?: {
+      onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void;
+      chunkSize?: number;
+    },
   ): Promise<{ success: boolean; error?: string }> => {
-    return window.mcApi.fileProjectReadStream(projectId, path, (data) => {
-      onChunk(data.chunk, data.isLast, data.progress);
-      if (options?.onProgress && data.progress) {
-        options.onProgress(data.progress);
-      }
-    }, options);
+    return window.mcApi.fileProjectReadStream(
+      projectId,
+      path,
+      (data) => {
+        onChunk(data.chunk, data.isLast, data.progress);
+        if (options?.onProgress && data.progress) {
+          options.onProgress(data.progress);
+        }
+      },
+      options,
+    );
   },
 
   /**
@@ -623,9 +644,21 @@ export const ipcClient = {
   downloadLargeFiles: async (
     projectId: string,
     largeFiles: LargeFileMetaT[],
-    onProgress?: (progress: { loaded: number; total: number; percentage: number; currentFile: string }) => void,
-    onFileProgress?: (filePath: string, progress: { loaded: number; total: number; percentage: number }) => void
-  ): Promise<{ success: boolean; files: Array<{ path: string; content: string }>; error?: string }> => {
+    onProgress?: (progress: {
+      loaded: number;
+      total: number;
+      percentage: number;
+      currentFile: string;
+    }) => void,
+    onFileProgress?: (
+      filePath: string,
+      progress: { loaded: number; total: number; percentage: number },
+    ) => void,
+  ): Promise<{
+    success: boolean;
+    files: Array<{ path: string; content: string }>;
+    error?: string;
+  }> => {
     const results: Array<{ path: string; content: string }> = [];
     let totalLoaded = 0;
     const totalSize = largeFiles.reduce((sum, f) => sum + f.size, 0);
@@ -643,17 +676,26 @@ export const ipcClient = {
           totalLoaded += chunk.byteLength;
 
           if (onFileProgress) {
-            onFileProgress(file.path, { loaded: fileLoaded, total: file.size, percentage: progress?.percentage ?? Math.round((fileLoaded / file.size) * 100) });
+            onFileProgress(file.path, {
+              loaded: fileLoaded,
+              total: file.size,
+              percentage: progress?.percentage ?? Math.round((fileLoaded / file.size) * 100),
+            });
           }
           if (onProgress) {
-            onProgress({ loaded: totalLoaded, total: totalSize, percentage: Math.round((totalLoaded / totalSize) * 100), currentFile: file.path });
+            onProgress({
+              loaded: totalLoaded,
+              total: totalSize,
+              percentage: Math.round((totalLoaded / totalSize) * 100),
+              currentFile: file.path,
+            });
           }
         },
-        { chunkSize: 1024 * 1024 }
+        { chunkSize: 1024 * 1024 },
       );
 
       // 合并分片
-      const fullBuffer = Buffer.concat(chunks as any);
+      const fullBuffer = Buffer.concat(chunks);
       results.push({ path: file.path, content: fullBuffer.toString('utf8') });
     }
 
@@ -665,7 +707,9 @@ export const ipcClient = {
    * @param handler 变更回调
    * @returns 取消订阅函数
    */
-  onProjectChanged: (handler: (payload: { type: 'created' | 'updated' | 'deleted'; projectId: string }) => void) => {
+  onProjectChanged: (
+    handler: (payload: { type: 'created' | 'updated' | 'deleted'; projectId: string }) => void,
+  ) => {
     return window.mcApi.onProjectChanged?.(handler) ?? (() => {});
   },
 };

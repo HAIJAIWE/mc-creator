@@ -7,7 +7,8 @@ import { ipcClient } from '../lib/ipc-client.js';
 function RagSourceItem({ hit }: { hit: RagHitT }) {
   const [expanded, setExpanded] = useState(false);
   const isExternal = hit.url !== undefined && /^https?:\/\//.test(hit.url);
-  const snippet = expanded || hit.snippet.length <= 220 ? hit.snippet : hit.snippet.slice(0, 220) + '…';
+  const snippet =
+    expanded || hit.snippet.length <= 220 ? hit.snippet : hit.snippet.slice(0, 220) + '…';
 
   return (
     <div className="rounded-mc border border-mc-border bg-mc-bg px-2 py-1.5">

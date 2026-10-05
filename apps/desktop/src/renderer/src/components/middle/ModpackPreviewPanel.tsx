@@ -72,7 +72,13 @@ export function ModpackPreviewPanel() {
   // === 依赖解析 / 冲突 / 导出状态 ===
   const projectId = useProjectStore((s) => s.currentProjectId);
   const [depGraph, setDepGraph] = useState<{
-    nodes: { projectId: string; name: string; versionId: string; versionNumber?: string | undefined; source: string }[];
+    nodes: {
+      projectId: string;
+      name: string;
+      versionId: string;
+      versionNumber?: string | undefined;
+      source: string;
+    }[];
     edges: { from: string; to: string; kind: string; versionConstraint?: string | undefined }[];
   } | null>(null);
   const [conflicts, setConflicts] = useState<ModConflictT[]>([]);
@@ -80,7 +86,12 @@ export function ModpackPreviewPanel() {
   const [resolveMsg, setResolveMsg] = useState<string | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState<{ loaded: number; total: number; percentage: number; currentFile: string } | null>(null);
+  const [exportProgress, setExportProgress] = useState<{
+    loaded: number;
+    total: number;
+    percentage: number;
+    currentFile: string;
+  } | null>(null);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
 
   const pack = spec as unknown as ModpackSpec | null;
@@ -225,7 +236,9 @@ export function ModpackPreviewPanel() {
         loader: pack.loader,
       });
       setConflicts(res.conflicts);
-      setResolveMsg(res.conflicts.length === 0 ? '未发现冲突' : `发现 ${res.conflicts.length} 项冲突`);
+      setResolveMsg(
+        res.conflicts.length === 0 ? '未发现冲突' : `发现 ${res.conflicts.length} 项冲突`,
+      );
     } catch (e) {
       setResolveMsg(`检测失败：${(e as Error).message}`);
     }
@@ -239,9 +252,10 @@ export function ModpackPreviewPanel() {
       if (s.action === 'remove') {
         const target = s.targetProjectId ?? conflict.projectIds[0];
         if (!target) return;
-        setSpec(
-          { ...pack, mods: pack.mods.filter((m) => m.projectId !== target) } as unknown as typeof spec,
-        );
+        setSpec({
+          ...pack,
+          mods: pack.mods.filter((m) => m.projectId !== target),
+        } as unknown as typeof spec);
         setConflicts((prev) => prev.filter((c) => c !== conflict));
         return;
       }
@@ -262,14 +276,12 @@ export function ModpackPreviewPanel() {
       // upgrade / downgrade / switch-loader-version：就地更新 versionId，下次解析时锁定完整元数据
       const targetPid = conflict.projectIds[0];
       if (!targetPid || !s.targetVersionId) return;
-      setSpec(
-        {
-          ...pack,
-          mods: pack.mods.map((m) =>
-            m.projectId === targetPid ? { ...m, versionId: s.targetVersionId as string } : m,
-          ),
-        } as unknown as typeof spec,
-      );
+      setSpec({
+        ...pack,
+        mods: pack.mods.map((m) =>
+          m.projectId === targetPid ? { ...m, versionId: s.targetVersionId as string } : m,
+        ),
+      } as unknown as typeof spec);
       setResolveMsg(`已将 ${targetPid} 切换到版本 ${s.targetVersionId}，建议重新解析以锁定元数据`);
       setConflicts((prev) => prev.filter((c) => c !== conflict));
     },
@@ -292,7 +304,12 @@ export function ModpackPreviewPanel() {
         (p) => setExportProgress(p),
       );
       if (res.ok && res.savedPath) {
-        setExportProgress({ loaded: res.totalBytes, total: res.totalBytes, percentage: 100, currentFile: '' });
+        setExportProgress({
+          loaded: res.totalBytes,
+          total: res.totalBytes,
+          percentage: 100,
+          currentFile: '',
+        });
         setExportMsg(
           `已导出 ${res.fileCount} 个文件（${formatBytes(res.totalBytes)}${res.usedStream ? '，流式写入' : ''}）到：${res.savedPath}`,
         );
@@ -545,9 +562,7 @@ export function ModpackPreviewPanel() {
               <RefreshCw className="h-3 w-3" />
               {resolving ? '解析中…' : '解析依赖'}
             </button>
-            {fromCache && (
-              <span className="text-[10px] text-mc-gold">离线缓存数据</span>
-            )}
+            {fromCache && <span className="text-[10px] text-mc-gold">离线缓存数据</span>}
             {resolveMsg && <span className="text-[10px] text-mc-mute">{resolveMsg}</span>}
           </div>
           {!depGraph ? (
@@ -567,7 +582,10 @@ export function ModpackPreviewPanel() {
               const out = depGraph.edges.filter((e) => e.from === n.projectId);
               const incoming = depGraph.edges.filter((e) => e.to === n.projectId);
               return (
-                <div key={n.projectId} className="rounded-mc border border-mc-border bg-mc-surface-2 p-2">
+                <div
+                  key={n.projectId}
+                  className="rounded-mc border border-mc-border bg-mc-surface-2 p-2"
+                >
                   <div className="flex items-center gap-2">
                     <Package className="h-3 w-3 text-mc-accent" />
                     <span className="text-xs font-medium text-mc-text">{n.name}</span>
@@ -582,12 +600,31 @@ export function ModpackPreviewPanel() {
                     <div className="mt-1 space-y-0.5 pl-5 text-[10px] text-mc-dim">
                       {out.map((e, i) => (
                         <div key={i}>
-                          <span className={e.kind === 'requires' ? 'text-mc-accent' : e.kind === 'breaks' ? 'text-red-400' : 'text-mc-mute'}>
-                            {e.kind === 'requires' ? '需要' : e.kind === 'optional' ? '可选' : e.kind === 'breaks' ? '冲突' : '内嵌'}
+                          <span
+                            className={
+                              e.kind === 'requires'
+                                ? 'text-mc-accent'
+                                : e.kind === 'breaks'
+                                  ? 'text-red-400'
+                                  : 'text-mc-mute'
+                            }
+                          >
+                            {e.kind === 'requires'
+                              ? '需要'
+                              : e.kind === 'optional'
+                                ? '可选'
+                                : e.kind === 'breaks'
+                                  ? '冲突'
+                                  : '内嵌'}
                           </span>
                           {' → '}
                           <span className="font-mono">{e.to}</span>
-                          {e.versionConstraint && <span className="text-mc-mute"> @{e.versionConstraint.slice(0, 8)}</span>}
+                          {e.versionConstraint && (
+                            <span className="text-mc-mute">
+                              {' '}
+                              @{e.versionConstraint.slice(0, 8)}
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -631,7 +668,9 @@ export function ModpackPreviewPanel() {
                   <span className="rounded-mc bg-red-500/20 px-1 py-0.5 text-[9px] text-red-400">
                     {CONFLICT_KIND_LABEL[c.kind]}
                   </span>
-                  <span className="font-mono text-[10px] text-mc-mute">{c.projectIds.join(', ')}</span>
+                  <span className="font-mono text-[10px] text-mc-mute">
+                    {c.projectIds.join(', ')}
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-mc-text">{c.message}</p>
                 <p className="mt-0.5 text-[10px] text-mc-dim">建议：{c.suggestion.reason}</p>
@@ -655,9 +694,10 @@ export function ModpackPreviewPanel() {
                       onClick={() => {
                         const target = c.projectIds[0];
                         if (!target) return;
-                        setSpec(
-                          { ...pack, mods: pack.mods.filter((m) => m.projectId !== target) } as unknown as typeof spec,
-                        );
+                        setSpec({
+                          ...pack,
+                          mods: pack.mods.filter((m) => m.projectId !== target),
+                        } as unknown as typeof spec);
                         setConflicts((prev) => prev.filter((x) => x !== c));
                       }}
                       className="rounded-mc border border-mc-border px-2 py-0.5 text-[10px] text-mc-dim hover:text-mc-text"
@@ -689,7 +729,8 @@ export function ModpackPreviewPanel() {
           <div>
             <h3 className="mb-2 text-sm font-medium text-mc-text">导出 .mrpack（Modrinth 格式）</h3>
             <p className="mb-3 text-xs text-mc-mute">
-              modrinth.index.json + overrides/ 打包为 .mrpack；大文件走 file:project:writeStream 流式通道
+              modrinth.index.json + overrides/ 打包为 .mrpack；大文件走 file:project:writeStream
+              流式通道
             </p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -697,7 +738,11 @@ export function ModpackPreviewPanel() {
                 disabled={resolving || pack.mods.length === 0}
                 className="flex items-center gap-1 rounded-mc border border-mc-border bg-mc-surface-2 px-3 py-1.5 text-xs text-mc-text hover:border-mc-accent"
               >
-                {resolving ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                {resolving ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
                 {resolving ? '解析中…' : '先解析依赖'}
               </button>
               <button
@@ -705,7 +750,11 @@ export function ModpackPreviewPanel() {
                 disabled={exporting || pack.mods.length === 0}
                 className="flex items-center gap-1 rounded-mc border border-mc-accent bg-mc-accent/10 px-3 py-1.5 text-xs text-mc-accent hover:bg-mc-accent/20"
               >
-                {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                {exporting ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Download className="h-3 w-3" />
+                )}
                 {exporting ? '导出中…' : '导出 .mrpack'}
               </button>
             </div>
@@ -719,7 +768,8 @@ export function ModpackPreviewPanel() {
                   />
                 </div>
                 <p className="mt-1 text-[10px] text-mc-mute">
-                  {exportProgress.percentage}% · {formatBytes(exportProgress.loaded)} / {formatBytes(exportProgress.total)}
+                  {exportProgress.percentage}% · {formatBytes(exportProgress.loaded)} /{' '}
+                  {formatBytes(exportProgress.total)}
                   {exportProgress.currentFile ? ` · ${exportProgress.currentFile}` : ''}
                 </p>
               </div>

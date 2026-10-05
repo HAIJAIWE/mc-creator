@@ -70,7 +70,6 @@ interface LayerItemProps {
 
 const LayerItem = ({
   layer,
-  index,
   isActive,
   onSelect,
   onRename,
@@ -126,7 +125,7 @@ const LayerItem = ({
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e: React.DragEvent, onMove: (fromIndex: number, toIndex: number) => void) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const draggedId = e.dataTransfer.getData('text/plain');
     if (draggedId && draggedId !== layer.id) {
@@ -140,17 +139,18 @@ const LayerItem = ({
       draggable={true}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
-      onDrop={(e) => handleDrop(e, () => {})}
+      onDrop={(e) => handleDrop(e)}
       className={`group flex items-center gap-2 px-2 py-1.5 rounded-mc transition-colors ${
-        isActive
-          ? 'bg-mc-primary/15 border-l-2 border-l-mc-primary'
-          : 'hover:bg-mc-surface-3'
+        isActive ? 'bg-mc-primary/15 border-l-2 border-l-mc-primary' : 'hover:bg-mc-surface-3'
       } ${layer.locked ? 'opacity-60' : ''}`}
       onClick={onSelect}
     >
       {/* 可见性 */}
       <button
-        onClick={(e) => { e.stopPropagation(); onVisibilityToggle(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onVisibilityToggle();
+        }}
         className="flex-shrink-0 p-0.5 rounded-sm text-mc-dim hover:text-mc-text transition-colors"
         title={layer.visible ? '隐藏图层' : '显示图层'}
       >
@@ -159,7 +159,10 @@ const LayerItem = ({
 
       {/* 锁定 */}
       <button
-        onClick={(e) => { e.stopPropagation(); onLockToggle(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onLockToggle();
+        }}
         className="flex-shrink-0 p-0.5 rounded-sm text-mc-dim hover:text-mc-text transition-colors"
         title={layer.locked ? '解锁图层' : '锁定图层'}
       >
@@ -200,7 +203,10 @@ const LayerItem = ({
         />
       ) : (
         <div
-          onDoubleClick={(e) => { e.stopPropagation(); setIsRenaming(true); }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setIsRenaming(true);
+          }}
           className="flex-1 min-w-0 text-[11px] truncate text-mc-text cursor-pointer"
           title={layer.name}
         >
@@ -218,7 +224,10 @@ const LayerItem = ({
         min="0"
         max="100"
         value={layer.opacity}
-        onChange={(e) => { e.stopPropagation(); onOpacityChange(parseInt(e.target.value)); }}
+        onChange={(e) => {
+          e.stopPropagation();
+          onOpacityChange(parseInt(e.target.value));
+        }}
         onClick={(e) => e.stopPropagation()}
         className="w-20 h-1.5 bg-mc-surface-3 rounded appearance-none accent-mc-primary cursor-pointer"
         title={`不透明度: ${layer.opacity}%`}
@@ -227,18 +236,25 @@ const LayerItem = ({
       {/* 混合模式 */}
       <div className="relative">
         <button
-          onClick={(e) => { e.stopPropagation(); setShowBlendMenu(!showBlendMenu); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowBlendMenu(!showBlendMenu);
+          }}
           className="flex-shrink-0 px-1.5 py-0.5 text-[10px] bg-mc-surface-3 border border-mc-border rounded-mc text-mc-dim hover:text-mc-text transition-colors"
-          title={`混合模式: ${BLEND_MODES.find(b => b.value === layer.blendMode)?.label || layer.blendMode}`}
+          title={`混合模式: ${BLEND_MODES.find((b) => b.value === layer.blendMode)?.label || layer.blendMode}`}
         >
-          {BLEND_MODES.find(b => b.value === layer.blendMode)?.label || layer.blendMode}
+          {BLEND_MODES.find((b) => b.value === layer.blendMode)?.label || layer.blendMode}
         </button>
         {showBlendMenu && (
           <div className="absolute bottom-full left-0 mb-1 z-10 bg-mc-surface-2 border border-mc-border rounded-mc p-1 min-w-[120px] shadow-lg">
             {BLEND_MODES.map((b) => (
               <button
                 key={b.value}
-                onClick={(e) => { e.stopPropagation(); onBlendModeChange(b.value); setShowBlendMenu(false); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBlendModeChange(b.value);
+                  setShowBlendMenu(false);
+                }}
                 className={`w-full px-2 py-1 text-[11px] rounded-sm text-left transition-colors ${
                   layer.blendMode === b.value
                     ? 'bg-mc-primary/20 text-mc-primary'
@@ -257,21 +273,30 @@ const LayerItem = ({
         {!isBaseOrOverlay && (
           <>
             <button
-              onClick={(e) => { e.stopPropagation(); onRename(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRename();
+              }}
               className="p-0.5 rounded-sm text-mc-dim hover:text-mc-text transition-colors"
               title="重命名"
             >
               <Edit2 className="h-3 w-3" />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDuplicate();
+              }}
               className="p-0.5 rounded-sm text-mc-dim hover:text-mc-text transition-colors"
               title="复制图层"
             >
               <Copy className="h-3 w-3" />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
               className="p-0.5 rounded-sm text-mc-dim hover:text-red-400 transition-colors"
               title="删除图层"
             >
@@ -280,7 +305,10 @@ const LayerItem = ({
           </>
         )}
         <button
-          onClick={(e) => { e.stopPropagation(); onClear(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClear();
+          }}
           className="p-0.5 rounded-sm text-mc-dim hover:text-mc-text transition-colors"
           title="清空图层"
         >
@@ -288,7 +316,10 @@ const LayerItem = ({
         </button>
         {canMergeDown && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMergeDown(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMergeDown();
+            }}
             className="p-0.5 rounded-sm text-mc-dim hover:text-mc-text transition-colors"
             title="向下合并"
           >
@@ -297,7 +328,10 @@ const LayerItem = ({
         )}
         {canMoveUp && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveUp();
+            }}
             className="p-0.5 rounded-sm text-mc-dim hover:text-mc-text transition-colors"
             title="上移"
           >
@@ -306,7 +340,10 @@ const LayerItem = ({
         )}
         {canMoveDown && (
           <button
-            onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveDown();
+            }}
             className="p-0.5 rounded-sm text-mc-dim hover:text-mc-text transition-colors"
             title="下移"
           >
@@ -341,7 +378,6 @@ export const LayerPanel = ({
   onLayerDuplicate,
   onLayerDelete,
   onLayerClear,
-  onLayerRename,
   onLayerMove,
   onLayerPropsChange,
   onMergeDown,
@@ -349,15 +385,15 @@ export const LayerPanel = ({
 }: LayerPanelProps) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
 
-  const getLayerIndex = (id: string) => layers.findIndex(l => l.id === id);
+  const getLayerIndex = (id: string) => layers.findIndex((l) => l.id === id);
 
   const handleSelect = (id: string) => {
-    const layer = layers.find(l => l.id === id);
+    const layer = layers.find((l) => l.id === id);
     if (layer && !layer.locked) onLayerSelect(id);
   };
 
   const handleAddLayer = (type: LayerType) => {
-    const customLayers = layers.filter(l => l.type === 'custom').length;
+    const customLayers = layers.filter((l) => l.type === 'custom').length;
     const name = type === 'custom' ? `图层 ${customLayers + 1}` : type === 'base' ? '底层' : '表层';
     onLayerAdd(name, type);
     setShowAddMenu(false);
@@ -380,12 +416,12 @@ export const LayerPanel = ({
   };
 
   const handleVisibilityToggle = (id: string) => {
-    const layer = layers.find(l => l.id === id);
+    const layer = layers.find((l) => l.id === id);
     if (layer) onLayerPropsChange(id, { visible: !layer.visible });
   };
 
   const handleLockToggle = (id: string) => {
-    const layer = layers.find(l => l.id === id);
+    const layer = layers.find((l) => l.id === id);
     if (layer) onLayerPropsChange(id, { locked: !layer.locked });
   };
 
@@ -419,7 +455,7 @@ export const LayerPanel = ({
         <div className="flex items-center gap-1">
           <button
             onClick={() => onMergeVisible()}
-            disabled={layers.filter(l => l.visible && l.id !== 'base').length === 0}
+            disabled={layers.filter((l) => l.visible && l.id !== 'base').length === 0}
             className="p-1 rounded-mc border border-mc-border bg-mc-surface-3 text-mc-dim hover:text-mc-text disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             title="合并可见图层"
           >

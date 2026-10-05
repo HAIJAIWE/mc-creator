@@ -119,7 +119,8 @@ export function CodeDiffDialog({
 
   if (!isOpen) return null;
 
-  const canMerge = isEditing && localContentEdited !== serverContent && localContentEdited !== localContent;
+  const canMerge =
+    isEditing && localContentEdited !== serverContent && localContentEdited !== localContent;
 
   return (
     <div
@@ -175,7 +176,9 @@ export function CodeDiffDialog({
             <kbd className="rounded-mc bg-mc-bg px-1.5 py-0.5 border border-mc-border">F7</kbd>
             <span>下一个差异</span>
             <span className="mx-1">|</span>
-            <kbd className="rounded-mc bg-mc-bg px-1.5 py-0.5 border border-mc-border">Shift+F7</kbd>
+            <kbd className="rounded-mc bg-mc-bg px-1.5 py-0.5 border border-mc-border">
+              Shift+F7
+            </kbd>
             <span>上一个差异</span>
             <span className="mx-1">|</span>
             <kbd className="rounded-mc bg-mc-bg px-1.5 py-0.5 border border-mc-border">Esc</kbd>
@@ -199,7 +202,9 @@ export function CodeDiffDialog({
               disabled={isSaving}
               className="mc-btn-ghost disabled:opacity-50"
             >
-              {isSaving && saveAction === 'accept-server' && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+              {isSaving && saveAction === 'accept-server' && (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              )}
               <GitMerge className="h-3 w-3 mr-1" />
               接受服务器版本
             </button>
@@ -210,7 +215,9 @@ export function CodeDiffDialog({
               disabled={isSaving}
               className="mc-btn-ghost disabled:opacity-50"
             >
-              {isSaving && saveAction === 'keep-local' && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+              {isSaving && saveAction === 'keep-local' && (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              )}
               <Check className="h-3 w-3 mr-1" />
               保留本地版本
             </button>
@@ -221,7 +228,9 @@ export function CodeDiffDialog({
               disabled={isSaving || !canMerge}
               className="mc-btn-primary disabled:opacity-50"
             >
-              {isSaving && saveAction === 'merge-to-local' && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+              {isSaving && saveAction === 'merge-to-local' && (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              )}
               <Save className="h-3 w-3 mr-1" />
               合并到本地
             </button>

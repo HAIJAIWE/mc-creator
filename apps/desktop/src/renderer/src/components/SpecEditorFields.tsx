@@ -181,7 +181,10 @@ export function validateInt(
   const v = Number(text);
   if (!Number.isInteger(v)) return { error: `${label}必须为整数`, value: null };
   if (v < min || (max !== undefined && v > max)) {
-    return { error: max === undefined ? `${label}不能小于 ${min}` : `${label}范围 ${min}–${max}`, value: null };
+    return {
+      error: max === undefined ? `${label}不能小于 ${min}` : `${label}范围 ${min}–${max}`,
+      value: null,
+    };
   }
   return { error: null, value: v };
 }
@@ -231,10 +234,7 @@ export interface RecipeRefs {
   asInput: string[];
 }
 
-export function findRecipeRefs(
-  recipes: ModSpec['recipes'] | undefined,
-  id: string,
-): RecipeRefs {
+export function findRecipeRefs(recipes: ModSpec['recipes'] | undefined, id: string): RecipeRefs {
   const asOutput: string[] = [];
   const asInput: string[] = [];
   for (const r of recipes ?? []) {

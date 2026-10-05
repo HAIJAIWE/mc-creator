@@ -39,10 +39,9 @@ export interface PluginNodeContext {
 /** 插件节点编译函数：纯函数，返回要写入项目的文件列表（支持异步）。 */
 export type PluginToSpecFn = (ctx: PluginNodeContext) => FileNode[] | Promise<FileNode[]>;
 
-const PluginToSpecSchema = z.custom<PluginToSpecFn>(
-  (v) => typeof v === 'function',
-  { message: 'toSpec 必须是函数' },
-);
+const PluginToSpecSchema = z.custom<PluginToSpecFn>((v) => typeof v === 'function', {
+  message: 'toSpec 必须是函数',
+});
 
 /**
  * 插件节点定义。

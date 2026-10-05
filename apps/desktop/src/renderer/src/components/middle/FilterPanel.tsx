@@ -7,15 +7,87 @@ interface FilterPanelProps {
   onPipelineChange: (pipeline: FilterPipeline) => void;
 }
 
-const FILTER_TYPES: { type: FilterNode['type']; label: string; defaultParams: Record<string, number>; paramLabels: Record<string, string>; min: number; max: number; step: number }[] = [
-  { type: 'brightness', label: '亮度', defaultParams: { value: 1 }, paramLabels: { value: '强度' }, min: 0, max: 2, step: 0.05 },
-  { type: 'contrast', label: '对比度', defaultParams: { value: 1 }, paramLabels: { value: '强度' }, min: 0, max: 2, step: 0.05 },
-  { type: 'saturation', label: '饱和度', defaultParams: { value: 1 }, paramLabels: { value: '强度' }, min: 0, max: 3, step: 0.05 },
-  { type: 'hue', label: '色相', defaultParams: { deg: 0 }, paramLabels: { deg: '角度' }, min: -180, max: 180, step: 1 },
-  { type: 'sepia', label: '复古/棕褐', defaultParams: { value: 0 }, paramLabels: { value: '强度' }, min: 0, max: 1, step: 0.05 },
-  { type: 'grayscale', label: '灰度', defaultParams: { value: 0 }, paramLabels: { value: '强度' }, min: 0, max: 1, step: 0.05 },
-  { type: 'invert', label: '反色', defaultParams: { value: 0 }, paramLabels: { value: '强度' }, min: 0, max: 1, step: 0.05 },
-  { type: 'sharpen', label: '锐化', defaultParams: { value: 0 }, paramLabels: { value: '强度' }, min: 0, max: 1, step: 0.05 },
+const FILTER_TYPES: {
+  type: FilterNode['type'];
+  label: string;
+  defaultParams: Record<string, number>;
+  paramLabels: Record<string, string>;
+  min: number;
+  max: number;
+  step: number;
+}[] = [
+  {
+    type: 'brightness',
+    label: '亮度',
+    defaultParams: { value: 1 },
+    paramLabels: { value: '强度' },
+    min: 0,
+    max: 2,
+    step: 0.05,
+  },
+  {
+    type: 'contrast',
+    label: '对比度',
+    defaultParams: { value: 1 },
+    paramLabels: { value: '强度' },
+    min: 0,
+    max: 2,
+    step: 0.05,
+  },
+  {
+    type: 'saturation',
+    label: '饱和度',
+    defaultParams: { value: 1 },
+    paramLabels: { value: '强度' },
+    min: 0,
+    max: 3,
+    step: 0.05,
+  },
+  {
+    type: 'hue',
+    label: '色相',
+    defaultParams: { deg: 0 },
+    paramLabels: { deg: '角度' },
+    min: -180,
+    max: 180,
+    step: 1,
+  },
+  {
+    type: 'sepia',
+    label: '复古/棕褐',
+    defaultParams: { value: 0 },
+    paramLabels: { value: '强度' },
+    min: 0,
+    max: 1,
+    step: 0.05,
+  },
+  {
+    type: 'grayscale',
+    label: '灰度',
+    defaultParams: { value: 0 },
+    paramLabels: { value: '强度' },
+    min: 0,
+    max: 1,
+    step: 0.05,
+  },
+  {
+    type: 'invert',
+    label: '反色',
+    defaultParams: { value: 0 },
+    paramLabels: { value: '强度' },
+    min: 0,
+    max: 1,
+    step: 0.05,
+  },
+  {
+    type: 'sharpen',
+    label: '锐化',
+    defaultParams: { value: 0 },
+    paramLabels: { value: '强度' },
+    min: 0,
+    max: 1,
+    step: 0.05,
+  },
 ];
 
 const generateId = () => Math.random().toString(36).slice(2, 10);
@@ -24,7 +96,7 @@ export const FilterPanel = ({ pipeline, onPipelineChange }: FilterPanelProps) =>
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   const addFilter = (type: FilterNode['type']) => {
-    const def = FILTER_TYPES.find(f => f.type === type)!;
+    const def = FILTER_TYPES.find((f) => f.type === type)!;
     const newFilter: FilterNode = {
       id: generateId(),
       type,
@@ -41,24 +113,22 @@ export const FilterPanel = ({ pipeline, onPipelineChange }: FilterPanelProps) =>
   const removeFilter = (id: string) => {
     onPipelineChange({
       ...pipeline,
-      filters: pipeline.filters.filter(f => f.id !== id),
+      filters: pipeline.filters.filter((f) => f.id !== id),
     });
   };
 
   const toggleFilter = (id: string) => {
     onPipelineChange({
       ...pipeline,
-      filters: pipeline.filters.map(f =>
-        f.id === id ? { ...f, enabled: !f.enabled } : f
-      ),
+      filters: pipeline.filters.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f)),
     });
   };
 
   const updateFilterParam = (id: string, key: string, value: number) => {
     onPipelineChange({
       ...pipeline,
-      filters: pipeline.filters.map(f =>
-        f.id === id ? { ...f, params: { ...f.params, [key]: value } } : f
+      filters: pipeline.filters.map((f) =>
+        f.id === id ? { ...f, params: { ...f.params, [key]: value } } : f,
       ),
     });
   };
@@ -124,8 +194,8 @@ export const FilterPanel = ({ pipeline, onPipelineChange }: FilterPanelProps) =>
             无滤镜，点击上方「添加滤镜」开始
           </div>
         ) : (
-          pipeline.filters.map((filter, index) => {
-            const def = FILTER_TYPES.find(f => f.type === filter.type)!;
+          pipeline.filters.map((filter) => {
+            const def = FILTER_TYPES.find((f) => f.type === filter.type)!;
             return (
               <div
                 key={filter.id}
@@ -133,7 +203,9 @@ export const FilterPanel = ({ pipeline, onPipelineChange }: FilterPanelProps) =>
                 style={{ opacity: filter.enabled ? 1 : 0.5 }}
               >
                 <div className="flex items-start gap-2 mb-1.5">
-                  <span className="flex-1 font-medium text-[11px] text-mc-text capitalize">{def.label}</span>
+                  <span className="flex-1 font-medium text-[11px] text-mc-text capitalize">
+                    {def.label}
+                  </span>
                   <label className="flex items-center gap-1 cursor-pointer">
                     <input
                       type="checkbox"
@@ -166,7 +238,9 @@ export const FilterPanel = ({ pipeline, onPipelineChange }: FilterPanelProps) =>
                           max={def.max}
                           step={def.step}
                           value={paramValue}
-                          onChange={(e) => updateFilterParam(filter.id, paramKey, parseFloat(e.target.value))}
+                          onChange={(e) =>
+                            updateFilterParam(filter.id, paramKey, parseFloat(e.target.value))
+                          }
                           className="flex-1 h-1.5 bg-mc-surface-2 rounded appearance-none accent-mc-primary"
                         />
                         <input
@@ -175,7 +249,9 @@ export const FilterPanel = ({ pipeline, onPipelineChange }: FilterPanelProps) =>
                           max={def.max}
                           step={def.step}
                           value={paramValue}
-                          onChange={(e) => updateFilterParam(filter.id, paramKey, parseFloat(e.target.value))}
+                          onChange={(e) =>
+                            updateFilterParam(filter.id, paramKey, parseFloat(e.target.value))
+                          }
                           className="w-14 px-1 py-0.5 text-[10px] bg-mc-surface-2 border border-mc-border rounded-mc text-mc-text"
                         />
                       </div>

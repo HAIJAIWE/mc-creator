@@ -13,33 +13,38 @@ export const APP_DATA_DIR = 'mc-creator';
 // ---------------------------------------------------------------------------
 
 /** 项目持久化元数据目录 */
-export const PROJECTS_DIR = (): string => resolve(app.getPath('userData'), APP_DATA_DIR, 'projects');
+export const PROJECTS_DIR = (): string =>
+  resolve(app.getPath('userData'), APP_DATA_DIR, 'projects');
 
 /** 全局 mc-launcher 目录 */
-export const MC_LAUNCHER_DIR = (): string => resolve(app.getPath('userData'), APP_DATA_DIR, 'mc-launcher');
+export const MC_LAUNCHER_DIR = (): string =>
+  resolve(app.getPath('userData'), APP_DATA_DIR, 'mc-launcher');
 
 /** 全局 mod 缓存仓库 */
 export const GLOBAL_MODS_DIR = (): string => resolve(app.getPath('userData'), APP_DATA_DIR, 'mods');
 
 /** 全局 modpack 目录 */
-export const GLOBAL_MODPACKS_DIR = (): string => resolve(app.getPath('userData'), APP_DATA_DIR, 'modpacks');
+export const GLOBAL_MODPACKS_DIR = (): string =>
+  resolve(app.getPath('userData'), APP_DATA_DIR, 'modpacks');
 
 /** 全局 resource-packs 目录 */
 export const GLOBAL_RESOURCE_PACKS_DIR = (): string =>
   resolve(app.getPath('userData'), APP_DATA_DIR, 'resource-packs');
 
 /** 全局 servers 目录 */
-export const GLOBAL_SERVERS_DIR = (): string => resolve(app.getPath('userData'), APP_DATA_DIR, 'servers');
+export const GLOBAL_SERVERS_DIR = (): string =>
+  resolve(app.getPath('userData'), APP_DATA_DIR, 'servers');
 
 /** 全局 skins 目录 */
-export const GLOBAL_SKINS_DIR = (): string => resolve(app.getPath('userData'), APP_DATA_DIR, 'skins');
+export const GLOBAL_SKINS_DIR = (): string =>
+  resolve(app.getPath('userData'), APP_DATA_DIR, 'skins');
 
 /** 全局 temp 目录 */
 export const GLOBAL_TEMP_DIR = (): string => resolve(app.getPath('userData'), APP_DATA_DIR, 'temp');
 
 // ---------------------------------------------------------------------------
 // 项目级作用域路径 (Profile-Driven)
-// 
+//
 // 路径模板由 project profile (project-profiles.json / ProfileManager) 定义,
 // 使用 {projectName} 占位符。实际路径在 runtime 时根据当前活动项目
 // 进行填充。这种设计支持多 profile (mc_creator, modpack, 等) 并行.
@@ -57,7 +62,7 @@ function getCurrentProjectName(): string | undefined {
 
 // ---------------------------------------------------------------------------
 // 项目级作用域路径 (Profile-Driven)
-// 
+//
 // 这些路径相对于用户数据目录，由当前 profile 的模板决定.
 // 当项目未加载时，回退到基于 projectId 的后向兼容路径.
 // ---------------------------------------------------------------------------
@@ -123,7 +128,10 @@ export function projectExports(projectId?: string): string {
   if (!projectName) {
     return resolve(app.getPath('userData'), APP_DATA_DIR, 'exports', 'untitled');
   }
-  return resolveProfilePath(profileManager.currentProfileConfig.exports || 'exports/{projectName}', projectName);
+  return resolveProfilePath(
+    profileManager.currentProfileConfig.exports || 'exports/{projectName}',
+    projectName,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -131,17 +139,28 @@ export function projectExports(projectId?: string): string {
 // ---------------------------------------------------------------------------
 
 /** 根据 projectId 计算旧式 PROJECT_SCOPED 路径 (兼容旧代码) */
-export function legacyProjectPath(projectId: string, subDir: 'workspace' | 'output' | 'buildCache' | 'temp' | 'resourcePacks' | 'mods' | 'exports'): string {
+export function legacyProjectPath(
+  projectId: string,
+  subDir: 'workspace' | 'output' | 'buildCache' | 'temp' | 'resourcePacks' | 'mods' | 'exports',
+): string {
   const base = resolve(app.getPath('userData'), APP_DATA_DIR, 'workspaces', projectId);
   switch (subDir) {
-    case 'workspace': return base;
-    case 'output': return resolve(base, 'output');
-    case 'buildCache': return resolve(base, '.build-cache');
-    case 'temp': return resolve(base, 'temp');
-    case 'resourcePacks': return resolve(base, 'resource-packs');
-    case 'mods': return resolve(base, 'mods');
-    case 'exports': return resolve(base, 'exports');
-    default: return base;
+    case 'workspace':
+      return base;
+    case 'output':
+      return resolve(base, 'output');
+    case 'buildCache':
+      return resolve(base, '.build-cache');
+    case 'temp':
+      return resolve(base, 'temp');
+    case 'resourcePacks':
+      return resolve(base, 'resource-packs');
+    case 'mods':
+      return resolve(base, 'mods');
+    case 'exports':
+      return resolve(base, 'exports');
+    default:
+      return base;
   }
 }
 
@@ -167,9 +186,15 @@ export async function ensureProjectDirs(projectId: string): Promise<{
   const projectName = profileManager.getCurrentProjectName() || projectId;
   const workspace = resolveProfilePath(profileManager.currentProfileConfig.workspace, projectName);
   const output = resolveProfilePath(profileManager.currentProfileConfig.output, projectName);
-  const buildCache = resolveProfilePath(profileManager.currentProfileConfig.buildCache, projectName);
+  const buildCache = resolveProfilePath(
+    profileManager.currentProfileConfig.buildCache,
+    projectName,
+  );
   const temp = resolveProfilePath(profileManager.currentProfileConfig.temp, projectName);
-  const resourcePacks = resolveProfilePath(profileManager.currentProfileConfig.resourcePacks, projectName);
+  const resourcePacks = resolveProfilePath(
+    profileManager.currentProfileConfig.resourcePacks,
+    projectName,
+  );
   const mods = resolveProfilePath(profileManager.currentProfileConfig.mods, projectName);
 
   await ensureDir(workspace);

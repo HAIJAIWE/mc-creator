@@ -12,7 +12,11 @@ import {
 import { officialSkinUrl } from '../../assets/skins/skins.js';
 import { useModStore } from '../../store/mod-store.js';
 import { FieldGroup, TextField, SelectField } from './shared/index.js';
-import { SkinPixelEditor, type SkinPixelEditorHandle, type CapeEditorHandle } from './SkinPixelEditor.js';
+import {
+  SkinPixelEditor,
+  type SkinPixelEditorHandle,
+  type CapeEditorHandle,
+} from './SkinPixelEditor.js';
 import { CapeEditor } from './CapeEditor.js';
 import { ExportEngine } from './ExportEngine.js';
 import { ExportPanel } from './ExportPanel.js';
@@ -53,15 +57,7 @@ const ANIMATIONS: { id: AnimationType; label: string; factory: () => PlayerAnima
 // 其余 7 款按官方外观考据（发型/服装/配饰），由 paintSkinTexture 程序化绘制。
 
 type HairStyle =
-  | 'short'
-  | 'long'
-  | 'bob'
-  | 'buzz'
-  | 'bowlcut'
-  | 'ponytail'
-  | 'braid'
-  | 'curly'
-  | 'scarf';
+  'short' | 'long' | 'bob' | 'buzz' | 'bowlcut' | 'ponytail' | 'braid' | 'curly' | 'scarf';
 
 interface SkinColors {
   skinColor: string;
@@ -324,7 +320,15 @@ function randomColor(arr: string[]): string {
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
-  const v = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  const v = parseInt(
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h,
+    16,
+  );
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
 }
 
@@ -352,11 +356,7 @@ interface SkinFeatures {
  * opaque), then overpaint generous blocks per region (uniform colors, so the
  * 1px slim-narrowing is invisible). Face is painted on the front only.
  */
-function paintSkinTexture(
-  colors: SkinColors,
-  _model: SkinSpec['model'],
-  f: SkinFeatures,
-): string {
+function paintSkinTexture(colors: SkinColors, _model: SkinSpec['model'], f: SkinFeatures): string {
   void _model;
   const canvas = document.createElement('canvas');
   canvas.width = 64;
@@ -379,7 +379,10 @@ function paintSkinTexture(
   R(0, 0, 64, 64, skin);
 
   // 1. legs: right block (0,16,16,16), left block (16,48,16,16)
-  const legBlocks = [[0, 16], [16, 48]];
+  const legBlocks = [
+    [0, 16],
+    [16, 48],
+  ];
   for (let li = 0; li < legBlocks.length; li++) {
     const bx = legBlocks[li][0];
     const by = legBlocks[li][1];
@@ -514,8 +517,14 @@ function drawTextureThumb(
   if (!ctx) return;
   ctx.imageSmoothingEnabled = false;
   const B = (
-    sx: number, sy: number, sw: number, sh: number,
-    dx: number, dy: number, dw: number, dh: number,
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number,
   ) => ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
   B(8, 8, 8, 8, ox, 0, 8, 8);
   B(20, 20, 8, 12, ox, 8, 8, 12);
@@ -523,7 +532,7 @@ function drawTextureThumb(
   B(36, 52, aw, 12, ox + 8, 8, aw, 12);
   B(4, 20, 4, 12, ox, 20, 4, 12);
   B(20, 52, 4, 12, ox + 4, 20, 4, 12);
-  }
+}
 // ===== 已保存皮肤（localStorage 持久化） =====
 
 interface SavedSkin {
@@ -569,10 +578,11 @@ const DEMO_SKIN: SkinSpec = {
  * - 编辑器：沿用原有颜色表单 / 2D 贴图 / 预设 / 导出能力
  */
 export function SkinPreviewPanel() {
-  const { spec: storeSpec, setSpec: storeSetSpec, files } = useModStore(
-    (s) => ({ spec: s.spec, setSpec: s.setSpec, files: s.files }),
-    shallow,
-  );
+  const {
+    spec: storeSpec,
+    setSpec: storeSetSpec,
+    files,
+  } = useModStore((s) => ({ spec: s.spec, setSpec: s.setSpec, files: s.files }), shallow);
 
   // 无项目 spec 时用本地演示数据兜底，保证选择器直接可见可玩
   const [demoSpec, setDemoSpec] = useState<SkinSpec>(DEMO_SKIN);
@@ -679,27 +689,42 @@ export function SkinPreviewPanel() {
       const img = await loadSkinImage(dataUrl);
       const normalized = img ? normalizeSkinPng(img) : null;
       if (!normalized) throw new Error('非 64x64 / 64x32 皮肤，已拒绝');
-      const name = url.split('/').pop()?.split('?')[0]?.replace(/\.png$/i, '') || 'url-skin';
+      const name =
+        url
+          .split('/')
+          .pop()
+          ?.split('?')[0]
+          ?.replace(/\.png$/i, '') || 'url-skin';
       addSavedDataUrl(normalized, name.slice(0, 32));
       setGalleryUrl('');
     } catch (e) {
-      setGalleryError(e instanceof Error ? e.message : '导入失败（可能是跨域限制，请改用本地 PNG 导入）');
+      setGalleryError(
+        e instanceof Error ? e.message : '导入失败（可能是跨域限制，请改用本地 PNG 导入）',
+      );
     } finally {
       setGalleryBusy(false);
     }
   }, [galleryUrl, addSavedDataUrl]);
 
   // ===== 新增：部位可见性控制 =====
-  const [visibleParts, setVisibleParts] = useState<Set<BodyPartId>>(new Set([
-    'head', 'headOverlay',
-    'body', 'bodyOverlay',
-    'rightArm', 'rightArmOverlay',
-    'leftArm', 'leftArmOverlay',
-    'rightLeg', 'rightLegOverlay',
-    'leftLeg', 'leftLegOverlay',
-  ]));
+  const [visibleParts, setVisibleParts] = useState<Set<BodyPartId>>(
+    new Set([
+      'head',
+      'headOverlay',
+      'body',
+      'bodyOverlay',
+      'rightArm',
+      'rightArmOverlay',
+      'leftArm',
+      'leftArmOverlay',
+      'rightLeg',
+      'rightLegOverlay',
+      'leftLeg',
+      'leftLegOverlay',
+    ]),
+  );
   const togglePartVisibility = useCallback((partId: BodyPartId) => {
-    setVisibleParts(prev => {
+    setVisibleParts((prev) => {
       const next = new Set(prev);
       if (next.has(partId)) {
         next.delete(partId);
@@ -913,8 +938,19 @@ export function SkinPreviewPanel() {
             'resourcepack',
             skinUrl,
             capeTextureUrl
-              ? { capeDataUrl: capeTextureUrl, meta: { packFormat: 15, description: `MC Creator Skin Pack - ${spec.playerName}` } }
-              : { meta: { packFormat: 15, description: `MC Creator Skin Pack - ${spec.playerName}` } },
+              ? {
+                  capeDataUrl: capeTextureUrl,
+                  meta: {
+                    packFormat: 15,
+                    description: `MC Creator Skin Pack - ${spec.playerName}`,
+                  },
+                }
+              : {
+                  meta: {
+                    packFormat: 15,
+                    description: `MC Creator Skin Pack - ${spec.playerName}`,
+                  },
+                },
           )) as Blob;
           downloadBlob(blob, `${spec.playerName}-resourcepack.zip`);
         } else if (kind === 'gltf' && skinUrl) {
@@ -937,14 +973,11 @@ export function SkinPreviewPanel() {
     [pixelTextureUrl, editorSkinUrl, capeTextureUrl, spec.playerName, downloadBlob],
   );
 
-  
-  
   // 选择器大预览：已保存皮肤用上传原图，否则用所选官方纹理（Steve 兜底）
   const selectedSaved = savedSkins.find((x) => x.id === selectedId) ?? null;
   const bigPreviewUrl =
     selectedSaved?.dataUrl ?? skinTextures.get(selectedId) ?? skinTextures.get('Steve') ?? null;
-  const bigPreviewModel =
-    DEFAULT_SKINS.find((d) => d.name === selectedId)?.model ?? spec.model;
+  const bigPreviewModel = DEFAULT_SKINS.find((d) => d.name === selectedId)?.model ?? spec.model;
 
   // v1.3 广场过滤：名称搜索 + 仅看收藏
   const galleryQ = galleryQuery.trim().toLowerCase();
@@ -983,42 +1016,41 @@ export function SkinPreviewPanel() {
     setSelectedId(s.id);
   }, []);
 
-  const addSavedFiles = useCallback(
-    (fileList: FileList | File[]) => {
-      const arr = Array.from(fileList).filter((f) => f.type === 'image/png' || /\.png$/i.test(f.name));
-      if (arr.length === 0) return;
-      arr.slice(0, 5).forEach((f) => {
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const raw = String(reader.result ?? '');
-          if (!raw.startsWith('data:image')) return;
-          const img = await loadSkinImage(raw);
-          const dataUrl = img ? normalizeSkinPng(img) : null;
-          // 非 64x64 / 64x32 直接拒绝，避免贴图错位
-          if (!dataUrl) return;
-          const item: SavedSkin = {
-            id: `saved-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
-            name: f.name.replace(/\.png$/i, ''),
-            model: 'classic',
-            dataUrl,
-            createdAt: Date.now(),
-          };
-          setSavedSkins((prev) => {
-            const next = [item, ...prev].slice(0, 20);
-            try {
-              localStorage.setItem(SAVED_SKINS_KEY, JSON.stringify(next));
-            } catch {
-              /* ignore */
-            }
-            return next;
-          });
-          setSelectedId(item.id);
+  const addSavedFiles = useCallback((fileList: FileList | File[]) => {
+    const arr = Array.from(fileList).filter(
+      (f) => f.type === 'image/png' || /\.png$/i.test(f.name),
+    );
+    if (arr.length === 0) return;
+    arr.slice(0, 5).forEach((f) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const raw = String(reader.result ?? '');
+        if (!raw.startsWith('data:image')) return;
+        const img = await loadSkinImage(raw);
+        const dataUrl = img ? normalizeSkinPng(img) : null;
+        // 非 64x64 / 64x32 直接拒绝，避免贴图错位
+        if (!dataUrl) return;
+        const item: SavedSkin = {
+          id: `saved-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+          name: f.name.replace(/\.png$/i, ''),
+          model: 'classic',
+          dataUrl,
+          createdAt: Date.now(),
         };
-        reader.readAsDataURL(f);
-      });
-    },
-    [],
-  );
+        setSavedSkins((prev) => {
+          const next = [item, ...prev].slice(0, 20);
+          try {
+            localStorage.setItem(SAVED_SKINS_KEY, JSON.stringify(next));
+          } catch {
+            /* ignore */
+          }
+          return next;
+        });
+        setSelectedId(item.id);
+      };
+      reader.readAsDataURL(f);
+    });
+  }, []);
 
   const removeSaved = useCallback(
     (id: string) => {
@@ -1057,8 +1089,6 @@ export function SkinPreviewPanel() {
     a.download = `${skinSpec.playerName}-preview.png`;
     a.click();
   }, [spec]);
-
-  
 
   const skin = spec;
 
@@ -1101,11 +1131,12 @@ export function SkinPreviewPanel() {
                 <button
                   key={a.id}
                   onClick={() => setAnimation(a.id)}
-                  className={"rounded-mc px-2 py-0.5 text-[10px] font-medium transition-colors " + (
-                    animation === a.id
+                  className={
+                    'rounded-mc px-2 py-0.5 text-[10px] font-medium transition-colors ' +
+                    (animation === a.id
                       ? 'bg-mc-accent/30 text-mc-accent'
-                      : 'text-mc-dim hover:bg-mc-surface-3 hover:text-mc-text'
-                  )}
+                      : 'text-mc-dim hover:bg-mc-surface-3 hover:text-mc-text')
+                  }
                 >
                   {a.label}
                 </button>
@@ -1113,9 +1144,12 @@ export function SkinPreviewPanel() {
               <span className="mx-1 h-3 w-px bg-mc-border" />
               <button
                 onClick={() => setAutoRotate(!autoRotate)}
-                className={"flex items-center gap-0.5 rounded-mc px-1.5 py-0.5 text-[10px] transition-colors " + (
-                  autoRotate ? 'bg-mc-accent/20 text-mc-accent' : 'text-mc-dim hover:bg-mc-surface-3'
-                )}
+                className={
+                  'flex items-center gap-0.5 rounded-mc px-1.5 py-0.5 text-[10px] transition-colors ' +
+                  (autoRotate
+                    ? 'bg-mc-accent/20 text-mc-accent'
+                    : 'text-mc-dim hover:bg-mc-surface-3')
+                }
                 title="自动旋转"
               >
                 <RotateCcw className="h-2.5 w-2.5" /> 自转
@@ -1141,9 +1175,16 @@ export function SkinPreviewPanel() {
           {/* 右：皮肤库（导入 + 已保存 + 默认） */}
           <div
             className="flex w-full flex-col gap-3 overflow-y-auto border-t border-mc-border p-3 md:w-[380px] md:border-l md:border-t-0"
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length > 0) addSavedFiles(e.dataTransfer.files); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              if (e.dataTransfer.files.length > 0) addSavedFiles(e.dataTransfer.files);
+            }}
           >
             <input
               ref={fileInputRef}
@@ -1151,13 +1192,19 @@ export function SkinPreviewPanel() {
               accept=".png,image/png"
               multiple
               className="hidden"
-              onChange={(e) => { if (e.target.files) addSavedFiles(e.target.files); e.target.value = ''; }}
+              onChange={(e) => {
+                if (e.target.files) addSavedFiles(e.target.files);
+                e.target.value = '';
+              }}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className={"flex items-center justify-center gap-1 rounded-mc border border-dashed px-2 py-2 text-xs transition-colors " + (
-                dragOver ? 'border-mc-accent bg-mc-accent/10 text-mc-accent' : 'border-mc-border text-mc-dim hover:border-mc-accent hover:text-mc-text'
-              )}
+              className={
+                'flex items-center justify-center gap-1 rounded-mc border border-dashed px-2 py-2 text-xs transition-colors ' +
+                (dragOver
+                  ? 'border-mc-accent bg-mc-accent/10 text-mc-accent'
+                  : 'border-mc-border text-mc-dim hover:border-mc-accent hover:text-mc-text')
+              }
             >
               <Plus className="h-3.5 w-3.5" /> 导入 PNG（可拖拽到此处）
             </button>
@@ -1212,24 +1259,37 @@ export function SkinPreviewPanel() {
                 onClick={() => setSavedOpen((v) => !v)}
                 className="mb-1.5 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-mc-dim"
               >
-                <ChevronDown className={"h-3 w-3 transition-transform " + (savedOpen ? '' : '-rotate-90')} />
+                <ChevronDown
+                  className={'h-3 w-3 transition-transform ' + (savedOpen ? '' : '-rotate-90')}
+                />
                 已保存皮肤 ({filteredSaved.length}/{savedSkins.length})
               </button>
-              {savedOpen && (
-                filteredSaved.length > 0 ? (
+              {savedOpen &&
+                (filteredSaved.length > 0 ? (
                   <div className="grid grid-cols-3 gap-1">
                     {filteredSaved.map((s) => (
                       <div
                         key={s.id}
-                        className={"relative flex flex-col items-center gap-1 rounded-mc border px-1 py-1.5 " + (
-                          selectedId === s.id ? 'border-mc-accent bg-mc-surface-3' : 'border-mc-border bg-mc-surface-2'
-                        )}
+                        className={
+                          'relative flex flex-col items-center gap-1 rounded-mc border px-1 py-1.5 ' +
+                          (selectedId === s.id
+                            ? 'border-mc-accent bg-mc-surface-3'
+                            : 'border-mc-border bg-mc-surface-2')
+                        }
                       >
-                        <button onClick={() => selectSaved(s)} title={s.name} className="flex flex-col items-center gap-1">
+                        <button
+                          onClick={() => selectSaved(s)}
+                          title={s.name}
+                          className="flex flex-col items-center gap-1"
+                        >
                           <TextureThumb url={s.dataUrl} model={s.model} />
-                          <span className="max-w-full truncate text-[10px] text-mc-dim">{s.name}</span>
+                          <span className="max-w-full truncate text-[10px] text-mc-dim">
+                            {s.name}
+                          </span>
                         </button>
-                        {selectedId === s.id && <Check className="absolute left-1 top-1 h-3 w-3 text-mc-accent" />}
+                        {selectedId === s.id && (
+                          <Check className="absolute left-1 top-1 h-3 w-3 text-mc-accent" />
+                        )}
                         <button
                           onClick={() => toggleFavorite(s.id)}
                           className={`absolute bottom-1 left-1 text-[12px] leading-none ${favorites.includes(s.id) ? 'text-mc-accent' : 'text-mc-mute hover:text-mc-accent'}`}
@@ -1249,10 +1309,11 @@ export function SkinPreviewPanel() {
                   </div>
                 ) : (
                   <div className="text-[11px] text-mc-mute">
-                    {savedSkins.length === 0 ? '暂无已保存皮肤，可导入 PNG' : '没有匹配的皮肤，换个关键词或关闭收藏过滤试试'}
+                    {savedSkins.length === 0
+                      ? '暂无已保存皮肤，可导入 PNG'
+                      : '没有匹配的皮肤，换个关键词或关闭收藏过滤试试'}
                   </div>
-                )
-              )}
+                ))}
             </div>
 
             {/* 默认皮肤 */}
@@ -1261,50 +1322,56 @@ export function SkinPreviewPanel() {
                 onClick={() => setDefaultOpen((v) => !v)}
                 className="mb-1.5 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-mc-dim"
               >
-                <ChevronDown className={"h-3 w-3 transition-transform " + (defaultOpen ? '' : '-rotate-90')} />
+                <ChevronDown
+                  className={'h-3 w-3 transition-transform ' + (defaultOpen ? '' : '-rotate-90')}
+                />
                 默认皮肤 ({filteredDefaults.length}/{DEFAULT_SKINS.length})
               </button>
-              {defaultOpen && (
-                filteredDefaults.length > 0 ? (
-                <div className="grid grid-cols-3 gap-1">
-                  {filteredDefaults.map((d) => {
-                    const thumbUrl = skinTextures.get(d.name);
-                    const fav = favorites.includes(d.name);
-                    return (
-                      <div
-                        key={d.name}
-                        className={"relative flex flex-col items-center gap-1 rounded-mc border px-1 py-1.5 hover:border-mc-accent " + (
-                          selectedId === d.name ? 'border-mc-accent bg-mc-surface-3' : 'border-mc-border bg-mc-surface-2'
-                        )}
-                      >
-                        <button
-                          onClick={() => applyPreset(d)}
-                          className="flex flex-col items-center gap-1"
-                          title={"应用 " + d.name}
+              {defaultOpen &&
+                (filteredDefaults.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-1">
+                    {filteredDefaults.map((d) => {
+                      const thumbUrl = skinTextures.get(d.name);
+                      const fav = favorites.includes(d.name);
+                      return (
+                        <div
+                          key={d.name}
+                          className={
+                            'relative flex flex-col items-center gap-1 rounded-mc border px-1 py-1.5 hover:border-mc-accent ' +
+                            (selectedId === d.name
+                              ? 'border-mc-accent bg-mc-surface-3'
+                              : 'border-mc-border bg-mc-surface-2')
+                          }
                         >
-                          {thumbUrl ? (
-                            <TextureThumb url={thumbUrl} model={d.model} />
-                          ) : (
-                            <span className="text-[10px] text-mc-mute">无缩略图</span>
+                          <button
+                            onClick={() => applyPreset(d)}
+                            className="flex flex-col items-center gap-1"
+                            title={'应用 ' + d.name}
+                          >
+                            {thumbUrl ? (
+                              <TextureThumb url={thumbUrl} model={d.model} />
+                            ) : (
+                              <span className="text-[10px] text-mc-mute">无缩略图</span>
+                            )}
+                            <span className="text-[10px] text-mc-dim">{d.name}</span>
+                          </button>
+                          {selectedId === d.name && (
+                            <Check className="absolute left-1 top-1 h-3 w-3 text-mc-accent" />
                           )}
-                          <span className="text-[10px] text-mc-dim">{d.name}</span>
-                        </button>
-                        {selectedId === d.name && <Check className="absolute left-1 top-1 h-3 w-3 text-mc-accent" />}
-                        <button
-                          onClick={() => toggleFavorite(d.name)}
-                          className={`absolute bottom-1 left-1 text-[12px] leading-none ${fav ? 'text-mc-accent' : 'text-mc-mute hover:text-mc-accent'}`}
-                          title={fav ? '取消收藏' : '收藏'}
-                        >
-                          {fav ? '★' : '☆'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                          <button
+                            onClick={() => toggleFavorite(d.name)}
+                            className={`absolute bottom-1 left-1 text-[12px] leading-none ${fav ? 'text-mc-accent' : 'text-mc-mute hover:text-mc-accent'}`}
+                            title={fav ? '取消收藏' : '收藏'}
+                          >
+                            {fav ? '★' : '☆'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <div className="text-[11px] text-mc-mute">没有匹配的默认皮肤</div>
-                )
-              )}
+                ))}
             </div>
           </div>
         </div>
@@ -1312,7 +1379,10 @@ export function SkinPreviewPanel() {
         {/* 底部演示账号横幅 */}
         <div className="flex items-center gap-2 border-t border-mc-border px-4 py-2 text-[11px] text-mc-mute">
           <User className="h-3 w-3" />
-          <span>{spec.playerName} · {spec.model === 'slim' ? 'Alex 模型 (3px 臂)' : 'Steve 模型 (4px 臂)'}</span>
+          <span>
+            {spec.playerName} ·{' '}
+            {spec.model === 'slim' ? 'Alex 模型 (3px 臂)' : 'Steve 模型 (4px 臂)'}
+          </span>
           <span className="ml-auto">点击「编辑皮肤」进入像素 / 3D 编辑器</span>
         </div>
       </div>
@@ -1343,11 +1413,12 @@ export function SkinPreviewPanel() {
               <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-mc border border-mc-border bg-mc-surface-2/80 px-2 py-1.5 w-full max-w-[400px]">
                 <button
                   onClick={() => setPaintMode((v) => !v)}
-                  className={"flex items-center gap-1 rounded-mc px-2 py-1 text-[11px] transition-colors " + (
-                    paintMode
+                  className={
+                    'flex items-center gap-1 rounded-mc px-2 py-1 text-[11px] transition-colors ' +
+                    (paintMode
                       ? 'border-mc-accent bg-mc-accent/20 text-mc-accent'
-                      : 'border-mc-border bg-mc-surface-2 text-mc-dim hover:text-mc-text'
-                  )}
+                      : 'border-mc-border bg-mc-surface-2 text-mc-dim hover:text-mc-text')
+                  }
                   title={paintMode ? '切换到旋转模式' : '切换到绘制模式'}
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -1384,11 +1455,12 @@ export function SkinPreviewPanel() {
                   <button
                     key={a.id}
                     onClick={() => setAnimation(a.id)}
-                    className={"rounded-mc px-2 py-0.5 text-[10px] font-medium transition-colors " + (
-                      animation === a.id
+                    className={
+                      'rounded-mc px-2 py-0.5 text-[10px] font-medium transition-colors ' +
+                      (animation === a.id
                         ? 'bg-mc-accent/30 text-mc-accent'
-                        : 'text-mc-dim hover:bg-mc-surface-3 hover:text-mc-text'
-                    )}
+                        : 'text-mc-dim hover:bg-mc-surface-3 hover:text-mc-text')
+                    }
                   >
                     {a.label}
                   </button>
@@ -1396,9 +1468,12 @@ export function SkinPreviewPanel() {
                 <span className="mx-1 h-3 w-px bg-mc-border" />
                 <button
                   onClick={() => setAutoRotate(!autoRotate)}
-                  className={"flex items-center gap-0.5 rounded-mc px-1.5 py-0.5 text-[10px] transition-colors " + (
-                    autoRotate ? 'bg-mc-accent/20 text-mc-accent' : 'text-mc-dim hover:bg-mc-surface-3'
-                  )}
+                  className={
+                    'flex items-center gap-0.5 rounded-mc px-1.5 py-0.5 text-[10px] transition-colors ' +
+                    (autoRotate
+                      ? 'bg-mc-accent/20 text-mc-accent'
+                      : 'text-mc-dim hover:bg-mc-surface-3')
+                  }
                   title="自动旋转"
                 >
                   <RotateCcw className="h-2.5 w-2.5" /> 自转
@@ -1423,7 +1498,9 @@ export function SkinPreviewPanel() {
               <button
                 onClick={() => setEditorTab('skin')}
                 className={`rounded-mc px-2 py-1 text-xs font-bold uppercase tracking-wider ${
-                  editorTab === 'skin' ? 'bg-mc-accent/20 text-mc-accent' : 'text-mc-dim hover:text-mc-text'
+                  editorTab === 'skin'
+                    ? 'bg-mc-accent/20 text-mc-accent'
+                    : 'text-mc-dim hover:text-mc-text'
                 }`}
               >
                 像素编辑器 (64x64)
@@ -1431,7 +1508,9 @@ export function SkinPreviewPanel() {
               <button
                 onClick={() => setEditorTab('cape')}
                 className={`rounded-mc px-2 py-1 text-xs font-bold uppercase tracking-wider ${
-                  editorTab === 'cape' ? 'bg-mc-accent/20 text-mc-accent' : 'text-mc-dim hover:text-mc-text'
+                  editorTab === 'cape'
+                    ? 'bg-mc-accent/20 text-mc-accent'
+                    : 'text-mc-dim hover:text-mc-text'
                 }`}
               >
                 披风 (64x32)
@@ -1493,12 +1572,13 @@ export function SkinPreviewPanel() {
                       },
                     )
                   }
-                  className={"flex flex-col items-center gap-1 rounded-mc border px-1 py-1.5 hover:border-mc-accent " + (
-                    matchedOfficial?.name === p.name
+                  className={
+                    'flex flex-col items-center gap-1 rounded-mc border px-1 py-1.5 hover:border-mc-accent ' +
+                    (matchedOfficial?.name === p.name
                       ? 'border-mc-accent bg-mc-surface-3'
-                      : 'border-mc-border bg-mc-surface-2'
-                  )}
-                  title={"应用 " + p.name + " 预设"}
+                      : 'border-mc-border bg-mc-surface-2')
+                  }
+                  title={'应用 ' + p.name + ' 预设'}
                 >
                   <div className="flex gap-0.5">
                     {[p.colors.skinColor, p.colors.hairColor, p.colors.shirtColor].map((c, i) => (
@@ -1968,9 +2048,7 @@ function TextureThumb({ url, model }: { url: string; model: SkinSpec['model'] })
     img.onload = () => drawTextureThumb(canvas, img, model);
     img.src = url;
   }, [url, model]);
-  return (
-    <canvas ref={thumbRef} className="h-8 w-auto" style={{ imageRendering: 'pixelated' }} />
-  );
+  return <canvas ref={thumbRef} className="h-8 w-auto" style={{ imageRendering: 'pixelated' }} />;
 }
 
 // ===== 颜色行子组件 =====

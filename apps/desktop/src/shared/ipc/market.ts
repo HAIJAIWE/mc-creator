@@ -53,7 +53,9 @@ export const ModrinthVersionsResponse = z.object({
           filename: z.string(),
           primary: z.boolean(),
           size: z.number(),
-          hashes: z.object({ sha512: z.string().optional(), sha1: z.string().optional() }).optional(),
+          hashes: z
+            .object({ sha512: z.string().optional(), sha1: z.string().optional() })
+            .optional(),
         }),
       ),
     }),

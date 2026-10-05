@@ -12,10 +12,30 @@ interface ExportPanelProps {
 }
 
 const FORMATS: Array<{ id: ExportFormat; label: string; desc: string; icon: React.ReactNode }> = [
-  { id: 'png', label: '皮肤 PNG', desc: '64x64 合成纹理', icon: <ImageIcon className="h-3.5 w-3.5" /> },
-  { id: 'resourcepack', label: '资源包 ZIP', desc: 'steve/alex + 披风 + pack.mcmeta', icon: <Package className="h-3.5 w-3.5" /> },
-  { id: 'gltf', label: 'GLTF 模型', desc: '纹理内嵌，可预览结构', icon: <Box className="h-3.5 w-3.5" /> },
-  { id: 'gif', label: 'GIF 动图', desc: '录制 3D 预览动作', icon: <Film className="h-3.5 w-3.5" /> },
+  {
+    id: 'png',
+    label: '皮肤 PNG',
+    desc: '64x64 合成纹理',
+    icon: <ImageIcon className="h-3.5 w-3.5" />,
+  },
+  {
+    id: 'resourcepack',
+    label: '资源包 ZIP',
+    desc: 'steve/alex + 披风 + pack.mcmeta',
+    icon: <Package className="h-3.5 w-3.5" />,
+  },
+  {
+    id: 'gltf',
+    label: 'GLTF 模型',
+    desc: '纹理内嵌，可预览结构',
+    icon: <Box className="h-3.5 w-3.5" />,
+  },
+  {
+    id: 'gif',
+    label: 'GIF 动图',
+    desc: '录制 3D 预览动作',
+    icon: <Film className="h-3.5 w-3.5" />,
+  },
 ];
 
 export function ExportPanel({ skinUrl, capeUrl, playerName, getViewerCanvas }: ExportPanelProps) {
@@ -107,11 +127,7 @@ export function ExportPanel({ skinUrl, capeUrl, playerName, getViewerCanvas }: E
     }
     try {
       setBusy('webm');
-      const blob = await ExportEngine.exportVideo(
-        canvas,
-        Math.max(1, Math.min(15, webmSecs)),
-        30,
-      );
+      const blob = await ExportEngine.exportVideo(canvas, Math.max(1, Math.min(15, webmSecs)), 30);
       downloadBlob(blob, `${playerName}-preview.webm`);
     } catch (e) {
       setError(e instanceof Error ? e.message : '录制失败（当前环境可能不支持 MediaRecorder）');

@@ -130,7 +130,11 @@ describe('P12 buildChatSystemMessage', () => {
 
   it('无 context 但有 ragHits 时返回知识库增强消息（注明来源）', () => {
     const msg = buildChatSystemMessage(undefined, [
-      { title: '有形合成配方 crafting_shaped', snippet: 'pattern 片段', source: 'Minecraft Wiki · Recipe' },
+      {
+        title: '有形合成配方 crafting_shaped',
+        snippet: 'pattern 片段',
+        source: 'Minecraft Wiki · Recipe',
+      },
     ]);
     expect(msg).toContain('本地知识库参考');
     expect(msg).toContain('有形合成配方 crafting_shaped');

@@ -63,9 +63,15 @@ describe('collab-relay e2e（真实脚本进程）', () => {
     const receivedA: CollabMessage[] = [];
     const receivedB: CollabMessage[] = [];
     const receivedOther: CollabMessage[] = [];
-    const a = createCollabWsTransport(URL, 'e2e-room', 'e2e-a', { onMessage: (m) => receivedA.push(m) });
-    const b = createCollabWsTransport(URL, 'e2e-room', 'e2e-b', { onMessage: (m) => receivedB.push(m) });
-    const c = createCollabWsTransport(URL, 'other-room', 'e2e-c', { onMessage: (m) => receivedOther.push(m) });
+    const a = createCollabWsTransport(URL, 'e2e-room', 'e2e-a', {
+      onMessage: (m) => receivedA.push(m),
+    });
+    const b = createCollabWsTransport(URL, 'e2e-room', 'e2e-b', {
+      onMessage: (m) => receivedB.push(m),
+    });
+    const c = createCollabWsTransport(URL, 'other-room', 'e2e-c', {
+      onMessage: (m) => receivedOther.push(m),
+    });
     expect(a).not.toBeNull();
     expect(b).not.toBeNull();
     expect(c).not.toBeNull();

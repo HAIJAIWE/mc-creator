@@ -106,8 +106,18 @@ describe('model-config（多套配置 + safeStorage 加密）', () => {
   });
 
   it('saveModelConfig 更新已有 active profile（不新增重复项）', async () => {
-    await saveModelConfig({ name: 'DeepSeek', modelId: 'deepseek-chat', baseURL: 'u', apiKey: 'k1' });
-    await saveModelConfig({ name: 'DeepSeek', modelId: 'deepseek-reasoner', baseURL: 'u', apiKey: 'k2' });
+    await saveModelConfig({
+      name: 'DeepSeek',
+      modelId: 'deepseek-chat',
+      baseURL: 'u',
+      apiKey: 'k1',
+    });
+    await saveModelConfig({
+      name: 'DeepSeek',
+      modelId: 'deepseek-reasoner',
+      baseURL: 'u',
+      apiKey: 'k2',
+    });
     const { profiles } = loadModelProfiles();
     expect(profiles).toHaveLength(1);
     expect(profiles[0].modelId).toBe('deepseek-reasoner');

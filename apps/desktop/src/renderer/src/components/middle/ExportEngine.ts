@@ -63,7 +63,9 @@ export class ExportEngine {
 
   /** 导出为 WebM 视频（MediaRecorder，Chrome/Electron 可用；如需 MP4 请用 ffmpeg 后处理） */
   static async exportVideo(canvas: HTMLCanvasElement, duration = 5, fps = 30): Promise<Blob> {
-    const stream = (canvas as HTMLCanvasElement & { captureStream: (fps: number) => MediaStream }).captureStream(fps);
+    const stream = (
+      canvas as HTMLCanvasElement & { captureStream: (fps: number) => MediaStream }
+    ).captureStream(fps);
     const recorder = new MediaRecorder(stream, {
       mimeType: 'video/webm;codecs=vp9',
       videoBitsPerSecond: 2500000,
@@ -80,7 +82,10 @@ export class ExportEngine {
   }
 
   /** 导出为最小 GLB 占位（不依赖 three；完整导出后续接 GLTFExporter） */
-  static async exportGltf(skinCanvas: HTMLCanvasElement, capeCanvas?: HTMLCanvasElement): Promise<string> {
+  static async exportGltf(
+    skinCanvas: HTMLCanvasElement,
+    capeCanvas?: HTMLCanvasElement,
+  ): Promise<string> {
     void capeCanvas;
     // 生成一个最小合法 glTF JSON（单面片 + 皮肤纹理内嵌），保证可下载、可预览结构
     const skinUrl = skinCanvas.toDataURL('image/png');
@@ -120,7 +125,11 @@ export class ExportEngine {
     const zip = new JSZip();
     zip.file(
       'pack.mcmeta',
-      JSON.stringify({ pack: { pack_format: meta.packFormat, description: meta.description } }, null, 2),
+      JSON.stringify(
+        { pack: { pack_format: meta.packFormat, description: meta.description } },
+        null,
+        2,
+      ),
     );
     const skinBlob = await fetch(skinDataUrl).then((r) => r.blob());
     zip.file('assets/minecraft/textures/entity/steve.png', skinBlob);
@@ -129,7 +138,11 @@ export class ExportEngine {
       const capeBlob = await fetch(capeDataUrl).then((r) => r.blob());
       zip.file('assets/minecraft/textures/entity/cape.png', capeBlob);
     }
-    return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+    return zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 9 },
+    });
   }
 
   /** 统一导出入口 */

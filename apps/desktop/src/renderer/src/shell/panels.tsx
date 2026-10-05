@@ -66,31 +66,13 @@ export function getDomainPanels(): PanelRegistration[] {
 }
 
 /** 预定义的 core 面板 ID（基础设施） */
-export const CORE_PANEL_IDS = [
-  'explorer',
-  'search',
-  'git',
-  'packages',
-  'settings',
-] as const;
+export const CORE_PANEL_IDS = ['explorer', 'search', 'git', 'packages', 'settings'] as const;
 
 /** 预定义的 domain 面板 ID（领域编辑器） */
-export const DOMAIN_PANEL_IDS = [
-  'items',
-  'blocks',
-  'entity',
-  'audio',
-  'cicd',
-  'game',
-] as const;
+export const DOMAIN_PANEL_IDS = ['items', 'blocks', 'entity', 'audio', 'cicd', 'game'] as const;
 
 /** 预定义的 middle 面板 ID（中部功能） */
-export const MIDDLE_PANEL_IDS = [
-  'preview',
-  'lowcode',
-  'purecode',
-  'code',
-] as const;
+export const MIDDLE_PANEL_IDS = ['preview', 'lowcode', 'purecode', 'code'] as const;
 
 /** 类型别名 */
 export type CorePanelId = (typeof CORE_PANEL_IDS)[number];
@@ -100,7 +82,7 @@ export type AnyPanelId = CorePanelId | DomainPanelId | MiddlePanelId;
 
 /** 创建标准的惰性加载器（统一 Suspense fallback 行为） */
 export function createPanelLoader<T extends ComponentType<unknown>>(
-  importFn: () => Promise<{ default: T }>
+  importFn: () => Promise<{ default: T }>,
 ): () => Promise<{ default: ComponentType<unknown> }> {
   return () => importFn() as Promise<{ default: ComponentType<unknown> }>;
 }
@@ -111,6 +93,10 @@ export function createShellIcon(name: string): React.ReactNode {
 }
 
 /** 通用 McIcon 工厂（供 .ts 注册文件使用，避免在 .ts 里写 JSX 或顶层 React.createElement） */
-export function createMcIcon(scope: 'pixel' | 'game' | 'mob', name: string, size = 20): React.ReactNode {
+export function createMcIcon(
+  scope: 'pixel' | 'game' | 'mob',
+  name: string,
+  size = 20,
+): React.ReactNode {
   return <McIcon scope={scope} name={name} size={size} />;
 }

@@ -1,9 +1,9 @@
 /**
  * IPC Intent 体系
  * 参考 Onyxz UMAS 和 minemind 的规划器模式
- * 
+ *
  * 所有 IPC handler 都应接收 { intent, payload } 并返回 { success, data, error? }
- * 
+ *
  * 结构:
  * - FileIntent: 文件操作
  * - GeneratorIntent: AI 生成操作
@@ -194,7 +194,7 @@ export interface ProjectConfig {
 export interface BaseIntentPayload {
   projectId?: string; // 目标项目 ID
   path?: string; // 文件路径 (相对于工作区)
-  content?: any; // 文件内容
+  content?: string; // 文件内容
   name?: string; // 新文件名
   target?: string; // 目标路径 (用于 move/rename)
   /** AI 生成时的额外参数 */
@@ -220,7 +220,7 @@ export interface GeneratorIntentPayload extends BaseIntentPayload {
   /** 生成时的提示 */
   prompt?: string;
   /** 参数配置 */
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }
 
 /** 项目操作 payload */
@@ -251,7 +251,7 @@ export interface BaseIntentResult {
   /** 新项目/当前项目的 ID */
   projectId?: string;
   /** 版本号或元数据 */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   /** 建议/信息 */
   suggestions?: string[];
 }
@@ -286,8 +286,8 @@ export interface ProjectIntentResult extends BaseIntentResult {
 
 /** IPC handler 接收事件和 payload，返回结果 */
 export type IntentHandler = <T extends keyof IntentPayloadMap>(
-  event: any,
-  payload: IntentPayloadMap[T]
+  event: unknown,
+  payload: IntentPayloadMap[T],
 ) => Promise<IntentResultMap[T]>;
 
 // 映射 payload 类型到 intent 键

@@ -33,7 +33,7 @@ export class FileConflictError extends Error {
       ? `local: mtime=${localMeta.mtime}, size=${localMeta.size}, hash=${localMeta.hash.slice(0, 8)}`
       : 'local: (file not found)';
     super(
-      `File conflict at "${path}": server: mtime=${serverMeta.mtime}, size=${serverMeta.size}, hash=${serverMeta.hash.slice(0, 8)}; ${localDesc}`
+      `File conflict at "${path}": server: mtime=${serverMeta.mtime}, size=${serverMeta.size}, hash=${serverMeta.hash.slice(0, 8)}; ${localDesc}`,
     );
     this.name = 'FileConflictError';
     this.path = path;
@@ -104,9 +104,15 @@ interface ModState {
   /** 获取当前项目 ID（内部使用） */
   _getProjectId: () => string | null;
   /** 更新文件内容（带冲突检测）：返回 { success: true } 或 { success: false, conflict: FileConflictError } */
-  updateFileContent: (path: string, content: string) => Promise<{ success: true } | { success: false; conflict: FileConflictError }>;
+  updateFileContent: (
+    path: string,
+    content: string,
+  ) => Promise<{ success: true } | { success: false; conflict: FileConflictError }>;
   /** 创建文件（带冲突检测） */
-  createFile: (path: string, content?: string) => Promise<{ success: true } | { success: false; conflict: FileConflictError }>;
+  createFile: (
+    path: string,
+    content?: string,
+  ) => Promise<{ success: true } | { success: false; conflict: FileConflictError }>;
   /** 强制写入文件（跳过冲突检测，用于用户选择"强制覆盖"后） */
   forceWriteFile: (path: string, content: string) => Promise<void>;
   deleteFile: (path: string) => void;
@@ -456,7 +462,12 @@ export const useModStore = createWithEqualityFn<ModState>()(
 
         try {
           // 使用带元数据校验的写入
-          const newMeta = await ipcClient.fileProjectWriteTextWithMeta(projectId, path, content, expectedMeta);
+          const newMeta = await ipcClient.fileProjectWriteTextWithMeta(
+            projectId,
+            path,
+            content,
+            expectedMeta,
+          );
           // 写入成功，更新本地状态和元数据缓存
           set((s) => {
             const files = s.files.map((f) => (f.path === path ? { ...f, content } : f));
@@ -466,10 +477,15 @@ export const useModStore = createWithEqualityFn<ModState>()(
             return { files, dirtyFiles, lastKnownMeta };
           });
           return { success: true as const };
-        } catch (e: any) {
+        } catch (raw) {
+          const e = raw as { conflict?: true; serverMeta: FileMeta; localMeta?: FileMeta | null };
           // 处理冲突错误
           if (e?.conflict && e?.serverMeta) {
-            const conflict = new FileConflictError(path, e.serverMeta, e.localMeta ?? expectedMeta ?? null);
+            const conflict = new FileConflictError(
+              path,
+              e.serverMeta,
+              e.localMeta ?? expectedMeta ?? null,
+            );
             // 更新缓存为服务端最新元数据（便于后续强制覆盖）
             set((s) => ({
               lastKnownMeta: { ...s.lastKnownMeta, [path]: e.serverMeta },
@@ -478,7 +494,10 @@ export const useModStore = createWithEqualityFn<ModState>()(
           }
           // 其他错误
           console.warn('[mod-store] Failed to update file:', e);
-          return { success: false as const, conflict: new FileConflictError(path, { mtime: 0, size: 0, hash: '' }, null) };
+          return {
+            success: false as const,
+            conflict: new FileConflictError(path, { mtime: 0, size: 0, hash: '' }, null),
+          };
         }
       },
 
@@ -503,10 +522,19 @@ export const useModStore = createWithEqualityFn<ModState>()(
         }
 
         // 新文件预期不存在，传入空文件 meta 作为预期
-        const expectedMeta: FileMeta = { mtime: 0, size: 0, hash: 'd41d8cd98f00b204e9800998ecf8427e' };
+        const expectedMeta: FileMeta = {
+          mtime: 0,
+          size: 0,
+          hash: 'd41d8cd98f00b204e9800998ecf8427e',
+        };
 
         try {
-          const newMeta = await ipcClient.fileProjectWriteTextWithMeta(projectId, path, content, expectedMeta);
+          const newMeta = await ipcClient.fileProjectWriteTextWithMeta(
+            projectId,
+            path,
+            content,
+            expectedMeta,
+          );
           set((s) => {
             const newFile: FileNode = { path, content };
             const files = [...s.files, newFile];
@@ -517,7 +545,8 @@ export const useModStore = createWithEqualityFn<ModState>()(
             return { files, dirtyFiles, selectedFile: path, openTabs, lastKnownMeta };
           });
           return { success: true as const };
-        } catch (e: any) {
+        } catch (raw) {
+          const e = raw as { conflict?: true; serverMeta: FileMeta; localMeta?: FileMeta | null };
           if (e?.conflict && e?.serverMeta) {
             const conflict = new FileConflictError(path, e.serverMeta, e.localMeta ?? expectedMeta);
             set((s) => ({
@@ -526,7 +555,10 @@ export const useModStore = createWithEqualityFn<ModState>()(
             return { success: false as const, conflict };
           }
           console.warn('[mod-store] Failed to create file:', e);
-          return { success: false as const, conflict: new FileConflictError(path, { mtime: 0, size: 0, hash: '' }, null) };
+          return {
+            success: false as const,
+            conflict: new FileConflictError(path, { mtime: 0, size: 0, hash: '' }, null),
+          };
         }
       },
 
@@ -546,7 +578,12 @@ export const useModStore = createWithEqualityFn<ModState>()(
 
         try {
           // 不传 expectedMeta，跳过冲突检测
-          const newMeta = await ipcClient.fileProjectWriteTextWithMeta(projectId, path, content, undefined);
+          const newMeta = await ipcClient.fileProjectWriteTextWithMeta(
+            projectId,
+            path,
+            content,
+            undefined,
+          );
           set((s) => {
             const files = s.files.map((f) => (f.path === path ? { ...f, content } : f));
             const dirtyFiles = new Set(s.dirtyFiles);
@@ -606,9 +643,11 @@ export const useModStore = createWithEqualityFn<ModState>()(
           if (projectId) {
             const oldFile = state.files.find((f) => f.path === oldPath);
             if (oldFile) {
-              ipcClient.fileProjectWriteText(projectId, newPath, oldFile.content).catch((e: unknown) => {
-                console.warn('[mod-store] Failed to write renamed file:', e);
-              });
+              ipcClient
+                .fileProjectWriteText(projectId, newPath, oldFile.content)
+                .catch((e: unknown) => {
+                  console.warn('[mod-store] Failed to write renamed file:', e);
+                });
             }
             ipcClient.fileProjectDeleteItem(projectId, oldPath).catch((e: unknown) => {
               console.warn('[mod-store] Failed to delete old file after rename:', e);

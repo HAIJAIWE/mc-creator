@@ -15,7 +15,10 @@ interface PanelErrorBoundaryState {
  * 面板级错误边界：3D 视图 / 像素编辑器崩溃时只降级当前面板，
  * 不牵连整个 MiddlePanel。支持一键重试（重置状态）。
  */
-export class PanelErrorBoundary extends Component<PanelErrorBoundaryProps, PanelErrorBoundaryState> {
+export class PanelErrorBoundary extends Component<
+  PanelErrorBoundaryProps,
+  PanelErrorBoundaryState
+> {
   state: PanelErrorBoundaryState = { error: null };
 
   static getDerivedStateFromError(error: Error): PanelErrorBoundaryState {
@@ -36,9 +39,7 @@ export class PanelErrorBoundary extends Component<PanelErrorBoundaryProps, Panel
     return (
       <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 rounded-mc border border-red-900/50 bg-red-950/20 p-4 text-center">
         <AlertCircle className="h-5 w-5 text-red-400" />
-        <div className="text-[12px] text-mc-text">
-          {this.props.label ?? '面板'}加载失败
-        </div>
+        <div className="text-[12px] text-mc-text">{this.props.label ?? '面板'}加载失败</div>
         <div className="max-w-full truncate text-[10px] text-mc-mute" title={error.message}>
           {error.message}
         </div>

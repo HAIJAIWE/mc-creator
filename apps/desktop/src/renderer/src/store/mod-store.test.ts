@@ -160,9 +160,7 @@ describe('mod-store', () => {
 
   it('updateItem 合并补丁且锁定 id（改 id 必须走 renameItemId）', () => {
     const store = useModStore.getState();
-    store.setSpec(
-      ModSpec.parse({ modId: 't', name: 'T', items: [{ id: 'ruby', name: 'Ruby' }] }),
-    );
+    store.setSpec(ModSpec.parse({ modId: 't', name: 'T', items: [{ id: 'ruby', name: 'Ruby' }] }));
     store.updateItem('ruby', { maxStackSize: 16, id: 'hacked' } as never);
     const item = useModStore.getState().spec?.items[0];
     expect(item?.maxStackSize).toBe(16);

@@ -20,11 +20,21 @@ const PRESETS: { value: PosePreset; label: string; icon: React.ReactNode }[] = [
 ];
 
 const JOINTS: (keyof JointAngles)[] = [
-  'head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg',
+  'head',
+  'body',
+  'leftArm',
+  'rightArm',
+  'leftLeg',
+  'rightLeg',
 ];
 
 const JOINT_LABELS: Record<keyof JointAngles, string> = {
-  head: '头部', body: '身体', leftArm: '左臂', rightArm: '右臂', leftLeg: '左腿', rightLeg: '右腿',
+  head: '头部',
+  body: '身体',
+  leftArm: '左臂',
+  rightArm: '右臂',
+  leftLeg: '左腿',
+  rightLeg: '右腿',
 };
 
 const AXES: ('x' | 'y' | 'z')[] = ['x', 'y', 'z'];
@@ -37,10 +47,19 @@ export const PosePanel = ({
   onReset,
 }: PosePanelProps) => {
   const [expanded, setExpanded] = useState<Record<keyof JointAngles, boolean>>({
-    head: false, body: false, leftArm: false, rightArm: false, leftLeg: false, rightLeg: false,
+    head: false,
+    body: false,
+    leftArm: false,
+    rightArm: false,
+    leftLeg: false,
+    rightLeg: false,
   });
 
-  const handleSliderChange = (joint: keyof JointAngles, axis: 'x' | 'y' | 'z', e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSliderChange = (
+    joint: keyof JointAngles,
+    axis: 'x' | 'y' | 'z',
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const value = parseFloat(e.target.value);
     onCustomPoseChange(joint, axis, value);
   };
@@ -89,15 +108,16 @@ export const PosePanel = ({
               <summary className="flex items-center gap-2 cursor-pointer text-[12px] text-mc-text select-none">
                 <span className="w-20 font-medium">{JOINT_LABELS[joint]}</span>
                 <span className="text-mc-dim text-[10px]">
-                  X: {customPose[joint].x.toFixed(0)}°
-                  Y: {customPose[joint].y.toFixed(0)}°
-                  Z: {customPose[joint].z.toFixed(0)}°
+                  X: {customPose[joint].x.toFixed(0)}° Y: {customPose[joint].y.toFixed(0)}° Z:{' '}
+                  {customPose[joint].z.toFixed(0)}°
                 </span>
               </summary>
               <div className="mt-2 space-y-1.5">
                 {AXES.map((axis) => (
                   <div key={axis} className="flex items-center gap-2">
-                    <label className="w-6 text-[11px] text-mc-dim font-mono">{axis.toUpperCase()}</label>
+                    <label className="w-6 text-[11px] text-mc-dim font-mono">
+                      {axis.toUpperCase()}
+                    </label>
                     <input
                       type="range"
                       min="-180"

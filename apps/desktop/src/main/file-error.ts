@@ -18,15 +18,19 @@ export interface FileMetaWithHash extends FileMeta {
 export type FileError =
   | { code: 'NOT_FOUND'; path: string; message: string }
   | { code: 'PERMISSION_DENIED'; path: string; message: string }
-  | { code: 'CONFLICT'; path: string; serverMeta: FileMetaWithHash; localMeta: FileMetaWithHash; message: string }
+  | {
+      code: 'CONFLICT';
+      path: string;
+      serverMeta: FileMetaWithHash;
+      localMeta: FileMetaWithHash;
+      message: string;
+    }
   | { code: 'DISK_FULL'; path: string; message: string }
   | { code: 'INVALID_PATH'; path: string; message: string }
   | { code: 'UNKNOWN'; message: string };
 
 /** Result 类型：成功或失败 */
-export type Result<T, E = FileError> =
-  | { ok: true; value: T }
-  | { ok: false; error: E };
+export type Result<T, E = FileError> = { ok: true; value: T } | { ok: false; error: E };
 
 /** 创建成功 Result */
 export function ok<T>(value: T): Result<T, never> {
@@ -56,8 +60,18 @@ export function mapFsError(error: NodeJS.ErrnoException, path: string): FileErro
         code: 'CONFLICT',
         path,
         message: `File already exists: ${path}`,
-        serverMeta: { size: 0, mtime: 0, isDirectory: false, hash: 'd41d8cd98f00b204e9800998ecf8427e' },
-        localMeta: { size: 0, mtime: 0, isDirectory: false, hash: 'd41d8cd98f00b204e9800998ecf8427e' },
+        serverMeta: {
+          size: 0,
+          mtime: 0,
+          isDirectory: false,
+          hash: 'd41d8cd98f00b204e9800998ecf8427e',
+        },
+        localMeta: {
+          size: 0,
+          mtime: 0,
+          isDirectory: false,
+          hash: 'd41d8cd98f00b204e9800998ecf8427e',
+        },
       };
     default:
       return { code: 'UNKNOWN', message: error.message };

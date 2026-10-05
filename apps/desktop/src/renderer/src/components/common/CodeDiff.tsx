@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef, forwardRef } from 'react';
 import { ChevronUp, ChevronDown, Columns, Minimize2 } from 'lucide-react';
+import { diffLines } from 'diff';
 
 /** 差异块类型 */
 export type DiffChunkType = 'added' | 'removed' | 'changed' | 'unchanged';
@@ -63,8 +64,6 @@ export interface CodeDiffProps {
  */
 export function computeDiffChunks(oldContent: string, newContent: string): DiffChunk[] {
   // 使用 diff 库计算逐行差异
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { diffLines } = require('diff');
   const diffs = diffLines(oldContent, newContent, { newlineIsToken: true });
 
   const chunks: DiffChunk[] = [];
@@ -75,7 +74,8 @@ export function computeDiffChunks(oldContent: string, newContent: string): DiffC
   for (const part of diffs) {
     const lines = part.value.split('\n');
     // 处理末尾空行
-    const actualLines = lines.length > 0 && lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;
+    const actualLines =
+      lines.length > 0 && lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;
 
     if (part.added) {
       // 新增行
@@ -154,11 +154,7 @@ export function computeDiffChunks(oldContent: string, newContent: string): DiffC
   const mergedChunks: DiffChunk[] = [];
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
-    if (
-      chunk.type === 'removed' &&
-      i + 1 < chunks.length &&
-      chunks[i + 1].type === 'added'
-    ) {
+    if (chunk.type === 'removed' && i + 1 < chunks.length && chunks[i + 1].type === 'added') {
       // 合并为 changed 类型
       const nextChunk = chunks[i + 1];
       const mergedLines: DiffLine[] = [
@@ -214,13 +210,7 @@ export function computeDiffStats(chunks: DiffChunk[]): DiffStats {
 /**
  * 单行渲染组件
  */
-function DiffLineView({
-  line,
-  showLineNumbers,
-}: {
-  line: DiffLine;
-  showLineNumbers: boolean;
-}) {
+function DiffLineView({ line, showLineNumbers }: { line: DiffLine; showLineNumbers: boolean }) {
   const typeColors: Record<DiffLine['type'], string> = {
     added: 'bg-mc-accent/10 border-l-2 border-mc-accent',
     removed: 'bg-mc-redstone/10 border-l-2 border-mc-redstone',
@@ -244,10 +234,10 @@ function DiffLineView({
           {line.lineNumberOld !== null && line.lineNumberNew !== null
             ? `${line.lineNumberOld} → ${line.lineNumberNew}`
             : line.lineNumberOld !== null
-            ? `${line.lineNumberOld} → —`
-            : line.lineNumberNew !== null
-            ? `— → ${line.lineNumberNew}`
-            : '—'}
+              ? `${line.lineNumberOld} → —`
+              : line.lineNumberNew !== null
+                ? `— → ${line.lineNumberNew}`
+                : '—'}
         </div>
       )}
       <div
@@ -276,7 +266,11 @@ const SideBySideChunk = forwardRef<HTMLDivElement, SideBySideChunkProps>(
   ({ chunk, index, showLineNumbers, isActive, onClick }, ref) => {
     const typeColors: Record<DiffChunkType, { bg: string; border: string; badge: string }> = {
       added: { bg: 'bg-mc-accent/5', border: 'border-mc-accent', badge: 'bg-mc-accent text-mc-bg' },
-      removed: { bg: 'bg-mc-redstone/5', border: 'border-mc-redstone', badge: 'bg-mc-redstone text-mc-bg' },
+      removed: {
+        bg: 'bg-mc-redstone/5',
+        border: 'border-mc-redstone',
+        badge: 'bg-mc-redstone text-mc-bg',
+      },
       changed: { bg: 'bg-mc-gold/5', border: 'border-mc-gold', badge: 'bg-mc-gold text-mc-bg' },
       unchanged: { bg: '', border: 'border-mc-border', badge: 'bg-mc-dim text-mc-text' },
     };
@@ -297,9 +291,7 @@ const SideBySideChunk = forwardRef<HTMLDivElement, SideBySideChunkProps>(
         data-chunk-index={index}
       >
         <div className="flex items-center gap-2 px-2 py-1 border-b border-mc-border/50 bg-mc-surface/50">
-          <span
-            className={`px-1.5 py-0.5 rounded-mc text-[9px] font-medium ${colors.badge}`}
-          >
+          <span className={`px-1.5 py-0.5 rounded-mc text-[9px] font-medium ${colors.badge}`}>
             {typeLabels[chunk.type]}
           </span>
           <span className="text-[10px] text-mc-mute font-mono">
@@ -342,7 +334,7 @@ const SideBySideChunk = forwardRef<HTMLDivElement, SideBySideChunkProps>(
         </div>
       </div>
     );
-  }
+  },
 );
 
 SideBySideChunk.displayName = 'SideBySideChunk';
@@ -362,7 +354,11 @@ const InlineChunk = forwardRef<HTMLDivElement, InlineChunkProps>(
   ({ chunk, index, showLineNumbers, isActive, onClick }, ref) => {
     const typeColors: Record<DiffChunkType, { bg: string; border: string; badge: string }> = {
       added: { bg: 'bg-mc-accent/5', border: 'border-mc-accent', badge: 'bg-mc-accent text-mc-bg' },
-      removed: { bg: 'bg-mc-redstone/5', border: 'border-mc-redstone', badge: 'bg-mc-redstone text-mc-bg' },
+      removed: {
+        bg: 'bg-mc-redstone/5',
+        border: 'border-mc-redstone',
+        badge: 'bg-mc-redstone text-mc-bg',
+      },
       changed: { bg: 'bg-mc-gold/5', border: 'border-mc-gold', badge: 'bg-mc-gold text-mc-bg' },
       unchanged: { bg: '', border: 'border-mc-border', badge: 'bg-mc-dim text-mc-text' },
     };
@@ -383,9 +379,7 @@ const InlineChunk = forwardRef<HTMLDivElement, InlineChunkProps>(
         data-chunk-index={index}
       >
         <div className="flex items-center gap-2 px-2 py-1 border-b border-mc-border/50 bg-mc-surface/50">
-          <span
-            className={`px-1.5 py-0.5 rounded-mc text-[9px] font-medium ${colors.badge}`}
-          >
+          <span className={`px-1.5 py-0.5 rounded-mc text-[9px] font-medium ${colors.badge}`}>
             {typeLabels[chunk.type]}
           </span>
           <span className="text-[10px] text-mc-mute font-mono">
@@ -405,7 +399,7 @@ const InlineChunk = forwardRef<HTMLDivElement, InlineChunkProps>(
         </div>
       </div>
     );
-  }
+  },
 );
 
 InlineChunk.displayName = 'InlineChunk';
@@ -418,12 +412,10 @@ export function CodeDiff({
   newContent,
   oldLabel = '服务器版本',
   newLabel = '本地版本',
-  readOnly = true,
   showLineNumbers = true,
   viewMode = 'side-by-side',
   onViewModeChange,
   maxHeight = '60vh',
-  language,
   onChunkClick,
   activeChunkIndex,
 }: CodeDiffProps) {
@@ -466,7 +458,7 @@ export function CodeDiff({
       const targetChunkIndex = chunks.indexOf(targetChunk);
       onChunkClick?.(targetChunkIndex);
     },
-    [chunks, activeChunkIndex, onChunkClick]
+    [chunks, activeChunkIndex, onChunkClick],
   );
 
   // 滚动到激活的差异块
@@ -477,9 +469,7 @@ export function CodeDiff({
   }, [activeChunkIndex]);
 
   // 过滤显示的块
-  const displayChunks = collapsedUnchanged
-    ? chunks.filter((c) => c.type !== 'unchanged')
-    : chunks;
+  const displayChunks = collapsedUnchanged ? chunks.filter((c) => c.type !== 'unchanged') : chunks;
 
   return (
     <div className="flex flex-col h-full bg-mc-bg">
@@ -537,9 +527,7 @@ export function CodeDiff({
             <button
               onClick={() => onViewModeChange?.('inline')}
               className={`px-2 py-1 rounded-mc text-xs transition-colors ${
-                viewMode === 'inline'
-                  ? 'bg-mc-accent text-mc-bg'
-                  : 'text-mc-dim hover:text-mc-text'
+                viewMode === 'inline' ? 'bg-mc-accent text-mc-bg' : 'text-mc-dim hover:text-mc-text'
               }`}
               title="内联模式"
             >
@@ -582,7 +570,7 @@ export function CodeDiff({
           </div>
         ) : (
           <div className="p-2 space-y-2">
-            {displayChunks.map((chunk, displayIndex) => {
+            {displayChunks.map((chunk) => {
               const originalIndex = chunks.indexOf(chunk);
               const isActive = activeChunkIndex === originalIndex;
               const ChunkComponent = viewMode === 'side-by-side' ? SideBySideChunk : InlineChunk;

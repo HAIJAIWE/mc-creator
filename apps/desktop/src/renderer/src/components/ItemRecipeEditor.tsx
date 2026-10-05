@@ -367,7 +367,10 @@ function ItemSpecPanel() {
           <div>
             <GroupTitle>基础属性</GroupTitle>
             <div className="space-y-2">
-              <Field label="ID（小写字母/数字/下划线，失焦保存；非法自动转合法）" error={idCheck?.error}>
+              <Field
+                label="ID（小写字母/数字/下划线，失焦保存；非法自动转合法）"
+                error={idCheck?.error}
+              >
                 <input
                   className="mc-input w-full font-mono"
                   value={draft.idText}
@@ -396,7 +399,9 @@ function ItemSpecPanel() {
                   name={draft.assetName}
                   onScopeChange={(s) => {
                     const names = listAssets(s);
-                    const effective = names.includes(draft.assetName) ? draft.assetName : (names[0] ?? '');
+                    const effective = names.includes(draft.assetName)
+                      ? draft.assetName
+                      : (names[0] ?? '');
                     applyDraft(
                       { scope: s, assetName: effective },
                       effective ? { texturePath: formatTexturePath(s, effective) } : undefined,
@@ -418,7 +423,10 @@ function ItemSpecPanel() {
                       max={64}
                       onChange={(e) => {
                         const v = validateInt(e.target.value, '最大堆叠', 1, 64);
-                        applyDraft({ maxStack: e.target.value }, v.value === null ? undefined : { maxStackSize: v.value });
+                        applyDraft(
+                          { maxStack: e.target.value },
+                          v.value === null ? undefined : { maxStackSize: v.value },
+                        );
                       }}
                     />
                   </Field>
@@ -456,13 +464,20 @@ function ItemSpecPanel() {
                       min={0}
                       onChange={(e) => {
                         const v = validateInt(e.target.value, '耐久上限', 0);
-                        applyDraft({ maxDamage: e.target.value }, v.value === null ? undefined : { maxDamage: v.value });
+                        applyDraft(
+                          { maxDamage: e.target.value },
+                          v.value === null ? undefined : { maxDamage: v.value },
+                        );
                       }}
                     />
                   </Field>
                 </div>
                 <div className="flex-1">
-                  <Field label="附魔能力 enchantability" error={enchantCheck?.error} hint="0=不可附魔，值越高好附魔越好">
+                  <Field
+                    label="附魔能力 enchantability"
+                    error={enchantCheck?.error}
+                    hint="0=不可附魔，值越高好附魔越好"
+                  >
                     <input
                       type="number"
                       className="mc-input w-full"
@@ -657,7 +672,11 @@ function ItemSpecPanel() {
                 </Field>
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <Field label="挖掘等级（0–10）" error={miningLevelCheck?.error} hint="0木 1石 2铁 3钻 4下界合金">
+                    <Field
+                      label="挖掘等级（0–10）"
+                      error={miningLevelCheck?.error}
+                      hint="0木 1石 2铁 3钻 4下界合金"
+                    >
                       <input
                         type="number"
                         className="mc-input w-full"

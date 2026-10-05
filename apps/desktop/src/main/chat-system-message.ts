@@ -44,7 +44,10 @@ export interface RagCitation {
  * - 有 context 时拼接项目类型 / 用户描述 / spec 摘要。
  * - 有 ragHits 时追加本地知识库片段（注明来源，要求模型引用时标注出处）。
  */
-export function buildChatSystemMessage(context?: ChatStreamContext, ragHits?: RagCitation[]): string {
+export function buildChatSystemMessage(
+  context?: ChatStreamContext,
+  ragHits?: RagCitation[],
+): string {
   if (!context && (!ragHits || ragHits.length === 0)) return DEFAULT_CHAT_SYSTEM_MESSAGE;
 
   const parts: string[] = [
