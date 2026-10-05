@@ -231,20 +231,15 @@ function serverIdOf(payload: unknown): string | undefined {
 }
 
 /**
- * §7.4 快照类 kind：contract 包尚无 backup 分级（MCP_TOOL_PERMISSIONS 无
- * backup_* key），按 W 级走「确认闸门 + 真实现」（risk=write）。不改 contract
- * 包（那是别人的文件），此处本地声明路由集合。
+ * §7.4 快照类 kind（R2b-wiring）：contract 包 MCP_TOOL_PERMISSIONS 已有 backup_* /
+ * task_* 分级（list_backups/list_tasks/run_due_tasks 为 R，走 dispatch 只读分支
+ * 不进确认闸门）。此处只剩 W 级快照 kind，直走确认闸门（risk=write）。
  */
-const BACKUP_WRITE_KINDS = new Set([
-  'backup_server',
-  'list_backups',
-  'restore_backup',
-  'prune_backups',
-]);
+const BACKUP_WRITE_KINDS = new Set(['backup_server', 'restore_backup', 'prune_backups']);
 
 /**
- * §7.4 定时任务 W 类路由（MCP_TOOL_PERMISSIONS 尚无 schedule/cancel 分级，
- * 与 BACKUP_WRITE_KINDS 同理按 W 级直走确认闸门；R 类 list_tasks/run_due_tasks
+ * §7.4 定时任务 W 类路由（R2b-wiring：contract 包已有 schedule/cancel 分级，
+ * 此集合保留作显式 W 级直走确认闸门的路由；R 类 list_tasks/run_due_tasks
  * 走 dispatch 只读分支，不进确认闸门）。
  */
 const TASK_WRITE_KINDS = new Set(['schedule_task', 'cancel_task']);
@@ -499,10 +494,6 @@ const STEP_DEFS: Record<string, { stage: string; message: string }[]> = {
     { stage: 'snapshotting', message: '复制 world/ 与配置文件到快照目录' },
     { stage: 'complete', message: '快照完成并写入 manifest' },
   ],
-  list_backups: [
-    { stage: 'validating', message: '校验服务端存在性' },
-    { stage: 'listing', message: '列出已有快照' },
-  ],
   restore_backup: [
     { stage: 'validating', message: '校验服务端与快照存在性' },
     { stage: 'restoring', message: '从快照拷回服务端目录' },
@@ -550,8 +541,6 @@ function confirmSummary(kind: string, payload: unknown): string {
       return `把服务端「${id}」的插件回滚到上一版产物（按 sha256 匹配）`;
     case 'backup_server':
       return `为服务端「${id}」创建世界/配置快照（写入 backups/ 目录）`;
-    case 'list_backups':
-      return `列出服务端「${id}」的已有快照（只读快照目录）`;
     case 'restore_backup':
       return `把快照恢复到服务端「${id}」（覆盖世界与配置，建议随后重启）`;
     case 'prune_backups':
@@ -1887,8 +1876,6 @@ export class ServerKernel implements KernelContract {
           return await this.rollbackBuild(root, payload, step);
         case 'backup_server':
           return await this.backupServer(root, payload, step);
-        case 'list_backups':
-          return await this.listBackups(root, payload, step);
         case 'restore_backup':
           return await this.restoreBackup(root, payload, step);
         case 'prune_backups':
@@ -1946,8 +1933,8 @@ export class ServerKernel implements KernelContract {
       async result(): Promise<TaskResult> {
         bus.markResultStarted();
         try {
-          // §7.4 快照类：MCP_TOOL_PERMISSIONS 无 backup_* key（isWriteOrExecute
-          // 为 false），此处按 W 级直走确认闸门；既有分支一行未改。
+          // §7.4 快照 W 类：backup_server/restore_backup/prune_backups 按 W 级
+          // 直走确认闸门；R 类 list_backups 已有 contract 分级，走下面只读分支。
           if (BACKUP_WRITE_KINDS.has(kind)) {
             return await kernel.executeWrite(id, kind, payload, bus);
           }
@@ -2005,6 +1992,11 @@ export class ServerKernel implements KernelContract {
               // R：只读账本，sandbox 下走 sandbox root（与快照同根）。
               const root = kernel.writeRoot();
               return await kernel.listScheduledTasks(root, payload);
+            }
+            case 'list_backups': {
+              // R：只读快照目录，不进确认闸门（R2b-wiring，见 BACKUP_WRITE_KINDS 注释）。
+              const root = kernel.writeRoot();
+              return await kernel.listBackups(root, payload, () => {});
             }
             case 'run_due_tasks': {
               // R：读+账本状态推进；到期 backup 文件动作属已预授权范围，不需二次确认。

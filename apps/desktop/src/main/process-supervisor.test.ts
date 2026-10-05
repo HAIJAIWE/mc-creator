@@ -2755,3 +2755,154 @@ describe('RCON 回退（§7.4 stdin 不可用时退化 RCON）', () => {
     }
   });
 });
+
+// =========================================================================
+// 13. 按 id 启停（R2a：restartServer / stopServer —— 只加公共方法，不加 IPC）
+//
+// 纪律：沿用第 10 节的 makeCrashHarness（可控假子进程 + 手动时钟），
+// 不起真进程、不 sleep。只加新用例，既有断言一行未动。
+// =========================================================================
+
+describe('按 id 启停 restartServer/stopServer（过确认闸门 + 复用停机路径，不抛裸异常）', () => {
+  it('重启走确认：confirm kind=restart_server，通过后旧停新起', async () => {
+    const seen: Array<{ kind: string; risk: string }> = [];
+    const { svc, children, spawnSpy } = makeCrashHarness({
+      confirm: (r) => {
+        seen.push({ kind: r.kind, risk: r.risk });
+        return true;
+      },
+    });
+    svc.launch({ serverId: 's1', cmd: 'java', args: ['-jar', 'a.jar'] });
+    expect(svc.status('s1')?.state).toBe('running');
+
+    const out = await svc.restartServer('s1');
+    expect(out.serverId).toBe('s1');
+    expect(out.ok).toBe(true);
+    expect(out.code).toBeNull();
+    expect(out.reason).toBeNull();
+    expect(out.stop).toMatchObject({ serverId: 's1', exited: true });
+    expect(typeof out.at).toBe('string');
+    // 确认被问过两次：launch_instance + restart_server（绝不复用上次批准）
+    expect(seen).toEqual([
+      { kind: 'launch_instance', risk: 'execute' },
+      { kind: 'restart_server', risk: 'execute' },
+    ]);
+    // 旧进程已停、新进程已起：共 spawn 两次，当前 running
+    expect(spawnSpy).toHaveBeenCalledTimes(2);
+    expect(children).toHaveLength(2);
+    expect(svc.status('s1')?.state).toBe('running');
+  });
+
+  it('拒绝不启动：未确认返回 NOT_CONFIRMED，原进程保持 running 且 emit restart-rejected', async () => {
+    const { svc, children, spawnSpy } = makeCrashHarness({ confirm: confirmOnceOnly() });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    const rejected: Array<{ serverId: string }> = [];
+    svc.on('restart-rejected', (e: { serverId: string }) => rejected.push(e));
+
+    const out = await svc.restartServer('s1');
+    expect(out.ok).toBe(false);
+    expect(out.code).toBe('NOT_CONFIRMED');
+    expect(out.reason).toContain('§10.6');
+    expect(out.stop).toBeNull();
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    expect(children).toHaveLength(1);
+    expect(svc.status('s1')?.state).toBe('running');
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.serverId).toBe('s1');
+  });
+
+  it('无 entry 结构化错：restart/stop 对 ghost 返回 SERVER_NOT_FOUND 且不抛', async () => {
+    const { svc, spawnSpy } = makeCrashHarness();
+    const r1 = await svc.restartServer('ghost');
+    const r2 = await svc.stopServer('ghost');
+    for (const out of [r1, r2]) {
+      expect(out.serverId).toBe('ghost');
+      expect(out.ok).toBe(false);
+      expect(out.code).toBe('SERVER_NOT_FOUND');
+      expect(out.reason).toContain('未托管');
+      expect(out.stop).toBeNull();
+    }
+    expect(spawnSpy).not.toHaveBeenCalled();
+    expect(svc.status('ghost')).toBeNull();
+  });
+
+  it('停止置位不自动重启：stopServer 后退避再久也不拉起', async () => {
+    const { svc, spawnSpy, clock } = makeCrashHarness({ autoRestart: true });
+    const handle = svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    const out = await svc.stopServer('s1');
+    expect(out.ok).toBe(true);
+    expect(out.stop).toMatchObject({ serverId: 's1', exited: true });
+    expect(svc.status('s1')?.state).toBe('stopped');
+    expect(svc.status('s1')?.crashCount).toBe(0);
+    clock.advance(120_000);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    expect(svc.status('s1')?.autoRestartPending).toBe(false);
+    await handle.exited;
+  });
+
+  it('崩溃后退避中 stopServer：掐掉定时器，不再拉起且保留 crashed 现场', async () => {
+    const { svc, spawnSpy, children, clock } = makeCrashHarness({ autoRestart: true });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    expect(svc.status('s1')?.autoRestartPending).toBe(true);
+
+    const out = await svc.stopServer('s1');
+    expect(out.ok).toBe(true);
+    expect(clock.pendingMs()).toBeNull();
+    clock.advance(120_000);
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+    // stop 对已崩进程是 no-op：状态仍是 crashed，崩溃证据留给 UI
+    expect(svc.status('s1')?.state).toBe('crashed');
+  });
+
+  it('崩溃后 restartServer：no-op 停机 + doSpawn 拉起，手动重启视为新一轮（退避归零）', async () => {
+    const { svc, spawnSpy, children, clock } = makeCrashHarness({ autoRestart: true });
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    // 先走完一次自动重启，让退避计数到 1（下一轮退避本应是 2000）
+    children[0].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    clock.advance(1_000);
+    await waitForState(svc, 's1', (s) => s === 'running');
+    expect(svc.status('s1')?.autoRestartCount).toBe(1);
+
+    // 用户手动重启 = 新的一轮：退避计数归零（与 launch() 同策略，crashCount 不清零）
+    const out = await svc.restartServer('s1');
+    expect(out.ok).toBe(true);
+    expect(spawnSpy).toHaveBeenCalledTimes(3);
+    await waitForState(svc, 's1', (s) => s === 'running');
+    expect(svc.status('s1')?.autoRestartCount).toBe(0);
+    expect(svc.status('s1')?.crashCount).toBe(1);
+
+    // 再崩一次：退避从 1s 起步（若没归零会是 2s）
+    children[2].die(1);
+    await waitForState(svc, 's1', (s) => s === 'crashed');
+    expect(clock.pendingMs()).toBe(1_000);
+  });
+
+  it('shutdownAll 后 restartServer → SERVICE_CLOSED，不 spawn（关服路径行为不变）', async () => {
+    const { svc, spawnSpy } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    await svc.shutdownAll();
+    const out = await svc.restartServer('s1');
+    expect(out.ok).toBe(false);
+    expect(out.code).toBe('SERVICE_CLOSED');
+    expect(out.stop).toBeNull();
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('stopServer 成功结果带停机报告（graceful 路径，快照 lastStop 同步）', async () => {
+    const { svc } = makeCrashHarness();
+    svc.launch({ serverId: 's1', cmd: 'java', args: [] });
+    const out = await svc.stopServer('s1');
+    expect(out).toMatchObject({
+      serverId: 's1',
+      ok: true,
+      code: null,
+      reason: null,
+      stop: { serverId: 's1', graceful: true, forced: false, exited: true, portTimedOut: false },
+    });
+    expect(svc.status('s1')?.state).toBe('stopped');
+    expect(svc.status('s1')?.lastStop?.graceful).toBe(true);
+  });
+});

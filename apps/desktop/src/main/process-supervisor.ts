@@ -269,6 +269,33 @@ export interface StopOutcome {
   portTimedOut: boolean;
 }
 
+/**
+ * 按 id 启停的失败码（R2a：沿 SendOutcome / StopOutcome 的既有词汇，不新造体系）。
+ */
+export type ServerControlErrorCode =
+  /** 该 serverId 从未被托管（先 launch/launchServer 才有 entry 可停可重启）。 */
+  | 'SERVER_NOT_FOUND'
+  /** 未获 §10.6 确认（restart）：原进程保持原状，一个字节都没动。 */
+  | 'NOT_CONFIRMED'
+  /** 服务已 shutdownAll：restart 会凭空起进程故拒绝（stop 只停不停起，不受影响）。 */
+  | 'SERVICE_CLOSED'
+  /** 旧进程已停，但 doSpawn 抛错（新进程没拉起来，停机报告仍在 stop 里）。 */
+  | 'SPAWN_FAILED';
+
+/**
+ * restartServer / stopServer 的统一结构化结果（R2a：沿 SendOutcome 形状，永不抛裸异常）。
+ * 成功时 `stop` 为停机阶段的报告（沿 StopOutcome）；无 entry / 未确认 / 已关闭时为 null。
+ */
+export interface ServerControlOutcome {
+  serverId: string;
+  ok: boolean;
+  code: ServerControlErrorCode | null;
+  /** 中文失败原因；ok=true 时为 null。 */
+  reason: string | null;
+  stop: StopOutcome | null;
+  at: string;
+}
+
 /** 启动后交给调用方的句柄。 */
 export interface LaunchedProcess {
   serverId: string;
@@ -595,6 +622,103 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
     if (e === undefined) return [];
     const n = limit === undefined ? this.tailLines : Math.max(0, limit);
     return e.lines.slice(Math.max(0, e.lines.length - n));
+  }
+
+  /**
+   * 按 id 重启被托管进程（R2a：只加公共方法，不加 IPC，轮询器是 R2b 的事）。
+   *
+   * 顺序刻意如此，每一步失败都是**结构化返回而非抛错**：
+   * 1) 无 entry → SERVER_NOT_FOUND（沿 StopOutcome / 自有错误形状）；
+   * 2) 已 shutdownAll → SERVICE_CLOSED（关服后绝不凭空起进程）；
+   * 3) §10.6 确认（kind='restart_server'，与 runAutoRestart 同一道闸门）——
+   *    未确认则 emit 'restart-rejected'（rejected 事件语义）并原样保留原进程；
+   * 4) 复用停机路径优雅停（stopPublic：掐退避定时器 + 经 stopEntry 置 stopRequested，
+   *    用户请求停机不触发自动重启）；
+   * 5) 停机等待期间若应用开始退出 → 不再 doSpawn（SERVICE_CLOSED，停机报告仍带回）；
+   * 6) doSpawn(entry.spec)：日志环形缓冲与 crashCount 跨重启保留；
+   *    用户手动重启视为「新一轮」，退避计数归零（与 launch() 同策略）。
+   */
+  async restartServer(serverId: string): Promise<ServerControlOutcome> {
+    const fail = (
+      code: ServerControlErrorCode,
+      reason: string,
+      stop: StopOutcome | null = null,
+    ): ServerControlOutcome => ({
+      serverId,
+      ok: false,
+      code,
+      reason,
+      stop,
+      at: new Date(this.now()).toISOString(),
+    });
+    const e = this.entries.get(serverId);
+    if (e === undefined) {
+      return fail('SERVER_NOT_FOUND', `未托管 ${serverId}，无法重启（先 launch/launchServer）`);
+    }
+    if (this.shutdownPromise !== null) {
+      return fail('SERVICE_CLOSED', '服务已关闭，拒绝重启');
+    }
+    if (!this.requestConfirmation(e.spec, 'restart_server', e.cwd)) {
+      this.emit('restart-rejected', {
+        serverId,
+        at: new Date(this.now()).toISOString(),
+      });
+      return fail('NOT_CONFIRMED', `用户未确认，拒绝重启 ${serverId}（§10.6）`);
+    }
+    const stop = await this.stopPublic(e);
+    if (this.shutdownPromise !== null) {
+      // 停机等待期间应用开始退出：不再拉新进程，否则关服后凭空多起一个。
+      return fail('SERVICE_CLOSED', '停机期间服务已关闭，不再拉起新进程', stop);
+    }
+    try {
+      this.doSpawn(e.spec, e.cwd);
+    } catch (err) {
+      return fail(
+        'SPAWN_FAILED',
+        `重启拉起失败：${err instanceof Error ? err.message : String(err)}`,
+        stop,
+      );
+    }
+    this.resetRestartBackoff(serverId);
+    return {
+      serverId,
+      ok: true,
+      code: null,
+      reason: null,
+      stop,
+      at: new Date(this.now()).toISOString(),
+    };
+  }
+
+  /**
+   * 按 id 停止被托管进程（R2a：只加公共方法，不加 IPC）。
+   * 复用停机路径：stopPublic 内部经 stopEntry 置 stopRequested（用户请求停机不触发
+   * 自动重启，见文件头 §7.1 注释）并掐掉挂起的退避定时器；已 stopped / crashed
+   * 时为 no-op 成功（崩溃证据保留，不改动状态）。
+   */
+  async stopServer(serverId: string): Promise<ServerControlOutcome> {
+    const e = this.entries.get(serverId);
+    if (e === undefined) {
+      const miss: ServerControlOutcome = {
+        serverId,
+        ok: false,
+        code: 'SERVER_NOT_FOUND',
+        reason: `未托管 ${serverId}，无法停止`,
+        stop: null,
+        at: new Date(this.now()).toISOString(),
+      };
+      return miss;
+    }
+    const stop = await this.stopPublic(e);
+    const done: ServerControlOutcome = {
+      serverId,
+      ok: true,
+      code: null,
+      reason: null,
+      stop,
+      at: new Date(this.now()).toISOString(),
+    };
+    return done;
   }
 
   async shutdownAll(): Promise<void> {
@@ -1339,6 +1463,16 @@ export interface ProcessSupervisor extends EventEmitter {
    * 必须过 §10.6 确认闸门；失败返回明确 code，绝不静默丢。
    */
   sendCommand(serverId: string, command: string): Promise<SendOutcome>;
+  /**
+   * 按 id 重启被托管进程（R2a）：过 §10.6 确认 → 优雅停 → doSpawn。
+   * 结构化返回（ServerControlOutcome），不抛裸异常；未确认时 emit 'restart-rejected'。
+   */
+  restartServer(serverId: string): Promise<ServerControlOutcome>;
+  /**
+   * 按 id 停止被托管进程（R2a）：复用停机路径（置 stopRequested，不触发自动重启）。
+   * 结构化返回（ServerControlOutcome），不抛裸异常。
+   */
+  stopServer(serverId: string): Promise<ServerControlOutcome>;
   /** 全部优雅停机（应用退出时调用）。幂等。 */
   shutdownAll(): Promise<void>;
 }

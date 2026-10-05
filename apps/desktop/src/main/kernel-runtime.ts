@@ -198,6 +198,15 @@ const KIND_ROUTES: Record<string, KernelRoute> = {
   stop_server: 'server',
   rollback_build: 'server',
   generate_content: 'bedrock',
+  // §7.4 快照备份 + 定时任务（R2b-wiring，全 server 内核）
+  backup_server: 'server',
+  restore_backup: 'server',
+  prune_backups: 'server',
+  schedule_task: 'server',
+  cancel_task: 'server',
+  list_backups: 'server',
+  list_tasks: 'server',
+  run_due_tasks: 'server',
 };
 
 /**

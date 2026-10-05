@@ -1124,13 +1124,12 @@ describe('ServerKernel build_project 产物验证（step 2.5，接 devkit.valida
 });
 
 describe('ServerKernel §7.4 快照备份确认闸门（W 级，未确认零副作用）', () => {
-  it('四种快照 kind 未传 confirm → permission + backups/ 未创建', async () => {
+  it('三种快照写 kind 未传 confirm → permission + backups/ 未创建', async () => {
     const dataDir = mkTmp();
     seedServer(dataDir, 'bk0');
     const kernel = new ServerKernel({ dataDir });
     const cases = [
       { kind: 'backup_server', payload: { serverId: 'bk0' } },
-      { kind: 'list_backups', payload: { serverId: 'bk0' } },
       { kind: 'restore_backup', payload: { serverId: 'bk0', backupId: 'x' } },
       { kind: 'prune_backups', payload: { serverId: 'bk0', keepN: 1 } },
     ] as const;
@@ -1142,6 +1141,25 @@ describe('ServerKernel §7.4 快照备份确认闸门（W 级，未确认零副�
       expect(result.data).toMatchObject({ confirmRequired: true });
     }
     expect(existsSync(join(dataDir, 'backups'))).toBe(false);
+  });
+
+  it('list_backups 是 R 类：无 confirm 可读且不弹确认闸门', async () => {
+    const dataDir = mkTmp();
+    seedServer(dataDir, 'bk0r');
+    let asked = 0;
+    const kernel = new ServerKernel({
+      dataDir,
+      confirm: () => {
+        asked++;
+        return true;
+      },
+    });
+    const result = await kernel
+      .dispatch({ id: 'bk-gate-r', kind: 'list_backups', payload: { serverId: 'bk0r' } })
+      .result();
+    expect(result.ok).toBe(true);
+    expect(result.data).toMatchObject({ serverId: 'bk0r', backups: [] });
+    expect(asked).toBe(0);
   });
 
   it('confirm 返回 false → 拒绝且不落快照', async () => {

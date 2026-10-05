@@ -71,6 +71,8 @@ export const KERNEL_READ_KINDS = [
   'get_context_pack',
   'get_target_state',
   'validate_content',
+  'list_backups',
+  'list_tasks',
 ] as const;
 export const KernelReadKindSchema = z.enum(KERNEL_READ_KINDS);
 export type KernelReadKindT = z.infer<typeof KernelReadKindSchema>;
@@ -98,6 +100,12 @@ export const KERNEL_WRITE_KINDS = [
   'stop_server',
   'rollback_build',
   'generate_content',
+  'backup_server',
+  'restore_backup',
+  'prune_backups',
+  'schedule_task',
+  'cancel_task',
+  'run_due_tasks',
 ] as const;
 export const KernelWriteKindSchema = z.enum(KERNEL_WRITE_KINDS);
 export type KernelWriteKindT = z.infer<typeof KernelWriteKindSchema>;

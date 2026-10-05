@@ -113,9 +113,15 @@ describe('通道注册', () => {
       expect(byName.get(kind)?.uiReachable, `${kind} 应可达`).toBe(true);
     }
     for (const kind of KERNEL_WRITE_KINDS) {
+      // R2b-wiring：run_due_tasks 是 R 级（免确认读+账本推进）但仅主进程侧可达，
+      // 不满足「W/X 类」假设，跳过通用断言，见下显式分级。
+      if (kind === 'run_due_tasks') continue;
       expect(byName.get(kind)?.permission, `${kind} 应是 W/X 类`).not.toBe('R');
       expect(byName.get(kind)?.uiReachable, `${kind} 不可达`).toBe(false);
     }
+    // R2b-wiring 新增 kind 分级：run_due_tasks 标 R 但主进程侧（定时触发器不进渲染层）。
+    expect(byName.get('run_due_tasks')?.permission, 'run_due_tasks 应是 R 类').toBe('R');
+    expect(byName.get('run_due_tasks')?.uiReachable, 'run_due_tasks 不可达').toBe(false);
     expect(res.kinds).toHaveLength(KERNEL_READ_KINDS.length + KERNEL_WRITE_KINDS.length);
   });
 

@@ -258,6 +258,22 @@ export function registerKernelHandlers(runtime?: KernelRuntime): void {
         return { ...wrapped, data: KernelValidateContentResponse.parse(wrapped.data) };
       }
 
+      case 'list_backups': {
+        // §7.4 快照列表：内核要求按 serverId 定位（无 serverId 直接 validation 拒绝），
+        // 故复用读通道既有的 serverId schema（与 read_logs / read_config 同形）。
+        const { serverId } = KernelReadLogsRequest.parse(payload);
+        const r = await rt.runRead('list_backups', { serverId });
+        return toResult<unknown>(r);
+      }
+
+      case 'list_tasks': {
+        // §7.4 定时账本：内核接受空 payload（查全部，不过滤）；serverId 过滤是轮询器
+        //（R2b）的事，本分支只保证名单与通道一致。
+        KernelEmptyRequest.parse(payload);
+        const r = await rt.runRead('list_tasks');
+        return toResult<unknown>(r);
+      }
+
       default:
         // TS 穷尽性兜底：KERNEL_READ_KINDS 加了新 kind 而这里没加 case 时编译失败。
         return unimplementedKind(String((req as { kind: string }).kind));
