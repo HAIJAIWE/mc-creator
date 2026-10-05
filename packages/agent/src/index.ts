@@ -12,3 +12,4 @@ export * from './host.js';
 export * from './infer.js';
 export * from './openai-chat.js';
 export * from './zen-free.js';
+export * from './closed-loop.js';
