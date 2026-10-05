@@ -127,6 +127,49 @@ export default tseslint.config(
     },
   },
 
+  /**
+   * devkit 的沙箱执行器（§8.3）：必须在运行时 require 原生绑定。
+   *
+   * `no-require-imports` 在这里必须关掉，理由不是「图方便」：
+   * `@mc-creator/jobobject` 含 `build/Release/jobobject.node`，rollup 无法处理
+   * 二进制。改成静态 import 会让它被内联进 bundle，产物里留下一个指向
+   * 不存在 .node 的 require，运行时 dlopen 失败 —— 与 MEMORY §2-①
+   * 记录的「打包启动即崩」是同一类故障。
+   *
+   * 用文件级精确匹配而非放宽整个包：devkit 其它文件都是正常 ESM。
+   */
+  {
+    files: ['packages/devkit/src/sandbox-exec.ts'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+
+  /**
+   * @mc-creator/jobobject 的 CommonJS 文件（§8.3 原生绑定的加载器与 launcher）。
+   *
+   * 必须是 CJS：`launcher.js` 由**子进程**用 `node launcher.js <json>` 直接执行，
+   * 不经过任何打包器。改成 ESM 会让 require('@mc-creator/jobobject') 在
+   * 运行时解析失败 —— 而那正是降级路径的判定依据（available=false）。
+   *
+   * 与根目录 `*.js` 那条配置同源（都注入 node globals、都关掉
+   * no-require-imports），但必须单列：根 `*.js` 只匹配仓库根那一层，
+   * 匹配不到 packages/jobobject/**。
+   */
+  {
+    files: ['packages/jobobject/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+
   // ---- Node.js scripts (.mjs) ----
   {
     files: ['apps/desktop/scripts/**/*.mjs', 'scripts/**/*.mjs'],
@@ -225,7 +268,15 @@ export default tseslint.config(
       '**/*.test.tsx',
       '**/*.spec.ts',
       '**/*.spec.tsx',
+      // jobobject 的用例是 CJS（跑在 node 侧，见上面那条配置），
+      // 需要 node globals 才能用 process / spawnSync。
+      'packages/jobobject/**/*.test.js',
     ],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',

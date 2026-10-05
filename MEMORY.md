@@ -1,37 +1,39 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：阶段 10 前的收尾轮（CI 全绿 + 5 个真缺陷修复 + 6 个提交）
+> 最近更新：§8.3 进程级隔离落地（原生 Job Object + 沙箱执行器 + 变异测试）
 
 ---
 
 ## 0. 当前状态一句话
 
-**阶段 0-9 全部落地，§15 工程化补齐已完成，CI 六个门禁全绿。**
-剩余唯一整块工作：**阶段 10 的产品体验层**—— 把内核层接进 desktop（见 §7）。
+**阶段 0-10 全部落地；§8.3 进程级隔离已实现并有实测证据。**
+设计文档**不在仓内** —— 需要它时只能靠代码注释里引用的原文片段
+（`packages/devkit/src/sandbox.ts` 头部是 §8.3 约束的主要载体）。
 
-| 门禁                             | 状态      | 实测                                                      |
-| -------------------------------- | --------- | --------------------------------------------------------- |
-| `pnpm -r test`                   | ✅ exit 0 | 17 包/ 268 files / 4303 tests（4282 passed + 21 skipped） |
-| `pnpm -r typecheck`              | ✅ exit 0 | all 17 packages Done                                      |
-| `pnpm lint`                      | ✅ exit 0 | **0 errors**（44 warnings，不影响退出码）                 |
-| `pnpm format:check`              | ✅ exit 0 | All matched files use Prettier code style                 |
-| `node scripts/check-docs.mjs`    | ✅ exit 0 | 所有文档数字与代码真值一致                                |
-| `node scripts/check-bundle.mjs`  | ✅ exit 0 | 入口 1.58MB / 首屏 2.15MB / 非worker 13.20MB              |
-| `pnpm --filter desktop test:e2e` | ✅ exit 0 | **11 passed**（真实拉起 Electron 44.4.3）                 |
+| 门禁                             | 状态      | 实测                                                                |
+| -------------------------------- | --------- | ------------------------------------------------------------------- |
+| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 291 files / 4871 passed + 43 skipped                         |
+| `pnpm -r typecheck`              | ✅ exit 0 | all 18 packages Done                                                |
+| `pnpm lint`                      | ✅ exit 0 | **0 errors**（44 warnings，不影响退出码）                           |
+| `pnpm format:check`              | ✅ exit 0 | All matched files use Prettier code style                           |
+| `node scripts/check-docs.mjs`    | ✅ exit 0 | 所有文档数字与代码真值一致                                          |
+| `node scripts/check-bundle.mjs`  | ✅ exit 0 | 入口 1.59MB / 非worker 13.20MB（体积未变，隔离代码在主进程侧）      |
+| `pnpm --filter desktop test:e2e` | ✅ exit 0 | **11 passed**（真实拉起 Electron 44.4.3）                           |
+| `pnpm --filter desktop build`    | ✅ exit 0 | 已验证 `@mc-creator/jobobject` 留在运行时 require，未被 rollup 内联 |
 
 ---
 
 ## 1. 最近 6 个提交
 
-| commit        | 内容                                                                |
-| ------------- | ------------------------------------------------------------------- |
-| `2e55ac1`     | asarUnpack + 修「打包启动即崩」+ Playwright E2E 门禁                |
-| `1ac0cb7`     | §12 版本化迁移框架 + §14 半成品检测                                 |
-| `84ac067`     | 移除失效的 isolated-vm 沙箱 + Mustache 加固 + file-manager 路径泄露 |
-| `b95b467`     | packages/ui 无效类名 + Tailwind 扫描范围漏包                        |
-| `996d127`     | PanelHost hook 崩溃 + Monaco 拆出主 chunk + 校验脚本读错文件        |
-| （格式/lint） | 全仓 prettier 259→0、eslint 100→0                                   |
+| commit    | 内容                                              |
+| --------- | ------------------------------------------------- |
+| `75bbbbc` | 微软账户 OAuth 登录与第三方认证合规闸门           |
+| `85ae23f` | generator-bedrock 生成 Bedrock Script API 脚本    |
+| `d219777` | 阶段 10 内核接线，主进程构造三内核并经 IPC 暴露   |
+| `177b250` | Maven version range 与五种依赖语义                |
+| `5ec1f51` | 整合包增量更新，按 sha512 跳过未变更文件          |
+| `cde22fe` | 重写 MEMORY.md 记录 11 个真缺陷与阶段 10 接线方案 |
 
 ---
 
@@ -216,6 +218,14 @@ Linux 腿**未本机验证**（依据官方 CI 同样在 ubuntu + xvfb 上跑 El
 6. **给brief 里写错误的修法。** 我让代理把 `Function` 改成
    `(...args: unknown[]) => void`，实测**破坏 tsc**（strictFunctionTypes
    参数逆变，窄回调不可赋给 `unknown[]` 形参）。代理自己发现并改了。
+7. **探针自己骗我，比探针写错更危险。** §8.3 那轮我用 `process.kill(pid, 0)`
+   判存活，在 Windows 上它对**活着的进程也返回「已死」**，于是我一度以为
+   「整树终止把父子都杀了」，差点把一个真实的 bug 当成通过。**测量方法本身要先
+   自检**（拿已知存活的 pid 验证），再拿去测别人。
+8. **「测试全绿」不等于「测试有效」。** 同一个探针里，内存上限测试在
+   **去掉上限的变异体下依然全绿** —— 因为 `while(true)` 狂分配本来就会耗尽
+   内存。判据：一条断言若在「被测行为被移除」时仍然通过，它测的就不是那个行为。
+   必须做变异测试（MEMORY §4.9）。
 
 ---
 
@@ -236,11 +246,18 @@ Linux 腿**未本机验证**（依据官方 CI 同样在 ubuntu + xvfb 上跑 El
 
 ---
 
-## 7. §7 下一步：阶段 10 产品体验层（唯一剩余整块）
+## 7. §7 阶段 10 产品体验层（**已完成**，见 commit `d219777`）
+
+> 本节原是「下一步」，现已落地。保留设计决策与踩坑记录供后续查阅：
+> 内核在**主进程内构造**、经 IPC 白名单暴露给渲染层，**不走 MCP 子进程**。
+> 实现文件：`src/main/kernel-runtime.ts`、`src/main/ipc/kernel.ts`、
+> `src/main/kernel-confirm.ts`、`src/shared/ipc/kernel.ts`、
+> 渲染层 `components/KernelPanel.tsx`。
 
 **§18 阶段 10 = 工程化补齐（已完成）+ 产品体验层（未开始）。**
 
-已核实的现状：**内核层根本没接进 desktop**。
+**以下是动手前的核实结论（现已全部落地，此处保留作为「为什么这么接」的依据）**：
+当时核实到**内核层根本没接进 desktop**。
 
 - `apps/desktop/package.json` 只依赖 `core`/`shared`/`shell`/`ui` ——
   **不依赖 agent，也不依赖任何 kernel 包**
@@ -262,7 +279,7 @@ Linux 腿**未本机验证**（依据官方 CI 同样在 ubuntu + xvfb 上跑 El
 即内核在**主进程内构造**，经 IPC 白名单暴露给渲染层，**不走 MCP 子进程**
 （MCP §10 是给外部 AI 客户端的工具面，是另一条通道）。
 
-范围：
+实施时的实际范围：
 
 | 文件                                       | 动作                                                                 |
 | ------------------------------------------ | -------------------------------------------------------------------- |
@@ -276,6 +293,110 @@ Linux 腿**未本机验证**（依据官方 CI 同样在 ubuntu + xvfb 上跑 El
 接上后 `index.ts` 的 `kernelRoot` 才有值 —— 它现在传 `undefined` **不是忘了传
 参数**，注释已改成准确表述。半成品实例扫描逻辑（`startup-recovery.ts` 的
 `scanInstanceRoot`）已落地并测透，无需改动。
+
+---
+
+## 7.5 §8.3 进程级隔离（本轮落地，含 5 个真踩坑）
+
+### 起点：约束在代码里，不在文档里
+
+`进程隔离` 这个词**全仓与全历史零命中**（`git log -S` 为空）。真正的锚点是
+`packages/devkit/src/sandbox.ts:2` → `设计文档 §8.3 安全模型 / §13.4 代码执行`，
+而**设计文档本身不在仓内**，只有代码注释引用了原文片段：
+
+> JDK 17 起 SecurityManager 被标记为待移除，JDK 24 已永久禁用
+> → 无法在进程内沙箱化 Java 代码 → **必须使用进程级或容器级隔离**
+
+`sandbox.ts` 明确写了它**不提供**进程内限制，只声明契约，由「进程/容器实施者」
+消费 —— 而那个实施者**当时根本不存在**。核实差距：
+
+| §8.3 约束               | 落地前                                                  | 落地后                                    |
+| ----------------------- | ------------------------------------------------------- | ----------------------------------------- |
+| cwd jail / 路径逃逸防护 | ✅ `assertWithinRoot`                                   | ✅ 不变                                   |
+| 墙钟超时 + 杀整棵树     | ✅ taskkill /t /f                                       | ✅ 且改为 job 句柄（更强）                |
+| `envAllowlist`          | ❌ **从未执行**（`gradle.ts:84` 是 `{...process.env}`） | ✅ 执行器按白名单过滤                     |
+| 内存硬上限              | ❌ 未实施                                               | ✅ `JOB_OBJECT_LIMIT_PROCESS_MEMORY`      |
+| CPU 配额                | ❌ 未实施                                               | ✅ `JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP` |
+| **禁用网络出站**        | ❌ 未实施                                               | ❌ **仍然未强制**（见下）                 |
+| `buildSandboxOptions`   | ❌ **生产零引用**（死代码）                             | ✅ 被 `build_project` 调用                |
+
+### ⚠️ 网络隔离：原生绑定也做不到
+
+**Job Object 无法禁止网络访问。** 需要 Windows 防火墙按程序规则（要管理员权限）
+或容器级隔离。所以 `enforced.network` 恒为 `false`，且被类型钉成字面量 `false`
+（`EnforcedReport.network: false`），`kernel-server` 的 `build_project` 把它放进
+返回值 `data.isolation` 向上暴露。**UI 因此无法显示一个永远为绿的「已沙箱化」。**
+
+### 五个真踩坑（都不是 lint 能发现的）
+
+1. **`cflags_cc` 不会传给 MSVC** —— `/utf-8` 和 `/EHsc` 都被**静默丢弃**。
+   症状：中文注释按系统代码页（936/GBK）读，GBK 尾字节含 `0x5C`(`\`) 被误读成
+   行尾续行符，**吞掉后面的 `#endif`** → `error C1020: unexpected #endif`；
+   `/EHsc` 丢失则报 C4530 且异常展开不可靠。修法：用 `msvs_settings`
+   （node-pty 已在用），并且把 `src/binding.cc` 改成**纯 ASCII**、中文说明移进
+   `README.md` —— ASCII 对任何 locale 的 CI 都免疫。
+
+2. **`terminateTree` 返回裸 boolean 是最坏的失败形态** —— 它在进程明明还活着
+   时返回 `true`（早期版本 + 陈旧二进制的组合）。改成返回诊断对象
+   `{ok, lastError, activeBefore, activeProcesses}`，并配了一条**对照实验**证明
+   `terminateTree` 变 no-op 时该用例确实变红。
+
+3. **「杀掉孙进程」这个断言测不出整树终止** —— 实测 Windows 上父进程被终止时
+   其非 detached 子进程会一并消失，所以「孙进程死了」**无法**区分
+   `TerminateJobObject`（杀整树）与 `TerminateProcess`（只杀父）：变异体存活。
+   真正能判别的是 **job 记账** —— 孤立的孙进程**仍留在 job 内**，
+   `activeProcesses === 0` 只有整树终止才做得到。
+
+4. **`process.kill(pid, 0)` 在 Windows 上不是有效的存活检查** —— 会给出「进程已死」
+   的假象（第一版探针因此误报 "tree died too early"）。改用 `tasklist`，且
+   **先自检方法本身**（用已知存活的自身 pid 验证），否则整套存活断言都是测量假象。
+   同理 `tasklist` 在无匹配时 exit 1，那是确定的「已死」而非测量错误。
+
+5. **内存上限测试最初毫无鉴别力** —— 用 `while(true)` 狂分配时，**去掉上限的
+   变异体也能拿到同样的 exit 9**（靠耗尽系统内存）。改成「单次分配 400MB +
+   上限 200MB」，并让分配量**远小于本机物理内存**，再配一条无上限的对照实验。
+
+### 变异测试实测（MEMORY §4.9 要求，含主代理自己改的东西）
+
+| 变异                         | 结果                              |
+| ---------------------------- | --------------------------------- |
+| 去掉内存上限 flag            | ✅ 被杀死                         |
+| 去掉 `KILL_ON_JOB_CLOSE`     | ✅ 被杀死                         |
+| `spawnInJob` 不返回 pid      | ✅ 被杀死                         |
+| `terminateTree` 退化成只杀父 | ✅ 被杀死（靠 job 记账断言）      |
+| **去掉 `CREATE_SUSPENDED`**  | ❌ **存活 —— 已知无法用单测覆盖** |
+
+最后一条是**设计约束而非测试缺口**：它消除的是「分配 job 之前」那个微秒级
+TOCTOU 窗口，构造它需要子进程在自己第一条指令里就 spawn 孙进程，本质不可确定性
+复现。正确性依据是 Win32 语义（后代由内核自动继承进 job）。**改动
+`spawnInJob` 的创建标志时，请把这条当设计约束看。**
+
+### 两个 API 语义坑（已修，值得记住）
+
+- **`waitForExit(child, 0)` 曾表示 INFINITE** → 想轮询的调用方永久阻塞。
+  现在 `0` = 轮询、`<0` = 无限等。开发时被这个坑过。
+- **`SystemRoot` 是硬性必需，不是可选加固** —— Windows 的 `CreateProcess` 靠它解析
+  DLL 搜索路径。实测逐一保留候选变量时，**只有带 `SystemRoot` 子进程才起得来**
+  （退 0），只带 `windir`/`TEMP`/`ComSpec`/`PATHEXT` 一律退 134。
+  所以 `filterEnv` 隐式保留 `SystemRoot`/`TEMP`/`TMP`（值由系统提供，无凭据）——
+  **收紧 env 本身会变成故障源**。
+
+### 落地清单
+
+| 文件                                        | 动作                                                              |
+| ------------------------------------------- | ----------------------------------------------------------------- |
+| `packages/jobobject/`（新包）               | N-API addon（7 个绑定）+ `launcher.js` + 永不抛错的加载器         |
+| `packages/devkit/src/sandbox-exec.ts`（新） | 沙箱执行器，让 `buildSandboxOptions` 变活；env 白名单             |
+| `packages/kernel-server/src/kernel.ts`      | `build_project` 走执行器，返回 `data.isolation`                   |
+| `apps/desktop/electron.vite.config.ts`      | `runtimeOnlyModules` 显式 external（`.node` 不能内联）            |
+| `apps/desktop/electron-builder.yml`         | `asarUnpack` 加一条 scoped 包路径                                 |
+| `apps/desktop/electron-builder.test.ts`     | 断言正则放行 `@scope/name`（**故意设卡的测试**）                  |
+| `eslint.config.mjs`                         | jobobject 的 CJS 规则 + sandbox-exec 的 `no-require-imports` 例外 |
+
+> **已验证**：`build` 后产物里是 `require("@mc-creator/jobobject")`（运行时解析），
+> **无 `.node` 字面量** → 不会重演 MEMORY §2-①「打包启动即崩」。
+> **未验证**：真实 `electron-builder` 打包产物里 asarUnpack 是否正确落地
+> （`--dir` 打包本轮没跑）。CI 上如有 packaging job 需留意。
 
 ---
 
@@ -313,8 +434,9 @@ Linux 腿**未本机验证**（依据官方 CI 同样在 ubuntu + xvfb 上跑 El
 3. typecheck → lint → 全量测试 → build → **E2E**（E2E 是唯一能验证真实浏览器
    行为的关卡，jsdom 测不到真实 `useId`、aria 解析、Suspense 时序、Monaco 集成）
 
-**尚未派代理执行。** 建议等阶段 10 接线完成后再动 —— 在 4300 条绿测试基线上
-叠版本升级，会让「升级引入的问题」和「新功能的问题」纠缠不清。
+**尚未派代理执行。** 阶段 10 接线（§7）已完成，**现在可以动了** ——
+但建议先跑一次 `electron-builder --dir` 确认 asarUnpack 那条新路径（§7.5 唯一未验证项），
+把打包链的不确定性先排除，再叠版本升级。
 
 ### 其它落后一代（文档要求的是**能力**不是版本）
 

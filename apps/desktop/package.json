@@ -51,6 +51,7 @@
     "zustand": "^4.5.0"
   },
   "optionalDependencies": {
+    "@mc-creator/jobobject": "workspace:*",
     "node-pty": "^1.1.0"
   },
   "devDependencies": {

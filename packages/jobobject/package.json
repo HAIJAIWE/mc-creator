@@ -1,0 +1,38 @@
+{
+  "name": "@mc-creator/jobobject",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Windows Job Object 原生绑定（设计文档 §8.3 进程级隔离：内存/CPU 上限 + 整树终止）",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./launcher": "./launcher.js"
+  },
+  "//files": "必须精确列文件，不能写 'build/'：node-gyp 的中间产物（.obj/.ipdb/.tlog/.lib/.exp，合计约 1.2MB，且带绝对路径）会被一起打进包。实测 --dir 打包时它们确实进了 app.asar.unpacked —— 整包解包策略下，一个宽泛目录就会把构建垃圾带走。prebuilds/ 保留在列表里，是为将来『提交预编译二进制』那条路线留插口。",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "launcher.js",
+    "scripts/install.js",
+    "prebuilds/",
+    "build/Release/jobobject.node"
+  ],
+  "scripts": {
+    "install": "node scripts/install.js",
+    "build:addon": "node scripts/install.js --force",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "node-addon-api": "^7.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "5",
+    "vitest": "^2.0.0"
+  }
+}

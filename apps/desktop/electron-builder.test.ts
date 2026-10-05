@@ -102,7 +102,11 @@ describe('electron-builder.yml 打包配置', () => {
     ).toBeTruthy();
 
     for (const name of natives) {
-      const covered = unpack.some((g) => g.includes(`node_modules/${name}/`));
+      // 必须匹配到目录**末尾**：`node_modules/${name}/` 是子串匹配，
+      // 所以 @mc-creator 会被 @mc-creator/jobobject 的那条 glob 误判为已覆盖。
+      // 那种误判很难发现 —— 真正的 jobobject 仍未解包，而这条断言是绿的。
+      // 断言意图（每个原生模块都被覆盖）未变，只是判据不再自欺。
+      const covered = unpack.some((g) => g.includes(`node_modules/${name}/**`));
       expect(covered, `原生模块 ${name} 未被 asarUnpack 覆盖，会被打进 asar 导致 dlopen 失败`).toBe(
         true,
       );
@@ -113,7 +117,18 @@ describe('electron-builder.yml 打包配置', () => {
     const unpack = topLevelList('asarUnpack');
     expect(unpack).not.toContain('**/*.node');
     for (const g of unpack) {
-      expect(g, `asarUnpack 条目 ${g} 过于宽泛`).toMatch(/\*\*\/node_modules\/[^/]+\/\*\*$/);
+      // 必须精确到包目录，且允许 scoped 包名（@scope/name）。
+      //
+      // 为什么必须放行 @scope/：§8.3 引入的 @mc-creator/jobobject 是 scoped 包，
+      // 路径是 node_modules/@mc-creator/jobobject/**。原来的
+      // `[^/]+` 匹配不到它（'@mc-creator' 后面还有一级），于是这条断言会
+      // 拒绝唯一正确的写法 —— 逼人改用宽泛 glob 或干脆不解包，
+      // 后者会让 dlopen 失败、打包出来的应用启动即崩（MEMORY §2-①② 的同类坑）。
+      //
+      // 断言意图未变：仍然拒绝 '**/*.node' 这类会误伤无关二进制的宽泛写法。
+      expect(g, `asarUnpack 条目 ${g} 过于宽泛`).toMatch(
+        /^\*\*\/node_modules\/(?:@[^/]+\/)?[^/]+\/\*\*$/,
+      );
     }
   });
 

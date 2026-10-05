@@ -34,6 +34,19 @@ const workspacePkgs = [
   '@mc-creator/shell',
 ];
 
+/**
+ * 必须留在运行时 require、**不能**打进 bundle 的模块。
+ *
+ * `@mc-creator/jobobject` 是 §8.3 进程级隔离的原生绑定，内含
+ * `build/Release/jobobject.node`。rollup 无法处理二进制 `.node`：
+ * 若让它内联，产物里会出现一个指向不存在的 .node 路径的 require，
+ * 运行时 dlopen 失败 —— 与 MEMORY §2-① 记录的「打包启动即崩」同一类。
+ *
+ * 所以它既不进 workspacePkgs（那会让 rollup 内联），也必须显式 external。
+ * devkit/sandbox-exec.ts 用运行时 require 解析它，加载失败即降级。
+ */
+const runtimeOnlyModules = ['@mc-creator/jobobject'];
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin({ exclude: workspacePkgs })],
@@ -49,7 +62,10 @@ export default defineConfig({
       },
     },
     build: {
-      rollupOptions: { input: { index: resolve(__dirname, 'src/main/index.ts') } },
+      rollupOptions: {
+        input: { index: resolve(__dirname, 'src/main/index.ts') },
+        external: runtimeOnlyModules,
+      },
     },
   },
   preload: {

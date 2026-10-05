@@ -24,6 +24,43 @@ files:
       - '**/*'
       - '!**/node_modules/**'
       - '!**/.vite/**'
+  # @mc-creator/jobobject（§8.3 原生绑定）的收集清单。
+  #
+  # 排除规则必须关在这个对象的 filter 里：顶层 '!' 开头的字符串会被
+  # getNodeModuleFileMatcher 一并收走（那会排除掉全部生产依赖，见上）。
+  #
+  # ⚠️ 已知局限（实测，别误以为这段白名单已生效）：
+  # 对 **workspace 软链包**，electron-builder 既不应用该包自己的 files[]，
+  # 也不应用这里的 from/to/filter —— 它直接把整个包目录拷进去。
+  # 变异实验：删掉本段只留 asarUnpack，产物 26 个文件；加上本段 24 个文件。
+  # 也就是说白名单只被部分尊重，node-gyp 的中间产物（obj/tlog/ipdb/lib/exp，
+  # 约 1.4MB）仍会进包。真正生效的是 asarUnpack 那条（.node 确实被解包）。
+  #
+  # 要彻底瘦身需让 build/ 不存在于包目录内（例如把产物复制到
+  # prebuilds/<platform>-<arch>/ 后删除 build/），代价是失去增量编译缓存。
+  # 当前判断：1.4MB 构建垃圾换增量编译缓存，可接受，暂不改。
+  - from: node_modules/@mc-creator/jobobject
+    to: node_modules/@mc-creator/jobobject
+    filter:
+      - 'index.js'
+      - 'index.d.ts'
+      - 'launcher.js'
+      - 'package.json'
+      - 'build/Release/jobobject.node'
+      - '!build/Release/*.lib'
+      - '!build/Release/*.exp'
+      - '!build/Release/*.ipdb'
+      - '!build/Release/*.iobj'
+      - '!build/Release/*.pdb'
+      - '!build/*.sln'
+      - '!build/*.vcxproj*'
+      - '!build/config.gypi'
+      - '!binding.gyp'
+      - '!src/**'
+      - '!dist/**'
+      - '!scripts/**'
+      - '!README.md'
+      - '!tsconfig.json'
 asar: true
 # 原生模块解包（设计文档 §15 硬性要求）
 # asar 只是归档格式，dlopen 无法从归档内加载 .node，必须解包到 app.asar.unpacked/
@@ -41,6 +78,29 @@ asarUnpack:
   #   只解 .node 会导致加载 .node 成功但创建 PTY 失败。
   #   降级行为：require 失败时 catch 住，终端 IPC 返回结构化错误，其余功能不受影响。
   - '**/node_modules/node-pty/**'
+  # @mc-creator/jobobject：§8.3 进程级隔离的原生绑定。
+  #   需整包解包：build/Release/jobobject.node 必须能被 dlopen，而 asar 内的
+  #   归档 dlopen 不了。与 node-pty 同样按「整包」而非单文件解包 ——
+  #   launcher.js 与 index.js 要在运行时按相对路径 require 同一个包。
+  #   降级行为：二进制缺失/未编译时 index.js 的 available=false，
+  #   devkit/sandbox-exec.ts 据此降级并把 enforced.source 标成 'unisolated'
+  #   （不会崩，也不会假装已隔离）。
+  #
+  #   为什么必须显式列出（不能靠 smartUnpack 猜）：
+  #   这个包是 **workspace 软链**，electron-builder 的 smartUnpack 靠
+  #   「包目录里出现 .node/.dll/.exe」来猜，而软链解析时机与普通目录不同。
+  #   实测：加这条之前打包成功，但 app.asar.unpacked 里**根本没有**
+  #   @mc-creator/jobobject —— 整个包连同 .node 都被塞进了 asar。
+  #   那种包在开发时完全正常（node_modules 里有真实文件），只有打包产物会
+  #   dlopen 失败 —— 与 MEMORY §2-①「打包启动即崩」是同一类陷阱：
+  #   pnpm build / test 全绿都证明不了它。已做变异验证：删掉本条，
+  #   electron-builder.test.ts 的「asarUnpack 覆盖每个原生模块」立刻变红。
+  # asarUnpack 只接受 glob 字符串数组（app-builder-lib 的 PlatformSpecificBuildOptions
+  # 里类型是 Array<string>），**不能**用 files 那套 from/to/filter 对象形式 ——
+  # 写成对象会被 schema 校验直接拒掉：
+  #   Invalid configuration object ... does not match the API schema
+  # 所以排除构建垃圾只能靠下面 files 段的 from/to/filter（那里可以用对象形式）。
+  - '**/node_modules/@mc-creator/jobobject/**'
 # isolated-vm 已从依赖中移除（原先 asarUnpack 里的 isolated-vm 一并删除）。
 #   它曾被用来「沙箱化」Mustache 渲染，但沙箱里跑的是**我们自己写的约 100 行
 #   渲染器**，template/fields 只作为 ExternalCopy 数据注入、从不当代码执行。

@@ -30,7 +30,10 @@
  * 关键边界（§7.1 / §13.4）：
  * - 本内核**不做进程托管**：restart_server / stop_server 只校验服务端存在性并返回
  *   控制指令，真实 SIGTERM / RCON 注入由外壳进程保活服务在确认后执行；
- * - build_project 走 devkit.runGradleBuild（独立进程 + 超时上限，§8.3），
+ * - build_project 优先走 devkit.runSandboxed（§8.3 进程级隔离：Windows Job Object
+ *   施加内存/CPU 上限与整树终止 + env 白名单）；隔离不可用时降级到
+ *   devkit.runGradleBuild，并把实际强制项（enforcedIsolation）如实回报，
+ *   其中 network 恒为 false —— Job Object 管不到网络，不要假装已禁网。
  *   sandbox 模式产物留在 sandboxDir，**永不自动部署进正式服务端**；
  * - deploy_plugin 的热重载只返回建议命令，不自动发控制台命令。
  * - 未知 kind：ok:false + unknown 分类（保留 stub 语义）。
@@ -52,7 +55,17 @@ import {
   MCP_TOOL_PERMISSIONS,
 } from '@mc-creator/contract';
 import { writeFileAtomic, ZipSafetyError } from '@mc-creator/shell';
-import { assertWithinRoot, makeArtifactRef, runGradleBuild, sha256File } from '@mc-creator/devkit';
+import {
+  assertWithinRoot,
+  buildSandboxOptions,
+  findBuiltJar,
+  findJarInLog,
+  makeArtifactRef,
+  runGradleBuild,
+  runSandboxed,
+  sha256File,
+  type EnforcedReport,
+} from '@mc-creator/devkit';
 
 /** 内核构造上下文。 */
 export interface KernelContext {
@@ -684,6 +697,71 @@ export class ServerKernel implements KernelContract {
     return { ok: true, data: { deleted: true, serverId, path: dir } };
   }
 
+  /**
+   * 跑 Gradle 构建，优先走 §8.3 的进程级隔离执行器。
+   *
+   * 隔离可用时经 @mc-creator/jobobject（Windows Job Object）施加内存/CPU 上限
+   * 与整树终止；不可用时降级为 runGradleBuild，并把「实际强制了什么」放进
+   * enforcedIsolation 回报给上层 —— 不静默假装已隔离（MEMORY §2-④）。
+   */
+  private async runBuild(
+    projectDir: string,
+    javaHome: string | undefined,
+    timeoutMs: number | undefined,
+  ): Promise<{
+    success: boolean;
+    jarPath: string | null;
+    log: string;
+    exitCode: number | null;
+    timedOut: boolean;
+    enforcedIsolation: EnforcedReport;
+  }> {
+    const limits = {
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    };
+    const env: Record<string, string | undefined> = { ...process.env };
+    if (javaHome !== undefined) env['JAVA_HOME'] = javaHome;
+    // 沙箱 cwd 就是工程目录：cwd jail 已由 guard(root, projectDir) 保证。
+    const sandbox = buildSandboxOptions(projectDir, {
+      cwd: projectDir,
+      limits,
+      envAllowlist: ['PATH', 'JAVA_HOME', 'GRADLE_USER_HOME', 'GRADLE_OPTS'],
+    });
+
+    const isWin = process.platform === 'win32';
+    const gradlew = isWin ? 'gradlew.bat' : './gradlew';
+    const args = ['build', '--quiet'];
+
+    const run = await runSandboxed({
+      sandbox,
+      file: gradlew,
+      args,
+      env,
+    });
+
+    if (run.enforced.source === 'unisolated') {
+      // 隔离不可用：退回原有实现（含 Windows shell:true 与 taskkill 杀树逻辑），
+      // 避免为了「统一」而丢掉 gradlew.bat 的启动兼容性。
+      const legacy = await runGradleBuild(projectDir, {
+        ...(javaHome === undefined ? {} : { javaHome }),
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      });
+      return { ...legacy, enforcedIsolation: run.enforced };
+    }
+
+    const jarPath = run.success
+      ? ((await findBuiltJar(projectDir)) ?? findJarInLog(projectDir, run.log))
+      : null;
+    return {
+      success: run.success,
+      jarPath,
+      log: run.log,
+      exitCode: run.exitCode,
+      timedOut: run.timedOut,
+      enforcedIsolation: run.enforced,
+    };
+  }
+
   private async buildProject(
     root: string,
     payload: unknown,
@@ -699,10 +777,7 @@ export class ServerKernel implements KernelContract {
     const timeoutMs = optNumber(p, 'timeoutMs');
 
     step(1);
-    const build = await runGradleBuild(projectDir, {
-      ...(javaHome === undefined ? {} : { javaHome }),
-      ...(timeoutMs === undefined ? {} : { timeoutMs }),
-    });
+    const build = await this.runBuild(projectDir, javaHome, timeoutMs);
     if (!build.success) {
       // 构建失败归 validation（可读日志摘要）并带稳定 code，便于上层回灌修复（§10.3）。
       const tail = build.log.trim().split('\n').slice(-20).join(' | ');
@@ -731,6 +806,17 @@ export class ServerKernel implements KernelContract {
         sha256,
         exitCode: build.exitCode,
         sandboxed: this.mode === 'sandbox',
+        // §8.3：把「实际强制了哪些隔离项」如实带给上层。
+        // network 恒为 false（Job Object 管不到网络）—— 上层据此提示用户，
+        // 而不是显示一个「已沙箱化」的错误绿灯。
+        isolation: {
+          source: build.enforcedIsolation.source,
+          memory: build.enforcedIsolation.memory,
+          cpu: build.enforcedIsolation.cpu,
+          network: build.enforcedIsolation.network,
+          treeKill: build.enforcedIsolation.treeKill,
+          reason: build.enforcedIsolation.reason,
+        },
         note:
           this.mode === 'sandbox'
             ? '沙箱模式：产物留在沙箱目录，永不自动部署进正式服务端（§13.4）'

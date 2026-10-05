@@ -441,6 +441,27 @@ describe('ServerKernel build_project 真实现', () => {
     expect(readFileSync(data.jarPath, 'utf8').trim()).toBe('fake');
   });
 
+  it('data.isolation 如实回报实际强制项，且 network 恒为 false（§8.3）', async () => {
+    const dataDir = mkTmp();
+    const projectDir = makeFakeProject(dataDir, 'proj', fakeBuildScript(['demo-1.0.jar']));
+    const result = await new ServerKernel({ dataDir, confirm: YES })
+      .dispatch({ id: 'bp-iso', kind: 'build_project', payload: { projectDir, timeoutMs: 20000 } })
+      .result();
+
+    expect(result.ok).toBe(true);
+    const iso = (result.data as { isolation?: Record<string, unknown> }).isolation;
+    // 上层必须能知道「这次到底有没有隔离」，否则 UI 只能显示一个
+    // 永远为绿的「已沙箱化」——那正是 MEMORY §2-④ 说的假安全。
+    expect(iso).toBeDefined();
+    expect(iso?.source === 'job-object' || iso?.source === 'unisolated').toBe(true);
+    // 无论如何都不能声称禁了网：Job Object 管不到网络。
+    expect(iso?.network).toBe(false);
+    // 降级时必须带原因，否则用户无从判断为什么没隔离。
+    if (iso?.source === 'unisolated') {
+      expect(typeof iso?.reason).toBe('string');
+    }
+  });
+
   it('jarName 指定 → 命中指定 jar（排除 -sources/-javadoc，取排序首个其余）', async () => {
     const dataDir = mkTmp();
     const projectDir = makeFakeProject(
