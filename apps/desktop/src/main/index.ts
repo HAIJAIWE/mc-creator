@@ -5,6 +5,7 @@ import { getProcessSupervisor } from './ipc/process-supervisor.js';
 import { runStartupRecovery, formatRecoveryReport } from './startup-recovery.js';
 import { getKernelRuntime, initKernelRuntime, resolveKernelRoot } from './kernel-runtime.js';
 import { createNativeConfirm } from './kernel-confirm.js';
+import { ensureSingleInstance } from './single-instance.js';
 
 // 受限环境（无 GPU / 沙箱代理）下禁用 GPU，避免 Chromium GPU 进程崩溃。
 // 代价：WebGL 不可用，skinview3d 等 3D 预览会加载失败（实测 SwiftShader
@@ -15,6 +16,24 @@ if (process.env.MC_CREATOR_NO_GPU) {
   app.commandLine.appendSwitch('disable-gpu');
   app.commandLine.appendSwitch('disable-gpu-sandbox');
   app.commandLine.appendSwitch('disable-dev-shm-usage');
+}
+
+/**
+ * §4.1 单实例锁：必须在模块顶部、`app.whenReady()` 之前拿。
+ * 第二个实例拿不到锁就 `app.quit()`，绝不进入下面的启动链——否则两套内核
+ * （`initKernels`）同时管理同一批服务端。
+ * 聚焦逻辑复用 `activate` 分支语义：有窗口则聚焦首个，无窗口则新建。
+ */
+const instanceRole = ensureSingleInstance({
+  app,
+  onSecondInstance: () => {
+    const existing = BrowserWindow.getAllWindows()[0];
+    if (existing) existing.focus();
+    else createWindow();
+  },
+});
+if (instanceRole === 'quit') {
+  app.quit();
 }
 
 function createWindow(): void {
@@ -166,6 +185,8 @@ function initKernels(): void {
 }
 
 app.whenReady().then(() => {
+  // §4.1 第二道闸：quit 分支已调 app.quit()，这里直接返回，绝不初始化内核。
+  if (instanceRole !== 'primary') return;
   initKernels();
   runStartupRecoveryScan();
   registerIpcHandlers(createDefaultOrchestrator);
