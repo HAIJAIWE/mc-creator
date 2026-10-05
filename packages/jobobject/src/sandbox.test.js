@@ -29,7 +29,7 @@
 
 import { describe, expect, it, beforeAll } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -52,13 +52,16 @@ function alive(pid) {
   return r.stdout.includes(`"${pid}"`);
 }
 
-/** 等文件出现并返回其内容（用于跨进程传回退出码）。 */
-async function waitForFile(file, timeoutMs) {
+/**
+ * 等文件出现并返回其内容（用于跨进程传回退出码）。
+ * 传 parse=number 时返回值转数字，否则返回原始字符串。
+ */
+async function waitForFile(file, timeoutMs, parse = 'number') {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (existsSync(file)) {
       const raw = readFileSync(file, 'utf8').trim();
-      if (raw !== '') return Number(raw);
+      if (raw !== '') return parse === 'number' ? Number(raw) : raw;
     }
     await sleep(50);
   }
@@ -171,6 +174,44 @@ describeIfAvailable('Job Object 真隔离（需要已编译的二进制）', () 
     jobobject.closeChild(parent.child);
     jobobject.closeJob(job);
   });
+
+  it('内存上限对「孙进程辈」同样生效（.bat -> node 的形状，同 Gradle 的 .bat -> java）', async () => {
+    // 这是 §8.3 真正要管的那一层：JOB_OBJECT_LIMIT_PROCESS_MEMORY 若只约束
+    // job 的**直接子进程**，那对 Gradle 构建毫无意义（真正吃内存的是
+    // .bat 拉起的 java，是孙进程）。实测确认它对孙进程同样生效。
+    const dir = mkdtempSync(path.join(tmpdir(), 'jobobject-gc-'));
+    const resultFile = path.join(dir, 'm.txt');
+    const job = jobobject.createJob(200, 0);
+
+    if (process.platform === 'win32') {
+      // cmd.exe 是 job 的直接子进程，node alloc.js 是它的子进程。
+      writeFileSync(
+        path.join(dir, 'go.bat'),
+        '@echo off\r\nnode alloc.js\r\nexit /b 0\r\n',
+        'utf8',
+      );
+      writeFileSync(
+        path.join(dir, 'alloc.js'),
+        `require('fs').writeFileSync(${JSON.stringify(resultFile)},'start');
+         try{var b=Buffer.alloc(400*1024*1024,1);b[0]=1;require('fs').writeFileSync(${JSON.stringify(resultFile)},'ok')}catch(e){require('fs').writeFileSync(${JSON.stringify(resultFile)},'refused')}`,
+        'utf8',
+      );
+      jobobject.spawnInJob(job, process.env.ComSpec ?? 'cmd.exe', ['/c', 'go.bat'], dir, true);
+    } else {
+      jobobject.spawnInJob(job, '/bin/sh', ['-c', 'node alloc.js'], dir, true);
+      writeFileSync(
+        path.join(dir, 'alloc.js'),
+        `require('fs').writeFileSync(${JSON.stringify(resultFile)},'start');
+         try{var b=Buffer.alloc(400*1024*1024,1);b[0]=1;require('fs').writeFileSync(${JSON.stringify(resultFile)},'ok')}catch(e){require('fs').writeFileSync(${JSON.stringify(resultFile)},'refused')}`,
+        'utf8',
+      );
+    }
+
+    const got = await waitForFile(resultFile, 60000, 'string');
+    // refused = 上限真的传到了孙进程；ok = 只约束了直接子进程（那就毫无意义）。
+    expect(got, '内存上限没有作用到孙进程 —— 对 Gradle 构建等于没设限').toBe('refused');
+    jobobject.closeJob(job);
+  }, 90000);
 
   it('对照实验：同一个孙进程在无上限 job 下分配成功', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'jobobject-inherit-ctrl-'));

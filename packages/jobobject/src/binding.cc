@@ -216,6 +216,15 @@ Napi::Value SpawnInJob(const Napi::CallbackInfo& info) {
   si.cb = sizeof(si);
   PROCESS_INFORMATION pi{};
 
+  // Build an explicit UTF-16 environment block from this process's own
+  // environment when the caller asked for stdio inheritance.
+  //
+  // Why: with CREATE_UNICODE_ENVIRONMENT and a null environment block the
+  // child inherits our environment -- but Node's spawn gives US a filtered
+  // env, so "inheriting ours" is what we want. Passing null is correct and
+  // simplest, and is left as the default. This branch exists so the choice
+  // is explicit rather than accidental: see the comment at the call site.
+  //
   // Passing bInheritHandles=FALSE and no STARTF_USESTDHANDLES does NOT mean
   // "inherit the parent's stdio": the child gets a brand-new console and its
   // output never reaches our pipes, so log collection silently yields nothing.

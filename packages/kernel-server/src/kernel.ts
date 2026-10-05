@@ -58,6 +58,7 @@ import { writeFileAtomic, ZipSafetyError } from '@mc-creator/shell';
 import {
   assertWithinRoot,
   buildSandboxOptions,
+  filterEnv,
   findBuiltJar,
   findJarInLog,
   makeArtifactRef,
@@ -719,8 +720,31 @@ export class ServerKernel implements KernelContract {
     const limits = {
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
     };
+    // env 交给 filterEnv 按白名单裁剪。来源必须是完整 process.env ——
+    // 只塞 JAVA_HOME 会让 PATH 实际缺失，.bat 里的 node 找不到，
+    // 构建「成功」却什么都没跑（实测 alloc.js 从未执行、build_project ok=true）。
     const env: Record<string, string | undefined> = { ...process.env };
     if (javaHome !== undefined) env['JAVA_HOME'] = javaHome;
+    // PATH 缺失 = 构建会静默空转（.bat 里的 node/gradle 找不到，而退出码仍是 0）。
+    // 与其产出一个空的「成功」，不如响。用 filterEnv 判定而不是 env['PATH']：
+    // 本机 process.env 存的是 `Path`，直接读 'PATH' 会误判为缺失。
+    if (filterEnv(['PATH'], env).PATH === undefined) {
+      return {
+        success: false,
+        jarPath: null,
+        log: '',
+        exitCode: null,
+        timedOut: false,
+        enforcedIsolation: {
+          source: 'unisolated',
+          memory: false,
+          cpu: false,
+          network: false,
+          treeKill: false,
+          reason: '当前进程环境缺少 PATH',
+        },
+      };
+    }
     // 沙箱 cwd 就是工程目录：cwd jail 已由 guard(root, projectDir) 保证。
     const sandbox = buildSandboxOptions(projectDir, {
       cwd: projectDir,
@@ -728,14 +752,28 @@ export class ServerKernel implements KernelContract {
       envAllowlist: ['PATH', 'JAVA_HOME', 'GRADLE_USER_HOME', 'GRADLE_OPTS'],
     });
 
+    // Windows 上只有 gradlew.bat，必须经 shell 启动（core 的 C-2 修复踩过
+    // `./gradlew` ENOENT）。但**不能**用 spawn 的 shell:true —— 那会引入一个
+    // 不受 job 约束的 cmd.exe，且 .bat 拉起的 java/gradle 是孙进程，
+    // 正是 §8.3 要消除的情形。改为显式拼 shell 命令行：cmd.exe 自身仍由
+    // CreateProcess 纳入 job，其后代随之继承，隔离不破。
     const isWin = process.platform === 'win32';
     const gradlew = isWin ? 'gradlew.bat' : './gradlew';
-    const args = ['build', '--quiet'];
+    const gradleArgs = ['build', '--quiet'];
+    const shell = isWin
+      ? (process.env['ComSpec'] ?? 'cmd.exe')
+      : (process.env['SHELL'] ?? '/bin/sh');
+    // 引号：Windows 的 cmd 对 - 前缀参数不能加引号，路径类必须加；
+    // posix 用单引号并转义内嵌单引号。
+    const tail = gradleArgs
+      .map((a) => (isWin ? (a.startsWith('-') ? a : `"${a}"`) : `'${a.replace(/'/g, `'\\''`)}'`))
+      .join(' ');
+    const script = isWin ? `/c ${gradlew} ${tail}` : `-c './${gradlew} ${tail}'`;
 
     const run = await runSandboxed({
       sandbox,
-      file: gradlew,
-      args,
+      file: shell,
+      args: [script],
       env,
     });
 

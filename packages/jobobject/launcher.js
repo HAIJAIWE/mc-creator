@@ -67,6 +67,11 @@ function main() {
 
   const job = jobobject.createJob(payload.maxMemoryMb ?? 0, payload.maxCpuCores ?? 0);
   let spawned;
+  // 目标进程继承本进程的 stdio（见下面 inheritStdio 参数）。但继承句柄与
+  // 环境是**两件独立的事**，实测踩过：CreateProcessW 若不给
+  // STARTF_USESTDHANDLES，子进程会拿到全新控制台，日志收不到；
+  // 而若不给环境块，cmd.exe 里 `node` 会因 PATH 缺失而找不到 ——
+  // 表现是「构建成功但脚本从未执行」，比直接失败危险得多。
   try {
     // inheritStdio=true：让目标进程继承**本 launcher 的** stdio，
     // 而 launcher 的 stdio 就是上层为它建的管道 —— 日志由此回到上层。

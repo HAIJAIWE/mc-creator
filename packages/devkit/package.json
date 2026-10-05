@@ -15,8 +15,10 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
+  "//jobobject": "§8.3 进程级隔离的原生绑定。必须是 dependencies：devkit 用运行时 require 解析它，而 pnpm 只为**直接依赖**建 node_modules 软链 —— 不列在这里就 require 不到，实测会静默降级成 enforced.source='unisolated'（隔离形同虚设，而测试全绿）。注意 pnpm 不认 dependencies 里的 // 注释键，所以说明放在 dependencies 之外。",
   "dependencies": {
-    "@mc-creator/contract": "workspace:*"
+    "@mc-creator/contract": "workspace:*",
+    "@mc-creator/jobobject": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

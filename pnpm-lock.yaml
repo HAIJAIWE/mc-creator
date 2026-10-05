@@ -309,6 +309,9 @@ importers:
       '@mc-creator/contract':
         specifier: workspace:*
         version: link:../contract
+      '@mc-creator/jobobject':
+        specifier: workspace:*
+        version: link:../jobobject
     devDependencies:
       '@types/node':
         specifier: ^26.1.1

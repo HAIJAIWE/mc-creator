@@ -81,6 +81,29 @@ describe('filterEnv：按 envAllowlist 过滤（§8.3 实际强制项）', () =>
     expect(Object.prototype.hasOwnProperty.call(got, 'NOT_SET')).toBe(false);
   });
 
+  it('大小写不敏感地读取：源里存的是 Path 也能命中 PATH', () => {
+    // 这条对应一个真实故障：本机 process.env 存的是 `Path`，展开后也只有
+    // `Path`，直接 source['PATH'] 得到 undefined → PATH 被静默丢掉 →
+    // cmd.exe 里 node 找不到 → build_project 返回 ok=true 但什么都没构建。
+    const src = { Path: 'C:\\nodejs;C:\\Windows', SystemRoot: 'C:\\WINDOWS' };
+    const got = filterEnv(['PATH'], src);
+    expect(got.PATH).toBe('C:\\nodejs;C:\\Windows');
+    // 输出键用白名单里的规范写法，交给 CreateProcess 的环境块用。
+    expect(Object.keys(got)).toContain('PATH');
+  });
+
+  it('真实 process.env 展开后仍能取到 PATH（回归：曾静默变空构建）', () => {
+    const spread = { ...process.env };
+    const got = filterEnv(['PATH'], spread);
+    // 本仓 CI 是 Linux（键名本就大写），这里只在有 PATH 的平台断言。
+    const anyKey = Object.keys(spread).find((k) => k.toLowerCase() === 'path');
+    if (anyKey === undefined) return;
+    expect(got.PATH, `展开后应能按不区分大小写取回 PATH（实际键名 ${anyKey}）`).toBe(
+      spread[anyKey],
+    );
+    expect((got.PATH ?? '').length).toBeGreaterThan(0);
+  });
+
   it('隐式保留 SystemRoot/TEMP：缺了它们 Windows 上子进程根本起不来', () => {
     // 这条是「为什么 filterEnv 不是纯白名单」的证据。Windows 的 CreateProcess
     // 依赖 SystemRoot 解析 DLL 搜索路径，删掉它子进程会以 ENOENT/134 失败 ——

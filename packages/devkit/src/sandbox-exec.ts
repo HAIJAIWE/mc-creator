@@ -28,6 +28,7 @@
  */
 
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { buildSandboxOptions, type SandboxOptions } from './sandbox.js';
 
 /** launcher 与原生模块的注入点：测试替换，运行时惰性解析。 */
@@ -93,33 +94,64 @@ export interface SandboxRunResult {
 /** launcher 用这个退出码表示「隔离不可用」，与真实退出码区分。 */
 const EXIT_UNAVAILABLE = 78;
 
+/**
+ * 运行时解析 CJS 模块的 require。
+ *
+ * 必须用 createRequire 而不是裸 `require`：devkit 是 `"type": "module"`，
+ * 裸 require 在 ESM 里**根本不存在**（ReferenceError），会被下面的 catch
+ * 吞掉、静默降级成 unisolated —— 隔离形同虚设而所有测试依然全绿。
+ * 这个坑真实发生过：实测 `enforced.source` 一直是 'unisolated'，
+ * 原因就是这里的 require 抛了 ReferenceError 而非模块缺失。
+ *
+ * 也不能用静态 import：devkit 会被 rollup 内联进 desktop 主进程，
+ * 而 .node 二进制绝不能进 bundle（见 electron.vite.config.ts 的 runtimeOnlyModules）。
+ */
+const runtimeRequire = createRequire(import.meta.url);
+
 function defaultLoadJobObject(): JobObjectModule | null {
   try {
-    // 运行时解析而非静态 import：devkit 会被 rollup 内联进 desktop 主进程，
-    // 而 .node 二进制绝不能进 bundle（见 electron.vite.config.ts 的 runtimeOnlyModules）。
-    const mod = require('@mc-creator/jobobject') as JobObjectModule;
-    return mod;
+    // 运行时解析而非静态 import：理由见 runtimeRequire 的注释。
+    return runtimeRequire('@mc-creator/jobobject') as JobObjectModule;
   } catch {
     return null;
   }
 }
 
 function defaultResolveLauncher(): string {
-  return require.resolve('@mc-creator/jobobject/launcher');
+  return runtimeRequire.resolve('@mc-creator/jobobject/launcher');
 }
 
 /**
  * 隐式保留的环境变量。
  *
- * `SystemRoot` 不是「可选加固」而是**硬性必需**：实测在 Windows 上，父进程
- * 只保留 PATH、其余全删时，子进程一律以 ENOENT / 134 起不来 —— CreateProcess
- * 解析 DLL 搜索路径依赖 SystemRoot，缺它连启动都做不到。TEMP/TMP 同理，
- * Gradle 需要可写临时目录。
+ * ⚠️ 键名大小写：Windows 环境变量**大小写不敏感**，但 JS 对象的键是敏感的。
+ * 本机（中文 Windows）`process.env` 里实际存的是 `Path` 而不是 `PATH` ——
+ * `'PATH' in process.env` 为 true 是因为 Node 做了别名，**但 `{...process.env}`
+ * 展开后只有 `Path`**，再用 `source['PATH']` 去读就得到 undefined。
+ * 实测踩过：filterEnv 拿到展开后的对象，PATH 被静默丢掉，cmd.exe 里的
+ * `node` 找不到，build_project 却返回 ok=true（构建静默空转）。
+ * 所以下面的读取必须**按不区分大小写的方式**找键。
+ *
+ * `SystemRoot` 不是「可选加固」而是**硬性必需**，有两条独立的实测证据：
+ *  1. 父进程只保留 PATH、其余全删时，子进程一律以 ENOENT / 134 起不来 ——
+ *     CreateProcess 解析 DLL 搜索路径依赖 SystemRoot，缺它连启动都做不到。
+ *  2. 保留 SystemRoot 但删掉 **PATH** 时，cmd.exe 能起来，可 .bat 里的
+ *     `node` 报「'node' 不是内部或外部命令」而静默不执行 —— 构建脚本看起来
+ *     「成功」但什么都没做。这比直接失败危险得多，所以 PATH 也必须隐式保留。
+ *
+ * TEMP/TMP 同理：Gradle 需要可写临时目录。
+ *
+ * ⚠️ PATH 必须在这里，而**不能**只依赖调用方的 envAllowlist。实测踩过：
+ * kernel-server 传的是 ['PATH','JAVA_HOME','GRADLE_USER_HOME','GRADLE_OPTS']，
+ * 看着已经含 PATH，但 runSandboxed 的 env 来源是**调用方给的 env 对象**，
+ * 里面恰好没有 PATH（内核只塞了 JAVA_HOME 与 process.env 的其余部分），
+ * 于是 .bat 里的 `node` 找不到、构建「成功」但什么都没做。
+ * 把 PATH 放在隐式层，等于「凡是要跑起来的进程必有其 PATH」。
  *
  * 这些值由 Windows 自己提供，不含任何凭据，保留不构成信息泄露。
  * 实测结论记录在 @mc-creator/jobobject/README.md。
  */
-export const IMPLICIT_ENV_ALLOWLIST: readonly string[] = ['SystemRoot', 'TEMP', 'TMP'];
+export const IMPLICIT_ENV_ALLOWLIST: readonly string[] = ['PATH', 'SystemRoot', 'TEMP', 'TMP'];
 
 /**
  * 按 envAllowlist 过滤环境变量（并隐式保留 Windows 启动必需项）。
@@ -131,13 +163,27 @@ export function filterEnv(
   allowlist: readonly string[],
   source: NodeJS.ProcessEnv,
 ): Record<string, string> {
+  // Windows 上环境变量名大小写不敏感，但 JS 对象的键敏感。本机 process.env
+  // 里存的是 `Path`，`{...process.env}` 展开后也只有 `Path` ——
+  // 直接 source['PATH'] 会静默拿到 undefined。必须先建一张小写索引。
+  const lowerIndex = new Map<string, string>();
+  for (const key of Object.keys(source)) {
+    lowerIndex.set(key.toLowerCase(), key);
+  }
+  const lookup = (key: string): string | undefined => {
+    const direct = source[key];
+    if (direct !== undefined) return direct;
+    const actual = lowerIndex.get(key.toLowerCase());
+    return actual === undefined ? undefined : source[actual];
+  };
+
   const out: Record<string, string> = {};
   for (const key of allowlist) {
-    const value = source[key];
+    const value = lookup(key);
     if (value !== undefined) out[key] = value;
   }
   for (const key of IMPLICIT_ENV_ALLOWLIST) {
-    const value = source[key];
+    const value = lookup(key);
     if (value !== undefined) out[key] = value;
   }
   return out;
