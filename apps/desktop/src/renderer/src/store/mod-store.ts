@@ -77,6 +77,7 @@ interface ModState {
   buildLog: string;
   buildSuccess: boolean | null;
   jarPath: string | null;
+  sha256: string | null;
   loading: boolean;
   error: string | null;
   fixLog: string[];
@@ -96,7 +97,12 @@ interface ModState {
   closeOtherTabs: (keepPath: string) => void;
   closeAllTabs: () => void;
   setSplitFile: (path: string | null) => void;
-  setBuildResult: (r: { success: boolean; log: string; jarPath: string | null }) => void;
+  setBuildResult: (r: {
+    success: boolean;
+    log: string;
+    jarPath: string | null;
+    sha256?: string | null;
+  }) => void;
   setLoading: (b: boolean) => void;
   setError: (e: string | null) => void;
   clearPreviousFiles: () => void;
@@ -248,6 +254,7 @@ export const useModStore = createWithEqualityFn<ModState>()(
       buildLog: '',
       buildSuccess: null,
       jarPath: null,
+      sha256: null,
       loading: false,
       error: null,
       fixLog: [],
@@ -282,6 +289,7 @@ export const useModStore = createWithEqualityFn<ModState>()(
             buildLog: '',
             buildSuccess: null,
             jarPath: null,
+            sha256: null,
             error: null,
             loading: false,
             conflictDialog: null,
@@ -380,7 +388,13 @@ export const useModStore = createWithEqualityFn<ModState>()(
       closeAllTabs: () => set({ openTabs: [], selectedFile: null }),
       // 分栏编辑：设置右侧面板文件
       setSplitFile: (path) => set({ splitFile: path }),
-      setBuildResult: (r) => set({ buildSuccess: r.success, buildLog: r.log, jarPath: r.jarPath }),
+      setBuildResult: (r) =>
+        set({
+          buildSuccess: r.success,
+          buildLog: r.log,
+          jarPath: r.jarPath,
+          sha256: r.sha256 ?? null,
+        }),
       setLoading: (b) => set({ loading: b }),
       setError: (e) => set({ error: e }),
       clearPreviousFiles: () => set({ previousFiles: [] }),

@@ -2,7 +2,8 @@
 import { ipcMain, app } from 'electron';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
+import { createHash } from 'node:crypto';
 import * as nodeFs from 'fs';
 import {
   runGradleBuild,
@@ -38,6 +39,30 @@ import {
   type PrepareBuildDirRes,
 } from '../../shared/ipc-channels.js';
 
+/**
+ * 旧构建通道产物 sha256（F2）：jarPath 非空且文件存在则算 hash，
+ * 失败/缺文件则返回 null，绝不抛错、绝不影响 success 判定。
+ */
+function sha256OfJar(projectPath: string, jarPath: string | null): string | null {
+  if (!jarPath) return null;
+  try {
+    const candidates: string[] = [jarPath];
+    if (projectPath && !isAbsolute(jarPath)) candidates.push(join(projectPath, jarPath));
+    for (const p of candidates) {
+      try {
+        if (!nodeFs.existsSync(p)) continue;
+        const data = nodeFs.readFileSync(p);
+        return createHash('sha256').update(data).digest('hex');
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function registerBuildHandlers(): void {
   ipcMain.handle(IPC.BUILD, async (_e, raw: unknown): Promise<BuildRes> => {
     const req = BuildRequest.parse(raw);
@@ -49,6 +74,7 @@ export function registerBuildHandlers(): void {
         success: false,
         jarPath: null,
         log: `未检测到 Java，构建 MC ${req.mcVersion ?? '（未指定）'} 需要 JDK ${need}+。请安装对应 JDK 或配置 JAVA_HOME`,
+        sha256: null,
       };
     }
     if (java < need) {
@@ -58,10 +84,16 @@ export function registerBuildHandlers(): void {
         log:
           `本机 JDK 为 ${java}，构建 MC ${req.mcVersion} 需要 JDK ${need}+。` +
           `请安装 JDK ${need} 或配置 JAVA_HOME（若 build.gradle 已配置 Gradle toolchain 自动下载，可忽略此提示）`,
+        sha256: null,
       };
     }
     const result = await runGradleBuild(req.projectPath);
-    return { success: result.success, jarPath: result.jarPath, log: result.log };
+    return {
+      success: result.success,
+      jarPath: result.jarPath,
+      log: result.log,
+      sha256: sha256OfJar(req.projectPath, result.jarPath),
+    };
   });
 
   // 带修复循环的构建
@@ -88,6 +120,7 @@ export function registerBuildHandlers(): void {
       jarPath: result.finalResult.jarPath,
       log: result.finalResult.log,
       fixLog: result.fixLog,
+      sha256: sha256OfJar(req.projectPath, result.finalResult.jarPath),
     };
   });
 

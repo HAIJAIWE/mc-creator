@@ -286,4 +286,20 @@ describe('mod-store', () => {
     expect(s.spec?.blocks[0].id).toBe('new_block');
     expect(s.spec?.recipes[0].output).toBe('new_block');
   });
+
+  it('setBuildResult 透传 sha256', () => {
+    const hash = 'a'.repeat(64);
+    useModStore
+      .getState()
+      .setBuildResult({ success: true, log: 'ok', jarPath: 'a.jar', sha256: hash });
+    const s = useModStore.getState();
+    expect(s.buildSuccess).toBe(true);
+    expect(s.jarPath).toBe('a.jar');
+    expect(s.sha256).toBe(hash);
+  });
+
+  it('setBuildResult 缺省 sha256 时默认为 null（兼容旧调用）', () => {
+    useModStore.getState().setBuildResult({ success: false, log: 'fail', jarPath: null });
+    expect(useModStore.getState().sha256).toBeNull();
+  });
 });

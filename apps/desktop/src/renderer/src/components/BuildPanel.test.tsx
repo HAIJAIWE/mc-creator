@@ -164,4 +164,24 @@ describe('BuildPanel', () => {
     // Phase text appears when loading || streamBuilding
     expect(screen.getByText(/准备构建目录|编译中/)).toBeTruthy();
   });
+
+  it('有 jarPath + sha256 时展示 SHA-256（monospace break-all）', () => {
+    const hash = 'a'.repeat(64);
+    const mockStore = createMockStore({ jarPath: 'test.jar', sha256: hash });
+    (useModStore as any).mockImplementation((selector: any) => selector(mockStore));
+
+    render(<BuildPanel />);
+    const el = screen.getByText(new RegExp(hash));
+    expect(el).toBeTruthy();
+    expect(el.className).toMatch(/font-mono/);
+    expect(el.className).toMatch(/break-all/);
+  });
+
+  it('sha256 为 null 时不展示 SHA-256 行', () => {
+    const mockStore = createMockStore({ jarPath: 'test.jar', sha256: null });
+    (useModStore as any).mockImplementation((selector: any) => selector(mockStore));
+
+    const { container } = render(<BuildPanel />);
+    expect(container.textContent).not.toMatch(/SHA-256/);
+  });
 });

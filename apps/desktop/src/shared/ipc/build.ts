@@ -10,6 +10,7 @@ export const BuildResponse = z.object({
   success: z.boolean(),
   jarPath: z.string().nullable(),
   log: z.string(),
+  sha256: z.string().nullable(),
 });
 
 // === 流式构建（P20） ===
@@ -65,6 +66,7 @@ export const BuildWithFixResponse = z.object({
   jarPath: z.string().nullable(),
   log: z.string(),
   fixLog: z.array(z.string()),
+  sha256: z.string().nullable(),
 });
 
 export type BuildWithFixReq = z.infer<typeof BuildWithFixRequest>;

@@ -21,6 +21,7 @@ export function BuildPanel() {
     buildLog,
     buildSuccess,
     jarPath,
+    sha256,
     loading,
     fixLog,
     buildStats,
@@ -36,6 +37,7 @@ export function BuildPanel() {
       buildLog: s.buildLog,
       buildSuccess: s.buildSuccess,
       jarPath: s.jarPath,
+      sha256: s.sha256,
       loading: s.loading,
       fixLog: s.fixLog,
       buildStats: s.buildStats,
@@ -138,7 +140,12 @@ export function BuildPanel() {
       setPhase('building');
       const res = await ipcClient.buildWithFix(projectPath);
       if (cancelledRef.current) return;
-      setBuildResult({ success: res.success, log: res.log, jarPath: res.jarPath });
+      setBuildResult({
+        success: res.success,
+        log: res.log,
+        jarPath: res.jarPath,
+        sha256: res.sha256 ?? null,
+      });
       setJarAbs(toAbs(projectPath, res.jarPath));
       setFixLog(res.fixLog ?? []);
       setAttempts(res.attempts ?? null);
@@ -386,6 +393,9 @@ export function BuildPanel() {
         </span>
       )}
       {jarPath && <span className="text-xs text-mc-text-dim">产物：{jarPath}</span>}
+      {jarPath && sha256 && (
+        <span className="font-mono text-xs break-all text-mc-text-dim">SHA-256：{sha256}</span>
+      )}
 
       {/* 流式构建结果提示 */}
       {streamSuccess === true && (
