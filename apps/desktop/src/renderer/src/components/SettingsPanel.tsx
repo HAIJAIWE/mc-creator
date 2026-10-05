@@ -44,7 +44,7 @@ interface Preset {
   models?: string[];
 }
 
-const MODEL_PRESETS: Preset[] = [
+export const MODEL_PRESETS: Preset[] = [
   {
     name: 'DeepSeek',
     baseURL: 'https://api.deepseek.com/v1',
@@ -92,6 +92,19 @@ const MODEL_PRESETS: Preset[] = [
     baseURL: 'http://localhost:1234/v1',
     modelId: 'local-model',
     local: true,
+  },
+  {
+    // 本地免费模型（dsh 转发，Ebony-Vinyl/dsh-our-free-model，MIT）：
+    // 本机转发默认 http://127.0.0.1:18899/v1，端口被占用时 dsh 会顺延（以其控制台实际输出为准）；
+    // Key 由用户从对方设置页生成后粘贴进 apiKey（走既有 safeStorage 加密落盘）；
+    // 合规：提示词经本机转发最终发往 opencode.ai Zen 网关（对方 README 原话唯一上游）。
+    // modelId / models[] 未经对方 /v1/models 实测 [待实测]，models[] 只是下拉提示，用户可手填。
+    name: '本地免费模型（dsh 转发）',
+    baseURL: 'http://127.0.0.1:18899/v1',
+    modelId: 'deepseek-v4.1-flash', // [待实测] 以对方 /v1/models 实测为准
+    apiKeyPlaceholder: '对方设置页生成的本地 Key',
+    local: true,
+    models: ['deepseek-v4.1-flash', 'kimi-k3'], // [待实测] 对方 README 点名款，仅下拉提示
   },
 ];
 
