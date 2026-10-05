@@ -1,7 +1,7 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：确认通道全链（X1/X2a/X2b，用户决策开放执行白名单）+ 全绿 309/5106；一次全量 flake 未复现，观察中
+> 最近更新：规格闭环点火（真模型一轮过，3.3s）+ 全绿 310/5123；免费模型 reasoning 吃 85% 预算已量化
 
 > 📄 **设计文档已找到**：`D:\Downloads\MC全链路AI工作台-设计文档-v3.1.md`（931 行）。
 > 之前两轮「文档不在仓内」的判断只对仓内而言 —— 文档在 `D:\Downloads` 下，
@@ -19,7 +19,7 @@
 
 | 门禁                             | 状态      | 实测                                                                |
 | -------------------------------- | --------- | ------------------------------------------------------------------- |
-| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 309 files / 5106 passed + 43 skipped                         |
+| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 310 files / 5123 passed + 43 skipped                         |
 | `pnpm -r typecheck`              | ✅ exit 0 | all 18 packages Done                                                |
 | `pnpm lint`                      | ✅ exit 0 | **0 errors**（44 warnings，不影响退出码）                           |
 | `pnpm format:check`              | ✅ exit 0 | All matched files use Prettier code style                           |
@@ -32,14 +32,14 @@
 
 ## 1. 最近 6 个提交
 
-| commit    | 内容                                       |
-| --------- | ------------------------------------------ |
-| `95c64eb` | 确认弹窗宿主与服务端执行按钮（用户决策）   |
-| `f09efd3` | 开放执行通道白名单与主进程接线（用户决策） |
-| `e58991f` | 确认通道主进程侧（超时拒绝/id 关联/审计）  |
-| `a4af6f6` | 工具表补 8 快照定时工具（25→33 断言同步）  |
-| `6862173` | 定时轮询器与启动接线（§7.4 定时另一半）    |
-| `bd00b57` | 新 kind 进名单与路由，主进程侧可达         |
+| commit    | 内容                                          |
+| --------- | --------------------------------------------- |
+| `ffb87d8` | 规格闭环点火（真模型一轮过，prompt 规格改正） |
+| `95c64eb` | 确认弹窗宿主与服务端执行按钮（用户决策）      |
+| `f09efd3` | 开放执行通道白名单与主进程接线（用户决策）    |
+| `e58991f` | 确认通道主进程侧（超时拒绝/id 关联/审计）     |
+| `a4af6f6` | 工具表补 8 快照定时工具（25→33 断言同步）     |
+| `6862173` | 定时轮询器与启动接线（§7.4 定时另一半）       |
 
 ---
 
@@ -534,6 +534,64 @@ revert，未提交**：无消费者就留着是死代码（§2-⑥ 模式），�
 > （更新器、存储选型）+ 真实 LLM 供应商接入（需要 Key 与出境合规决策，见 §10.0 合规开关）。
 > §17 闭环场景的链路已通（生成→编译→验证→部署），缺的是真实模型驱动。
 
+## 7.7 规格闭环点火（L2，commit `ffb87d8`）：真模型一轮过的三个真 bug
+
+链路：`AgentPanel`「AI 闭环生成」→ IPC `agent:run-loop` → `runClosedLoop`
+（Zen 免费通道）→ 真 `validateDatapack` → 合法 spec 经 `setSpec` 落编辑器。
+
+### 第一次点火：三轮全废（abort）
+
+| 轮  | 症状                                                                         |
+| --- | ---------------------------------------------------------------------------- |
+| 1   | `recipes.0.ingredient: Expected string, received object`                     |
+| 2   | `recipes.0.result: Expected string, received object`（修了上一处，撞下一处） |
+| 3   | `模型输出中没有配平的 JSON 块` → abort                                       |
+
+看起来像「免费模型不行」，实际**三个 bug 全在代码里**：
+
+1. **prompt 规格与 schema 相反。** `key` 的值是**字符串数组**
+   （`{"R":["minecraft:redstone"]}`），我写成了对象；`ingredient`/`result`
+   是**纯字符串**，我根本没写这句。模型照错规格生成，validate 当然全红。
+   → 加最小合法样例（形状以此为准）+ 点名「key 值是数组不是对象」。
+2. **我邀请模型写太长。** 我列了 30+ 个「选填数组」，模型全填。免费通道
+   实测 `completion_tokens=14097` 里 **`reasoning_tokens=11991`** —— 推理
+   吃掉 85%，正文被截断成半个 JSON。
+   → 加「只写真正用到的字段，不写等于空数组，不要为完整而填满」。
+   → 加「修复轮只改被点名的那一处，已正确的字段原样照抄」（治 whack-a-mole）。
+3. **截断被误诊成形状错。** detail 写「没有配平的 JSON 块」，修复轮就去
+   改形状，而真因是写太长 → 白烧一轮。
+   → 现在按「JSON 未闭合」判定为**截断**，detail 明说「不是形状错，应缩短内容」。
+
+### 第二次点火：一轮过
+
+```
+[agent-loop] stage=generate ok=true attempts=0 next=validate
+[agent-loop] stage=validate ok=true attempts=0 next=succeed
+ok = true   attempts = 0   elapsed = 3279 ms
+```
+
+### 关于 `max_tokens` 的实测（别再试这条路了）
+
+| max_tokens | content 字数 | finish | completion | reasoning |
+| ---------- | ------------ | ------ | ---------- | --------- |
+| 不传       | 6917         | stop   | 14097      | 11991     |
+| 16384      | **0**        | length | 16384      | 16381     |
+| 24576      | 1552         | stop   | 5389       | 4979      |
+
+给上限**不会**让正文变多，只会让推理吃光预算返回空串。解法只能是
+**减输出量**（少填字段 + 给样例），不是调 `max_tokens`。
+
+### 单轮超时提到 5 分钟
+
+默认 `DEFAULT_INFER_TIMEOUT_MS`=120s，免费慢模型单轮实测可达 60s+
+（修轮曾直接撞死超时）。闭环是后台任务、用户不等交互响应，宁可等足。
+这是**调参不是绕过**：超时仍在，只是阈值对齐真实上界。
+
+### 这轮的通用教训
+
+**「模型不行」几乎总是「我的 prompt 与 schema 不一致」。** 先去核对 schema
+真身（`packages/shared/src/schemas/datapack-spec.ts`），再怀疑模型。
+
 ---
 
 ## 8. §8 版本升级（评估已完成，未执行）
@@ -607,6 +665,9 @@ Tailwind 3.4（4 已发布）、Zod 3.23（4 已发布）。
    `git commit -F <文件>`。
 3. **commitlint 的 `subject-case`**：subject 不能以大写字母开头
    （`fix(security): Mustache ...` 会被拒）。中文开头即可。
+   **本轮再撞一次**：`feat(desktop): AI 规格闭环点火…` 被拒 —— 冒号后的
+   **第一个 token** 是拉丁大写（AI）就按 pascal-case 判，不是「整句开头」。
+   正确写法 `feat(desktop): 规格闭环点火（真模型一轮过）`。正文不受此限。
 4. **`git commit` 失败后lint-staged 会留 `stash@{N}: lint-staged automatic
 backup`**。不要盲删 stash 区，尤其指向旧 commit 的那些。
 5. `E:\Cache\temp\opencode` 是已批准的临时目录，探针/临时产物放那里，
