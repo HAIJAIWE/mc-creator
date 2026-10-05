@@ -5,6 +5,7 @@
  */
 
 import type { ModEntry } from '@mc-creator/shared';
+import type { DependencySemantic, DependencySeverity } from './dependency-semantics.js';
 
 /** 统一版本元数据（Modrinth / CurseForge 归一化后） */
 export interface VersionMetadata {
@@ -67,6 +68,29 @@ export type ConflictKind =
   | 'missing-dependency'
   | 'breaks-conflict';
 
+/**
+ * 依赖语义检查的细分原因（`kind: 'missing-dependency'` / `'breaks-conflict'` 的下位区分）。
+ *
+ * ⚠️ **为什么用独立字段而不新增 `ConflictKind`**：
+ * `apps/desktop/src/shared/ipc/modpack.ts` 的 `ModConflictSchema.kind` 是封闭
+ * zod enum，且 `ModpackPreviewPanel.tsx` 用 `Record<ModConflictT['kind'], string>`
+ * 穷举映射标签。给 `ConflictKind` 加新值会让桌面端 `conflicts: result.conflicts`
+ * 赋值处**编译失败**（core 的 union 更宽，不能赋给更窄的 union）。
+ * 桌面端本轮禁改（另有代理在途），故这里加可选字段表达细分语义 ——
+ * zod 对未知键默认 strip，IPC 契约不会破。
+ */
+export type ConflictDetail =
+  /** 依赖未安装 */
+  | 'absent'
+  /** 依赖已安装但版本不满足硬约束 */
+  | 'version-mismatch'
+  /** 版本约束 / 版本号无法解析，无法判定（不阻断） */
+  | 'version-unknown'
+  /** 两 mod 共存（conflicts / breaks） */
+  | 'coexist'
+  /** 共存且被约束限定为"特定版本区间" */
+  | 'version-conflict';
+
 /** 一键修复建议 */
 export interface FixSuggestion {
   action: 'upgrade' | 'downgrade' | 'remove' | 'add-missing' | 'switch-loader-version';
@@ -85,6 +109,21 @@ export interface ModConflict {
   suggestion: FixSuggestion;
   /** 建议的目标人类可读版本号（有则展示） */
   suggestedVersionNumber?: string;
+  /**
+   * 处置级别（§5.3 五种依赖语义各自不同）。
+   * - `error`：阻断级（缺失必需依赖 / 版本不符 / 显式互斥共存）
+   * - `warning`：不阻断但需告知（推荐依赖缺失 / `breaks` 共存）
+   * - `info`：仅提示（`suggests` 缺失 / 版本无法判定）
+   *
+   * 省略时按 `kind` 推断的默认值见 `conflicts.ts` 的 `severityOf`。
+   */
+  severity?: DependencySeverity;
+  /** 触发该条的依赖语义；非依赖类检查省略 */
+  semantic?: DependencySemantic;
+  /** 同 `kind` 下的细分判定分支 */
+  detail?: ConflictDetail;
+  /** 版本约束原文（Maven range 或软性推荐） */
+  constraint?: string;
 }
 
 /** 依赖解析输入 */
