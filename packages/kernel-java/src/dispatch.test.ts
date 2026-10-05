@@ -228,3 +228,137 @@ describe('JavaKernel get_context_pack（§10.4 状态注入，只读 R 类）', 
     expect(result.ok).toBe(true);
   });
 });
+
+describe('JavaKernel list_versions（T1b 运行时拉取，只读 R 类）', () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  const mkTmp = (): string => {
+    const d = mkdtempSync(join(tmpdir(), 'java-lv-'));
+    dirs.push(d);
+    return d;
+  };
+  // 与 shared MC_VERSIONS 一致的 8 个写死值（测试文件不新增 import，此处硬编码断言）。
+  const FALLBACK_IDS = [
+    '1.20.1',
+    '1.20.4',
+    '1.20.6',
+    '1.21.1',
+    '1.21.5',
+    '1.21.11',
+    '26.1',
+    '26.2',
+  ];
+  /** 写新鲜缓存：fetchVersionManifest 命中 cache，不碰网络（结果与网络无关）。 */
+  const seedCache = (dataDir: string): void => {
+    writeFileSync(
+      join(dataDir, 'version_manifest.json'),
+      JSON.stringify({
+        latest: { release: '1.21.11', snapshot: '25w01a' },
+        versions: [
+          {
+            id: '1.21.11',
+            type: 'release',
+            url: 'https://example.invalid/1.json',
+            releaseTime: '2026-01-01T00:00:00+00:00',
+          },
+          {
+            id: '25w01a',
+            type: 'snapshot',
+            url: 'https://example.invalid/2.json',
+            releaseTime: '2026-01-02T00:00:00+00:00',
+          },
+          {
+            id: '1.21.10',
+            type: 'release',
+            url: 'https://example.invalid/3.json',
+            releaseTime: '2025-12-01T00:00:00+00:00',
+          },
+        ],
+      }),
+    );
+  };
+
+  it('新鲜缓存 → ok:true + source=cache + 全量 ids/entries/latestRelease（R 类免确认）', async () => {
+    const dataDir = mkTmp();
+    seedCache(dataDir);
+    // 不传 confirm：若内核误把它当 W/X 处理，这里会拿到 permission 拒绝。
+    const result = await new JavaKernel({ dataDir })
+      .dispatch({ id: 'lv1', kind: 'list_versions', payload: null })
+      .result();
+    expect(result.ok).toBe(true);
+    expect(result.data).toEqual({
+      ids: ['1.21.11', '25w01a', '1.21.10'],
+      entries: [
+        { id: '1.21.11', type: 'release' },
+        { id: '25w01a', type: 'snapshot' },
+        { id: '1.21.10', type: 'release' },
+      ],
+      latestRelease: '1.21.11',
+      source: 'cache',
+    });
+  });
+
+  it('payload.type=release 过滤掉 snapshot；type=snapshot 只剩快照', async () => {
+    const dataDir = mkTmp();
+    seedCache(dataDir);
+    const kernel = new JavaKernel({ dataDir });
+    const releases = await kernel
+      .dispatch({ id: 'lv2a', kind: 'list_versions', payload: { type: 'release' } })
+      .result();
+    expect(releases.ok).toBe(true);
+    expect(releases.data).toMatchObject({
+      ids: ['1.21.11', '1.21.10'],
+      latestRelease: '1.21.11',
+      source: 'cache',
+    });
+    const snapshots = await kernel
+      .dispatch({ id: 'lv2b', kind: 'list_versions', payload: { type: 'snapshot' } })
+      .result();
+    expect(snapshots.ok).toBe(true);
+    expect(snapshots.data).toMatchObject({ ids: ['25w01a'], source: 'cache' });
+  });
+
+  it('无缓存 + 全局 fetch 拒连 → fallback：source=fallback 且 ids 等于 8 个写死值，绝不抛', async () => {
+    const dataDir = mkTmp();
+    const origFetch = globalThis.fetch;
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = (() =>
+      Promise.reject(new Error('offline-for-test'))) as typeof fetch;
+    try {
+      const result = await new JavaKernel({ dataDir })
+        .dispatch({ id: 'lv3', kind: 'list_versions', payload: null })
+        .result();
+      expect(result.ok).toBe(true);
+      const data = result.data as {
+        ids: string[];
+        entries: { id: string; type: string }[];
+        latestRelease: string | null;
+        source: string;
+      };
+      expect(data.source).toBe('fallback');
+      expect(data.ids).toEqual(FALLBACK_IDS);
+      expect(data.entries).toEqual(FALLBACK_IDS.map((id) => ({ id, type: 'release' })));
+      expect(data.latestRelease).toBe(FALLBACK_IDS[0]);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('未知 kind 行为未变（新增 case 未扰动 default）', async () => {
+    const handle = new JavaKernel().dispatch({
+      id: 'lv4',
+      kind: 'nope_after_list_versions',
+      payload: null,
+    });
+    expect(handle.id).toBe('lv4');
+    await expect(handle.result()).resolves.toEqual({
+      ok: false,
+      error: {
+        category: 'unknown',
+        message: '不支持的任务: nope_after_list_versions',
+        retryable: false,
+      },
+    });
+  });
+});

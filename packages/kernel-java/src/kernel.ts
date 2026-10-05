@@ -64,7 +64,8 @@ import {
   type ZipEntryLike,
 } from '@mc-creator/shell';
 import { assertWithinRoot, javaVersionFor, makeArtifactRef } from '@mc-creator/devkit';
-import { downloadFile } from '@mc-creator/engine';
+import { downloadFile, fetchVersionManifest } from '@mc-creator/engine';
+import { MC_VERSIONS } from '@mc-creator/shared';
 import { checkLocalFile, sameDigest, type DownloadReason } from './content/modpack/incremental.js';
 
 /** 内核构造上下文。 */
@@ -1469,6 +1470,43 @@ export class JavaKernel implements KernelContract {
                 };
               }
               return { ok: true, data: readContextParts(root, instanceId) };
+            }
+            case 'list_versions': {
+              const p = asRecord(payload);
+              const typeFilter = optString(p, 'type');
+              const root = readRoot();
+              const cachePath =
+                root === undefined || root === '' ? undefined : join(root, 'version_manifest.json');
+              try {
+                const manifest = await fetchVersionManifest({
+                  fallbackIds: [...MC_VERSIONS],
+                  ...(cachePath === undefined ? {} : { cachePath }),
+                });
+                const entries =
+                  typeFilter === 'release' || typeFilter === 'snapshot'
+                    ? manifest.entries.filter((e) => e.type === typeFilter)
+                    : manifest.entries;
+                return {
+                  ok: true,
+                  data: {
+                    ids: entries.map((e) => e.id),
+                    entries,
+                    latestRelease: manifest.latestRelease,
+                    source: manifest.source,
+                  },
+                };
+              } catch {
+                const ids = [...MC_VERSIONS];
+                return {
+                  ok: true,
+                  data: {
+                    ids,
+                    entries: ids.map((id) => ({ id, type: 'release' })),
+                    latestRelease: ids[0] ?? null,
+                    source: 'fallback' as const,
+                  },
+                };
+              }
             }
             default:
               return {
