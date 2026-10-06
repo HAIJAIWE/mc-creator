@@ -637,9 +637,34 @@ BuildPanel **不持有 MC/Forge 版本**：它的工程是生成出来的，版�
 不含 projectPath**（shared/ipc/build.ts 的 WarmDepsRequest），从**类型上**排除
 「误落进用户工程」的可能；devkit 侧还有一道 `isPathInside` 拒绝式守卫。
 
-界面上必须写清两件事，否则是在坑用户：① 代价（385MB 磁盘 + 数分钟）；
-② **只支持 Forge**（NeoForge 是 `neoformruntime`、Loom 缓存在工程内 `.gradle/loom-cache`，
-布局都不同，未支持）。
+界面上必须写清两件事，否则是在坑用户：① 代价（数百 MB 磁盘 + 数分钟）；
+② **只支持 Forge**（NeoForge 与 Loom 的缓存布局不同，未支持 —— 见下）。
+
+### NeoForge 预热为什么至今没做（已实测，别再重试同样的路）
+
+试过了，**拿不到数据**：NeoForge 只发布在 `maven.neoforged.net`，而这台机器到它
+**TCP 连不上**（DNS 正常解析到 `89.187.187.14`，`Test-NetConnection` 结果
+`TcpTestSucceeded = False`）。换镜像无效，因为：
+
+| 目标                                           | 结果                        |
+| ---------------------------------------------- | --------------------------- |
+| `maven.neoforged.net:443`                      | **TCP 连接失败**            |
+| 阿里云 maven 镜像                              | DNS 解析失败                |
+| 腾讯云 nexus（`net.neoforged` 路径）           | 404                         |
+| Maven Central（`net.neoforged` 路径）          | 404（它根本不发在 Central） |
+| Gradle Plugin Portal / libraries.minecraft.net | ✅ 200                      |
+
+**Forge 能跑是因为它发在 `maven.minecraftforge.net`（实测可达）** —— 两个 loader
+的发布仓库恰好一个通一个不通，纯属这台机器的网络环境。
+
+所以 `neoformruntime` 的**目录名、层级、命中判据全都只能靠猜**。今天所有可信结论
+（`moddev {}` 扩展名、`--no-validate-url`、toolchain 机制、预热形态）无一例外是
+**跑出来的**。要延续这个标准，就得在能访问 `maven.neoforged.net` 的环境里：
+跑一次真实 NeoForge 构建 → 把缓存目录树实测出来 → 再谈预热。
+
+**下一个会话若在可联网环境**：先用 `Test-NetConnection maven.neoforged.net -Port 443`
+确认通路，通了就照 §7.8 的 Forge 探针流程复刻一遍（生成器现在输出的是正确的
+`neoForge {}` 形状，见 commit `5254dd7`），量出布局再动手。**不通就别猜着写。**
 
 ### 写渲染层测试踩的三个坑（都不是代码 bug，是测试写法）
 
@@ -798,13 +823,20 @@ backup`**。不要盲删 stash 区，尤其指向旧 commit 的那些。
 7. **Gradle 往 stderr 写 JVM 警告会让 PowerShell 管道直接中断**
    （`NativeCommandError`），表现为「命令失败」而 Gradle 其实刚启动。
    跑 Gradle 一律 `cmd /c "xxx.bat ... > log 2>&1"`，别用 `| Tee-Object`。
-8. **这台机器连不上 `github.com` 的 release 资产**（`github.com:443` TCP connect
-   timeout，重试多次一致；但 `api.github.com` 正常、`services.gradle.org` 正常、
-   Microsoft CDN 正常）。拉 JDK 换 `aka.ms/download-jdk`。
-   未解之谜：Gradle 8.12 **不认**手动下载的 JDK 21（`gradle.properties` 与
-   `-Dorg.gradle.java.installations.paths` 两种方式都试过，均未出现在
-   `javaToolchains` 输出里，尽管 `release` 文件与 `bin/javac.exe` 都正常）。
-   **原因未查清，不要当成 Gradle 的 bug 下结论。**
+8. **这台机器连不上 `github.com` 的 release 资产，也连不上 `maven.neoforged.net`。**
+   `github.com:443` TCP connect timeout（重试多次一致；`api.github.com` 正常）；
+   `maven.neoforged.net:443` **TCP 连接失败**（DNS 正常，`TcpTestSucceeded=False`）。
+   **可用的下载通道（实测 2026-10）**：
+   - Gradle 发行版 → `https://mirrors.cloud.tencent.com/gradle/gradle-<ver>-bin.zip`
+     （130MB / 53s；`downloads.gradle.org` 不通，阿里云 404）
+   - JDK → `https://aka.ms/download-jdk/microsoft-jdk-<N>-windows-x64.zip`
+   - 通：`api.github.com`、`plugins.gradle.org`、`libraries.minecraft.net`、
+     `maven.minecraftforge.net`、`services.gradle.org`（校验用）
+   - 不通：`github.com` release 资产、`maven.neoforged.net`、`mvn.aliyun.com`（DNS）
+     未解之谜：Gradle 8.12 **不认**手动下载的 JDK 21（`gradle.properties` 与
+     `-Dorg.gradle.java.installations.paths` 两种方式都试过，均未出现在
+     `javaToolchains` 输出里，尽管 `release` 文件与 `bin/javac.exe` 都正常）。
+     **原因未查清，不要当成 Gradle 的 bug 下结论。**
 9. **量磁盘/文件大小要在动作前一刻量，别把半小时前的数当现状。**
    本轮**同一个坑踩了两次**：
    ① 清理探针时：删除时每个目录实测 **0 files**，而半小时前量它们是 846MB
