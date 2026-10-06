@@ -76,13 +76,19 @@ function getNullableNumberParam(
 /**
  * 把生成器结果文件合并写入 store：已有路径则更新内容，新路径则创建。
  * 供各生成工具共用，消除重复的文件合并逻辑。
+ *
+ * 注意：updateFileContent 和 createFile 是异步的（涉及 IPC 写入），
+ * 所以本函数必须是 async 并 await 它们；调用处需 await 调用。
  */
-function mergeFilesIntoStore(files: { path: string; content: string }[]): void {
+async function mergeFilesIntoStore(files: { path: string; content: string }[]): Promise<void> {
   const storeState = useModStore.getState();
   const existingPaths = new Set(storeState.files.map((f) => f.path));
   for (const file of files) {
-    if (existingPaths.has(file.path)) storeState.updateFileContent(file.path, file.content);
-    else storeState.createFile(file.path, file.content);
+    if (existingPaths.has(file.path)) {
+      await storeState.updateFileContent(file.path, file.content);
+    } else {
+      await storeState.createFile(file.path, file.content);
+    }
   }
 }
 
@@ -559,7 +565,7 @@ const applyContentTemplateTool: ToolDefinition = {
       const result = await gen.generate(ctx);
 
       // 写入文件
-      mergeFilesIntoStore(result.files);
+      await mergeFilesIntoStore(result.files);
       const storeState = useModStore.getState();
 
       // 生成语言文件
@@ -658,7 +664,7 @@ const generateDatapackTool: ToolDefinition = {
       const result = await gen.generate(ctx);
 
       // 将生成的文件写入 store
-      mergeFilesIntoStore(result.files);
+      await mergeFilesIntoStore(result.files);
 
       // 更新 spec（DatapackSpec 与 ModSpec 结构不同，需桥接）
       useModStore.getState().setSpec(parsed.data as unknown as ModSpec);
@@ -743,7 +749,7 @@ const generateModTool: ToolDefinition = {
       });
 
       // 将生成的文件写入 store
-      mergeFilesIntoStore(outcome.files);
+      await mergeFilesIntoStore(outcome.files);
 
       const spec = outcome.spec as ModSpec;
       useModStore.getState().setSpec(spec);
@@ -833,7 +839,7 @@ const generateFilesTool: ToolDefinition = {
       });
 
       // 合并文件到 store（已有则更新，新增则创建）
-      mergeFilesIntoStore(result.files);
+      await mergeFilesIntoStore(result.files);
       useModStore.getState().setSpec(result.spec as unknown as ModSpec);
 
       const summary = [`✅ ${type} 生成成功！`, `生成文件: ${result.files.length} 个`];

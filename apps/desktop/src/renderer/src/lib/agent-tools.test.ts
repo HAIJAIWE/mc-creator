@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { findTool, agentTools, toolsToFunctionDefinitions } from './agent-tools.js';
 import { useModStore } from '../store/mod-store.js';
 
@@ -25,6 +25,58 @@ vi.mock('./ipc-client.js', async (importOriginal) => {
 });
 
 import { ipcClient } from './ipc-client.js';
+
+/**
+ * 预热 core 生成器模块图。
+ *
+ * ipc-client 的 __MC_PREVIEW__ 分支用 `await import('@mc-creator/core/browser.js')`
+ * 在进程内跑真实生成器（见 ipc-client.ts:290）。该动态 import 会连带加载
+ * generators/index + orchestrator + rag + modpack 整张模块图，首次触发要付
+ * transform + evaluate 的全部成本。
+ *
+ * 若这笔开销落在首个 generate_* 用例体内：单跑文件时模块图小、几百毫秒就够；
+ * 全量并行跑（191 个文件 / 冷 vite 缓存）时它会顶穿 vitest 默认 testTimeout=5000ms，
+ * 于是该用例报 `Test timed out in 5000ms`（看起来像断言红，实际是超时）。
+ * 更糟的是 module 图仍在加载时，同 describe 里后续用例 await 的是同一个 pending
+ * import promise，会一起连坐超时。
+ *
+ * 挪到 beforeAll 里预热：hookTimeout 默认 10000ms，且失败会明确报在 hook 上，
+ * 不会伪装成断言失败。此处显式给 30s，覆盖冷缓存 + 重载机器的最坏情况。
+ */
+beforeAll(async () => {
+  await import('@mc-creator/core/browser.js');
+}, 30_000);
+
+/**
+ * 等待 store 出现指定路径的文件，超时抛清晰错误。
+ *
+ * 背景：agent-tools 的 mergeFilesIntoStore 调用 store 的 createFile /
+ * updateFileContent 时**没有 await**（两者都是 async 函数），所以
+ * 「execute 已 resolve」严格来说不等于「store 一定已写完」。
+ * 绝大多数情况下这两个 async 函数体在第一个 await 之前就已完成 set()，
+ * 断言同步读得到；但一旦走有 projectId 的分支（真正 await IPC）就会变成
+ * 真竞态。这里显式轮询到条件成立，让断言只依赖最终状态，不依赖时序。
+ *
+ * @param path 目标路径；给定后缀时按 endsWith 匹配
+ * @param timeoutMs 超时上限，默认 2s——超时抛错而不是无限等，避免把失败变成挂起
+ */
+async function waitForStorePath(
+  path: string,
+  timeoutMs = 2000,
+): Promise<{ path: string; content: string }[]> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const files = useModStore.getState().files;
+    if (files.some((f) => f.path === path || f.path.endsWith(path))) return files;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `等待 store 写入 "${path}" 超时（${timeoutMs}ms）。` +
+          `当前 files: ${files.map((f) => f.path).join(', ') || '(空)'}`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
 
 function resetStore() {
   // 预览模式：让 ipcClient.generateFiles 在进程内跑 core 生成器（无需 Electron 主进程）
@@ -363,7 +415,9 @@ describe('generate_mod', () => {
     expect(result).toContain('Mod 生成成功');
     expect(result).toContain('ruby_tools');
     expect(result).toContain('items: 1');
-    // 文件写入 store
+    // 文件写入 store：mergeFilesIntoStore 未 await store 的 async 写操作，
+    // 故先等条件成立（带 2s 上限，超时抛清晰错误），再断言最终状态。
+    await waitForStorePath('ModItems.java');
     const files = useModStore.getState().files;
     expect(files.some((f) => f.path.endsWith('ModItems.java'))).toBe(true);
     expect(files.some((f) => f.path === 'src/main/resources/fabric.mod.json')).toBe(true);
@@ -385,7 +439,8 @@ describe('generate_mod', () => {
       blocks: [],
     });
     const result = await tool.execute({ spec_json: specJson, loader: 'fabric' });
-    // 26.1 → build.gradle 用 Java 25
+    // 26.1 → build.gradle 用 Java 25（同样等 store 写完，见上方 waitForStorePath 注释）
+    await waitForStorePath('build.gradle');
     const files = useModStore.getState().files;
     const bg = files.find((f) => f.path === 'build.gradle');
     expect(bg!.content).toContain('JavaVersion.VERSION_25');
