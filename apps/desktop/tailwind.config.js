@@ -11,6 +11,16 @@ export default {
   // 在产物中 occurrences=0 —— Tabs 脏徽标、Toast 宽度约束、Progress 数字对齐
   // 全部无样式，且不报错。
   content: ['./src/renderer/**/*.{ts,tsx,html}', '../../packages/ui/src/**/*.{ts,tsx}'],
+  safelist: [
+    'bg-mc-surface-2',
+    'font-medium',
+    'text-mc-text',
+    'text-mc-dim',
+    'hover:bg-mc-surface-2',
+    'hover:opacity-60',
+    'hover:text-mc-text',
+    'hover:bg-mc-surface-2/60',
+  ],
   theme: {
     extend: {
       colors: {
@@ -32,22 +42,6 @@ export default {
           redstone: 'rgb(var(--mc-redstone) / <alpha-value>)',
           'redstone-deep': 'rgb(var(--mc-redstone-deep) / <alpha-value>)',
         },
-        // 节点头部色条（降饱和 MC 染色方块色）
-        'mc-item': '#d88a8a',
-        'mc-block': '#d8a87a',
-        'mc-entity': '#7ac6c6',
-        'mc-recipe': '#d8c87a',
-        'mc-machine': '#7ac68a',
-        'mc-multiblock': '#a87ac6',
-        'mc-event': '#9a7ac6',
-        'mc-condition': '#7a8ac6',
-        'mc-action': '#c67a7a',
-        'mc-code': '#9a9a9a',
-        'mc-comment': '#d8c87a',
-        // MC 按钮灰
-        'mc-btn': '#c6c6c6',
-        'mc-btn-hover': '#d4d4d4',
-        'mc-btn-active': '#a0a0a0',
       },
       fontFamily: {
         display: 'var(--mc-font-display)',
@@ -97,6 +91,15 @@ export default {
         'mc-pop': 'mc-pop 0.2s var(--mc-ease) both',
         'mc-drawer-in': 'mc-drawer-in 0.25s var(--mc-ease) both',
       },
+    },
+  },
+  plugins: [],
+  variants: {
+    extend: {
+      backgroundColor: ['hover'],
+      textColor: ['hover'],
+      opacity: ['hover'],
+      backgroundOpacity: ['hover'],
     },
   },
   plugins: [],

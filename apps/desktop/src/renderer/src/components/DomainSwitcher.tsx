@@ -116,7 +116,7 @@ export function DomainSwitcher({ value, onChange }: DomainSwitcherProps = {}) {
             className={`rounded-mc px-3 py-1 text-xs transition-colors ${
               isActive
                 ? 'bg-mc-surface-2 font-medium text-mc-text'
-                : 'text-mc-dim hover:bg-mc-surface-2/60 hover:text-mc-text'
+                : 'text-mc-dim hover:bg-mc-surface-2 hover:opacity-60 hover:text-mc-text'
             }`}
           >
             {domainLabel(def, t)}
