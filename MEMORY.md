@@ -1,7 +1,9 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：真机构建链逐段量通 —— NeoForge 生成的工程**从来构建不了**（`moddev {}` 包装不存在），已修；工具链解析器 + 快照同步完成
+> 最近更新：构建链全通 —— 真机构建量出 4 个阻断并修掉 3 个；
+> 「干净机器 → 生成 → 编译出 jar」端到端验证通过（gradlew.bat 21s，jar 含真 class）
+> 全绿 314/5226。NeoForge 端到端**本机不可验**（maven.neoforged.net 不通），见 §7.8
 
 > 📄 **设计文档已找到**：`D:\Downloads\MC全链路AI工作台-设计文档-v3.1.md`（931 行）。
 > 之前两轮「文档不在仓内」的判断只对仓内而言 —— 文档在 `D:\Downloads` 下，
@@ -19,7 +21,7 @@
 
 | 门禁                             | 状态      | 实测                                                                |
 | -------------------------------- | --------- | ------------------------------------------------------------------- |
-| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 310 files / 5123 passed + 43 skipped                         |
+| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 314 files / 5226 passed + 43 skipped                         |
 | `pnpm -r typecheck`              | ✅ exit 0 | all 18 packages Done                                                |
 | `pnpm lint`                      | ✅ exit 0 | **0 errors**（44 warnings，不影响退出码）                           |
 | `pnpm format:check`              | ✅ exit 0 | All matched files use Prettier code style                           |
@@ -32,14 +34,14 @@
 
 ## 1. 最近 6 个提交
 
-| commit    | 内容                                          |
-| --------- | --------------------------------------------- |
-| `ffb87d8` | 规格闭环点火（真模型一轮过，prompt 规格改正） |
-| `95c64eb` | 确认弹窗宿主与服务端执行按钮（用户决策）      |
-| `f09efd3` | 开放执行通道白名单与主进程接线（用户决策）    |
-| `e58991f` | 确认通道主进程侧（超时拒绝/id 关联/审计）     |
-| `a4af6f6` | 工具表补 8 快照定时工具（25→33 断言同步）     |
-| `6862173` | 定时轮询器与启动接线（§7.4 定时另一半）       |
+| commit    | 内容                                         |
+| --------- | -------------------------------------------- |
+| `d7fc861` | 预热入口接入设置面板（不解析用户工程）       |
+| `1e9a29b` | 依赖预热按需触发（ForgeGradle 冷启优化）     |
+| `f2b7858` | 三处构建入口接入 wrapper 自举                |
+| `534c07a` | 真机构建链四个阻断 + NeoForge 环境阻断       |
+| `61d3367` | wrapper 自举（缺启动脚本导致构建必 ENOENT）  |
+| `5254dd7` | NeoForge 生成工程从来构建不了（moddev 包装） |
 
 ---
 
@@ -605,9 +607,48 @@ ModDevGradle 2.0.143 → EXTNAMES 含 neoForge，HAS_MODDEV=false，HAS_NEOFORGE
 用 `sourceCompatibility`/`targetCompatibility` —— **不需要**解析器。
 给不需要的地方加 resolver 是噪音，刻意没加。
 
-### 预热的价值有了数字
+### 预热的价值与形态（§7.8 续，commits `1e9a29b` + `d7fc861`）
 
-同一工程冷启 `3m14s` → 热了之后 `17s`。这是「依赖预热」值得做的唯一依据。
+同一工程冷启 `3m14s` → 热了之后 `17s`。但**「预热所有组合」是错的方向**，
+量了磁盘构成才知道为什么：
+
+```
+~/.gradle 合计            1212 MB
+  caches/forge_gradle      385 MB   ← 反编译/映射，冷启开销的主要来源（每版本一份）
+  jdks                     485 MB   ← foojay 下载的 JDK
+  wrapper/dists            144 MB   ← 发行版，已由 gradle-bootstrap 覆盖
+  caches/modules-2          99 MB   ← 真正的 Maven 依赖（原来以为的大头，其实是小的）
+```
+
+所以形态定为**用户主动预热单个 MC 版本**：8 个版本全铺 ≈ 3GB + 数十分钟，不现实。
+入口在**设置面板**而非 BuildPanel —— 见下。
+
+### 预热入口为什么不放 BuildPanel（设计陷阱，别改回去）
+
+BuildPanel **不持有 MC/Forge 版本**：它的工程是生成出来的，版本只存在于
+`build.gradle` 的**文本**里。要做预热就得去解析用户工程的构建脚本 ——
+而那等于把预热对象变成「用户工程」，恰恰是预热必须避免的（会写他的 `build/`、
+还可能被算进 `lastBuildHash`）。
+
+解法：入口放设置面板，版本从 `LOADER_VERSIONS` 表出。**预热请求形状里刻意
+不含 projectPath**（shared/ipc/build.ts 的 WarmDepsRequest），从**类型上**排除
+「误落进用户工程」的可能；devkit 侧还有一道 `isPathInside` 拒绝式守卫。
+
+界面上必须写清两件事，否则是在坑用户：① 代价（385MB 磁盘 + 数分钟）；
+② **只支持 Forge**（NeoForge 是 `neoformruntime`、Loom 缓存在工程内 `.gradle/loom-cache`，
+布局都不同，未支持）。
+
+### 写渲染层测试踩的三个坑（都不是代码 bug，是测试写法）
+
+1. **jsdom 没有 `matchMedia`** → 组件挂载即 TypeError，多条用例一起红且看不出是哪条
+   （本仓 `themes.ts:296 getEffectiveMode` 读系统配色）。
+2. **主进程 push 触发的 setState 必须包 `act()`** —— React 18 会把更新排队不提交，
+   断言看到的是旧树，报错是「找不到元素」，完全指不到真因。
+3. **mock 返回形状必须先读消费点的解构**：`SettingsPanel.tsx:245` 读 `r.profiles`，
+   我返回 `[]` → `setProfiles(undefined)` 抛 TypeError，而它**发生在测试之外的微任务里**，
+   vitest 报成 "5 unhandled rejections"，把真正的断言结果全盖住，还害我差点把锅甩给
+   无辜的 `process-supervisor.test.ts`（单跑却是 145 passed）。
+   **教训：看到「别处坏了」先怀疑自己的 mock 形状。**
 
 ## 7.7 规格闭环点火（L2，commit `ffb87d8`）：真模型一轮过的三个真 bug
 
