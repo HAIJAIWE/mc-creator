@@ -666,6 +666,34 @@ BuildPanel **不持有 MC/Forge 版本**：它的工程是生成出来的，版�
 确认通路，通了就照 §7.8 的 Forge 探针流程复刻一遍（生成器现在输出的是正确的
 `neoForge {}` 形状，见 commit `5254dd7`），量出布局再动手。**不通就别猜着写。**
 
+#### 补充（同日）：DNS 是被污染的，且 NeoForge 机制与 Forge 不是一套
+
+三点新证据，都可复现：
+
+1. **不是普通封锁，是 DNS 污染。** 三次 `Resolve-DnsName maven.neoforged.net`
+   返回的 IP **每次都不同**（`89.187.187.10/.13/.15/.18` 与 `143.244.51.246/.59` 混杂），
+   `Test-NetConnection` 恒 `False`。同一次探测里 `github.com`、
+   `maven.minecraftforge.net`、`plugins.gradle.org`、`maven.aliyun.com`、
+   `mirrors.cloud.tencent.com` **全部 TCP 通** —— 只有它不通。
+   DoH 查真实 IP 这条路也堵死：`cloudflare-dns.com` 与 `dns.google` 的 SSL 都建不起来。
+2. **换镜像无效**：`maven.aliyun.com/repository/{public,central}`、腾讯云 nexus、
+   华为云 maven 对 `net/neoforged/neoforge/**` 一律 404 —— NeoForge 不发布在那里。
+3. **从插件 jar 挖机制**（Plugin Portal 可达，下 `moddev-gradle-1.0.21.jar` 1.29MB，
+   解包扫 747 个 class 的常量池）——**这条路绕过了制品不可达，结论是硬证据**：
+   - `dsl.NeoFormRuntime` 上有 **`neoForge.neoFormRuntime.enableCache`**：
+     缓存是**显式 DSL 开关**，不是自动生效的。
+   - `internal.CreateMinecraftArtifactsTask` 把它当**命令行参数传给外部进程**：
+     `--neoform` / `--disable-cache` / `--analyze-cache-misses`。
+     即 Minecraft 工件由 **NeoFormRuntime 外部进程**产出并缓存，
+     **缓存生命周期握在那个进程手里，不在 `~/.gradle/caches/` 的常规布局里**。
+   - `ModDevPlugin` 里另有 `java-runtime`、`neoforge-`、`modDevBuildDir`、
+     `build/minecraft-junit` 等字面量。
+
+**因此即使网络通，也不该照抄 Forge 那套**：Forge 的 `~/.gradle/caches/forge_gradle`
+是「跑一次就留下」，预热就是提前填满；NeoForge 是「显式开关 + 外部进程 + 另一套落点」。
+要预热很可能得**先改用户 build.gradle 打开 `enableCache`** —— 那是替用户改构建语义，
+不是我方能悄悄做的决定。**先确认预热有没有意义，再谈怎么做。**
+
 ### 写渲染层测试踩的三个坑（都不是代码 bug，是测试写法）
 
 1. **jsdom 没有 `matchMedia`** → 组件挂载即 TypeError，多条用例一起红且看不出是哪条
