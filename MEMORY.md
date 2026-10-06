@@ -610,7 +610,8 @@ ModDevGradle 2.0.143 → EXTNAMES 含 neoForge，HAS_MODDEV=false，HAS_NEOFORGE
 ### 预热的价值与形态（§7.8 续，commits `1e9a29b` + `d7fc861`）
 
 同一工程冷启 `3m14s` → 热了之后 `17s`。但**「预热所有组合」是错的方向**，
-量了磁盘构成才知道为什么：
+量了磁盘构成才知道为什么（**测于本轮中途；E:\Cache 下那批探针目录后来被清空了，
+下面 ~/.gradle 的数字仍有效**——它是 Gradle 自己的缓存，不在清理范围内）：
 
 ```
 ~/.gradle 合计            1212 MB
@@ -620,6 +621,7 @@ ModDevGradle 2.0.143 → EXTNAMES 含 neoForge，HAS_MODDEV=false，HAS_NEOFORGE
   caches/modules-2          99 MB   ← 真正的 Maven 依赖（原来以为的大头，其实是小的）
 ```
 
+**比例关系是结论，MB 数不必当真**（冷启动时量一次，那台机器的 Gradle 缓存只会变大）。
 所以形态定为**用户主动预热单个 MC 版本**：8 个版本全铺 ≈ 3GB + 数十分钟，不现实。
 入口在**设置面板**而非 BuildPanel —— 见下。
 
@@ -802,3 +804,8 @@ backup`**。不要盲删 stash 区，尤其指向旧 commit 的那些。
    `-Dorg.gradle.java.installations.paths` 两种方式都试过，均未出现在
    `javaToolchains` 输出里，尽管 `release` 文件与 `bin/javac.exe` 都正常）。
    **原因未查清，不要当成 Gradle 的 bug 下结论。**
+9. **量磁盘/文件大小要在动作前一刻量，别把半小时前的数当现状。**
+   本轮清理探针时：删除时每个目录实测 **0 files**，而半小时前量它们是 846MB
+   （gradle-8.12 130MB、jdk21 192MB 都真读到过）。中间隔了几轮 + 一个命令超时
+   中断，内容已被清空。同类的坑还有 MEMORY §4 那条「行尾」——**环境会漂移，
+   证据有时效**。报数字前重测一次。
