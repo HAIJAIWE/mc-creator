@@ -27,7 +27,7 @@ describe('tools.ts MCP 工具清单（§10.2 / §10.6）', () => {
     }
   });
 
-  it('§10.2 点名工具存在（含 v3.1 补齐的读现状/回滚类）', () => {
+  it('§10.2 点名工具存在（含 v3.1 补齐的读现状/回滚类 + §7.2 代理层 8 个新工具）', () => {
     const names = MCP_TOOL_DEFS.map((t) => t.name);
     for (const n of [
       'get_capabilities',
@@ -47,6 +47,15 @@ describe('tools.ts MCP 工具清单（§10.2 / §10.6）', () => {
       'rollback_build',
       'generate_content',
       'validate_content',
+      // §7.2 代理层新增工具
+      'create_proxy_server',
+      'start_proxy_server',
+      'stop_proxy_server',
+      'restart_proxy_server',
+      'delete_proxy_server',
+      'list_proxy_servers',
+      'get_proxy_server_config',
+      'set_proxy_server_config',
     ]) {
       expect(names).toContain(n);
     }
@@ -168,11 +177,11 @@ describe('pipeline.ts 生成闭环状态机（§10.3 成功判据）', () => {
   });
 });
 
-describe('§7.4 快照/定时 8 新工具（contract 33 键）', () => {
-  it('总数 33 且新 8 键全覆盖', () => {
+describe('§7.4 快照/定时 8 新工具 + §7.2 代理层 8 个新工具（contract 41 键）', () => {
+  it('总数 41 且新 16 键全覆盖', () => {
     const keys = Object.keys(MCP_TOOL_PERMISSIONS);
-    expect(keys).toHaveLength(33);
-    expect(MCP_TOOL_DEFS).toHaveLength(33);
+    expect(keys).toHaveLength(41);
+    expect(MCP_TOOL_DEFS).toHaveLength(41);
     const names = new Set(MCP_TOOL_DEFS.map((t) => t.name));
     for (const n of [
       'list_backups',
@@ -183,6 +192,15 @@ describe('§7.4 快照/定时 8 新工具（contract 33 键）', () => {
       'prune_backups',
       'schedule_task',
       'cancel_task',
+      // §7.2 代理层新增工具
+      'create_proxy_server',
+      'start_proxy_server',
+      'stop_proxy_server',
+      'restart_proxy_server',
+      'delete_proxy_server',
+      'list_proxy_servers',
+      'get_proxy_server_config',
+      'set_proxy_server_config',
     ]) {
       expect(names).toContain(n);
     }

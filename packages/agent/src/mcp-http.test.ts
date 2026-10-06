@@ -143,7 +143,7 @@ describe('parseHttpPayload（batch 支持 —— 规范要求，stdio 层不支�
 });
 
 describe('POST 单请求（§10.1 JSON-RPC 语义优先于 HTTP 状态码）', () => {
-  it('tools/list → 200 + application/json + 33 个工具', async () => {
+  it('tools/list → 200 + application/json + 41 个工具', async () => {
     const res = await handleHttpRequest(
       createMcpServer({}),
       req({ method: 'POST', body: rpcLine({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }),
@@ -151,7 +151,7 @@ describe('POST 单请求（§10.1 JSON-RPC 语义优先于 HTTP 状态码）', (
     expect(res.status).toBe(200);
     expect(res.headers['Content-Type']).toBe('application/json');
     const tools = (parseRpc(res.body).result as { tools: unknown[] }).tools;
-    expect(tools).toHaveLength(33);
+    expect(tools).toHaveLength(41);
   });
 
   it('notification（无 id）→ 202 空 body', async () => {
@@ -804,7 +804,7 @@ describe('§10.6 通道权限铁律在 HTTP 通道同样生效（回归防线）
     }
   });
 
-  it('W/X 一律拒绝：33 个工具里 W+X 抽查 permission 错误（全量覆盖见 agent.test.ts）', async () => {
+  it('W/X 一律拒绝：41 个工具里 W+X 抽查 permission 错误（全量覆盖见 agent.test.ts）', async () => {
     const server = createMcpServer({});
     const tools = server.listTools();
     const wOrX = [
@@ -960,7 +960,7 @@ describe('serveHttp 真机集成（port:0 随机端口 + 真实 fetch）', () =>
         headers: { 'content-type': 'application/json', 'mcp-session-id': sid ?? '' },
         body: rpcLine({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
       });
-      expect(((await list.json()) as any).result.tools).toHaveLength(33);
+      expect(((await list.json()) as any).result.tools).toHaveLength(41);
 
       const call = await fetch(running.url, {
         method: 'POST',

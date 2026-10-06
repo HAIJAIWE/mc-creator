@@ -227,6 +227,15 @@ export const MCP_TOOL_PERMISSIONS: Record<string, PermissionLevel> = {
   stop_server: 'X',
   rollback_build: 'X',
   generate_content: 'X',
+  // 代理服务器管理（§7.2 代理层）
+  create_proxy_server: 'W',
+  start_proxy_server: 'X',
+  stop_proxy_server: 'X',
+  restart_proxy_server: 'X',
+  delete_proxy_server: 'X',
+  list_proxy_servers: 'W',
+  get_proxy_server_config: 'W',
+  set_proxy_server_config: 'W',
 };
 
 /** 生成验证成功判据（§10.3），机器可判定。 */

@@ -54,6 +54,15 @@ const DEFS: Array<[name: string, description: string]> = [
   // 生成与校验
   ['generate_content', '生成内容（prompt+kind+edition+version，§10.3）'],
   ['validate_content', '校验内容（机器可判定成功信号，§10.3）'],
+  // 代理服务器管理（§7.2 代理层：Velocity / BungeeCord / Waterfall）
+  ['create_proxy_server', '创建代理服务器（指定类型 velocity/bungeecord/waterfall）'],
+  ['start_proxy_server', '启动代理服务器'],
+  ['stop_proxy_server', '停止代理服务器'],
+  ['restart_proxy_server', '重启代理服务器'],
+  ['delete_proxy_server', '删除代理服务器'],
+  ['list_proxy_servers', '列出所有代理服务器'],
+  ['get_proxy_server_config', '获取代理服务器配置'],
+  ['set_proxy_server_config', '设置代理服务器配置'],
 ];
 
 export const MCP_TOOL_DEFS: McpToolDef[] = DEFS.map(([name, description]) => ({

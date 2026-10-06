@@ -60,6 +60,7 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
@@ -327,6 +328,16 @@ function optStringArray(source: Record<string, unknown>, key: string): string[] 
 function optBoolean(source: Record<string, unknown>, key: string): boolean | undefined {
   const value = source[key];
   return typeof value === 'boolean' ? value : undefined;
+}
+
+function optRecord(
+  source: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> | undefined {
+  const v = source[key];
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : undefined;
 }
 
 /** server.properties 值转义：properties 是 key=value 行格式，值里的换行/等号需防注入。 */
@@ -1915,6 +1926,23 @@ export class ServerKernel implements KernelContract {
           return await this.scheduleTask(root, payload, step);
         case 'cancel_task':
           return await this.cancelTask(root, payload, step);
+        // 代理服务器管理（§7.2 代理层：Velocity / BungeeCord / Waterfall）
+        case 'create_proxy_server':
+          return await this.createProxyServer(root, payload, step);
+        case 'start_proxy_server':
+          return await this.startProxyServer(root, payload, step);
+        case 'stop_proxy_server':
+          return await this.stopProxyServer(root, payload, step);
+        case 'restart_proxy_server':
+          return await this.restartProxyServer(root, payload, step);
+        case 'delete_proxy_server':
+          return await this.deleteProxyServer(root, payload, step);
+        case 'list_proxy_servers':
+          return await this.listProxyServers(root, payload, step);
+        case 'get_proxy_server_config':
+          return await this.getProxyServerConfig(root, payload, step);
+        case 'set_proxy_server_config':
+          return await this.setProxyServerConfig(root, payload, step);
         default:
           verr(`不支持的任务: ${kind}`, 'UNKNOWN_KIND');
       }
@@ -2048,5 +2076,193 @@ export class ServerKernel implements KernelContract {
         }
       },
     };
+  }
+
+  // 代理服务器管理（§7.2 代理层：Velocity / BungeeCord / Waterfall）
+  private async createProxyServer(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const p = asRecord(payload);
+    const proxyId = optString(p, 'proxyId');
+    if (!proxyId) verr('缺少参数 payload.proxyId（代理服务器 ID）');
+    const proxyType = optString(p, 'proxyType') ?? 'velocity';
+    if (!['velocity', 'bungeecord', 'waterfall'].includes(proxyType)) {
+      verr(`不支持的代理类型: ${proxyType}，支持: velocity / bungeecord / waterfall`);
+    }
+    const proxyDir = this.proxyDir(root, proxyId);
+    if (existsSync(proxyDir)) verr(`代理服务器已存在: ${proxyId}`, 'PROXY_ALREADY_EXISTS');
+    step(0);
+    mkdirSync(this.proxyDir(root, proxyId), { recursive: true });
+    step(1);
+    // 写入基础配置文件
+    const config = {
+      proxyId,
+      proxyType,
+      port: optNumber(p, 'port') ?? (proxyType === 'velocity' ? 25577 : 25565),
+      bindAddress: optString(p, 'bindAddress') ?? '0.0.0.0',
+      motd: optString(p, 'motd') ?? 'A Minecraft Proxy Server',
+      maxPlayers: optNumber(p, 'maxPlayers') ?? 1000,
+      onlineMode: optBoolean(p, 'onlineMode') ?? true,
+    };
+    writeFileSync(
+      join(this.proxyDir(root, proxyId), 'config.json'),
+      JSON.stringify(config, null, 2),
+    );
+    step(2);
+    return { ok: true, data: { proxyId, proxyType, config } };
+  }
+
+  private async startProxyServer(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const proxyId = serverIdOf(payload);
+    if (!proxyId) verr('缺少合法 proxyId（payload.serverId）');
+    const proxyDir = this.proxyDir(root, proxyId);
+    if (!existsSync(proxyDir)) verr(`代理服务器不存在: ${proxyId}`, 'PROXY_NOT_FOUND');
+    const configPath = join(proxyDir, 'config.json');
+    if (!existsSync(configPath)) verr(`代理配置缺失: ${proxyId}`, 'CONFIG_MISSING');
+    step(0);
+    // 实际启动由外壳进程托管进程执行，这里只返回启动指令
+    return {
+      ok: true,
+      data: {
+        proxyId,
+        startCommand: 'java -Xms512M -Xmx1G -jar velocity.jar',
+        message: '代理服务器启动指令已生成，请由外壳进程托管执行',
+      },
+    };
+  }
+
+  private async stopProxyServer(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const proxyId = serverIdOf(payload);
+    if (!proxyId) verr('缺少合法 proxyId（payload.serverId）');
+    step(0);
+    // 停止指令由外壳执行
+    return {
+      ok: true,
+      data: { proxyId, message: '停止指令已生成，请由外壳执行 RCON/SIGTERM' },
+    };
+  }
+
+  private async restartProxyServer(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    await this.stopProxyServer(root, payload, step);
+    step(1);
+    return await this.startProxyServer(root, payload, step);
+  }
+
+  private async deleteProxyServer(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const p = asRecord(payload);
+    const proxyId = optString(p, 'proxyId') ?? serverIdOf(payload);
+    if (!proxyId) verr('缺少合法 proxyId');
+    step(0);
+    const proxyDir = this.proxyDir(root, proxyId);
+    if (existsSync(proxyDir)) {
+      rmSync(proxyDir, { recursive: true, force: true });
+    }
+    step(1);
+    return { ok: true, data: { proxyId, message: '代理服务器已删除' } };
+  }
+
+  private async listProxyServers(
+    root: string,
+    payload: unknown,
+    step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    step(0);
+    const proxyRoot = this.proxyRoot(root);
+    if (!existsSync(proxyRoot)) return { ok: true, data: { proxies: [] } };
+    step(1);
+    const entries = readdirSync(proxyRoot)
+      .filter((entry) => {
+        try {
+          return statSync(join(proxyRoot, entry)).isDirectory();
+        } catch {
+          return false;
+        }
+      })
+      .map((proxyId) => {
+        const configPath = join(this.proxyDir(root, proxyId), 'config.json');
+        let config: Record<string, unknown> = {};
+        if (existsSync(configPath)) {
+          try {
+            config = JSON.parse(readFileSync(configPath, 'utf8'));
+          } catch {
+            config = {};
+          }
+        }
+        return {
+          proxyId,
+          proxyType: config.proxyType ?? 'unknown',
+          port: config.port ?? 0,
+          onlineMode: config.onlineMode ?? true,
+        };
+      });
+    return { ok: true, data: { proxies: entries } };
+  }
+
+  private async getProxyServerConfig(
+    root: string,
+    payload: unknown,
+    _step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const proxyId = serverIdOf(payload);
+    if (!proxyId) verr('缺少合法 proxyId（payload.serverId）');
+    const configPath = join(this.proxyDir(root, proxyId), 'config.json');
+    if (!existsSync(configPath)) verr(`代理配置不存在: ${proxyId}`, 'CONFIG_MISSING');
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    return { ok: true, data: config };
+  }
+
+  private async setProxyServerConfig(
+    root: string,
+    payload: unknown,
+    _step: (index: number, message?: string) => void,
+  ): Promise<TaskResult> {
+    const p = asRecord(payload);
+    const proxyId = optString(p, 'proxyId') ?? serverIdOf(payload);
+    if (!proxyId) verr('缺少合法 proxyId');
+    const configPath = join(this.proxyDir(root, proxyId), 'config.json');
+    if (!existsSync(configPath)) verr(`代理配置不存在: ${proxyId}`, 'CONFIG_MISSING');
+    const newConfig = optRecord(p, 'config') ?? {};
+    // 合并配置，保留未提供的字段
+    const current = JSON.parse(
+      readFileSync(join(this.proxyDir(root, proxyId), 'config.json'), 'utf8'),
+    );
+    const merged = { ...current, ...newConfig };
+    writeFileSync(
+      join(this.proxyDir(root, proxyId), 'config.json'),
+      JSON.stringify(merged, null, 2),
+    );
+    return { ok: true, data: merged };
+  }
+
+  /**
+   * 代理服务器根目录。
+   */
+  private proxyRoot(root: string): string {
+    return join(root, 'proxies');
+  }
+
+  /**
+   * 单个代理服务器目录。
+   */
+  private proxyDir(root: string, proxyId: string): string {
+    return join(this.proxyRoot(root), proxyId);
   }
 }
