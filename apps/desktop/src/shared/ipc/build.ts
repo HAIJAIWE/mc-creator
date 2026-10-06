@@ -70,6 +70,43 @@ export const BuildWithFixResponse = z.object({
 });
 
 export type BuildWithFixReq = z.infer<typeof BuildWithFixRequest>;
+
+// === Gradle/ForgeGradle 依赖预热（W3） ===
+export const WARM_DEPS = 'mod:warmDeps';
+export const WARM_DEPS_PROGRESS = 'mod:warmDeps:progress';
+export const WARM_DEPS_CANCEL = 'mod:warmDeps:cancel';
+
+/**
+ * 预热请求。
+ *
+ * **刻意不接收 projectPath**：预热绝不能落在用户工程里（那会写他的 build/、
+ * 还可能被算进产物哈希 lastBuildHash）。所以这里只给版本组合 —— 数据来源唯一
+ * 是 `LOADER_VERSIONS` 表，而不是去解析用户 build.gradle 的文本。
+ */
+export const WarmDepsRequest = z.object({
+  mcVersion: z.string().min(1),
+  loader: z.enum(['forge']).default('forge'),
+});
+export const WarmDepsCancelRequest = z.object({ requestId: z.string().min(1) });
+
+export const WarmDepsResponse = z.object({
+  ok: z.boolean(),
+  warmed: z.boolean(),
+  aborted: z.boolean().default(false),
+  elapsedMs: z.number(),
+  log: z.string(),
+  error: z.string().nullable().default(null),
+});
+
+export type WarmDepsReq = z.infer<typeof WarmDepsRequest>;
+export type WarmDepsRes = z.infer<typeof WarmDepsResponse>;
+export type WarmDepsCancelReq = z.infer<typeof WarmDepsCancelRequest>;
+
+/** 进度推送（main→renderer send）。text 是给用户看的中文阶段提示。 */
+export type WarmDepsProgress = {
+  requestId: string;
+  text: string;
+};
 export type BuildWithFixRes = z.infer<typeof BuildWithFixResponse>;
 
 // === 准备构建目录（P22-4：构建前把内存中的 files 写入临时目录，避免硬编码路径） ===

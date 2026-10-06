@@ -24,6 +24,13 @@ import {
   type ColorMode,
 } from '../lib/themes.js';
 import type { ModelProfile } from '../../../shared/ipc-channels.js';
+import { LOADER_VERSIONS, type McVersion } from '@mc-creator/shared';
+
+/** 可预热的版本：只取 LOADER_VERSIONS 里有 forgeVersion 条目的（表即真相，不硬编码列表）。 */
+const WARMABLE_VERSIONS = (Object.keys(LOADER_VERSIONS) as McVersion[]).filter(
+  (v) =>
+    typeof LOADER_VERSIONS[v].forgeVersion === 'string' && LOADER_VERSIONS[v].forgeVersion !== '',
+);
 import { getLocale, setLocale, getAvailableLocales, getLocaleDisplayName } from '../i18n';
 import { useTranslation } from '../hooks/useTranslation.js';
 import {
@@ -143,7 +150,16 @@ const LAYOUT_PRESETS = [
   },
 ];
 
-type Tab = 'model' | 'curseforge' | 'appearance';
+/**
+ * 设置分组。
+ *
+ * `warmup`（依赖预热）刻意**不放在 BuildPanel**：预热需要「MC 版本 + Forge 版本」，
+ * 而 BuildPanel 不持有这个 —— 它的工程是生成出来的，版本只存在于 build.gradle 文本里。
+ * 去解析用户工程的构建脚本来反推预热目标，等于让预热对象变成「用户工程」，
+ * 而预热绝不能落在用户工程里（会写他的 build/、还可能被算进 lastBuildHash）。
+ * 这里直接用 `LOADER_VERSIONS` 表做下拉 —— 数据来源唯一，不解析文本。
+ */
+type Tab = 'model' | 'curseforge' | 'appearance' | 'warmup';
 
 export function SettingsPanel() {
   const leftWidth = useLayoutStore(selectLeftWidth);
@@ -151,6 +167,16 @@ export function SettingsPanel() {
   const setLeftWidth = useLayoutStore(selectSetLeftWidth);
   const setRightWidth = useLayoutStore(selectSetRightWidth);
   const [activeTab, setActiveTab] = useState<Tab>('model');
+
+  // === 依赖预热（W3） ===
+  // 只列 Forge 组合：devkit 的 warmForgeGradleCache 覆盖 ForgeGradle 6，
+  // NeoForge（neoformruntime）与 Loom（工程内缓存）布局不同，**尚未支持**。
+  // 下面文案必须如实说这一点，不能让用户以为「选哪个都能预热」。
+  const [warmMcVersion, setWarmMcVersion] = useState<string>('1.20.1');
+  const [warmRunning, setWarmRunning] = useState(false);
+  const [warmMsg, setWarmMsg] = useState<string | null>(null);
+  const [warmErr, setWarmErr] = useState<string | null>(null);
+  const [warmDone, setWarmDone] = useState<boolean | null>(null);
   const { t, tCommon } = useTranslation();
 
   // === 模型配置（多套并存，可切换/测试） ===
@@ -162,6 +188,41 @@ export function SettingsPanel() {
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // 预热进度订阅：卸载时必须退订，否则 setState 打到已卸载组件上。
+  useEffect(() => {
+    const requestId = `${warmMcVersion}-forge`;
+    return ipcClient.onWarmDepsProgress((p) => {
+      if (p.requestId !== requestId) return;
+      setWarmMsg(p.text);
+    });
+  }, [warmMcVersion]);
+
+  const startWarm = async () => {
+    setWarmRunning(true);
+    setWarmErr(null);
+    setWarmDone(null);
+    setWarmMsg('正在准备…');
+    try {
+      const r = await ipcClient.warmDeps(warmMcVersion, 'forge');
+      if (r.aborted) {
+        setWarmMsg('已取消');
+      } else if (!r.ok) {
+        setWarmErr(r.error ?? '未知原因');
+      } else {
+        setWarmDone(r.warmed);
+        setWarmMsg(
+          r.warmed
+            ? `预热完成（${Math.round(r.elapsedMs / 1000)} 秒）`
+            : '该版本已在缓存中，无需预热',
+        );
+      }
+    } catch (e) {
+      setWarmErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWarmRunning(false);
+    }
+  };
 
   // === CurseForge 配置 ===
   const [cfApiKey, setCfApiKey] = useState('');
@@ -374,6 +435,7 @@ export function SettingsPanel() {
             { id: 'model', label: tCommon('model') },
             { id: 'curseforge', label: 'CurseForge' },
             { id: 'appearance', label: tCommon('appearance') },
+            { id: 'warmup', label: '依赖预热' },
           ] as { id: Tab; label: string }[]
         ).map((tab) => (
           <button
@@ -571,6 +633,78 @@ export function SettingsPanel() {
               </button>
               {cfSaved && <span className="text-xs text-mc-accent">{tCommon('saved')}</span>}
             </div>
+          </div>
+        )}
+
+        {/* Tab 4: 依赖预热（W3）
+            文案要求：① 写清代价（385MB / 数分钟），否则用户被磁盘占用惊到；
+            ② 说清只支持 Forge，NeoForge/Loom 尚未支持 —— 不给「选哪个都行」的错觉。 */}
+        {activeTab === 'warmup' && (
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 text-xs font-medium text-mc-text">
+                Gradle / ForgeGradle 依赖预热
+              </div>
+              <p className="mb-2 text-[10px] text-mc-mute">
+                首次构建某个 MC 版本时，ForgeGradle 需要下载并反编译 Minecraft （实测冷启动 3 分 14
+                秒）。预热会提前做完这一步，之后构建约 17 秒。
+                <strong className="text-mc-text">代价：每个版本约占 385 MB 磁盘、需数分钟。</strong>
+              </p>
+              <label className="mb-1 block text-[10px] text-mc-dim" htmlFor="warm-mc-version">
+                MC 版本（仅 Forge 支持预热）
+              </label>
+              <select
+                id="warm-mc-version"
+                value={warmMcVersion}
+                onChange={(e) => setWarmMcVersion(e.target.value)}
+                disabled={warmRunning}
+                className="mc-input"
+              >
+                {WARMABLE_VERSIONS.map((v) => (
+                  <option key={v} value={v}>
+                    {v}（Forge {LOADER_VERSIONS[v as McVersion].forgeVersion}）
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[10px] text-mc-mute">
+                NeoForge 与 Fabric/Loom 的缓存布局不同，暂不支持预热；它们的首次构建仍需等待。
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={startWarm} disabled={warmRunning} className="mc-btn-primary">
+                {warmRunning ? '预热中…' : '预热该版本'}
+              </button>
+              {warmRunning && (
+                <button
+                  onClick={() => void ipcClient.cancelWarmDeps(`${warmMcVersion}-forge`)}
+                  className="mc-btn-ghost"
+                >
+                  取消
+                </button>
+              )}
+              {warmDone === true && (
+                <span className="text-xs text-mc-accent" role="status">
+                  已预热
+                </span>
+              )}
+              {warmDone === false && (
+                <span className="text-xs text-mc-mute" role="status">
+                  已在缓存中
+                </span>
+              )}
+            </div>
+            {/* role=status 让屏幕阅读器也能听到阶段变化；反编译阶段几分钟无输出，
+                文案已明确提示「请勿关闭窗口」，否则用户会以为卡死。 */}
+            {warmMsg && (
+              <p className="text-[10px] text-mc-dim" role="status">
+                {warmMsg}
+              </p>
+            )}
+            {warmErr && (
+              <p className="text-[10px] text-red-400" role="alert">
+                预热失败：{warmErr}
+              </p>
+            )}
           </div>
         )}
 

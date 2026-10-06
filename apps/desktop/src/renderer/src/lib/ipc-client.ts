@@ -3,6 +3,8 @@ import type {
   GenerateFilesRes,
   BuildRes,
   BuildWithFixRes,
+  WarmDepsRes,
+  WarmDepsProgress,
   ExportZipRes,
   SaveFileRes,
   SaveAllFilesRes,
@@ -370,6 +372,12 @@ export const ipcClient = {
   ) => window.mcApi.fixSuggest(buildLog, files, onChunk),
   buildWithFix: (projectPath: string): Promise<BuildWithFixRes> =>
     window.mcApi.buildWithFix(projectPath),
+  // Gradle/ForgeGradle 依赖预热（W3）。刻意不传 projectPath —— 预热在临时目录跑。
+  warmDeps: (mcVersion: string, loader: 'forge'): Promise<WarmDepsRes> =>
+    window.mcApi.warmDeps(mcVersion, loader),
+  cancelWarmDeps: (requestId: string): Promise<void> => window.mcApi.cancelWarmDeps(requestId),
+  onWarmDepsProgress: (cb: (p: WarmDepsProgress) => void): (() => void) =>
+    window.mcApi.onWarmDepsProgress(cb),
   // Phase 3.2：取消构建 + JDK 预检
   abortBuild: (): Promise<{ ok: boolean; killed: number }> => window.mcApi.abortBuild(),
   checkJava: (mcVersion?: string): Promise<BuildCheckJavaRes> => window.mcApi.checkJava(mcVersion),

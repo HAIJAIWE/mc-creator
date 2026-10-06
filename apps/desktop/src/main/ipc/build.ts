@@ -13,9 +13,9 @@ import {
   BuildFixer,
   Filesystem,
 } from '@mc-creator/core';
-import { ensureGradleWrapper } from '@mc-creator/devkit';
+import { ensureGradleWrapper, warmForgeGradleCache } from '@mc-creator/devkit';
 import type { McVersion } from '@mc-creator/shared';
-import { javaVersionFor } from '@mc-creator/shared';
+import { javaVersionFor, LOADER_VERSIONS } from '@mc-creator/shared';
 import { assertWithin } from '../ipc-utils.js';
 import { loadModelConfig } from '../model-config.js';
 import {
@@ -34,6 +34,13 @@ import {
   BuildCheckJavaRequest,
   PREPARE_BUILD_DIR,
   PrepareBuildDirRequest,
+  WARM_DEPS,
+  WARM_DEPS_PROGRESS,
+  WARM_DEPS_CANCEL,
+  WarmDepsRequest,
+  WarmDepsCancelRequest,
+  type WarmDepsRes,
+  type WarmDepsProgress,
   type BuildRes,
   type BuildAbortRes,
   type BuildCheckJavaRes,
@@ -244,6 +251,86 @@ ${req.buildLog}
         requestId: req.requestId,
       });
     });
+  });
+
+  // === Gradle/ForgeGradle 依赖预热（W3） ===
+  //
+  // 形态是「用户主动预热单个 MC 版本」，不是后台铺满所有组合 —— 实测磁盘构成：
+  // 冷启 3m14s 的大头是 forge_gradle 反编译（385MB/版本），8 个版本 ≈ 3GB。
+  //
+  // 三条设计约束：
+  // 1. **绝不接收 projectPath**：预热在临时目录跑，参数里没有用户工程路径这一项，
+  //    就不存在「误落进他的 build/」的可能（devkit 侧还有一道拒绝式守卫）。
+  // 2. **可取消**：预热要几分钟且中间无输出，用户必须能中止 —— AbortController 按
+  //    requestId 存；同 id 重复发起会先取消上一次（热路径幂等由 devkit 管）。
+  // 3. **进度必须推**：W3 的执行器只在进程结束时回传合并日志（改它要动 W2 已合入的
+  //    GradleTaskRunner 签名），所以 UI 上是「阶段提示」而非逐行日志。文案要如实说
+  //    「反编译最慢、请勿关窗口」，否则用户会以为卡死。
+  const warmControllers = new Map<string, AbortController>();
+  const warmTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  ipcMain.handle(WARM_DEPS, async (e, raw: unknown): Promise<WarmDepsRes> => {
+    const req = WarmDepsRequest.parse(raw);
+    // 发行版缓存由 gradle-bootstrap 负责（它还带宿主 JVM 上限预检）；
+    // ensureGradleWrapper 先跑一次，保证预热用的 gradle 与构建用的是同一份。
+    const boot = await ensureGradleWrapper({ projectPath: app.getPath('userData') });
+    if (!boot.ok) {
+      return {
+        ok: false,
+        warmed: false,
+        aborted: false,
+        elapsedMs: 0,
+        log: '',
+        error: `Gradle 准备失败：${boot.error}`,
+      };
+    }
+
+    const requestId = `${req.mcVersion}-${req.loader}`;
+    warmControllers.get(requestId)?.abort();
+    warmControllers.delete(requestId);
+    const controller = new AbortController();
+    warmControllers.set(requestId, controller);
+
+    try {
+      const versions = LOADER_VERSIONS[req.mcVersion as McVersion];
+      if (versions === undefined) {
+        return {
+          ok: false,
+          warmed: false,
+          aborted: false,
+          elapsedMs: 0,
+          log: '',
+          error: `未收录的 MC 版本：${req.mcVersion}`,
+        };
+      }
+      const r = await warmForgeGradleCache({
+        mcVersion: req.mcVersion,
+        forgeVersion: versions.forgeVersion,
+        gradleHome: boot.distributionHome,
+        signal: controller.signal,
+        onProgress: (text: string) => {
+          e.sender.send(WARM_DEPS_PROGRESS, { requestId, text } satisfies WarmDepsProgress);
+        },
+      });
+      return {
+        ok: r.ok,
+        warmed: r.warmed,
+        aborted: r.aborted,
+        elapsedMs: r.elapsedMs,
+        log: r.log,
+        error: r.ok ? null : (r.error ?? '未知原因'),
+      };
+    } finally {
+      warmControllers.delete(requestId);
+      const t = warmTimers.get(requestId);
+      if (t !== undefined) clearTimeout(t);
+      warmTimers.delete(requestId);
+    }
+  });
+
+  ipcMain.handle(WARM_DEPS_CANCEL, (_e, raw: unknown): void => {
+    const req = WarmDepsCancelRequest.parse(raw);
+    warmControllers.get(req.requestId)?.abort();
   });
 
   // 应用退出时清理所有活跃的构建子进程（PTY 清理在 ptySessions 定义后追加）

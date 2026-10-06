@@ -31,6 +31,9 @@ import {
   COMPARE_MODELS,
   COMPARE_MODELS_CHUNK,
   BUILD_WITH_FIX,
+  WARM_DEPS,
+  WARM_DEPS_PROGRESS,
+  WARM_DEPS_CANCEL,
   AI_FIX_SUGGEST,
   AI_FIX_SUGGEST_CHUNK,
   BUILD_STREAM,
@@ -77,6 +80,8 @@ import {
   RAG_SEARCH,
   type GeneratorType,
   type BuildStreamChunkT,
+  type WarmDepsRes,
+  type WarmDepsProgress,
   type RagSearchRes,
   type ProcessLogEventT,
   type ProcessStateEventT,
@@ -222,6 +227,16 @@ const api = {
     });
   },
   buildWithFix: (projectPath: string) => ipcRenderer.invoke(BUILD_WITH_FIX, { projectPath }),
+  // Gradle/ForgeGradle 依赖预热（W3）。刻意**不传 projectPath**：预热只在临时目录
+  // 跑，不碰用户工程。返回取消订阅函数，组件卸载时务必调用。
+  warmDeps: (mcVersion: string, loader: 'forge') =>
+    ipcRenderer.invoke(WARM_DEPS, { mcVersion, loader }) as Promise<WarmDepsRes>,
+  cancelWarmDeps: (requestId: string) => ipcRenderer.invoke(WARM_DEPS_CANCEL, { requestId }),
+  onWarmDepsProgress: (cb: (p: WarmDepsProgress) => void) => {
+    const handler = (_e: unknown, p: WarmDepsProgress) => cb(p);
+    ipcRenderer.on(WARM_DEPS_PROGRESS, handler);
+    return () => ipcRenderer.removeListener(WARM_DEPS_PROGRESS, handler);
+  },
   // Phase 3.2：取消构建（kill 流式构建子进程）+ JDK 预检
   abortBuild: () => ipcRenderer.invoke(BUILD_ABORT),
   checkJava: (mcVersion?: string) => ipcRenderer.invoke(BUILD_CHECK_JAVA, { mcVersion }),
