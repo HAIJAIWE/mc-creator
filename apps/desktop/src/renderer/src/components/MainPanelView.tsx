@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { useModStore } from '../store/mod-store.js';
 import { useProjectStore } from '../store/project-store.js';
+import { useDomainStore, selectDomain } from '../store/domain-store.js';
+import { emptyStateHintOfDomain } from '../shell/domains.js';
 import { McIcon } from '../assets/mc-ui/McIcon.js';
 import { withMonacoSetup } from '../lib/lazy-monaco.js';
 
@@ -75,10 +77,14 @@ function EmptyPanel({ message }: { message: string }) {
 export function MainPanelView({ activePanel }: { activePanel: string }) {
   const currentProjectId = useProjectStore((s) => s.currentProjectId);
   const selectedFile = useModStore((s) => s.selectedFile);
+  const domain = useDomainStore(selectDomain);
 
-  // 如果没有项目，显示空状态
+  // 如果没有项目，显示空状态。
+  // 文案按域给：§0.2 里三个域的「还没有东西」含义不同 —— launcher 是没选实例、server 是没建服务端、
+  // dev 才是没打开项目。用同一句话会误导（例如在服务器域提示「打开或新建项目」）。
+  // 注意这里早于下面的 switch：域感知只影响空态文案，不改动任何既有面板分支。
   if (!currentProjectId) {
-    return <EmptyPanel message="请先打开或新建项目" />;
+    return <EmptyPanel message={emptyStateHintOfDomain(domain)} />;
   }
 
   // 根据面板 ID 渲染对应内容

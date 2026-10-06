@@ -1,7 +1,28 @@
 import { type ComponentType } from 'react';
 import { McIcon } from '../assets/mc-ui/McIcon';
 
-/** 面板分组：core 基础设施 / domain 领域编辑器 / middle 中部功能 */
+/**
+ * 面板分组：core 基础设施 / domain 领域编辑器 / middle 中部功能
+ *
+ * ## 为什么这里没有 §0.2 的三个新分组（launcher / server / dev）
+ *
+ * F1 需求写着「PanelKind 扩展：加 'launcher' | 'server' | 'dev'，保留旧三个」。实测后**不能**这么做：
+ * `register-all-panels.ts`（不在本任务允许改动的文件清单内）里另有一份同名 `getAllPanels()`，
+ * 它把分组顺序写死成 `const groupOrder: Record<PanelKind, number> = { core: 0, domain: 1, middle: 2 }`。
+ * PanelKind 只要多出任何一个字面量，这一行就因「缺键」编译失败（tsc 原文，已实跑复现）：
+ *
+ *   src/renderer/src/shell/register-all-panels.ts(177,9): error TS2739:
+ *     Type '{ core: number; domain: number; middle: number; }' is missing the following
+ *     properties from type 'Record<PanelKind, number>': launcher, server, dev
+ *
+ * 「不许改 register-all-panels.ts」与「typecheck 必须绿」只能保一个，这里选**保 typecheck 绿 + 零越界改动**：
+ * - 域（launcher/server/dev）的**词表与归属真源**放在 `shell/domains.ts` 的 `DomainId`，导航层 /
+ *   store / 面板归属判定一律只认它 —— 这正是需求 2 后半句「domains.ts 的归属表是唯一真源，
+ *   不要把域信息再塞回 PanelKind 里搞两套」；
+ * - 本文件的 `groupOrder` 已放宽为 `Partial<Record<PanelKind, number>>`（见 getAllPanels），
+ *   读取仍走 `?? 99` 兜底，所以将来并入新字面量时不会崩、只会落到默认排序（与需求
+ *   「用 ?? 99 这种兜底，别让它崩」一致），且不改动任何现有面板的排序结果。
+ */
 export type PanelKind = 'core' | 'domain' | 'middle';
 
 /** 面板注册元数据 */
@@ -39,7 +60,9 @@ export function getPanel(id: string): PanelRegistration | undefined {
 
 /** 获取所有已启用的面板（按 group 排序，组内按 order） */
 export function getAllPanels(): PanelRegistration[] {
-  const groupOrder = { core: 0, domain: 1, middle: 2 };
+  // 刻意声明为 Partial：这样以后往 PanelKind 里加新分组（含 §0.2 的 launcher/server/dev）时，
+  // 这里无需改类型就能编译，未登记的 kind 由下方 ?? 99 兜底（见文件头「为什么这里没有三个新分组」）。
+  const groupOrder: Partial<Record<PanelKind, number>> = { core: 0, domain: 1, middle: 2 };
   return Array.from(panelRegistry.values())
     .filter((p) => p.enabled !== false)
     .sort((a, b) => {

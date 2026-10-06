@@ -178,6 +178,18 @@
     "settings": "Settings",
     "backToDashboard": "Back to Dashboard"
   },
+  "domains": {
+    "switcherLabel": "Workspace domain",
+    "agentHint": "Agent · available in all domains",
+    "launcher": "Launcher",
+    "server": "Server",
+    "dev": "MC Development",
+    "summary": {
+      "launcher": "Run your content: fetch the client, install deps, launch the game instance.",
+      "server": "Long-running shape: server instance, world data and resource-pack operations.",
+      "dev": "Produce the content itself: items, blocks, entities, audio and their build pipeline."
+    }
+  },
   "topToolbar": {
     "projectManagement": "Project Management",
     "saveProject": "Save Project",

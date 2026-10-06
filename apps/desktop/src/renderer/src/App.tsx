@@ -6,8 +6,10 @@ import { ProjectSaveDialog } from './components/ProjectSaveDialog.js';
 import { TaskCompleteDialog } from './components/TaskCompleteDialog.js';
 import { CodeDiffDialog } from './components/common/CodeDiffDialog.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
+import { DomainSwitcher } from './components/DomainSwitcher.js';
 import { useProjectStore } from './store/project-store.js';
 import { useModStore } from './store/mod-store.js';
+import { useDomainStore, selectDomain, selectSetDomain } from './store/domain-store.js';
 import {
   useLayoutStore,
   selectLeftWidth,
@@ -17,6 +19,7 @@ import {
 } from './shell/layout-store.js';
 import { initPanelRegistries } from './shell/index.js';
 import { getAllPanels } from './shell/panels.js';
+import { defaultPanelOfDomain, isCommonPanel, domainOfPanel } from './shell/domains.js';
 import { FileTree } from './components/FileTree.js';
 import { MainPanelView } from './components/MainPanelView.js';
 import { ProfileProvider } from './shell/profile-manager-provider.js';
@@ -64,19 +67,31 @@ function Workbench() {
   // 冲突差异对话框状态
   const conflictDialog = useModStore((s) => s.conflictDialog);
 
-  // 左侧面板激活状态（默认 explorer）
-  const [activeLeftPanel, setActiveLeftPanel] = useState('explorer');
+  // 当前工作域（§0.2 三域并列）。智能体右侧栏不在域里 —— 它横向贯穿三域，一直常驻。
+  const domain = useDomainStore(selectDomain);
+  const setDomain = useDomainStore(selectSetDomain);
+
+  // 左侧面板激活状态。
+  // 初始值从「固定 explorer」改为**域感知**：挂载时就落到当前域的默认面板，
+  // 否则重启后停在 explorer（common 面板），切域判定永远不触发，域切换形同虚设。
+  const [activeLeftPanel, setActiveLeftPanel] = useState(() => defaultPanelOfDomain(domain));
 
   // 获取所有面板列表（用于校验 activeLeftPanel 有效性）
   const allPanels = getAllPanels();
   const panelIds = allPanels.map((p) => p.id);
 
-  // 确保 activeLeftPanel 有效（首次加载或注册表变化时）
+  // 确保 activeLeftPanel 有效，并做域感知纠偏：
+  // 1) 面板不在注册表里 → 兜底到注册表首项
+  // 2) 面板属于别的域（common 视为哪儿都能待）→ 落到当前域的默认面板
   useEffect(() => {
     if (!panelIds.includes(activeLeftPanel)) {
-      setActiveLeftPanel(panelIds[0] ?? 'explorer');
+      setActiveLeftPanel(panelIds[0] ?? defaultPanelOfDomain(domain));
+      return;
     }
-  }, [panelIds, activeLeftPanel, setActiveLeftPanel]);
+    if (!isCommonPanel(activeLeftPanel) && domainOfPanel(activeLeftPanel) !== domain) {
+      setActiveLeftPanel(defaultPanelOfDomain(domain));
+    }
+  }, [panelIds, activeLeftPanel, domain]);
 
   const handleLeftResize = useCallback(
     (delta: number) => {
@@ -100,6 +115,10 @@ function Workbench() {
 
         {/* 顶部工具栏：项目菜单 + 全局设置 + API 状态 */}
         <TopToolbar onOpenSettings={() => setActiveLeftPanel('settings')} />
+
+        {/* 工作域切换器（§0.2）：三域并列，决定中部主视图的默认面板与空态文案。
+            放在 TopToolbar 之下、ActivityBar 之上：三栏布局本身不动。 */}
+        <DomainSwitcher value={domain} onChange={setDomain} />
 
         <div className="flex flex-1 overflow-hidden">
           <ActivityBar

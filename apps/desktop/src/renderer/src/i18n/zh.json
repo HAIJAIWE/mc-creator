@@ -178,6 +178,18 @@
     "settings": "设置",
     "backToDashboard": "返回项目仪表盘"
   },
+  "domains": {
+    "switcherLabel": "工作域切换",
+    "agentHint": "智能体 · 三域常驻",
+    "launcher": "启动器",
+    "server": "服务器",
+    "dev": "MC 开发",
+    "summary": {
+      "launcher": "把内容跑起来：拉客户端、装依赖、启动游戏实例。",
+      "server": "长期运行形态：服务端实例、世界数据与资源包的持续运维。",
+      "dev": "产出内容本身：物品、方块、实体、音效与它们的构建流水线。"
+    }
+  },
   "topToolbar": {
     "projectManagement": "项目管理",
     "saveProject": "保存项目",
