@@ -61,11 +61,14 @@ describe('EnchantmentGenerator', () => {
     expect(paths).toContain('assets/my_ench/lang/zh_cn.json');
   });
 
-  it('pack.mcmeta 的 pack_format 与描述', async () => {
+  it('pack.mcmeta 的 pack_format 与描述（1.21.1 → 48，官方值）', async () => {
     const ctx = { mcVersion: '1.21.1', spec: validSpec } as any;
     const result = await gen.generate(ctx);
     const mcmeta = JSON.parse(result.files[0].content);
-    expect(mcmeta.pack.pack_format).toBe(26);
+    // 官方 minecraft.wiki：1.21–1.21.1 的数据��格式号是 48（旧表写的 26 是资源包的值）。
+    // 1.21.1 属旧形态，用 pack_format 字段。
+    expect(mcmeta.pack.pack_format).toBe(48);
+    expect(mcmeta.pack.min_format).toBeUndefined();
     expect(mcmeta.pack.description).toBe('自定义附魔包');
   });
 

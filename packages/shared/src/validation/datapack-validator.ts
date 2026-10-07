@@ -3,6 +3,8 @@
  * 返回结构化的校验结果（错误 + 警告），供 UI 展示。
  */
 
+import { usesMinMaxFormat } from './pack-format.js';
+
 import type {
   DatapackSpec,
   RecipeSpec,
@@ -38,48 +40,116 @@ export interface ValidationResult {
   summary: { errors: number; warnings: number; infos: number };
 }
 
-/** pack_format 与 MC 版本对应表 */
+/**
+ * pack_format 与 MC 版本对应表（**仅 1.21.9 之前**）。
+ *
+ * 来源：minecraft.wiki "Pack format" 页 Data pack format history 的
+ * **Releases** 列（2026-10 在线核验）。逐条照抄官方「值 → 版本」对应关系。
+ *
+ * ⚠️ 1.21.9 起 pack_format 含**次版本**且 pack.mcmeta 改用 `min_format`/`max_format`
+ * 字段，故本表止于 1.21.8；新版本走 `MC_VERSION_TO_PACK_FORMAT` + `renderPackMcmeta`。
+ */
 const PACK_FORMAT_MAP: Record<number, string> = {
   4: '1.13–1.14.4',
   5: '1.15–1.16.1',
   6: '1.16.2–1.16.5',
   7: '1.17–1.17.1',
-  8: '1.18–1.18.2',
-  9: '1.19–1.19.2',
-  10: '1.19.3',
-  11: '1.19.3',
+  8: '1.18–1.18.1',
+  9: '1.18.2',
+  10: '1.19–1.19.3',
+  11: '1.19.3–1.19.4', // 23w03a 起 11 只覆盖 1.19.3；1.19.4 发布版沿用 11
   12: '1.19.4',
-  13: '1.19.4',
-  14: '1.20–1.20.1',
-  15: '1.20.2',
-  16: '1.20.3–1.20.4',
-  22: '1.20.5–1.20.6',
-  26: '1.21–1.21.1',
-  28: '1.21.2–1.21.3',
-  32: '1.21.4',
-  34: '1.21.5',
-  42: '1.21.6',
-  48: '1.21.7+',
+  15: '1.20–1.20.1',
+  18: '1.20.2',
+  26: '1.20.3–1.20.4',
+  41: '1.20.5–1.20.6',
+  48: '1.21–1.21.1',
+  57: '1.21.2–1.21.3',
+  61: '1.21.4',
+  71: '1.21.5',
+  80: '1.21.6',
+  81: '1.21.7–1.21.8',
 };
 
-/** MC 版本 → 数据包 pack_format（与 PACK_FORMAT_MAP 反向，新增 MC 版本时同步维护） */
+/**
+ * MC 版本 → 数据包 pack_format **主版本**。
+ *
+ * 1.21.9 之前：整数，与官方 Releases 表一致。
+ * 1.21.9 起：官方写作带次版本（`88.0` / `94.1` / `101.1` / `107.1` / `121.0`），
+ * 本表只存主版本整数，次版本见 `DATA_PACK_MINOR`。
+ *
+ * ⚠️ 旧表把 1.21.11 / 26.1 / 26.2 全写成 48（注释「低版本号始终可被新游戏加载」）。
+ * 那是**错的**：官方 1.21.11 是 94.1、26.1 是 101.1、26.2 是 107.1。
+ * 官方原文：格式号高于游戏支持的号会显示 incompatible；用 48 去投 26.2 属于
+ * 「格式过旧」，资源特性用不上。已按官方表更正。
+ */
 const MC_VERSION_TO_PACK_FORMAT: Record<string, number> = {
-  '1.20.1': 14, // 1.20–1.20.1
-  '1.20.2': 15,
-  '1.20.3': 16,
-  '1.20.4': 16,
-  '1.20.5': 22,
-  '1.20.6': 22,
-  '1.21.1': 26,
-  '1.21.2': 28,
-  '1.21.3': 28,
-  '1.21.4': 32,
-  '1.21.5': 34,
-  '1.21.6': 42,
-  '1.21.11': 48,
-  '26.1': 48, // 26.x 沿用 1.21.7+ 的 48（低版本号始终可被新游戏加载）
-  '26.2': 48,
+  '1.20.1': 15, // 1.20–1.20.1
+  '1.20.2': 18,
+  '1.20.3': 26, // 1.20.3 – 1.20.4
+  '1.20.4': 26,
+  '1.20.5': 41, // 1.20.5 – 1.20.6
+  '1.20.6': 41,
+  '1.21.1': 48, // 1.21 – 1.21.1
+  '1.21.2': 57, // 1.21.2 – 1.21.3
+  '1.21.3': 57,
+  '1.21.4': 61, // 1.21.4
+  '1.21.5': 71, // 1.21.5
+  '1.21.6': 80, // 1.21.6
+  '1.21.7': 81, // 1.21.7 – 1.21.8
+  '1.21.8': 81,
+  '1.21.9': 88, // 1.21.9 – 1.21.10（官方写作 88.0）
+  '1.21.10': 88,
+  '1.21.11': 94, // 1.21.11（官方写作 94.1）
+  '26.1': 101, // 26.1 – 26.1.2（官方写作 101.1）
+  '26.2': 107, // 26.2（官方写作 107.1）
+  '26.3': 121, // 26.3（官方写作 121.0）
 };
+
+/** 数据包 pack_format 的次版本（仅 1.21.9 起有意义，官方给的是带次版本值）。 */
+const DATA_PACK_MINOR: Record<string, number> = {
+  '1.21.9': 0,
+  '1.21.10': 0,
+  '1.21.11': 1,
+  '26.1': 1,
+  '26.2': 1,
+  '26.3': 0,
+};
+
+/**
+ * 该 MC 版本的数据包 pack format 值（含次版本，形如 `94.1`）。
+ *
+ * 1.21.9 之前次版本恒为 0，官方写作整数（如 48）；1.21.9 起官方写作带次版本。
+ * 本函数一律返回带次版本的字符串形态，由调用方决定是否裁掉 `.0`。
+ */
+export function getPackFormatValueForMcVersion(mcVersion: string): string | undefined {
+  const major = MC_VERSION_TO_PACK_FORMAT[mcVersion];
+  if (major === undefined) return undefined;
+  return `${major}.${DATA_PACK_MINOR[mcVersion] ?? 0}`;
+}
+
+/**
+ * 按官方形态渲染 pack.mcmeta 的 `pack` 对象。
+ *
+ * 1.21.9 起（25w31a）官方改用 `min_format` / `max_format`，原文：
+ * "Since 25w31a, the pack format has been changed to work with min_format and
+ * max_format fields instead of the previous pack_format field.
+ * Both data packs and resource packs have this change."
+ * 官方给的推荐写法（1.21.9+）：
+ * `{ "pack": { "description": "...", "min_format": 88, "max_format": 88 } }`
+ *
+ * 注意官方示例里写的是**整数** 88（不是 "88.0"），故此处 min/max 用整数主版本。
+ */
+export function renderPackMcmetaPack(
+  description: string,
+  packFormat: number,
+  mcVersion: string | undefined,
+): Record<string, unknown> {
+  if (mcVersion !== undefined && usesMinMaxFormat(mcVersion)) {
+    return { description, min_format: packFormat, max_format: packFormat };
+  }
+  return { description, pack_format: packFormat };
+}
 
 /**
  * 按 MC 版本推断数据包 pack_format；未知版本返回 undefined。

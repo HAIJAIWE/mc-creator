@@ -279,7 +279,7 @@ describe('ResourcePackGenerator', () => {
     expect(result.warnings).toContain('PNG/OGG 文件已 base64 编码，写入磁盘时需 decode');
   });
 
-  it('pack.mcmeta 内容正确（1.21.11 → 资源包 pack_format 75）', async () => {
+  it('pack.mcmeta 内容正确（1.21.11 → min_format/max_format 75，1.21.9 起用新字段）', async () => {
     const result = await gen.generate(
       makeCtx({
         packName: 'My Pack',
@@ -290,8 +290,21 @@ describe('ResourcePackGenerator', () => {
     const mcmeta = result.files.find((f) => f.path === 'pack.mcmeta');
     expect(mcmeta).toBeDefined();
     const parsed = JSON.parse(mcmeta!.content);
-    expect(parsed.pack.pack_format).toBe(75);
+    // 官方（minecraft.wiki）：Since 25w31a 起改用 min_format / max_format
+    // 而不是 pack_format。1.21.11 属新形态，1.21.11 的资源包格式号是 75.0 → 主版本 75。
+    expect(parsed.pack.min_format).toBe(75);
+    expect(parsed.pack.max_format).toBe(75);
+    expect(parsed.pack.pack_format).toBeUndefined();
     expect(parsed.pack.description).toBe('我的资源包');
+  });
+
+  it('1.21.9 之前仍用 pack_format（老形态不能被新形态替换）', async () => {
+    const ctx = makeCtx({ packName: 'P', packFormat: 34 });
+    ctx.mcVersion = '1.21.8';
+    const result = await gen.generate(ctx);
+    const parsed = JSON.parse(result.files.find((f) => f.path === 'pack.mcmeta')!.content);
+    expect(parsed.pack.pack_format).toBe(64);
+    expect(parsed.pack.min_format).toBeUndefined();
   });
 
   it('资源包 pack_format 按 MC 版本自动映射（1.20.1 → 15、1.20.4 → 22、1.21.5 → 55）', async () => {

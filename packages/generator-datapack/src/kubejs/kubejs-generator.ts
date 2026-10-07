@@ -5,7 +5,12 @@ import type {
   Loader,
   McVersion,
 } from '@mc-creator/shared';
-import { KubejsSpec, MC_VERSIONS, getPackFormatForMcVersion } from '@mc-creator/shared';
+import {
+  KubejsSpec,
+  MC_VERSIONS,
+  getPackFormatForMcVersion,
+  renderPackMcmetaPack,
+} from '@mc-creator/shared';
 import type { Generator } from '@mc-creator/shared';
 import type {
   KubejsSpec as KubejsSpecType,
@@ -53,10 +58,7 @@ export class KubejsGenerator implements Generator {
       path: 'pack.mcmeta',
       content: JSON.stringify(
         {
-          pack: {
-            pack_format: packFormat,
-            description: spec.description || spec.packName,
-          },
+          pack: renderPackMcmetaPack(spec.description || spec.packName, packFormat, ctx.mcVersion),
         },
         null,
         2,

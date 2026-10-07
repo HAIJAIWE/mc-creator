@@ -10,6 +10,7 @@ import {
   ResourcePackSpec,
   MC_VERSIONS,
   getResourcePackFormatForMcVersion,
+  renderPackMcmetaPack,
 } from '@mc-creator/shared';
 import type {
   ResourcePackSpec as ResourcePackSpecType,
@@ -68,7 +69,7 @@ export class ResourcePackGenerator implements Generator {
         `已按 MC 版本 ${ctx.mcVersion} 将 pack_format 从 ${spec.packFormat} 调整为 ${packFormat}（pack.mcmeta 与目标版本匹配）`,
       );
     }
-    files.push(this.generatePackMcmeta(spec, packFormat));
+    files.push(this.generatePackMcmeta(spec, packFormat, ctx.mcVersion));
 
     // 2. 贴图覆盖（写入 assets/minecraft/textures/<path>.png）
     const ns = sanitizePathSegment(spec.namespace);
@@ -113,15 +114,17 @@ export class ResourcePackGenerator implements Generator {
   }
 
   /** pack.mcmeta */
-  private generatePackMcmeta(spec: ResourcePackSpecType, packFormat: number): FileNode {
+  private generatePackMcmeta(
+    spec: ResourcePackSpecType,
+    packFormat: number,
+    mcVersion: string,
+  ): FileNode {
+    // 1.21.9 起官方改用 min_format/max_format（见 pack-format.ts 顶部引用）。
     return {
       path: 'pack.mcmeta',
       content: JSON.stringify(
         {
-          pack: {
-            pack_format: packFormat,
-            description: spec.packDescription || spec.packName,
-          },
+          pack: renderPackMcmetaPack(spec.packDescription || spec.packName, packFormat, mcVersion),
         },
         null,
         2,

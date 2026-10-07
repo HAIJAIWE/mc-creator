@@ -38,15 +38,24 @@ describe('DatapackGenerator', () => {
     );
     const meta = result.files.find((f) => f.path === 'pack.mcmeta');
     expect(meta).toBeDefined();
-    expect(JSON.parse(meta!.content).pack.pack_format).toBe(48);
+    // mcVersion=1.21.11：官方 1.21.11 的数据包格式号是 94.1 → 主版本 94；
+    // 且 1.21.9 起 pack.mcmeta 改用 min_format/max_format 字段。
+    const parsed = JSON.parse(meta!.content);
+    expect(parsed.pack.min_format).toBe(94);
+    expect(parsed.pack.max_format).toBe(94);
+    expect(parsed.pack.pack_format).toBeUndefined();
   });
 
-  it('pack_format 按 MC 版本自动映射（1.20.6 → 22，并给出 warning）', async () => {
+  it('pack_format 按 MC 版本自动映射（1.20.6 → 41，并给出 warning）', async () => {
     const ctx = makeCtx({ packId: 'my_pack', packName: 'My Pack', packFormat: 48 });
     ctx.mcVersion = '1.20.6';
     const result = await gen.generate(ctx);
     const meta = result.files.find((f) => f.path === 'pack.mcmeta');
-    expect(JSON.parse(meta!.content).pack.pack_format).toBe(22);
+    // 官方 minecraft.wiki：1.20.5–1.20.6 的数据��格式号是 41（旧表写的 22 是错的）。
+    // 1.20.6 属旧形态，仍用 pack_format 字段。
+    const parsed = JSON.parse(meta!.content);
+    expect(parsed.pack.pack_format).toBe(41);
+    expect(parsed.pack.min_format).toBeUndefined();
     expect(result.warnings.some((w) => w.includes('pack_format'))).toBe(true);
   });
 

@@ -17,7 +17,7 @@ import type {
   ModRecipeSpec,
   RecipeSpec,
 } from '@mc-creator/shared';
-import { MC_VERSIONS, getPackFormatForMcVersion } from '@mc-creator/shared';
+import { MC_VERSIONS, getPackFormatForMcVersion, renderPackMcmetaPack } from '@mc-creator/shared';
 import { isModRecipe, modRecipeToDatapackRecipe } from './recipe-adapter.js';
 import { sanitizePathSegment } from './writers/common.js';
 import {
@@ -83,10 +83,9 @@ export class DatapackGenerator implements Generator {
       path: 'pack.mcmeta',
       content: JSON.stringify(
         {
-          pack: {
-            pack_format: packFormat,
-            description: spec.description ?? spec.packName,
-          },
+          // 1.21.9 起官方改用 min_format/max_format 字段（见 shared/pack-format.ts
+          // 顶部对官方原文的引用），旧版本仍用 pack_format。
+          pack: renderPackMcmetaPack(spec.description ?? spec.packName, packFormat, ctx.mcVersion),
         },
         null,
         2,

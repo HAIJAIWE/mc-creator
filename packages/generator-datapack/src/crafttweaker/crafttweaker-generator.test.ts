@@ -50,11 +50,11 @@ describe('CraftTweakerGenerator', () => {
     expect(parsed.pack.description).toBe('CraftTweaker 测试包');
   });
 
-  it('pack_format 按 MC 版本自动映射（1.20.6 → 22）', async () => {
+  it('pack_format 按 MC 版本自动映射（1.20.6 → 41，官方值）', async () => {
     const ctx = { spec: validSpec, mcVersion: '1.20.6' } as any;
     const result = await gen.generate(ctx);
     const mcmeta = result.files.find((f) => f.path === 'pack.mcmeta');
-    expect(JSON.parse(mcmeta!.content).pack.pack_format).toBe(22);
+    expect(JSON.parse(mcmeta!.content).pack.pack_format).toBe(41);
     expect(result.warnings.some((w) => w.includes('pack_format'))).toBe(true);
   });
 
