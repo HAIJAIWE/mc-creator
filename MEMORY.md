@@ -1,9 +1,9 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：构建链全通 —— 真机构建量出 4 个阻断并修掉 3 个；
-> 「干净机器 → 生成 → 编译出 jar」端到端验证通过（gradlew.bat 21s，jar 含真 class）
-> 全绿 314/5226。NeoForge 端到端**本机不可验**（maven.neoforged.net 不通），见 §7.8
+> 最近更新：**§7.2 代理层上一版是假实现已重写** —— 落盘改为代理真读的
+> `velocity.toml` / `config.yml`（含多子服路由表），见 §7.9
+> 全绿 320/5397。NeoForge 端到端**本机不可验**（maven.neoforged.net 不通），见 §7.8
 
 > 📄 **设计文档已找到**：`D:\Downloads\MC全链路AI工作台-设计文档-v3.1.md`（931 行）。
 > 之前两轮「文档不在仓内」的判断只对仓内而言 —— 文档在 `D:\Downloads` 下，
@@ -21,9 +21,9 @@
 
 | 门禁                             | 状态      | 实测                                                                |
 | -------------------------------- | --------- | ------------------------------------------------------------------- |
-| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 314 files / 5226 passed + 43 skipped                         |
+| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 320 files / 5397 passed + 43 skipped                         |
 | `pnpm -r typecheck`              | ✅ exit 0 | all 18 packages Done                                                |
-| `pnpm lint`                      | ✅ exit 0 | **0 errors**（44 warnings，不影响退出码）                           |
+| `pnpm lint`                      | ✅ exit 0 | **0 errors**（45 warnings，不影响退出码）                           |
 | `pnpm format:check`              | ✅ exit 0 | All matched files use Prettier code style                           |
 | `node scripts/check-docs.mjs`    | ✅ exit 0 | 所有文档数字与代码真值一致                                          |
 | `node scripts/check-bundle.mjs`  | ✅ exit 0 | 入口 1.59MB / 非worker 13.20MB（体积未变，隔离代码在主进程侧）      |
@@ -34,14 +34,14 @@
 
 ## 1. 最近 6 个提交
 
-| commit    | 内容                                         |
-| --------- | -------------------------------------------- |
-| `d7fc861` | 预热入口接入设置面板（不解析用户工程）       |
-| `1e9a29b` | 依赖预热按需触发（ForgeGradle 冷启优化）     |
-| `f2b7858` | 三处构建入口接入 wrapper 自举                |
-| `534c07a` | 真机构建链四个阻断 + NeoForge 环境阻断       |
-| `61d3367` | wrapper 自举（缺启动脚本导致构建必 ENOENT）  |
-| `5254dd7` | NeoForge 生成工程从来构建不了（moddev 包装） |
+| commit    | 内容                                                 |
+| --------- | ---------------------------------------------------- |
+| （本轮）  | §7.2 代理层重写：落真配置 + 多子服路由表             |
+| `27a3553` | DomainSwitcher hover 样式生成                        |
+| `335f119` | agent-tools 时序缺陷（mergeFiles 缺 await）          |
+| `5a3da26` | §7.2 代理层 8 个 kind（**配置格式是假的**，见 §7.9） |
+| `c7e3060` | Bedrock 环境探测 + 文档 §6.1 纠错                    |
+| `acacd89` | §5.3 崩溃归因（suspect 只由直接判据产生）            |
 
 ---
 
@@ -763,6 +763,80 @@ ok = true   attempts = 0   elapsed = 3279 ms
 
 **「模型不行」几乎总是「我的 prompt 与 schema 不一致」。** 先去核对 schema
 真身（`packages/shared/src/schemas/datapack-spec.ts`），再怀疑模型。
+
+---
+
+## 7.9 §7.2 代理层：上一版是假实现，已按官方文档重写（commit 见 §1）
+
+### 上一版错在哪（自己审出来的，不是被测出来的）
+
+commit `5a3da26` 给 §7.2 代理层加了 8 个 kind + 8 个方法，测试全绿。**但测试只验了
+「自己造的东西能被自己读回来」，没验「产物是不是代理真读的东西」**：
+
+| 上一版                                             | 问题                                                              |
+| -------------------------------------------------- | ----------------------------------------------------------------- |
+| `config.json`，键 `proxyType`/`port`/`bindAddress` | **三个都不是任何代理的真实键**，代理根本不读这个文件              |
+| 无路由表                                           | §7.2 对代理层的定义是「独立网络层，处理多子服路由」，**全没实现** |
+| `startProxyServer` 硬编码 `java -jar velocity.jar` | bungee/waterfall 也返回这条命令，三种形态没区别                   |
+| 无校验                                             | 空 `backends`、地址非法、重名、`try` 引用不存在子服，全放行       |
+
+**教训（补 §10-9 同族）：绿测试不等于对的东西。** 当实现是「按想象造格式」时，
+把它的输出读回来的测试**必然**是绿的，因为它验证的是自洽性而非正确性。
+判据要落在**外部权威**上——这也是 §6.1 `Minecraft for Windows` 那次翻车的同源问题。
+
+### 重写后的形态（键名出处，不是记忆）
+
+| 形态       | 文件            | 格式 | 路由表                              | 路由顺序                 |
+| ---------- | --------------- | ---- | ----------------------------------- | ------------------------ |
+| velocity   | `velocity.toml` | TOML | `[servers]` 段 `name = "host:port"` | 顶层 `try = [...]`       |
+| bungeecord | `config.yml`    | YAML | `servers.<name>.address`            | `listeners[].priorities` |
+| waterfall  | `config.yml`    | YAML | 同 bungeecord                       | 同 bungeecord            |
+
+出处（都已实抓，不是凭记忆）：
+
+- **Velocity**：<https://docs.papermc.io/velocity/configuration>
+  原文明确 “Every Velocity file is stored in velocity.toml … Velocity uses the
+  TOML file format”，并列出 `servers` section、顶层 `try` Array、`bind`、`motd`、
+  `show-max-players`、`online-mode`。
+- **BungeeCord**：<https://www.spigotmc.org/wiki/bungeecord-configuration-guide/>
+  贴出完整默认 `config.yml`，其中 `listeners` 是**列表**、`servers.<n>` 是带
+  `address` 的映射、路由顺序在 `listeners[].priorities`（**不是**顶层 `try`）。
+
+**最易错的一点**：`try` 必须落在 `[servers]` 段**之前**。TOML 里进了段之后的裸键
+归属该段，放到段后会变成 `servers.try` —— 等于凭空多一个名叫 `try` 的后端。
+而上游默认配置又把 `try` 放在文件**末尾**（已在 `[query]` 之后），所以**解析时
+`try` 必须按键名认、不看当前段**。两个方向的坑各踩了一次，都是被自己写的测试
+（`try` 位置断言 + 上游默认配置往返）钉住的，不是靠想。
+
+### 代码位置与新增依赖
+
+- `packages/kernel-server/src/proxy-config.ts`（新）：渲染 / 解析 / 校验三层，
+  纯函数无 I/O。解析失败一律抛 `ProxyConfigParseError`，内核转 `validation`
+  ——**不做乐观回退**（同 kernel-bedrock/probe.ts「存在≠可读」的纪律）。
+- `packages/kernel-server/src/proxy-config.test.ts`（37 例）：键名快照 + 三形态
+  往返 + **真实上游默认配置**（Velocity 官方 toml、BungeeCord 官方 yml）解析。
+- `packages/kernel-server/src/proxy-execute.test.ts`（31 例）：内核任务面。
+- **新增依赖 `yaml@2.9.0`**（lockfile 里已有，是 eslint 的传递依赖；
+  `pnpm add` 实测 `downloaded 0`，纯离线链接，不引入新下载）。
+  Velocity 用 TOML、仓里无 TOML 库，故 TOML 侧手写子集解析（只认官方列出的键，
+  `[advanced]`/`[query]` 等无关段跳过；多行数组支持，因为上游 `try` 就是多行的）。
+
+### 变异测试（四条，全部 RED 证明断言咬得住）
+
+| 变异                                               | 结果     |
+| -------------------------------------------------- | -------- |
+| `bind` → `bindAddress`（自造键回归）               | RED      |
+| `try` 移回 `[servers]` 段之后（TOML 语义错）       | RED      |
+| `try` 改为按当前段判定（上游末尾布局会丢路由顺序） | RED      |
+| create 的 `validateProxySpec` 去掉                 | RED (3)  |
+| list 里吞掉单代理解析错误                          | RED      |
+| 回落写 `config.json`（回到假格式）                 | RED (13) |
+
+### 遗留（不猜）
+
+代理官方 jar 的下载源未接：Velocity 走 `https://api.papermc.io/v2/projects/velocity`，
+BungeeCord/Waterfall 走各自 API —— **这些 API 本轮未实测可达**，故 `start` 只返回
+控制指令（与既有 `controlServer` 同口径，§7.1 进程生命周期不归内核），不自动下载。
 
 ---
 

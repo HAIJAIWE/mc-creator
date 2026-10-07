@@ -78,6 +78,21 @@ import {
 } from '@mc-creator/contract';
 import { writeFileAtomic, ZipSafetyError } from '@mc-creator/shell';
 import {
+  PROXY_TYPES,
+  ProxyConfigParseError,
+  isProxyType,
+  parseAddress,
+  parseProxyConfig,
+  proxyConfigFileName,
+  renderAfterPatch,
+  renderProxyConfig,
+  validateProxySpec,
+  type ProxyBackend,
+  type ProxyConfigPatch,
+  type ProxyConfigView,
+  type ProxyType,
+} from './proxy-config.js';
+import {
   assertWithinRoot,
   buildSandboxOptions,
   createBuildQueue,
@@ -338,6 +353,80 @@ function optRecord(
   return typeof v === 'object' && v !== null && !Array.isArray(v)
     ? (v as Record<string, unknown>)
     : undefined;
+}
+
+/** 代理元信息文件名（本仓私有，**不是**代理配置格式的一部分）。 */
+const PROXY_META_FILE = '.proxy.json';
+
+/**
+ * proxyId 取值：优先 `proxyId`，回落 `serverId`（前端 IPC schema 用后者传 id）。
+ * 回落走 serverIdOf，继承其路径穿越防护。
+ */
+function proxyIdOf(payload: unknown): string | undefined {
+  const p = asRecord(payload);
+  const fromProxy = optString(p, 'proxyId');
+  if (fromProxy !== undefined && !fromProxy.includes('..') && !/[\\/]/.test(fromProxy)) {
+    return fromProxy;
+  }
+  return serverIdOf(payload);
+}
+
+/**
+ * 从 payload 读后端路由表。两种写法都接受：
+ * - `backends: [{ name, address }]`
+ * - `servers: { lobby: '127.0.0.1:30066' }`（对齐 BungeeCord 的 YAML 形状）
+ */
+function parseBackendList(source: Record<string, unknown>): ProxyBackend[] {
+  const list = source['backends'];
+  if (Array.isArray(list)) {
+    const out: ProxyBackend[] = [];
+    for (const item of list) {
+      const rec = asRecord(item);
+      const name = optString(rec, 'name');
+      const address = optString(rec, 'address');
+      if (name !== undefined && address !== undefined) out.push({ name, address });
+    }
+    return out;
+  }
+  const servers = optRecord(source, 'servers');
+  if (servers !== undefined) {
+    return Object.entries(servers).flatMap(([name, value]) => {
+      if (typeof value === 'string') return [{ name, address: value }];
+      const rec = asRecord(value);
+      const address = rec === undefined ? undefined : optString(rec, 'address');
+      return address === undefined ? [] : [{ name, address }];
+    });
+  }
+  return [];
+}
+
+/**
+ * 把 payload.patch 转成 ProxyConfigPatch（白名单字段，非法即报错）。
+ *
+ * 只认统一视图里的字段：`bind` / `motd` / `maxPlayers` / `onlineMode` /
+ * `backends` / `tryOrder`。`type` **不在**白名单 —— 换类型等于换整套配置格式
+ * （velocity.toml ↔ config.yml），必须走 create 而不是 patch。
+ */
+function parseProxyConfigPatch(patch: Record<string, unknown>, type: ProxyType): ProxyConfigPatch {
+  if ('type' in patch) {
+    verr(
+      `patch 不得含 type（换类型等于换配置格式，须新建代理；当前 ${type}）`,
+      'PROXY_CONFIG_INVALID',
+    );
+  }
+  const out: ProxyConfigPatch = {};
+  const bind = optString(patch, 'bind');
+  if (bind !== undefined) out.bind = bind;
+  const motd = optString(patch, 'motd');
+  if (motd !== undefined) out.motd = motd;
+  const maxPlayers = optNumber(patch, 'maxPlayers');
+  if (maxPlayers !== undefined) out.maxPlayers = maxPlayers;
+  const onlineMode = optBoolean(patch, 'onlineMode');
+  if (onlineMode !== undefined) out.onlineMode = onlineMode;
+  if ('backends' in patch) out.backends = parseBackendList(patch);
+  const tryOrder = optStringArray(patch, 'tryOrder');
+  if (tryOrder !== undefined) out.tryOrder = tryOrder;
+  return out;
 }
 
 /** server.properties 值转义：properties 是 key=value 行格式，值里的换行/等号需防注入。 */
@@ -1960,6 +2049,19 @@ export class ServerKernel implements KernelContract {
         };
       }
       if (isClassifiedError(e)) return { ok: false, error: e };
+      // 代理配置解析失败属用户配置问题，须归 validation 而不是 disk ——
+      // 上一版把它落到 toDiskError，UI 会报「磁盘错误」，把用户引向错误方向。
+      if (e instanceof ProxyConfigParseError) {
+        return {
+          ok: false,
+          error: {
+            category: 'validation',
+            code: 'PROXY_CONFIG_INVALID',
+            message: e.message,
+            retryable: false,
+          },
+        };
+      }
       return { ok: false, error: toDiskError(e) };
     }
   }
@@ -2079,39 +2181,70 @@ export class ServerKernel implements KernelContract {
   }
 
   // 代理服务器管理（§7.2 代理层：Velocity / BungeeCord / Waterfall）
+  //
+  // 落盘的是**代理真读的配置文件**（velocity.toml / config.yml，见 proxy-config.ts），
+  // 不是本仓自造的 config.json —— 后者三个键都不是任何代理的真实键，代理不读。
+  // 代理身份（type）存在 .proxy.json 里，因为它是本仓的元信息、不是代理配置的一部分。
   private async createProxyServer(
     root: string,
     payload: unknown,
     step: (index: number, message?: string) => void,
   ): Promise<TaskResult> {
     const p = asRecord(payload);
-    const proxyId = optString(p, 'proxyId');
-    if (!proxyId) verr('缺少参数 payload.proxyId（代理服务器 ID）');
-    const proxyType = optString(p, 'proxyType') ?? 'velocity';
-    if (!['velocity', 'bungeecord', 'waterfall'].includes(proxyType)) {
-      verr(`不支持的代理类型: ${proxyType}，支持: velocity / bungeecord / waterfall`);
+    const proxyId = proxyIdOf(payload);
+    if (proxyId === undefined) verr('缺少合法 proxyId（payload.proxyId / payload.serverId）');
+    const rawType = optString(p, 'proxyType') ?? 'velocity';
+    if (!isProxyType(rawType)) {
+      verr(
+        `不支持的代理类型: ${rawType}，支持: ${PROXY_TYPES.join(' / ')}`,
+        'PROXY_TYPE_UNSUPPORTED',
+      );
     }
-    const proxyDir = this.proxyDir(root, proxyId);
-    if (existsSync(proxyDir)) verr(`代理服务器已存在: ${proxyId}`, 'PROXY_ALREADY_EXISTS');
-    step(0);
-    mkdirSync(this.proxyDir(root, proxyId), { recursive: true });
-    step(1);
-    // 写入基础配置文件
-    const config = {
-      proxyId,
-      proxyType,
-      port: optNumber(p, 'port') ?? (proxyType === 'velocity' ? 25577 : 25565),
-      bindAddress: optString(p, 'bindAddress') ?? '0.0.0.0',
-      motd: optString(p, 'motd') ?? 'A Minecraft Proxy Server',
-      maxPlayers: optNumber(p, 'maxPlayers') ?? 1000,
+    // 端口/监听：兼容两种入参写法，但都落到真实的 `bind = "host:port"`。
+    const host = optString(p, 'bindHost') ?? optString(p, 'bindAddress') ?? '0.0.0.0';
+    // 旧字段 bindAddress 可能是裸 IP（上一版实现的形态），补上默认端口。
+    const bind =
+      parseAddress(optString(p, 'bind') ?? '') === undefined
+        ? `${host}:${optNumber(p, 'port') ?? 25577}`
+        : (optString(p, 'bind') as string);
+
+    const backends = parseBackendList(p);
+    const tryOrder = optStringArray(p, 'tryOrder');
+    const spec = {
+      type: rawType,
+      bind,
+      motd: optString(p, 'motd') ?? '&aMC Creator Proxy',
+      maxPlayers: optNumber(p, 'maxPlayers') ?? 500,
       onlineMode: optBoolean(p, 'onlineMode') ?? true,
+      backends,
+      ...(tryOrder === undefined ? {} : { tryOrder }),
     };
+    const errors = validateProxySpec(spec);
+    if (errors.length > 0) verr(`代理配置非法：${errors.join('；')}`, 'PROXY_CONFIG_INVALID');
+
+    step(0);
+    const dir = this.proxyDir(root, proxyId);
+    if (existsSync(dir)) verr(`代理已存在: ${proxyId}`, 'PROXY_ALREADY_EXISTS');
+    mkdirSync(dir, { recursive: true });
+    step(1);
+    const fileName = proxyConfigFileName(rawType);
+    writeFileSync(join(dir, fileName), renderProxyConfig(spec), 'utf8');
     writeFileSync(
-      join(this.proxyDir(root, proxyId), 'config.json'),
-      JSON.stringify(config, null, 2),
+      join(dir, PROXY_META_FILE),
+      `${JSON.stringify({ proxyId, type: rawType }, null, 2)}\n`,
+      'utf8',
     );
     step(2);
-    return { ok: true, data: { proxyId, proxyType, config } };
+    return {
+      ok: true,
+      data: {
+        proxyId,
+        proxyType: rawType,
+        configFile: fileName,
+        configPath: join(dir, fileName),
+        config: spec,
+      },
+    };
   }
 
   private async startProxyServer(
@@ -2119,20 +2252,41 @@ export class ServerKernel implements KernelContract {
     payload: unknown,
     step: (index: number, message?: string) => void,
   ): Promise<TaskResult> {
-    const proxyId = serverIdOf(payload);
-    if (!proxyId) verr('缺少合法 proxyId（payload.serverId）');
-    const proxyDir = this.proxyDir(root, proxyId);
-    if (!existsSync(proxyDir)) verr(`代理服务器不存在: ${proxyId}`, 'PROXY_NOT_FOUND');
-    const configPath = join(proxyDir, 'config.json');
-    if (!existsSync(configPath)) verr(`代理配置缺失: ${proxyId}`, 'CONFIG_MISSING');
+    const proxyId = proxyIdOf(payload);
+    if (proxyId === undefined) verr('缺少合法 proxyId（payload.proxyId / payload.serverId）');
+    const dir = this.proxyDir(root, proxyId);
+    if (!existsSync(dir)) verr(`代理不存在: ${proxyId}`, 'PROXY_NOT_FOUND');
     step(0);
-    // 实际启动由外壳进程托管进程执行，这里只返回启动指令
+    const meta = this.proxyMeta(root, proxyId);
+    if (meta === undefined) {
+      verr(`缺少 ${PROXY_META_FILE}，无法判定代理类型: ${proxyId}`, 'PROXY_CONFIG_MISSING');
+    }
+    // 校验配置文件真在且可解析：宁可启动前报错，也不让外壳 spawn 一个必然崩的进程。
+    const fileName = proxyConfigFileName(meta.type);
+    const configPath = join(dir, fileName);
+    if (!existsSync(configPath)) {
+      verr(`缺少代理配置文件 ${fileName}: ${proxyId}`, 'PROXY_CONFIG_MISSING');
+    }
+    const view = this.proxyConfig(root, proxyId, meta);
+    step(1);
+    if (view.backends.length === 0) {
+      verr(
+        `代理 ${proxyId} 的 ${fileName} 未声明任何后端子服（§7.2 代理层须有路由表）`,
+        'PROXY_CONFIG_INVALID',
+      );
+    }
     return {
       ok: true,
       data: {
         proxyId,
-        startCommand: 'java -Xms512M -Xmx1G -jar velocity.jar',
-        message: '代理服务器启动指令已生成，请由外壳进程托管执行',
+        proxyType: meta.type,
+        configFile: fileName,
+        // §7.1 与 controlServer 同口径：本内核不 spawn 长驻进程，只给控制指令。
+        startCommand: `java -jar <${meta.type}>-jar  # 需用户自行放入官方 jar`,
+        bind: view.bind,
+        backends: view.backends,
+        tryOrder: view.tryOrder,
+        note: '进程生命周期由外壳服务管理，本内核仅校验代理配置并返回控制指令（§7.1）',
       },
     };
   }
@@ -2142,13 +2296,24 @@ export class ServerKernel implements KernelContract {
     payload: unknown,
     step: (index: number, message?: string) => void,
   ): Promise<TaskResult> {
-    const proxyId = serverIdOf(payload);
-    if (!proxyId) verr('缺少合法 proxyId（payload.serverId）');
+    const p = asRecord(payload);
+    const proxyId = proxyIdOf(payload);
+    if (proxyId === undefined) verr('缺少合法 proxyId（payload.proxyId / payload.serverId）');
+    const dir = this.proxyDir(root, proxyId);
+    if (!existsSync(dir)) verr(`代理不存在: ${proxyId}`, 'PROXY_NOT_FOUND');
     step(0);
-    // 停止指令由外壳执行
+    const gracefulMs = optNumber(p, 'gracefulMs') ?? 30000;
+    if (!Number.isFinite(gracefulMs) || gracefulMs < 0) {
+      verr(`payload.gracefulMs 非法（需≥ 0）: ${gracefulMs}`);
+    }
     return {
       ok: true,
-      data: { proxyId, message: '停止指令已生成，请由外壳执行 RCON/SIGTERM' },
+      data: {
+        proxyId,
+        gracefulMs,
+        controlCommand: 'shutdown',
+        note: '停止指令由外壳发往代理进程（§7.1 进程生命周期不归本内核）',
+      },
     };
   }
 
@@ -2167,28 +2332,26 @@ export class ServerKernel implements KernelContract {
     payload: unknown,
     step: (index: number, message?: string) => void,
   ): Promise<TaskResult> {
-    const p = asRecord(payload);
-    const proxyId = optString(p, 'proxyId') ?? serverIdOf(payload);
-    if (!proxyId) verr('缺少合法 proxyId');
+    const proxyId = proxyIdOf(payload);
+    if (proxyId === undefined) verr('缺少合法 proxyId（payload.proxyId / payload.serverId）');
     step(0);
-    const proxyDir = this.proxyDir(root, proxyId);
-    if (existsSync(proxyDir)) {
-      rmSync(proxyDir, { recursive: true, force: true });
-    }
+    const dir = this.proxyDir(root, proxyId);
+    if (!existsSync(dir)) verr(`代理不存在: ${proxyId}`, 'PROXY_NOT_FOUND');
+    rmSync(dir, { recursive: true, force: true });
     step(1);
-    return { ok: true, data: { proxyId, message: '代理服务器已删除' } };
+    return { ok: true, data: { proxyId, deleted: true } };
   }
 
   private async listProxyServers(
     root: string,
-    payload: unknown,
+    _payload: unknown,
     step: (index: number, message?: string) => void,
   ): Promise<TaskResult> {
     step(0);
     const proxyRoot = this.proxyRoot(root);
     if (!existsSync(proxyRoot)) return { ok: true, data: { proxies: [] } };
     step(1);
-    const entries = readdirSync(proxyRoot)
+    const proxies = readdirSync(proxyRoot)
       .filter((entry) => {
         try {
           return statSync(join(proxyRoot, entry)).isDirectory();
@@ -2196,60 +2359,112 @@ export class ServerKernel implements KernelContract {
           return false;
         }
       })
+      .sort()
       .map((proxyId) => {
-        const configPath = join(this.proxyDir(root, proxyId), 'config.json');
-        let config: Record<string, unknown> = {};
-        if (existsSync(configPath)) {
-          try {
-            config = JSON.parse(readFileSync(configPath, 'utf8'));
-          } catch {
-            config = {};
-          }
+        const meta = this.proxyMeta(root, proxyId);
+        if (meta === undefined) {
+          return { proxyId, proxyType: 'unknown', configFile: null, parseError: '缺少元信息文件' };
         }
-        return {
-          proxyId,
-          proxyType: config.proxyType ?? 'unknown',
-          port: config.port ?? 0,
-          onlineMode: config.onlineMode ?? true,
-        };
+        const fileName = proxyConfigFileName(meta.type);
+        try {
+          const view = this.proxyConfig(root, proxyId, meta);
+          return {
+            proxyId,
+            proxyType: meta.type,
+            configFile: fileName,
+            bind: view.bind,
+            motd: view.motd,
+            maxPlayers: view.maxPlayers,
+            onlineMode: view.onlineMode,
+            backends: view.backends,
+            tryOrder: view.tryOrder,
+          };
+        } catch (e) {
+          // 列出不因为单个代理配置坏掉就整体失败：标 parseError 交 UI 提示。
+          const message = e instanceof Error ? e.message : String(e);
+          return { proxyId, proxyType: meta.type, configFile: fileName, parseError: message };
+        }
       });
-    return { ok: true, data: { proxies: entries } };
+    return { ok: true, data: { proxies } };
   }
 
   private async getProxyServerConfig(
     root: string,
     payload: unknown,
-    _step: (index: number, message?: string) => void,
+    step: (index: number, message?: string) => void,
   ): Promise<TaskResult> {
-    const proxyId = serverIdOf(payload);
-    if (!proxyId) verr('缺少合法 proxyId（payload.serverId）');
-    const configPath = join(this.proxyDir(root, proxyId), 'config.json');
-    if (!existsSync(configPath)) verr(`代理配置不存在: ${proxyId}`, 'CONFIG_MISSING');
-    const config = JSON.parse(readFileSync(configPath, 'utf8'));
-    return { ok: true, data: config };
+    const proxyId = proxyIdOf(payload);
+    if (proxyId === undefined) verr('缺少合法 proxyId（payload.proxyId / payload.serverId）');
+    step(0);
+    const dir = this.proxyDir(root, proxyId);
+    if (!existsSync(dir)) verr(`代理不存在: ${proxyId}`, 'PROXY_NOT_FOUND');
+    const meta = this.proxyMeta(root, proxyId);
+    if (meta === undefined) {
+      verr(`缺少 ${PROXY_META_FILE}，无法判定代理类型: ${proxyId}`, 'PROXY_CONFIG_MISSING');
+    }
+    const fileName = proxyConfigFileName(meta.type);
+    const configPath = join(dir, fileName);
+    if (!existsSync(configPath)) {
+      verr(`缺少代理配置文件 ${fileName}: ${proxyId}`, 'PROXY_CONFIG_MISSING');
+    }
+    const raw = readFileSync(configPath, 'utf8');
+    step(1);
+    // 解析失败 → validation（parseProxyConfig 已抛 ProxyConfigParseError，不做乐观回退）。
+    const view = this.proxyConfig(root, proxyId, meta);
+    return {
+      ok: true,
+      data: {
+        proxyId,
+        proxyType: meta.type,
+        configFile: fileName,
+        path: configPath,
+        raw,
+        config: view,
+      },
+    };
   }
 
   private async setProxyServerConfig(
     root: string,
     payload: unknown,
-    _step: (index: number, message?: string) => void,
+    step: (index: number, message?: string) => void,
   ): Promise<TaskResult> {
     const p = asRecord(payload);
-    const proxyId = optString(p, 'proxyId') ?? serverIdOf(payload);
-    if (!proxyId) verr('缺少合法 proxyId');
-    const configPath = join(this.proxyDir(root, proxyId), 'config.json');
-    if (!existsSync(configPath)) verr(`代理配置不存在: ${proxyId}`, 'CONFIG_MISSING');
-    const newConfig = optRecord(p, 'config') ?? {};
-    // 合并配置，保留未提供的字段
-    const current = JSON.parse(
-      readFileSync(join(this.proxyDir(root, proxyId), 'config.json'), 'utf8'),
-    );
-    const merged = { ...current, ...newConfig };
-    writeFileSync(
-      join(this.proxyDir(root, proxyId), 'config.json'),
-      JSON.stringify(merged, null, 2),
-    );
-    return { ok: true, data: merged };
+    const proxyId = proxyIdOf(payload);
+    if (proxyId === undefined) verr('缺少合法 proxyId（payload.proxyId / payload.serverId）');
+    step(0);
+    const dir = this.proxyDir(root, proxyId);
+    if (!existsSync(dir)) verr(`代理不存在: ${proxyId}`, 'PROXY_NOT_FOUND');
+    const meta = this.proxyMeta(root, proxyId);
+    if (meta === undefined) {
+      verr(`缺少 ${PROXY_META_FILE}，无法判定代理类型: ${proxyId}`, 'PROXY_CONFIG_MISSING');
+    }
+    const fileName = proxyConfigFileName(meta.type);
+    const configPath = join(dir, fileName);
+    if (!existsSync(configPath)) {
+      verr(`缺少代理配置文件 ${fileName}: ${proxyId}`, 'PROXY_CONFIG_MISSING');
+    }
+    const patch = optRecord(p, 'patch') ?? optRecord(p, 'config');
+    if (patch === undefined || Object.keys(patch).length === 0) {
+      verr('缺少非空参数 payload.patch（或 payload.config）');
+    }
+    step(1);
+    const current = this.proxyConfig(root, proxyId, meta);
+    const patchObj = parseProxyConfigPatch(patch, meta.type);
+    // 渲染 + 复校验都在 renderAfterPatch 内，非法补丁抛 ProxyConfigParseError。
+    const rendered = renderAfterPatch(meta.type, current, patchObj);
+    writeFileSync(configPath, rendered, 'utf8');
+    step(2);
+    return {
+      ok: true,
+      data: {
+        proxyId,
+        proxyType: meta.type,
+        configFile: fileName,
+        path: configPath,
+        config: parseProxyConfig(meta.type, rendered),
+      },
+    };
   }
 
   /**
@@ -2257,6 +2472,47 @@ export class ServerKernel implements KernelContract {
    */
   private proxyRoot(root: string): string {
     return join(root, 'proxies');
+  }
+
+  /**
+   * 读代理元信息（`.proxy.json`）。这是本仓的元信息、**不是**代理配置的一部分，
+   * 因为 velocity.toml / config.yml 里都没有「代理类型」这个键 —— 类型只能另存。
+   * 读不到就返 undefined，调用方据此报 PROXY_CONFIG_MISSING（不做乐观默认）。
+   */
+  private proxyMeta(
+    root: string,
+    proxyId: string,
+  ): { proxyId: string; type: ProxyType } | undefined {
+    const metaPath = join(this.proxyDir(root, proxyId), PROXY_META_FILE);
+    if (!existsSync(metaPath)) return undefined;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(metaPath, 'utf8'));
+    } catch {
+      return undefined;
+    }
+    const record = asRecord(parsed);
+    const type = record['type'];
+    if (!isProxyType(type)) return undefined;
+    const id = optString(record, 'proxyId');
+    return { proxyId: id ?? proxyId, type };
+  }
+
+  /**
+   * 读并解析代理配置。配置文件缺失或坏掉都抛错（ProxyConfigParseError / 由调用方转 validation）。
+   */
+  private proxyConfig(
+    root: string,
+    proxyId: string,
+    meta: { proxyId: string; type: ProxyType },
+  ): ProxyConfigView {
+    const configPath = join(this.proxyDir(root, proxyId), proxyConfigFileName(meta.type));
+    if (!existsSync(configPath)) {
+      throw new ProxyConfigParseError(
+        `缺少代理配置文件 ${proxyConfigFileName(meta.type)}: ${proxyId}`,
+      );
+    }
+    return parseProxyConfig(meta.type, readFileSync(configPath, 'utf8'));
   }
 
   /**

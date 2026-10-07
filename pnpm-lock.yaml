@@ -509,6 +509,9 @@ importers:
       '@mc-creator/shell':
         specifier: workspace:*
         version: link:../shell
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
     devDependencies:
       vitest:
         specifier: ^2.0.0

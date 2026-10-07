@@ -18,7 +18,8 @@
   "dependencies": {
     "@mc-creator/contract": "workspace:*",
     "@mc-creator/devkit": "workspace:*",
-    "@mc-creator/shell": "workspace:*"
+    "@mc-creator/shell": "workspace:*",
+    "yaml": "2.9.0"
   },
   "devDependencies": {
     "vitest": "^2.0.0"

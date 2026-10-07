@@ -107,6 +107,15 @@ export const KERNEL_WRITE_KINDS = [
   'schedule_task',
   'cancel_task',
   'run_due_tasks',
+  // 代理服务器管理（§7.2 代理层：Velocity / BungeeCord / Waterfall）
+  'create_proxy_server',
+  'start_proxy_server',
+  'stop_proxy_server',
+  'restart_proxy_server',
+  'delete_proxy_server',
+  'list_proxy_servers',
+  'get_proxy_server_config',
+  'set_proxy_server_config',
 ] as const;
 export const KernelWriteKindSchema = z.enum(KERNEL_WRITE_KINDS);
 export type KernelWriteKindT = z.infer<typeof KernelWriteKindSchema>;
