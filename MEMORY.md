@@ -1,9 +1,9 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：**§6.2 基岩导入网关导入前校验落地**（按官方 manifest.json 参考），见 §7.10；
-> §7.2 代理层上一版是假实现已重写 —— 落盘改为代理真读的 `velocity.toml` / `config.yml`，
-> 见 §7.9。全绿 321/5435。
+> 最近更新：**§6.4 材质改走官方 Texture Set**（MER 只是其中一层，不是机制本身），见 §7.11；
+> §6.2 基岩导入网关导入前校验落地，见 §7.10；§7.2 代理层上一版是假实现已重写，见 §7.9。
+> 全绿 322/5475。
 > NeoForge 端到端**本机不可验**（maven.neoforged.net 不通），见 §7.8
 
 > 📄 **设计文档已找到**：`D:\Downloads\MC全链路AI工作台-设计文档-v3.1.md`（931 行）。
@@ -22,7 +22,7 @@
 
 | 门禁                             | 状态      | 实测                                                                |
 | -------------------------------- | --------- | ------------------------------------------------------------------- |
-| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 321 files / 5435 passed + 43 skipped                         |
+| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 322 files / 5475 passed + 43 skipped                         |
 | `pnpm -r typecheck`              | ✅ exit 0 | all 18 packages Done                                                |
 | `pnpm lint`                      | ✅ exit 0 | **0 errors**（45 warnings，不影响退出码）                           |
 | `pnpm format:check`              | ✅ exit 0 | All matched files use Prettier code style                           |
@@ -37,6 +37,7 @@
 
 | commit    | 内容                                                 |
 | --------- | ---------------------------------------------------- |
+| `f8decc6` | §6.4 材质改走官方 Texture Set，接通物品 PBR          |
 | `635efae` | §6.2 基岩导入网关：导入前校验落地                    |
 | `41f30e3` | §7.2 代理层重写：落真配置 + 多子服路由表             |
 | `5a3da26` | §7.2 代理层 8 个 kind（**配置格式是假的**，见 §7.9） |
@@ -885,6 +886,55 @@ BungeeCord/Waterfall 走各自 API —— **这些 API 本轮未实测可达**�
 `format_version===1` 语义错成 `===2`。
 
 门禁：321 files / 5435 passed + 43 skipped，typecheck 0，lint 0 errors，check-docs exit 0。
+
+---
+
+## 7.11 §6.4 / §5.5 材质：改走官方 Texture Set（commit `f8decc6`）
+
+### 文档的一处措辞会误导实现
+
+§6.4 原话是「无光影系统，替代物为 **RTX**：MER 贴图（Metalness/Emissive/Roughness）」。
+**「MER 贴图」不是 Bedrock 的机制** —— Bedrock 走 **Texture Set**（`*.texture_set.json`），
+MER 只是 texture_set 里的一层。本仓此前只生成 `textures/items/<id>.png`（纯色/渐变），
+**没有 texture_set.json**，也就是产物在 Vibrant Visuals / RTX 下拿不到任何材质信息。
+→ 与 §7.9 同一个病根：**按文档的笼统措辞造了个近似物，而不是去查真实机制**。
+
+出处（实抓）：
+<https://learn.microsoft.com/en-us/minecraft/creator/reference/content/texturesetsreference/texturesetsconcepts/texturesetsintroduction>
+—— "Texture Set JSON and Introduction to Texture Sets"，
+`ms.date 2025-05-28`，`updated_at 2025-12-03`，**schema 版本标注 1.21.30**。
+
+### 按官方「Invalid」清单逐条校验（游戏真会拒绝的那批）
+
+| 规则                                                                        | 官方依据                                                                          |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `color` 是**唯一必填**层，也是 Classic 管线唯一用到的层                     | "This is the only required layer."                                                |
+| `normal` 与 `heightmap` **互斥**                                            | 两处分别写明 "should not both be defined"                                         |
+| `heightmap` 单通道，且**不得用于 texture-based object**（物品）             | Caution 段                                                                        |
+| `MER` 与 `MERS` **互斥**                                                    | "should not be defined at the same time"                                          |
+| MER 通道 **R=Metalness, G=Emissive, B=Roughness**；MERS 的 **A=Subsurface** | Layers 段                                                                         |
+| MERS **只被 Vibrant Visuals 支持，RTX 下 subsurface 被完全忽略**            | "not supported in RTX and any provided subsurface values will simply be ignored." |
+| texture_set **只能引用同包贴图**                                            | "can only reference images that exist in the same resource pack"                  |
+| 重复图片引用优先级 **`.tga > .png > .jpg > .jpeg`**                         | 官方明文                                                                          |
+| 非法则记 `CONTENT_ERROR` 且**整份定义不被使用**                             | "Invalid *.texture_set.json" 段                                                   |
+
+最后一条是关键：**非法 texture_set 是静默失效**，所以本模块校验失败直接抛，
+不落一份会被游戏丢弃的文件。
+
+### 不猜的一处（显式记录缺口）
+
+官方**没规定**「字符串恰好形如 2 位十六进制」该按均匀值还是按贴图名解释。
+本模块**取并集**（任一成立即合法），不自行发明优先级 —— 并有测试把这条缺口钉住，
+免得日后有人以为已经消歧。
+
+### 接线与「不猜材质」
+
+`BpItemEntrySpec` 新增可选 `pbr`（metalness/emissive/roughness 0-255 + 可选 normal）。
+**不声明就不产 texture_set.json**，也**不按贴图主色猜材质** —— 猜出来的 MER 会让用户
+看到「我生成了金属剑却不像金属」且查不出原因。
+
+变异五条全 RED：schema 版本、`normal`/`heightmap` 互斥、平局偏向 subsurface、
+扩展名优先级、MER 通道顺序。
 
 ---
 
