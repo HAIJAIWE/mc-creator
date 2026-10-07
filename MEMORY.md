@@ -1,12 +1,13 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：**§5.7 数据包目录层级校验落地**（层级陷阱提前到生成期），见 §7.14；
+> 最近更新：**§5.6 光影包与加载器组合校验落地**（缺加载器会静默失效），见 §7.15；
+> §5.7 数据包目录层级校验，见 §7.14；
 > §5.9 皮肤 UV 布局，见 §7.13；
 > **pack_format 表错位已按 minecraft.wiki 更正**，见 §7.12；
 > §6.4 材质改走官方 Texture Set，见 §7.11；
 > §6.2 基岩导入网关导入前校验落地，见 §7.10；§7.2 代理层上一版是假实现已重写，见 §7.9。
-> 全绿 324/5522。
+> 全绿 325/5549。
 > NeoForge 端到端**本机不可验**（maven.neoforged.net 不通），见 §7.8
 
 > 📄 **设计文档已找到**：`D:\Downloads\MC全链路AI工作台-设计文档-v3.1.md`（931 行）。
@@ -25,7 +26,7 @@
 
 | 门禁                             | 状态      | 实测                                                                |
 | -------------------------------- | --------- | ------------------------------------------------------------------- |
-| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 324 files / 5522 passed + 43 skipped                         |
+| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 325 files / 5549 passed + 43 skipped                         |
 | `pnpm -r typecheck`              | ✅ exit 0 | all 18 packages Done                                                |
 | `pnpm lint`                      | ✅ exit 0 | **0 errors**（45 warnings，不影响退出码）                           |
 | `pnpm format:check`              | ✅ exit 0 | All matched files use Prettier code style                           |
@@ -40,6 +41,7 @@
 
 | commit    | 内容                                                    |
 | --------- | ------------------------------------------------------- |
+| `07f8d65` | §5.6 光影包与加载器组合校验                             |
 | `2a5aa48` | §5.7 数据包目录层级校验（层级陷阱）                     |
 | `ed1c616` | §5.9 皮肤 UV 布局（官方像素数判据）                     |
 | `ea98101` | 按 minecraft.wiki 更正 pack_format 表与 1.21.9 字段形态 |
@@ -1064,6 +1066,71 @@ slim 少的 64 是怎么对上的（写进注释供复核）：单臂贴图占�
 `my:recipes`）时才判得出。测试里把这条边界**显式钉住**，避免日后误以为已覆盖。
 
 变异三条全 RED：层级陷阱检测去掉、命名空间校验去掉、路径穿越检测去掉。
+
+---
+
+## 7.15 §5.6 光影 + §5.4 复核（commit `07f8d65`）
+
+### §5.6 此前只有落位
+
+`kernel-java` 只把 `shader` 类文件丢进 `instances/<id>/shaderpacks/`，
+**没有任何格式或组合校验**。于是「装了光影包但没装加载器」被静默放过 ——
+游戏照常跑、光影完全不生效、**没有任何报错**，用户看不出是缺加载器。
+
+判据出处（实抓）Iris 官方文档 "An Introduction to Shaders"
+<https://shaders.properties/current/guides/your-first-shaderpack/0_intro/>：
+
+- 前置条件：「An instance of Minecraft with **Iris, Optifine, or Oculus** installed.」
+- GLSL：旧包 **120**，MC 1.17 起 OpenGL 3.2（**150**），OpenGL 3.3 对应 **330**。
+- Programs 侧栏：`begin` / `shadowcomp` 标 **Iris Only**；
+  `RENDERTARGETS` / `DRAWBUFFERS` 标 **Legacy**。
+
+三条可机器判的判据 + 一条确认性提示（Iris + Sodium 组合）：
+
+| 判据                                     | 级别        | 依据                                     |
+| ---------------------------------------- | ----------- | ---------------------------------------- |
+| 有光影包必须有加载器                     | error       | 官方前置条件                             |
+| 用了 Iris-only 程序但加载器只有 OptiFine | error       | Programs 侧栏                            |
+| GLSL 偏高                                | error       | 编译失败                                 |
+| GLSL 偏低                                | **warning** | 官方说加载器通常仍能跑，只是失去部分特性 |
+| Iris + Sodium + 有光影包                 | info        | §5.6 点名的组合                          |
+
+**Oculus 算 Iris 系**（它是 Sodium + Iris 的合并分支，继承同一套加载实现），
+这条在实现时是**先写错成「只有 iris」被测试打红**后补的。
+
+**刻意不猜 jar 文件名**：文件名用户可随意改，按文件名判会给出错误的「已装加载器」
+结论。只按 mod id 匹配，且 `iris_api` 不能被误判成 `iris`。
+
+接线在 `uninstall_content` 的 `kind === 'shader'` 分支：复查剩余光影包 × 已装 mod，
+把 issues/blocking/summary 放进 data，UI 能直接给结论。
+
+### 又抓到一次 §7.9 的「自洽性绿」
+
+`incremental.test.ts` 的分块断言两侧都用 `DIGEST_CHUNK_SIZE` **常量**：
+
+```ts
+expect(new Set(probe.readLens)).toEqual(new Set([DIGEST_CHUNK_SIZE]));
+```
+
+改常量为 64MiB → 断言**照样绿**（两边一起变）。而文件头声称的
+「内存占用与文件大小无关，2GB 的 jar 也不会被整块读进内存」**此前没有任何测试钉住**。
+已改用**字面量 65536** 并加一条把常量绝对值钉死的用例。变异 64KiB→64MiB 现 RED(2)。
+
+> **教训（补 §7.9）**：断言里引用被测常量 = 自洽性绿。要钉住常量的**绝对值**，
+> 断言里必须用**字面量**。
+
+### §5.4 / §6.3 复核结论：不是缺口
+
+- **§5.4 增量更新**：实现完整（`content/modpack/incremental.ts` + `kernel.ts` 接线，
+  23 测试）。本轮做验证而非补实现：变异四条确认判据咬得住 ——
+  sha512 比对去掉 RED(2)、无哈希不跳过 RED(1)、摘要大小写敏感 RED(1)、
+  分块大小 RED(2，现已修好）。判定口径刻意保守：拿不到内容级证据（sha512）
+  就**一律下载**，不用 size 兜底（同尺寸不同内容的 jar 存在，误判跳过 =「更新没生效」
+  且事后无从查证）。
+- **§6.3 Script API**：完备。`experimentalApi` → `-beta` 依赖后缀 +
+  `is_experimental` + manifest `experiments` 节**三者同源**（不可能漂移）；
+  `server-admin` / `server-net` 的 BDS-only + 仅 beta 限制在
+  `script-api/unsupported.ts` 有明确说明。
 
 ---
 
