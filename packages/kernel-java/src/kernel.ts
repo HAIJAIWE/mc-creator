@@ -67,6 +67,11 @@ import { assertWithinRoot, javaVersionFor, makeArtifactRef } from '@mc-creator/d
 import { downloadFile, fetchVersionManifest } from '@mc-creator/engine';
 import { MC_VERSIONS } from '@mc-creator/shared';
 import { checkLocalFile, sameDigest, type DownloadReason } from './content/modpack/incremental.js';
+import {
+  checkShaderSetup,
+  hasBlockingShaderIssue,
+  summarizeShaderSetup,
+} from './content/shader/shader-compat.js';
 
 /** 内核构造上下文。 */
 export interface KernelContext {
@@ -1191,6 +1196,35 @@ export class JavaKernel implements KernelContract {
     }
     step(1);
     for (const target of existing) rmSync(target, { recursive: true });
+
+    // §5.6 光影：卸载后若仍有其它光影包，连同加载器组合一起复查。
+    // 「装了光影包但没加载器」会让光影**静默不生效且无任何报错**，
+    // 用户看不出原因 —— 故在改动光影内容后主动给结论，而不是等用户发现。
+    let shaderSetup: { issues: unknown[]; blocking: boolean; summary: string } | undefined;
+    if (contentKind === 'shader') {
+      const dir = this.instanceDir(root, instanceId);
+      const shaderDir = join(dir, 'shaderpacks');
+      const remaining = existsSync(shaderDir)
+        ? readdirSync(shaderDir).filter((n) => !n.startsWith('.'))
+        : [];
+      const modsDir = join(dir, 'mods');
+      const installedMods = existsSync(modsDir)
+        ? readdirSync(modsDir)
+            .filter((n) => n.endsWith('.jar'))
+            // mod id 取文件名主干（不含版本号与扩展名），小写比较。
+            .map((n) => n.replace(/\.jar$/i, '').toLowerCase())
+        : [];
+      const issues = checkShaderSetup(
+        remaining.map((n) => ({ name: n })),
+        installedMods.map((id) => ({ id })),
+      );
+      shaderSetup = {
+        issues,
+        blocking: hasBlockingShaderIssue(issues),
+        summary: summarizeShaderSetup(issues),
+      };
+    }
+
     return {
       ok: true,
       data: {
@@ -1199,6 +1233,7 @@ export class JavaKernel implements KernelContract {
         identifier,
         removed: existing.length,
         path: existing[0],
+        ...(shaderSetup === undefined ? {} : { shaderSetup }),
       },
     };
   }

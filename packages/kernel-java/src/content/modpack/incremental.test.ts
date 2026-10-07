@@ -97,9 +97,19 @@ describe('digestFile 流式摘要（§5.4 增量更新的性能前提）', () =>
     // 每次 read 的缓冲长度恒为 64KiB，与文件大小无关 —— 内存上限与 2GB 包无关。
     // 7 次 = 5 个满块 + 1 个 17 字节尾块 + 1 次读到 0 判定 EOF。
     expect(probe.readLens.length).toBe(7);
-    expect(new Set(probe.readLens)).toEqual(new Set([DIGEST_CHUNK_SIZE]));
+    // ⚠️ 这里必须用**字面量** 65536 断言，不能用 DIGEST_CHUNK_SIZE ——
+    // 用常量的话，改了常量两边一起变，断言仍绿（自洽性绿，见 MEMORY §7.9）。
+    // 本文件头声称的「内存占用与文件大小无关」只有在这里被钉住才算数。
+    expect(new Set(probe.readLens)).toEqual(new Set([65536]));
     // 整块读的 API 一次都没被调用。
     expect(probe.readFilePaths).toEqual([]);
+  });
+
+  it('分块大小常量本身为 64KiB（内存上限的绝对值，不可调大）', () => {
+    // §5.4 的前提是「2GB 的整合包也不会被整块读进内存」。一旦有人把分块调到
+    // 几十 MB，内存上限判据就名存实亡，故把绝对值钉死。
+    expect(DIGEST_CHUNK_SIZE).toBe(64 * 1024);
+    expect(DIGEST_CHUNK_SIZE).toBe(65536);
   });
 
   it('空文件 → 合法摘要且不炸（长度为 0 的边界）', async () => {
