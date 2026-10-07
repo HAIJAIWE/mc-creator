@@ -7,3 +7,4 @@ export * from './generators/index.js';
 export * from './modrinth/index.js';
 export * from './curseforge/index.js';
 export * from './modpack/index.js';
+export * from './papermc/index.js';
