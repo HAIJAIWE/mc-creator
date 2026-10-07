@@ -1,9 +1,10 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：**§7.2 代理层上一版是假实现已重写** —— 落盘改为代理真读的
-> `velocity.toml` / `config.yml`（含多子服路由表），见 §7.9
-> 全绿 320/5397。NeoForge 端到端**本机不可验**（maven.neoforged.net 不通），见 §7.8
+> 最近更新：**§6.2 基岩导入网关导入前校验落地**（按官方 manifest.json 参考），见 §7.10；
+> §7.2 代理层上一版是假实现已重写 —— 落盘改为代理真读的 `velocity.toml` / `config.yml`，
+> 见 §7.9。全绿 321/5435。
+> NeoForge 端到端**本机不可验**（maven.neoforged.net 不通），见 §7.8
 
 > 📄 **设计文档已找到**：`D:\Downloads\MC全链路AI工作台-设计文档-v3.1.md`（931 行）。
 > 之前两轮「文档不在仓内」的判断只对仓内而言 —— 文档在 `D:\Downloads` 下，
@@ -21,7 +22,7 @@
 
 | 门禁                             | 状态      | 实测                                                                |
 | -------------------------------- | --------- | ------------------------------------------------------------------- |
-| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 320 files / 5397 passed + 43 skipped                         |
+| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 321 files / 5435 passed + 43 skipped                         |
 | `pnpm -r typecheck`              | ✅ exit 0 | all 18 packages Done                                                |
 | `pnpm lint`                      | ✅ exit 0 | **0 errors**（45 warnings，不影响退出码）                           |
 | `pnpm format:check`              | ✅ exit 0 | All matched files use Prettier code style                           |
@@ -36,12 +37,12 @@
 
 | commit    | 内容                                                 |
 | --------- | ---------------------------------------------------- |
-| （本轮）  | §7.2 代理层重写：落真配置 + 多子服路由表             |
+| `635efae` | §6.2 基岩导入网关：导入前校验落地                    |
+| `41f30e3` | §7.2 代理层重写：落真配置 + 多子服路由表             |
+| `5a3da26` | §7.2 代理层 8 个 kind（**配置格式是假的**，见 §7.9） |
 | `27a3553` | DomainSwitcher hover 样式生成                        |
 | `335f119` | agent-tools 时序缺陷（mergeFiles 缺 await）          |
-| `5a3da26` | §7.2 代理层 8 个 kind（**配置格式是假的**，见 §7.9） |
 | `c7e3060` | Bedrock 环境探测 + 文档 §6.1 纠错                    |
-| `acacd89` | §5.3 崩溃归因（suspect 只由直接判据产生）            |
 
 ---
 
@@ -837,6 +838,53 @@ commit `5a3da26` 给 §7.2 代理层加了 8 个 kind + 8 个方法，测试全�
 代理官方 jar 的下载源未接：Velocity 走 `https://api.papermc.io/v2/projects/velocity`，
 BungeeCord/Waterfall 走各自 API —— **这些 API 本轮未实测可达**，故 `start` 只返回
 控制指令（与既有 `controlServer` 同口径，§7.1 进程生命周期不归内核），不自动下载。
+
+---
+
+## 7.10 §6.2 基岩导入网关：导入前校验落地（commit `635efae`）
+
+### 做了什么
+
+`packages/kernel-bedrock/src/import-gateway.ts`（新，纯函数无 I/O）：格式识别 +
+三条导入前校验。**落位/解压不在这一层**，那是内核 install/import 任务的事。
+
+出处（实抓，非凭记忆）：
+<https://learn.microsoft.com/en-us/minecraft/creator/reference/content/addonsreference/packmanifest>
+—— "Add-Ons Reference: manifest.json"，`ms.date 2025-08-04`，`updated_at 2026-04-21`。
+
+### 官方事实要点（逐条对照原文，不是记忆）
+
+| 事实                                                                                        | 原文依据                                                                                                |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `format_version`：**1 用于 skin packs**；2 用于 resource·behavior·world template；3 preview | "This may be 1 for skin packs or 2 for resource, behavior, and world templates"                         |
+| `min_engine_version` 对 resource/behavior **必填**                                          | "This is a required field for resource and behavior packs"                                              |
+| `version` 覆盖语义：**更高才替换，同级或更低被忽略**                                        | "The new pack will replace the old one if the version is higher, and ignored if it's the same or lower" |
+| `modules[].type`：`resources`/`data`/`world_template`/`script`                              | 官方枚举表                                                                                              |
+| `modules[].language` 只在 `script` 时出现，**唯一支持值 javascript**                        | "The only supported value is `javascript`."                                                             |
+| `capabilities`：`chemistry`/`editorExtension`/`experimental_custom_ui`/`raytraced`/`pbr`    | 官方枚举表                                                                                              |
+
+### 修掉的一处过宽判定
+
+`header.uuid` 本仓 `kernel.ts` 原用 `UUID_RE = /^[0-9a-fA-F-]{32,36}$/`
+（"32/36 位十六进制或带连字符"）——**那会放过 `----------------` 这种零连字符串**。
+导入网关里收严到官方形状 `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`（x 为十六进制，
+大小写都接受，因为 Windows 工具链产出过大写）。
+
+### 不做的一条（不猜）
+
+§6.3 写「实验性 API 需在 manifest 声明」，**本轮不加这条校验**。官方参考里稳定通道的
+依赖就是 `dependencies[].module_name = "@minecraft/server" + version`；而 beta 模块
+（如 server-gestures）走 `@minecraft/server-<version>-beta` 形式的 module_name。
+**哪些模块在哪个版本转入 beta 是游戏版本事实、随版本变动**，不在本仓静态判定范围 ——
+硬编码一张 beta 列表就是猜，且必然随游戏更新过期。
+
+### 测试与变异
+
+`import-gateway.test.ts` 38 例，含**官方 Behavior Pack / Resource Pack 示例逐字解析**
+（不只测我方生成物）。变异三条全 RED：uuid 判定退回旧宽松正则、兼容方向反转、
+`format_version===1` 语义错成 `===2`。
+
+门禁：321 files / 5435 passed + 43 skipped，typecheck 0，lint 0 errors，check-docs exit 0。
 
 ---
 
