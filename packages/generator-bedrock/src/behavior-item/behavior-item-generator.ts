@@ -18,6 +18,7 @@ import {
   hexToRgb,
   type PixelBuffer,
 } from '../utils/png-encoder.js';
+import { TextureSetError, merToHex, renderTextureSet } from '../texture-set/texture-set.js';
 
 /** 生成简单 UUID v4（基岩版 manifest 需要） */
 function generateUUID(): string {
@@ -87,6 +88,11 @@ export class BehaviorItemGenerator implements Generator {
         path: `textures/items/${item.id}.png`,
         content: toBase64(this.generateItemTexture(item)),
       });
+      // §6.4：只有声明了 pbr 才出 texture_set.json。
+      // 不声明时**不给默认值也不猜** —— 产物就是「无材质信息的纯色贴图」，
+      // 这与生成器此前的行为一致，不是回退。
+      const pbrFile = this.generateTextureSet(item, warnings);
+      if (pbrFile !== undefined) files.push(pbrFile);
     }
 
     const langFiles = this.generateLangFiles(spec);
@@ -103,6 +109,54 @@ export class BehaviorItemGenerator implements Generator {
       warnings,
       buildCmd: '',
     };
+  }
+
+  /**
+   * 生成 `textures/items/<id>.texture_set.json`（§6.4 PBR 材质）。
+   *
+   * 三个要点，都来自官方 Texture Set 页面：
+   * - MER 层通道映射 R=Metalness / G=Emissive / B=Roughness（见 merToHex）。
+   * - `textureBasedObject: true` —— 物品是 texture-based object，
+   *   官方 Caution 明说这类对象**不能用 heightmap、只能用 normal**，故这里只出 MER(+normal)。
+   * - 引用的贴图必须同包存在：normal 若给的是外部名字，游戏会记 CONTENT_ERROR
+   *   并**整份 texture_set 不生效**（静默失效最难查），故这里只透传不校验存在性，
+   *   但把警告交给调用方。
+   */
+  private generateTextureSet(item: BpItemEntrySpec, warnings: string[]): FileNode | undefined {
+    const pbr = item.pbr;
+    if (pbr === undefined) return undefined;
+    try {
+      const content = renderTextureSet({
+        name: item.id,
+        textureBasedObject: true,
+        // 物品贴图走 RTX / Vibrant Visuals 两条路都可能，用经典管线最保守：
+        // 只出 MER（RTX 与 VV 都读），不出 MERS（VV 专属、RTX 忽略）。
+        pipeline: 'vibrant_visuals',
+        layers: {
+          color: item.id,
+          metalness_emissive_roughness: merToHex(pbr.metalness, pbr.emissive, pbr.roughness),
+          ...(pbr.normal === undefined ? {} : { normal: pbr.normal }),
+        },
+      });
+      if (pbr.normal !== undefined) {
+        warnings.push(
+          `物品 ${item.id} 的 texture_set 引用了法线贴图 ${pbr.normal}：` +
+            '官方规定 texture_set 只能引用同一资源包内的贴图，请确认该 png 已随包产出，否则整份 texture_set 会失效',
+        );
+      }
+      return {
+        path: `textures/items/${item.id}.texture_set.json`,
+        content,
+      };
+    } catch (e) {
+      // 官方：非法 texture_set 会记 CONTENT_ERROR 且整份不被使用。
+      // 宁可不出文件并给出原因，也不要落一份会被游戏静默丢弃的文件。
+      if (e instanceof TextureSetError) {
+        warnings.push(`物品 ${item.id} 的 PBR 定义非法，已跳过 texture_set.json：${e.message}`);
+        return undefined;
+      }
+      throw e;
+    }
   }
 
   /** 生成 manifest.json */

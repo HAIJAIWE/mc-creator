@@ -66,6 +66,38 @@ export const BpItemEntrySpec = z.object({
     .optional(),
   /** 原始组件 JSON，追加到 minecraft:item 的 components */
   customComponents: z.array(z.record(z.unknown())).default([]),
+  /**
+   * PBR 材质（§6.4 材质 / §5.5 资源包 PBR）。
+   *
+   * 声明后生成器会额外产出 `textures/items/<id>.texture_set.json`，
+   * 否则产物在 Vibrant Visuals / RTX 下拿不到任何材质信息（只有纯色贴图）。
+   *
+   * 通道语义按官方 Texture Set（不是「MER 贴图」这个笼统说法）：
+   * - metalness 0-255：0 = 绝缘体，255 = 纯金属
+   * - emissive 0-255：自发光强度
+   * - roughness 0-255：0 = 镜面，255 = 全漫反射
+   *
+   * **不给就是不给**：不设默认值、不按贴图主色猜材质 —— 猜出来的 MER 会让
+   * 用户看到「我明明生成了金属剑却不像金属」而查不出原因。
+   */
+  pbr: z
+    .object({
+      /** 金属度。0 绝缘 / 255 金属。 */
+      metalness: z.number().min(0).max(255).default(0),
+      /** 自发光强度。 */
+      emissive: z.number().min(0).max(255).default(0),
+      /** 粗糙度。0 镜面 / 255 漫反射。 */
+      roughness: z.number().min(0).max(255).default(255),
+      /**
+       * 法线贴图名（不含扩展名，须与 color 同目录同包，官方只允许同包引用）。
+       * 不给则只出 MER，不出 normal 层。
+       */
+      normal: z
+        .string()
+        .regex(/^[A-Za-z0-9_][A-Za-z0-9_./-]{0,127}$/)
+        .optional(),
+    })
+    .optional(),
 });
 
 /** BehaviorItemSpec：基岩版行为包自定义物品规格 */

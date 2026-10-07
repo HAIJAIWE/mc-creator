@@ -61,6 +61,63 @@ describe('BehaviorItemGenerator', () => {
     expect(paths).toContain('texts/en_US.lang');
   });
 
+  it('未声明 pbr 时不产 texture_set.json（不给默认值也不猜材质）', async () => {
+    const result = await gen.generate({ spec: validSpec } as any);
+    expect(result.files.map((f) => f.path).some((p) => p.endsWith('.texture_set.json'))).toBe(
+      false,
+    );
+  });
+
+  it('声明 pbr 后产 texture_set.json，MER 按 R=Metalness/G=Emissive/B=Roughness', async () => {
+    const spec = {
+      ...validSpec,
+      items: [
+        {
+          id: 'gold_ingot',
+          name: '金锭',
+          primaryColor: '#ffd700',
+          pbr: { metalness: 255, emissive: 0, roughness: 32 },
+        },
+      ],
+    };
+    const result = await gen.generate({ spec } as any);
+    const f = result.files.find((x) => x.path === 'textures/items/gold_ingot.texture_set.json');
+    expect(f).toBeDefined();
+    const doc = JSON.parse(f!.content);
+    expect(doc.format_version).toBe('1.21.30');
+    expect(doc['minecraft:texture_set'].color).toBe('gold_ingot');
+    // R=FF(255 metal) G=00(0 emissive) B=20(32 rough)
+    expect(doc['minecraft:texture_set'].metalness_emissive_roughness).toBe('#FF0020');
+    // 物品是 texture-based object，官方禁止 heightmap；未给 normal 时不应出现该键
+    expect(doc['minecraft:texture_set'].heightmap).toBeUndefined();
+  });
+
+  it('声明 pbr.normal 时透传 normal 层并给出「必须同包存在」的警告', async () => {
+    const spec = {
+      ...validSpec,
+      items: [
+        {
+          id: 'rune_blade',
+          name: '符文剑',
+          pbr: { metalness: 200, emissive: 32, roughness: 64, normal: 'rune_blade_normal' },
+        },
+      ],
+    };
+    const result = await gen.generate({ spec } as any);
+    const f = result.files.find((x) => x.path === 'textures/items/rune_blade.texture_set.json');
+    const doc = JSON.parse(f!.content);
+    expect(doc['minecraft:texture_set'].normal).toBe('rune_blade_normal');
+    expect(result.warnings.some((w) => w.includes('rune_blade_normal'))).toBe(true);
+  });
+
+  it('pbr schema 越界值被拒（metalness/roughness 必须 0-255）', async () => {
+    const spec = {
+      ...validSpec,
+      items: [{ id: 'bad', name: 'x', pbr: { metalness: 300, emissive: 0, roughness: 0 } }],
+    };
+    await expect(gen.generate({ spec } as any)).rejects.toThrow();
+  });
+
   it('manifest 包含行为包模块与 UUID', async () => {
     const ctx = { spec: validSpec } as any;
     const result = await gen.generate(ctx);
