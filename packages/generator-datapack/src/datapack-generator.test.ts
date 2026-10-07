@@ -46,6 +46,45 @@ describe('DatapackGenerator', () => {
     expect(parsed.pack.pack_format).toBeUndefined();
   });
 
+  it('§5.7 目录层级自检：本生成器产物合规，不产生层级告警', async () => {
+    const result = await gen.generate(
+      makeCtx({
+        packId: 'my_pack',
+        packName: 'My Pack',
+        packFormat: 48,
+        recipes: [
+          {
+            id: 'stone_to_dirt',
+            type: 'shaped',
+            pattern: ['S'],
+            key: { S: 'minecraft:stone' },
+            result: 'minecraft:dirt',
+            count: 1,
+          },
+        ],
+      }),
+    );
+    // 生成器自己写出的 pack.mcmeta 必须在根、data/ 必须在根下。
+    const paths = result.files.map((f) => f.path);
+    expect(paths).toContain('pack.mcmeta');
+    expect(paths.some((p) => p.startsWith('data/my_pack/'))).toBe(true);
+    // 不应出现任何 §5.7 告警
+    expect(result.warnings.filter((w) => w.includes('[§5.7]'))).toEqual([]);
+  });
+
+  it('§5.7：无任何内容时产物无 data/，自检如实报 NO_CONTENT（warning 非 error）', async () => {
+    const result = await gen.generate(
+      makeCtx({ packId: 'my_pack', packName: 'My Pack', packFormat: 48, recipes: [] }),
+    );
+    const paths = result.files.map((f) => f.path);
+    expect(paths).toContain('pack.mcmeta');
+    expect(paths.some((p) => p.startsWith('data/'))).toBe(false);
+    // 空数据包：自检必须**报出来**而不是静默放过
+    const w = result.warnings.find((x) => x.includes('[§5.7]'));
+    expect(w).toBeDefined();
+    expect(w).toContain('不会被游戏加载');
+  });
+
   it('pack_format 按 MC 版本自动映射（1.20.6 → 41，并给出 warning）', async () => {
     const ctx = makeCtx({ packId: 'my_pack', packName: 'My Pack', packFormat: 48 });
     ctx.mcVersion = '1.20.6';

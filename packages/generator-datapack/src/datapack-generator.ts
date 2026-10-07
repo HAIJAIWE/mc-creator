@@ -17,7 +17,12 @@ import type {
   ModRecipeSpec,
   RecipeSpec,
 } from '@mc-creator/shared';
-import { MC_VERSIONS, getPackFormatForMcVersion, renderPackMcmetaPack } from '@mc-creator/shared';
+import {
+  MC_VERSIONS,
+  getPackFormatForMcVersion,
+  renderPackMcmetaPack,
+  validateDatapackLayout,
+} from '@mc-creator/shared';
 import { isModRecipe, modRecipeToDatapackRecipe } from './recipe-adapter.js';
 import { sanitizePathSegment } from './writers/common.js';
 import {
@@ -244,6 +249,14 @@ export class DatapackGenerator implements Generator {
     // 超平坦预设（worldgen/flat_level_generator_preset）
     for (const fp of spec.flatPresets ?? []) {
       files.push(generateFlatPreset(ns, fp));
+    }
+
+    // §5.7 目录层级陷阱：**必须在 files 全部装配完之后**自检，
+    // 否则 pack.mcmeta 尚未入列会被误报成「缺失」。
+    // 放在生成期而不是只留模块，是为了拦住「打包完才发现游戏不加载」——
+    // 运行时 `/datapack list` 看不到该包，用户根本无从排查。
+    for (const issue of validateDatapackLayout(files)) {
+      warnings.push(`[§5.7] ${issue.message}`);
     }
 
     return {

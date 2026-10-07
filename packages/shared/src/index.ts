@@ -6,4 +6,5 @@ export * from './presets/recipe-presets.js';
 export * from './presets/worldgen-presets.js';
 export * from './presets/content-templates.js';
 export * from './validation/datapack-validator.js';
+export * from './validation/datapack-layout.js';
 export * from './validation/pack-format.js';
