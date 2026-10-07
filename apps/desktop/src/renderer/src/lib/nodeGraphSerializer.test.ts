@@ -342,6 +342,15 @@ describe('serializeGraph', () => {
     expect(parsed.version).toBe(SERIALIZER_VERSION);
   });
 
+  // ⚠️ 上面那条只验「产物 version == 常量」，**不验常量的绝对值** ——
+  // 实测把 SERIALIZER_VERSION 从 2 改成 3 全仓测试仍全绿。
+  // 但这是**落盘格式的版本号**：改了会让此前保存的 .json 存档走不进的分支，
+  // 属于「数据能不能读回来」的事，必须有测试察觉。故用字面量钉死。
+  it('SERIALIZER_VERSION 的绝对值被字面量钉死（2；改版本须同步迁移测试）', () => {
+    expect(SERIALIZER_VERSION).toBe(2);
+    expect(SERIALIZER_FORMAT).toBe('mc-creator-node-graph');
+  });
+
   it('exportedAt 是合法 ISO 时间戳', () => {
     const graph = makeGraph([]);
     const json = serializeGraph(graph);

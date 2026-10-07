@@ -779,4 +779,26 @@ describe('回归：加固没有改变合法渲染的既有断言', () => {
     expect(MAX_FIELDS_ENTRIES).toBe(100);
     expect(MAX_FIELDS_DEPTH).toBe(8);
   });
+
+  // ⚠️ 上一条只验「常量与 limits 自洽」，**不验常量的绝对值** ——
+  // 两者都改成 10 倍仍然全绿（实测：MAX_TEMPLATE_LENGTH 50k→500k、
+  // MAX_TOTAL_ITERATIONS 50k→5M 都是 GREEN）。这些是 §13 的安全上限
+  // （模板体积 / 迭代 DoS 防护），放宽 10 倍属安全回退却无人察觉。
+  // 故这里必须用**字面量**钉死绝对值（自洽性绿，见 MEMORY §7.9 / §7.15）。
+  it('安全上限的绝对值被字面量钉死（放宽上限必须是有意的决定）', () => {
+    expect(MAX_TEMPLATE_LENGTH).toBe(50_000);
+    expect(MAX_EACH_ITERATIONS).toBe(10_000);
+    expect(MAX_TOTAL_ITERATIONS).toBe(50_000);
+    expect(MAX_BLOCK_DEPTH).toBe(16);
+    // MAX_TOKEN_COUNT 是派生的（模板长度 / 5），钉住派生关系而非魔数。
+    expect(MAX_TOKEN_COUNT).toBe(Math.ceil(50_000 / 5));
+    expect(MAX_TOKEN_COUNT).toBe(10_000);
+  });
+
+  it('limits 对象里的绝对值同样是字面量钉死', () => {
+    expect(DEFAULT_LIMITS.maxTemplateLength).toBe(50_000);
+    expect(DEFAULT_LIMITS.maxEachIterations).toBe(10_000);
+    expect(DEFAULT_LIMITS.maxTotalIterations).toBe(50_000);
+    expect(DEFAULT_LIMITS.maxBlockDepth).toBe(16);
+  });
 });

@@ -304,6 +304,21 @@ describe('生产确认实现（原生 dialog，fail-closed）', () => {
     expect(opts?.type).toBe('warning');
   });
 
+  // ⚠️ 上面那些只验「告知内容 == 常量」，**不验常量本身的绝对值** ——
+  // 实测把 RISK_NOTICE_VERSION 从 '1.2/19-v1' 改成 'v2' 全仓测试仍全绿。
+  // 但这个版本串是**「已确认过哪一版文案」的凭据**：它与 RISK_NOTICE_LINES 一同
+  // 构成 §19 的告知面，改了文案却不同步递增版本号 = 让旧确认被误认成已确认新版，
+  // 合规确认就失效了。故必须用字面量钉死。
+  //
+  // 注：版本标识**不进正文**（用户看到的是告知文本本身，不是版本号），
+  // 它只在 grant 记录与「版本不同则重新确认」这条判定里用。
+  it('合规告知的版本标识被字面量钉死（文案变更必须同步递增）', () => {
+    expect(RISK_NOTICE_VERSION).toBe('1.2/19-v1');
+    // 版本号编码了它覆盖的文档章节（§1.2 / §19），改章节就应改版本号
+    expect(RISK_NOTICE_VERSION).toContain('1.2');
+    expect(RISK_NOTICE_VERSION).toContain('19');
+  });
+
   it('有父窗口时用带父窗口的重载（模态，不会跑到后面去）', async () => {
     const win = { isDestroyed: () => false };
     mocks.getFocusedWindow.mockReturnValue(win);
