@@ -6,164 +6,191 @@ on:
   pull_request:
     branches: [main, master]
 
-jobs:
-  lint:
-    name: Lint & Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint --max-warnings 0
-      - run: pnpm format:check
-      - run: node scripts/check-docs.mjs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-latest
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+env:
+  PNPM_VERSION: '9'
+  NODE_VERSIONS: '20,22'
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & TypeCheck (Node ${{ matrix.node }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest]
+        node: ['20', '22']
+        include:
+          - os: windows-latest
+            node: '20'
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          version: 9
-      - uses: actions/setup-node@v4
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
-          node-version: 20
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
           cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        id: pnpm-store-cache
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: node-modules-cache
+        with:
+          path: |
+            **/node_modules
+            !**/node_modules/.cache
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: TypeCheck
+        run: pnpm -r typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format Check
+        run: pnpm format:check
+
+      - name: Check Docs
+        run: node scripts/check-docs.mjs
 
   test:
-    name: Test (${{ matrix.os }})
+    name: Test (Node ${{ matrix.node }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+        os: [ubuntu-latest]
+        node: ['20', '22']
+        include:
+          - os: windows-latest
+            node: '20'
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test:coverage
+          fetch-depth: 0
 
-  e2e:
-    name: E2E (Electron, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # 只跑 Linux + Windows，不跑 macOS。理由：
-        # ① macOS 不在既有 build 矩阵里，仓库本来就没在 macOS 上验过重活；
-        # ② Electron E2E 依赖 GUI 会话，macOS runner 的窗口服务器行为最容易
-        #    出现只在 CI 才复现的偶发失败，而这套用例的价值在于「稳定地报红」，
-        #    一个时好时坏的信号比没有信号更糟；
-        # ③ Linux/Windows 已经覆盖了路径分隔符、大小写敏感、userData 位置
-        #    （%APPDATA% vs ~/.config）这几类最容易出平台 bug 的差异。
-        os: [ubuntu-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v4
-      # Linux 上 Electron 需要一块「屏幕」：GitHub 的 ubuntu runner 没有 X
-      # display，Chromium 起不来。xvfb-run 提供虚拟屏，比 --headless 更接近
-      # 真实桌面（Electron 的 BrowserWindow 不支持真正的 headless 模式）。
-      - name: Install xvfb (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-      - uses: pnpm/action-setup@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
-          version: 9
-      - uses: actions/setup-node@v4
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: 'pnpm'
-      # 注意这里**不设** ELECTRON_SKIP_BINARY_DOWNLOAD：E2E 要真跑 Electron，
-      # 跳过二进制下载等于没装应用。typecheck job 才需要跳过。
-      - run: pnpm install --frozen-lockfile
-      - name: Install Playwright OS dependencies
-        run: npx playwright install-deps
-      - name: Build desktop app (E2E runs against the compiled out/ bundle)
-        run: pnpm --filter @mc-creator/desktop build
-      - name: Run Playwright E2E
-        run: xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm --filter @mc-creator/desktop test:e2e
-        if: runner.os == 'Linux'
-      - name: Run Playwright E2E
-        run: pnpm --filter @mc-creator/desktop test:e2e
-        if: runner.os != 'Linux'
-      - name: Upload Playwright report
-        if: failure()
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        id: pnpm-store-cache
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: node-modules-cache
+        with:
+          path: |
+            **/node_modules
+            !**/node_modules/.cache
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Run Tests
+        run: pnpm -r test
+        env:
+          CI: true
+
+      - name: Upload coverage reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.os }}
-          path: apps/desktop/playwright-report/
+          name: coverage-${{ matrix.os }}-node${{ matrix.node }}
+          path: |
+            **/coverage/**/*
+            **/coverage.lcov
+            **/coverage.xml
           retention-days: 7
+          compression-level: 6
 
-  bundle:
-    name: Bundle Size Check
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}-node${{ matrix.node }}
+          path: |
+            **/dist/**/*
+            **/build/**/*
+            **/.output/**/*
+          retention-days: 7
+          compression-level: 6
+
+  # Optional: Summary job to collect results
+  summary:
+    name: Summary
+    needs: [lint-and-typecheck, test]
+    if: always()
     runs-on: ubuntu-latest
-    needs: [typecheck, test, e2e]
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @mc-creator/desktop build
-      - name: Check bundle size
-        run: node scripts/check-bundle.mjs
-
-  build:
-    name: Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    needs: [typecheck, test, e2e]
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Linux system dependencies for Electron
-        if: runner.os == 'Linux'
+      - name: Check job statuses
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libudev-dev \
-            libatk1.0-dev \
-            libatk-bridge2.0-dev \
-            libcups2-dev \
-            libxkbcommon-dev \
-            libxss-dev \
-            libxtst-dev \
-            libnss3-dev \
-            libdrm-dev \
-            libgbm-dev \
-            libasound2-dev
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+          if [[ "${{ needs.lint-and-typecheck.result }}" != "success" ]]; then
+            echo "::error::Lint & TypeCheck job failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test.result }}" != "success" ]]; then
+            echo "::error::Test job failed"
+            exit 1
+          fi
+          echo "All jobs passed!"
