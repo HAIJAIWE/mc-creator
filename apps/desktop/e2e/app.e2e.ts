@@ -338,4 +338,74 @@ test.describe('§15 硬约束：E2E 不得触碰真实更新源与外部 API', (
     expect(ledger.attempts.join('\n')).toContain('api.curseforge.com');
     expect(ledger.attempts.join('\n')).toContain('launchermeta.mojang.com');
   });
+
+  // §6.4 skinpack 生成器端到端：验证 GENERATE_FILES 返回完整皮肤包结构
+  test('skinpack 生成：GENERATE_FILES 返回 manifest + skins.json + textures + lang', async ({
+    mcApp,
+  }) => {
+    // 直接通过主进程 IPC 调用 generateFiles（走 skinpack 生成器）
+    const res = await mcApp.app.evaluate(async ({ ipcRenderer }) => {
+      return ipcRenderer.invoke('GENERATE_FILES', {
+        generatorType: 'skinpack',
+        loader: 'vanilla',
+        mcVersion: '1.21.1',
+        spec: {
+          serializeName: 'E2ETestPack',
+          packName: 'E2E Test Pack',
+          description: 'E2E skinpack test',
+          textureSize: 64,
+          skins: [
+            {
+              skinKey: 'knight',
+              displayName: 'Knight Armor',
+              geometry: 'custom',
+              type: 'free',
+              primaryColor: '#334455',
+            },
+          ],
+          lang: { zh_CN: { knight: '骑士铠甲' } },
+        },
+        projectId: 'e2e-skinpack-test',
+      });
+    });
+
+    expect(res.files.length).toBeGreaterThanOrEqual(4); // manifest + skins.json + texture + lang
+    expect(res.files.some((f: { path: string }) => f.path === 'manifest.json')).toBe(true);
+    expect(res.files.some((f: { path: string }) => f.path === 'skins.json')).toBe(true);
+    expect(
+      res.files.some(
+        (f: { path: string }) => f.path.startsWith('textures/') && f.path.endsWith('.png'),
+      ),
+    ).toBe(true);
+    expect(
+      res.files.some(
+        (f: { path: string }) => f.path.startsWith('texts/') && f.path.endsWith('.lang'),
+      ),
+    ).toBe(true);
+
+    // 验证 manifest 内容
+    const manifest = JSON.parse(
+      res.files.find((f: { path: string }) => f.path === 'manifest.json')!.content,
+    );
+    expect(manifest.format_version).toBe(2);
+    expect(manifest.modules[0]?.type).toBe('skin_pack');
+
+    // 验证 skins.json
+    const skinsJson = JSON.parse(
+      res.files.find((f: { path: string }) => f.path === 'skins.json')!.content,
+    );
+    expect(skinsJson.serialize_name).toBe('E2ETestPack');
+    expect(skinsJson.localization_name).toBe('E2ETestPack');
+    expect(skinsJson.skins).toHaveLength(1);
+    expect(skinsJson.skins[0]?.skinKey).toBe('knight');
+
+    // 验证本地化
+    const langFiles = res.files.filter(
+      (f: { path: string }) => f.path.startsWith('texts/') && f.path.endsWith('.lang'),
+    );
+    expect(langFiles.length).toBeGreaterThanOrEqual(1);
+    const enLang = langFiles.find((f: { path: string }) => f.path === 'texts/en_US.lang');
+    expect(enLang).toBeDefined();
+    expect(enLang!.content).toContain('skin.E2ETestPack.knight=Knight Armor');
+  });
 });
