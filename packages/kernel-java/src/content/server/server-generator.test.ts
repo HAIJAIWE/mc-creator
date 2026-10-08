@@ -230,14 +230,48 @@ describe('ServerGenerator', () => {
     expect(bat!.content).toContain('set MC_VERSION=1.21.1');
   });
 
-  it('一键部署: serverType=paper 下载 PaperMC API', async () => {
+  it('一键部署: serverType=paper 走 PaperMC **v3**（v2 已 410 Gone）', async () => {
     const result = await gen.generate(
       makeCtx({ serverName: 'Srv', serverType: 'paper', serverVersion: '1.21.1' }),
     );
     const sh = result.files.find((f) => f.path === 'install.sh');
-    expect(sh!.content).toContain('api.papermc.io');
     const bat = result.files.find((f) => f.path === 'install.bat');
-    expect(bat!.content).toContain('api.papermc.io');
+
+    // ⚠️ 这一条原来只断言 toContain('api.papermc.io') —— **钉了域名、没钉版本**，
+    // 所以端点整体下线（v2 → 410 Gone）时它照样绿，而生成的 install.sh/install.bat
+    // 已经变成必然失败的死链。这与 MEMORY §7.16「断言里引用被测常量 = 自洽性绿」
+    // 是同一个病的另一面：这里不是常量，是**只断言了不变量的一半**。
+    // 现在钉死：必须是 v3 的 fill 域，且**不得出现**已下线的 v2 路径。
+    for (const [name, f] of [
+      ['install.sh', sh],
+      ['install.bat', bat],
+    ] as const) {
+      expect(f, name).toBeDefined();
+      expect(f!.content, name).toContain('fill.papermc.io/v3');
+      expect(f!.content, name).not.toContain('api.papermc.io');
+      // 必须走 builds/latest：最新 build 由服务端决定，脚本不自己挑
+      expect(f!.content, name).toContain('/builds/latest');
+      // 必须直接取服务端给的下载 URL，而不是自己拼 URL
+      expect(f!.content, name).toContain('server:default');
+    }
+
+    // 死链的真正危害是「静默损坏」：curl / Invoke-WebRequest 不带 -f / -ErrorAction
+    // 时，HTTP 错误页会被当成 jar 写进磁盘，表现为「装完了但启动报 jar 损坏」。
+    // shell 侧用 curl -fL，batch 侧用 Invoke-RestMethod + 显式判空并 exit 1。
+    expect(sh!.content).toMatch(/curl -fL -o/);
+    expect(bat!.content).toContain('Invoke-RestMethod');
+    expect(bat!.content).toContain('exit 1');
+
+    // 取不到下载地址时必须明确失败，不能拼出空版本号的畸形 URL 继续跑。
+    // ⚠️ 这里必须断言**整个守卫块**而不是单独 toContain('exit 1')：
+    // install.bat 侧的 PowerShell 单行里也有 exit 1，只查子串会被旁路 ——
+    // 实测把守卫条件改成 `if false` 时该断言照样 GREEN（假绿）。
+    expect(sh!.content).toMatch(/if \[ -z "\$PAPER_URL" \]; then[\s\S]*?exit 1[\s\S]*?fi/);
+    // batch 侧同理：判空与 exit 1 必须同处一条 -Command
+    expect(bat!.content).toMatch(/if \(-not \$u\) \{[^}]*exit 1/);
+    // 绝不能出现自己拼 URL 的痕迹（旧实现会拼出 /builds/$PAPER_BUILD/... ）
+    expect(sh!.content).not.toMatch(/\/builds\/\$\{?PAPER_BUILD/);
+    expect(bat!.content).not.toMatch(/\/downloads\/paper-/);
   });
 
   it('一键部署: serverType=fabric 下载 fabric-installer', async () => {
@@ -259,13 +293,29 @@ describe('ServerGenerator', () => {
     expect(sh!.content).toContain('未在脚本目录找到配置文件');
   });
 
-  it('审查修复: install.bat Paper 分支 BUILD 变量直拼（跨进程安全）', async () => {
+  it('审查修复: install.bat Paper 分支不跨进程传值（取 URL 与下载同在一条 PowerShell 内）', async () => {
     const result = await gen.generate(
       makeCtx({ serverName: 'Srv', serverType: 'paper', serverVersion: '1.21.1' }),
     );
     const bat = result.files.find((f) => f.path === 'install.bat');
-    expect(bat!.content).toContain("+ '%%i' +");
+    // 原机制是 `for /f` 取出 build 号、再 `'%%i'` 直拼进第二条 PowerShell 命令，
+    // 以避免用 $env:BUILD 跨进程传值（那条修复的意图是对的）。
+    // 改走 v3 builds/latest 后**跨进程变量整个不需要了** —— 直接在同一条
+    // PowerShell 里取到 url 并下载，比原机制更强，所以这里钉的是**意图**
+    // （不得用环境变量跨进程传值、不得再有 for /f 取值中转），而不是废弃的机制。
     expect(bat!.content).not.toContain('$env:BUILD');
+    expect(bat!.content).not.toContain('for /f');
+    expect(bat!.content).not.toContain('%%i');
+    // 取 url 与下载必须在同一条 -Command 里（否则又变成跨进程传值）
+    const cmdLines = bat!.content.split('\n').filter((l) => l.includes('-Command'));
+    expect(cmdLines.length).toBeGreaterThan(0);
+    for (const line of cmdLines) {
+      // 每条 PowerShell 命令要么不含 paper 下载，要么取 url 与下载在同一句里
+      if (line.includes('builds/latest')) {
+        expect(line).toContain('Invoke-WebRequest');
+        expect(line).toMatch(/\$u=/);
+      }
+    }
   });
   it("deployTarget='systemd' 生成 minecraft.service + install-systemd.sh", async () => {
     const result = await gen.generate(

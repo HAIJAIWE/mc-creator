@@ -178,16 +178,36 @@ describe('网络封装：非 2xx 抛错并带上状态与 URL', () => {
     }
   });
 
-  it('build 请求 URL 含版本号；省略版本时走 builds/latest', async () => {
+  it('build 请求 URL 用传入的真实版本号（实测 v3 不接受 latest 作版本段）', async () => {
     const seen: string[] = [];
     const spy: FetchLike = async (url) => {
       seen.push(url);
       return { ok: true, status: 200, json: async () => REAL_BUILD_LATEST };
     };
     await fetchServerDownload('velocity', spy, { version: '3.4.0' });
-    await fetchServerDownload('velocity', spy);
+    await fetchServerDownload('paper', spy, { version: '1.21.4' });
     expect(seen[0]).toBe(`${PAPERMC_API_BASE}/projects/velocity/versions/3.4.0/builds/latest`);
-    expect(seen[1]).toBe(`${PAPERMC_API_BASE}/projects/velocity/versions/latest/builds/latest`);
+    expect(seen[1]).toBe(`${PAPERMC_API_BASE}/projects/paper/versions/1.21.4/builds/latest`);
+  });
+
+  it('⚠️ 上一版把 /versions/latest/builds/latest 当正确行为钉住了 —— 实测那是 404', async () => {
+    // 2026-10 实测：GET /v3/projects/paper/versions/latest/builds/latest
+    //   → 404 {"ok":false,"error":"version_not_found"}
+    // v3 的 `latest` 只在最后一段（build 号）有意义；versions/{版本} 必须真实。
+    // 所以本模块**不做** 'latest' 兜底，必须由调用方显式给版本号。
+    const spy: FetchLike = async () => {
+      throw new Error('不该发出请求：版本段非法时必须在本地就拒掉');
+    };
+    await expect(fetchServerDownload('paper', spy, { version: 'latest' })).rejects.toThrow(
+      PaperApiError,
+    );
+    await expect(fetchServerDownload('paper', spy, { version: 'latest' })).rejects.toThrow(
+      /404 version_not_found/,
+    );
+    // 空串同样拒（否则会拼出 /versions//builds/latest 这种畸形路径）
+    await expect(fetchServerDownload('paper', spy, { version: '   ' })).rejects.toThrow(
+      PaperApiError,
+    );
   });
 
   it('指定版本时 build 响应没带 version 字段，用请求版本补上', async () => {
@@ -236,5 +256,22 @@ describe('真网络冒烟（端点此刻是否真可用）', () => {
     const res = await globalThis.fetch('https://api.papermc.io/v2/projects/velocity');
     // 期望 410 Gone。若将来上游恢复 v2，这条会红 —— 那时说明该重新评估。
     expect(res.status).toBe(410);
+  });
+
+  it("'latest' 作版本段在上游确实是 404 version_not_found（本地拒它的依据）", async () => {
+    const res = await globalThis.fetch(
+      `${PAPERMC_API_BASE}/projects/paper/versions/latest/builds/latest`,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe('version_not_found');
+  });
+
+  it('真实版本号 + builds/latest 真能取到 paper 的下载条目（对照上一条）', async () => {
+    const d = await fetchServerDownload('paper', fetchImpl, { version: '1.21.4' });
+    expect(d.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(d.filename).toMatch(/^paper-1\.21\.4-\d+\.jar$/);
+    expect(d.size).toBeGreaterThan(0);
+    expect(d.url.startsWith('https://fill-data.papermc.io/')).toBe(true);
   });
 });

@@ -234,17 +234,38 @@ export async function fetchProjectVersions(
 }
 
 /**
- * 取指定版本（或最新版本）的服务端下载元数据（真网络）。
+ * 取指定**MC 版本**的服务端下载元数据（真网络）。
  *
- * `version` 省略时走 `builds/latest`，避免本模块自己挑版本 ——
- * 「最新」的定义由服务端决定。
+ * ⚠️ `version` 是**必填**，不接受 `'latest'` 兜底。
+ *
+ * 实测（2026-10）：`/v3/projects/paper/versions/latest/builds/latest` 返回
+ * **404 `version_not_found`** —— v3 的 `latest` 只在**路径最后一段**（build 号）
+ * 有意义，`versions/{版本}` 这一段必须是真实 MC 版本号。
+ *
+ * 「最新 build」由 `builds/latest` 这段决定，那才是服务端的语义；
+ * 而「最新 MC 版本」本模块**不猜**，必须由调用方从 `fetchProjectVersions`
+ * 的结果里明确挑一个。猜版本号就是 §7.9 踩过的坑。
  */
 export async function fetchServerDownload(
   project: string,
   fetchImpl: FetchLike,
-  opts: { version?: string; arch?: ProcArch } = {},
+  opts: { version: string; arch?: ProcArch },
 ): Promise<PaperDownload> {
-  const version = opts.version ?? 'latest';
+  const version = opts.version;
+  if (typeof version !== 'string' || version.trim() === '') {
+    throw new PaperApiError(
+      `取 ${project} 下载信息失败：必须显式给出 MC 版本号（v3 不接受 'latest' 作为版本段）`,
+      PAPERMC_API_BASE,
+    );
+  }
+  if (version.toLowerCase() === 'latest') {
+    // 提前拦下并说明原因，而不是让调用方拿到一个语焉不详的 404。
+    throw new PaperApiError(
+      `版本段不能是 'latest'：实测 /versions/latest/builds/latest 返回 404 version_not_found。` +
+        `请先用 fetchProjectVersions 选出真实版本号。`,
+      PAPERMC_API_BASE,
+    );
+  }
   const url = `${PAPERMC_API_BASE}/projects/${encodeURIComponent(project)}/versions/${encodeURIComponent(version)}/builds/latest`;
   const res = await fetchImpl(url);
   if (!res.ok) {
@@ -255,9 +276,9 @@ export async function fetchServerDownload(
     );
   }
   const parsed = parseBuildDownload(await res.json(), opts.arch ?? 'x64');
-  // /builds/latest 不回带 version 字段，从请求的版本号补上（latest 时留空由调用方处理）。
-  if (parsed.version === '' && opts.version !== undefined) {
-    return { ...parsed, version: opts.version };
+  // /builds/latest 不回带 version 字段（实测响应里确实没有），从请求版本号补上。
+  if (parsed.version === '') {
+    return { ...parsed, version };
   }
   return parsed;
 }

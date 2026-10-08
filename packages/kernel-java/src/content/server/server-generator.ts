@@ -314,10 +314,21 @@ echo "备份完成: $BACKUP_DIR"
     // 按 serverType 生成下载服务端的 shell 片段
     let downloadCmd: string;
     if (spec.serverType === 'paper') {
+      // ⚠️ 这里曾用 https://api.papermc.io/v2/... —— 该端点实测已 **410 Gone**（v2 下线）。
+      // 死链被烤进生成的 install.sh，用户在自己服务器上跑时：
+      //   curl -s 拿到 410 页面 → grep '"build":' 匹配不到 → PAPER_BUILD 为空串
+      //   → 再 curl 一个 /downloads/paper-<ver>-.jar 的 404 → 脚本仍继续往下跑。
+      // 现改为 v3 的 builds/latest，直接取服务端给的下载 URL，**不再自己拼**。
+      // curl -f 是必须的：没有它，HTTP 错误响应体会被原样写进 jar 文件，
+      // 表现为「装完了但启动报 jar 损坏」，比直接失败更难查。
+      // 用 python3 解析 JSON：同文件 vanilla 分支已在用，且 apt 步骤已装 python3。
       downloadCmd = `echo "下载 Paper 服务端 (${shellEscape(spec.serverVersion)})..."
-PAPER_API="https://api.papermc.io/v2/projects/paper/versions/${shellEscape(spec.serverVersion)}/builds"
-PAPER_BUILD=$(curl -s "$PAPER_API" | grep -o '"build":[0-9]*' | tail -1 | cut -d: -f2)
-curl -o "\${jarName}" "\${PAPER_API}/\${PAPER_BUILD}/downloads/paper-${shellEscape(spec.serverVersion)}-\${PAPER_BUILD}.jar"`;
+PAPER_URL=$(curl -fsSL "https://fill.papermc.io/v3/projects/paper/versions/${shellEscape(spec.serverVersion)}/builds/latest" | python3 -c "import sys,json; print(json.load(sys.stdin)['downloads']['server:default']['url'])")
+if [ -z "$PAPER_URL" ]; then
+  echo "错误: 未取到 Paper 下载地址（该 MC 版本可能不存在于 PaperMC）"
+  exit 1
+fi
+curl -fL -o "\${jarName}" "$PAPER_URL"`;
     } else if (spec.serverType === 'fabric') {
       downloadCmd = `echo "下载 Fabric 服务端 (${shellEscape(spec.serverVersion)})..."
 curl -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar"
@@ -427,12 +438,11 @@ echo "=============================================="
   private generateInstallBat(spec: ServerSpecType): FileNode {
     let downloadCmd: string;
     if (spec.serverType === 'paper') {
+      // ⚠️ 同 install.sh：原 v2 端点（api.papermc.io/v2）实测已 410 Gone，
+      // 且原写法 Invoke-WebRequest 不带 -ErrorAction，410 错误页会被当成
+      // 「下载成功」写进 %JAR%。改用 v3 builds/latest 直接取服务端给的 URL。
       downloadCmd = `echo 下载 Paper 服务端 (%MC_VERSION%)...
-powershell -Command "Invoke-WebRequest -Uri 'https://api.papermc.io/v2/projects/paper/versions/%MC_VERSION%/builds' -OutFile paper_builds.json"
-for /f "delims=" %%i in ('powershell -Command "(Get-Content paper_builds.json | ConvertFrom-Json).builds[-1].build"') do (
-  powershell -Command "Invoke-WebRequest -Uri ('https://api.papermc.io/v2/projects/paper/versions/%MC_VERSION%/builds/' + '%%i' + '/downloads/paper-%MC_VERSION%-' + '%%i' + '.jar') -OutFile %JAR%"
-)
-del paper_builds.json`;
+powershell -Command "$j=Invoke-RestMethod -Uri 'https://fill.papermc.io/v3/projects/paper/versions/%MC_VERSION%/builds/latest'; $u=$j.downloads.'server:default'.url; if (-not $u) { Write-Error ('未取到 Paper 下载地址（该 MC 版本可能不存在于 PaperMC）'); exit 1 }; Invoke-WebRequest -Uri $u -OutFile '%JAR%'"`;
     } else if (spec.serverType === 'fabric') {
       downloadCmd = `echo 下载 Fabric 服务端 (%MC_VERSION%)...
 powershell -Command "Invoke-WebRequest -Uri 'https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar' -OutFile fabric-installer.jar"
