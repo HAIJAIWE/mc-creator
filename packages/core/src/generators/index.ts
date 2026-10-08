@@ -27,6 +27,9 @@ import { BehaviorPackGenerator } from './behavior-pack/index.js';
 import { EnchantmentGenerator } from './enchantment/index.js';
 import { BehaviorItemGenerator } from './behavior-item/index.js';
 import { BehaviorEntityGenerator } from './behavior-entity/index.js';
+// §6.4 基岩皮肤包生成器本体在 @mc-creator/generator-bedrock（与 behavior-pack 等
+// 基岩生成器同包），core 依赖该包，故在此注册即可 —— 不需要把文件搬进 core。
+import { SkinPackGenerator } from '@mc-creator/generator-bedrock';
 
 /**
  * 创建已注册所有内置生成器的默认注册表。
@@ -47,5 +50,6 @@ export function createDefaultRegistry(): GeneratorRegistry {
   registry.register(new EnchantmentGenerator());
   registry.register(new BehaviorItemGenerator());
   registry.register(new BehaviorEntityGenerator());
+  registry.register(new SkinPackGenerator());
   return registry;
 }

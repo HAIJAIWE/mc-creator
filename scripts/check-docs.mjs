@@ -72,9 +72,11 @@ function extractTruth() {
   }
 
   // Generator types count
+  // ⚠️ 必须先剥离 // 注释再数引号字符串 —— 注释里出现 'skin' 这类带引号的词
+  // 会被误数成数组元素（实测：注释 `与 'skin'（Java …）` 让计数多 1）。
   const generatorTypesMatch = generatorTypesSrc.match(/GENERATOR_TYPES\s*=\s*\[([\s\S]*?)\]/);
   const genTypes = generatorTypesMatch
-    ? (generatorTypesMatch[1].match(/'([^']+)'/g) || []).length
+    ? (generatorTypesMatch[1].replace(/\/\/[^\n]*/g, '').match(/'([^']+)'/g) || []).length
     : 0;
 
   return {

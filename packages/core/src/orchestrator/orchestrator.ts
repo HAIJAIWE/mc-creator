@@ -12,6 +12,7 @@ import {
   DataEnchantmentSpec,
   BehaviorItemSpec,
   BehaviorEntitySpec,
+  SkinPackSpec,
   type ModSpec as ModSpecType,
 } from '@mc-creator/shared';
 import type { ModelProvider } from '../model-provider/types.js';
@@ -33,7 +34,10 @@ export type SpecType =
   | 'behavior_pack'
   | 'enchantment'
   | 'behavior_item'
-  | 'behavior_entity';
+  | 'behavior_entity'
+  // §6.4 基岩皮肤包。与 'skin'（Java 单张 64×64 PNG）是两回事：
+  // 皮肤包是 manifest(skin_pack) + skins.json + textures/*.png + texts/*.lang。
+  | 'skinpack';
 
 interface SpecConfig {
   schema: ZodTypeAny;
@@ -265,6 +269,21 @@ Schema 字段：
 - entities[]: 实体列表（id 小写下划线, name 显示名, health, attackDamage 0=不攻击, movementSpeed, knockbackResistance 0-1, fireImmune 布尔, scale 体型缩放, xp 击杀经验, despawn 布尔, hostile 布尔, geometry creeper/zombie/skeleton/spider/blaze/slime 内置模型, mainColor #RRGGBB, accentColor #RRGGBB, goals[]{type melee/ranged/idle_wander/look_at_player/flee_sun/swim/follow_owner/panic, priority 0-10, speedMultiplier, attackRange 仅远程, attackInterval 仅远程}, targetTypes[] 如 player/villager, drops[]{item 物品ID 如 minecraft:bone, count, chance 0-1}）
 - lang: 语言覆盖（zh_CN/en_US 键值对）
 颜色必须是 #RRGGBB 格式的 6 位十六进制。实体名（如哥布林）放 name 字段。只输出 JSON，不要解释。`,
+  },
+  skinpack: {
+    schema: SkinPackSpec,
+    prompt: `你是 Minecraft 基岩版皮肤包规格生成器。根据描述生成 SkinPackSpec JSON。
+Schema 字段：
+- serializeName: 包标识符（字母数字下划线，如 AdventurePack）
+- packName: 显示名
+- description: 描述
+- packFormat: 数字（基岩版默认 2）
+- textureSize: 64 或 128（官方 CSPJ107 强制）
+- skins[]: 皮肤列表（skinKey 标识符, displayName 显示名, geometry custom|customSlim, type free|paid, primaryColor #RRGGBB, secondaryColor #RRGGBB）
+- cape: 披风（capeKey, color #RRGGBB）
+- lang: 语言覆盖（zh_CN/en_US 键值对）
+注意：serializeName 会同时写入 skins.json 的 serialize_name 与 localization_name（官方 CSPJ103 强制两者相同）。
+只输出 JSON，不要解释。`,
   },
 };
 

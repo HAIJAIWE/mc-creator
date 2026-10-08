@@ -182,6 +182,20 @@ export const GENERATOR_DESCRIPTORS = {
     },
     needsLoader: false,
   },
+  skinpack: {
+    type: 'skinpack',
+    label: { zh: '基岩皮肤包', en: 'Bedrock Skin Pack' },
+    description: {
+      zh: '创建基岩版皮肤包（manifest + skins.json + 贴图 + 语言文件）',
+      en: 'Create Bedrock skin pack (manifest + skins.json + textures + lang)',
+    },
+    icon: { scope: 'pixel', name: 'gen-skinpack' },
+    promptPlaceholder: {
+      zh: '描述你想要的皮肤包（如：骑士主题，含披风）…',
+      en: 'Describe the skin pack you want (e.g. knight theme with cape)…',
+    },
+    needsLoader: false,
+  },
 } satisfies Record<GeneratorType, GeneratorDescriptor>;
 
 /**

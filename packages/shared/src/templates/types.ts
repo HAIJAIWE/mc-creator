@@ -39,4 +39,7 @@ export type GeneratorType =
   | 'behavior_pack'
   | 'enchantment'
   | 'behavior_item'
-  | 'behavior_entity';
+  | 'behavior_entity'
+  // §6.4 基岩皮肤包：独立于 Java 的 skin（那是单张 64×64 PNG），
+  // 皮肤包是「manifest + skins.json + 多张 PNG + lang」的整包结构。
+  | 'skinpack';

@@ -50,14 +50,16 @@ describe('createDefaultRegistry 端到端', () => {
     'enchantment',
     'behavior_item',
     'behavior_entity',
+    // §6.4 基岩皮肤包（2026-10 补上，与 behavior_* 同属基岩族但 kind 不同）
+    'skinpack',
   ] as const;
 
-  it('注册了全部 13 种 generator', () => {
+  it('注册了全部 14 种 generator', () => {
     const registry = createDefaultRegistry();
     for (const type of EXPECTED_TYPES) {
       expect(registry.get(type), `generator "${type}" should be registered`).toBeDefined();
     }
-    expect(registry.list()).toHaveLength(13);
+    expect(registry.list()).toHaveLength(14);
   });
 
   it('launcher generator 端到端生成 8 个文件', async () => {

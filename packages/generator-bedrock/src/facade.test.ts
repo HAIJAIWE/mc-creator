@@ -47,4 +47,13 @@ describe('generator-bedrock facade', () => {
     // 反向：注册表里不能有 GENERATOR_NAMES 之外的条目（防止加了类忘了登记）
     expect([...registry.keys()].sort()).toEqual([...GENERATOR_NAMES].sort());
   });
+
+  it('skinpack 的 kind 是 skinpack 而非 addon（与 behavior_* 不同族）', () => {
+    // 这条是「为什么 skinpack 要单列」的回归保护：
+    // 皮肤包的 manifest 模块类型是 skin_pack，与 add-on 的 resources/data 不同，
+    // 在 contract 的 ALL_KINDS 里也是单独一类。若有人把它并进 addon，
+    // 这条会红 —— 而并进去的后果是 UI 会把皮肤包当 add-on 展示与处理。
+    expect(GENERATOR_KINDS.skinpack).toBe('skinpack');
+    expect(GENERATOR_KINDS.behavior_pack).toBe('addon');
+  });
 });

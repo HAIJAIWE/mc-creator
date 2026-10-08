@@ -233,8 +233,17 @@ function buildPreviewSpec(description: string, type: GeneratorType): Record<stri
         ],
         ...base,
       };
+    case 'skinpack':
+      return {
+        serializeName: materialId,
+        packName: packName,
+        packFormat: 2,
+        textureSize: 64,
+        skins: [{ skinKey: materialId, displayName: packName, primaryColor: '#C68642' }],
+        ...base,
+      };
   }
-  // 穷尽性检查：13 种 GeneratorType 已在上方 switch 全覆盖，
+  // 穷尽性检查：14 种 GeneratorType 已在上方 switch 全覆盖，
   // 新增类型时此处编译失败（避免预览模板静默漏掉新类型）。
   const _exhaustive: never = type;
   return _exhaustive;
