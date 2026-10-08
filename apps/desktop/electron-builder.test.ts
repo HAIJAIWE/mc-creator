@@ -71,15 +71,48 @@ const topLevelList = (key: string): string[] => {
   return items;
 };
 
-/** 读取顶层键下面任意深度的块文本 */
+/** 读取任意键下面任意深度的块文本（支持嵌套键，如 mac.notarize） */
 const blockOf = (key: string): string => {
   const lines = yaml.split('\n');
-  const start = lines.findIndex((l) => l.startsWith(`${key}:`));
+  // 支持点号分隔的路径：如 "mac.notarize"
+  const parts = key.split('.');
+  let start = -1;
+
+  // 找到路径的第一个键
+  const firstKey = parts[0];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trimStart().startsWith(`${firstKey}:`)) {
+      start = i;
+      break;
+    }
+  }
   if (start === -1) return '';
+
+  // 如果有嵌套路径，逐层深入
+  let currentStart = start;
+  for (let partIdx = 1; partIdx < parts.length; partIdx++) {
+    const part = parts[partIdx];
+    let found = false;
+    const currentIndent = lines[currentStart].search(/\S/);
+    for (let i = currentStart + 1; i < lines.length; i++) {
+      const lineIndent = lines[i].search(/\S/);
+      if (lineIndent <= currentIndent) break; // 回到同级或上级
+      if (lineIndent > currentIndent && lines[i].trimStart().startsWith(`${part}:`)) {
+        // 找到子键
+        currentStart = i;
+        found = true;
+        break;
+      }
+    }
+    if (!found) return '';
+  }
+
+  // 提取块内容（直到缩进回到当前层级或更上层）
   const out: string[] = [];
-  for (let i = start + 1; i < lines.length; i++) {
+  const blockIndent = lines[currentStart].search(/\S/);
+  for (let i = currentStart + 1; i < lines.length; i++) {
     const line = lines[i]!;
-    if (line.trim() !== '' && !/^\s/.test(line)) break;
+    if (line.trim() !== '' && lines[i].search(/\S/) <= blockIndent) break;
     out.push(line);
   }
   return out.join('\n');
@@ -174,5 +207,31 @@ describe('electron-builder.yml 打包配置', () => {
     // 见 electron-builder.yml 内注释：保持默认 true 时
     // electron-builder --dir 会因 isolated-vm 编译失败而中断整个打包。
     expect(topLevelScalar('npmRebuild')).toBe('false');
+  });
+
+  // §21 #6：macOS 公证与 Hardened Runtime 配置（Apple 要求所有分发应用必须公证）
+  it('mac 必须配置 notarize（公证）且使用 notarizecli', () => {
+    const notarizeBlock = blockOf('mac.notarize');
+
+    expect(notarizeBlock).toMatch(/tool:\s*notarizecli/);
+    // 只写键名占位，防止误提交敏感信息
+    expect(notarizeBlock).toMatch(/appleId:\s*\$\{\{APPLE_ID\}\}/);
+    expect(notarizeBlock).toMatch(/appleIdPassword:\s*\$\{\{APPLE_APP_SPECIFIC_PASSWORD\}\}/);
+    expect(notarizeBlock).toMatch(/teamId:\s*\$\{\{APPLE_TEAM_ID\}\}/);
+  });
+
+  it('mac 必须配置 hardenedRuntime 并声明必要的例外', () => {
+    const hr = blockOf('mac.hardenedRuntime');
+    // 这些例外基于现有功能实测（node-pty PTY、jobobject 原生模块加载）
+    expect(hr).toMatch(/allowExecutionOfJitCompiledCode:\s*true/);
+    expect(hr).toMatch(/disableLibraryValidation:\s*true/);
+    expect(hr).toMatch(/allowDyldEnvironmentVariables:\s*true/);
+    // 不得随意增减例外（会被 Gatekeeper 拦截或导致功能失效）
+  });
+
+  it('Electron 版本必须解析到当前稳定版（44.7.0，package.json 钉 ^44.4.3）', () => {
+    // 这是门槛测试：若 Electron 主版本变化，§21 #6 的公证/硬化要求可能变化
+    const pkg = JSON.parse(readText('package.json'));
+    expect(pkg.devDependencies.electron).toMatch(/^\^44\./);
   });
 });

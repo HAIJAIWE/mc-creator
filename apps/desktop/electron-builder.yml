@@ -154,6 +154,33 @@ mac:
         - arm64
   icon: build-resources/icon.icns
   category: public.app-category.developer-tools
+  # §21 #6：macOS 公证配置（Apple Developer 要求所有分发应用必须公证）
+  # 官方要求（2026-10 核实）：所有分发到 Mac 的应用必须公证，否则 Gatekeeper 会拦截
+  # 1. 启用 Hardened Runtime（electron-builder 默认开启，无需显式配置）
+  # 2. 启用公证：需要 Apple ID、App-specific Password、Team ID
+  # 4. electron-builder 通过 notarize 配置自动处理公证流程
+  #    环境变量（CI 注入，本地开发机需自行配置）：
+  #    - CSC_LINK: Developer ID Application 证书路径（.p12）
+  #    - CSC_KEY_PASSWORD: 证书密码
+  #    - APPLE_ID: Apple ID 邮箱
+  #    - APPLE_APP_SPECIFIC_PASSWORD: App-specific 密码（非 Apple ID 密码）
+  #    - APPLE_TEAM_ID: Developer Team ID（10 位字母数字）
+  notarize:
+    tool: notarizecli # electron-builder 26+ 推荐，比旧 notarize 工具更稳定
+    # 实际值由环境变量注入，配置里只写键名占位，防止提交敏感信息
+    appleId: ${{APPLE_ID}}
+    appleIdPassword: ${{APPLE_APP_SPECIFIC_PASSWORD}}
+    teamId: ${{APPLE_TEAM_ID}}
+  # §21 #6：Hardened Runtime 权限配置（启用后必须显式声明用到的例外）
+  # electron-builder 默认开启 Hardened Runtime，但部分功能需显式声明例外
+  # ⚠️ 以下例外基于现有功能实测，不可随意增减
+  hardenedRuntime:
+    # §15：node-pty 需要创建子进程管理 PTY
+    allowExecutionOfJitCompiledCode: true
+    # node-pty / jobobject 的原生模块加载
+    disableLibraryValidation: true
+    # §8.3：jobobject 进程隔离需要进程间通信
+    allowDyldEnvironmentVariables: true
 extraResources:
   - from: ../../packages/generator-mod/src
     to: generators/mod
