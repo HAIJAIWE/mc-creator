@@ -1,7 +1,9 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：**§21 #6 Electron 公证与 Hardened Runtime 配置完成**（Electron 44.7.0 范围内，已补 notarizecli + hardenedRuntime 例外），见 §7.22；
+> 最近更新：**SkinPackGenerator 接进通用生成入口**（8 处集成点全补），
+> 并修掉 check-docs 把注释里的引号字符串误数成数组元素的 bug。见 §7.23；
+> §21 #6 Electron 公证与 Hardened Runtime 配置，见 §7.22；
 > 但抓到「查不到证据」≠「证据不存在」—— 预发布标签有 stable/preview **两族**。
 > 并给基岩版本表加了 `VERIFY_VERSIONS=1` 自动巡检。见 §7.21；
 > §5.7 数据包目录层级校验，见 §7.14；
@@ -1616,3 +1618,53 @@ M2 改成未发布版本 `1.18.99` → RED(2)。
 
 > **一条变异「不该红」不等于变异选错了**：先判断实现的语义是否正确，
 > 再决定是改实现还是改变异。本条正是靠这一步避免了误报。
+
+---
+
+## 7.23 生成器接进通用入口要改 8 处，漏一处就静默失效（commit `d8a463c`）
+
+### 起因
+
+补上 SkinPackGenerator 后做 E2E 调查，发现 `window.mcApi.generateFiles({generatorType:'skinpack'})`
+**会失败** —— 生成器本体在 `generator-bedrock` 包，但 core 的 GENERATE_FILES 通道不知道它。
+`kernel-bedrock` 的 `pickGenerator` 能路由到它，但那是**另一条路径**。
+
+### 教训：新增生成器要改的 8 处集成点
+
+| #   | 位置                                                            | 漏掉的后果                        |
+| --- | --------------------------------------------------------------- | --------------------------------- |
+| 1   | `shared/templates/types.ts` GeneratorType 联合                  | 类型系统拒绝该类型                |
+| 2   | `core/orchestrator/orchestrator.ts` SpecType + SPEC_CONFIGS     | AI 编排层无法生成 spec            |
+| 3   | `core/generators/index.ts` createDefaultRegistry                | **通用 generateFiles 通道失败**   |
+| 4   | `shared/templates/index.ts` TEMPLATES_BY_TYPE                   | 模板选择器缺该类型                |
+| 5   | `desktop/shared/ipc/generator-types.ts` GENERATOR_TYPES         | 桌面层类型联合缺项                |
+| 6   | `desktop/shared/generator-descriptors.ts` GENERATOR_DESCRIPTORS | UI 无描述符（编译期对齐检查会红） |
+| 7   | `desktop/.../ipc-client.ts` generateSpec 的 switch              | 预览模板静默漏掉新类型            |
+| 8   | `core/generators/registry.test.ts` 计数断言                     | 测试红（这是好事）                |
+
+> **第 3 处是最容易漏的**：生成器写好了、kernel 能路由到，但通用入口不知道它。
+> 这类缺口**不会报错**，只是该功能在通用通道上静默不可用。
+
+### 顺带修掉 check-docs 的一个真 bug
+
+check-docs 数 `GENERATOR_TYPES` 时**没有剥离注释**，而 generator-types.ts 的注释里
+写着 `与 'skin'（Java 单张 64×64 PNG）是两回事` —— 注释里的 `'skin'` 被正则
+当成数组元素数进去，计数多 1（15 而非 14），进而**误报 README 不一致**。
+
+修法是计数前先 `.replace(/\/\/[^\n]*/g, '')` 剥离行注释。
+
+> **这类 bug 的危险在于它会让正确的代码被报成错的** ——
+> 而人可能会去「修」本来对的 README，把对的改成错的。
+
+### 过程中两处自我纠正
+
+1. contract.test.ts 我先写成 15，跑测试才发现 `LEGACY_GENERATOR_TO_KIND` 是 **14** 个键
+   （原 13 + skinpack）—— 我在注释里写了「13 → 14 → 15」是凭印象编的数列。
+2. README.md 有 4 处「13 种生成器类型」，终端显示乱码导致前两次替换没命中，
+   改用 read 读原文精确替换。
+
+### 变异验证
+
+- 从 createDefaultRegistry 去掉 skinpack 注册 → registry.test.ts RED
+- 从 GENERATOR_TYPES 去掉 skinpack → generator-descriptors.test.ts RED（键集合不一致）
+- 从 TEMPLATES_BY_TYPE 去掉 skinpack → 编译期报错（Record<GeneratorType, ...> 缺键）
