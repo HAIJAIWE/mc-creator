@@ -1,16 +1,15 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：**抓到两处 PaperMC v2 死链**（其中一处烤进生成的部署脚本，
-> 且缺 `-f` 会把错误页写进 jar），以及一处**我自己的自洽性绿**：
-> 把必然 404 的 URL 钉成了「正确行为」。另有「只钉了一半的不变量」
-> 与「子串断言被旁路」两个新病种，见 §7.18；
+> 最近更新：**maven 布局里没有 `latest` 目录** —— metadata 的 `<latest>` 是字段
+> 不是路径段，实测 `fabric-installer/latest/…jar` → 404；以及「实测样本里两个
+> 字段取值相同 → 该类区分逻辑永远测不出来，必须造分叉样本」，见 §7.19；
 > §5.7 数据包目录层级校验，见 §7.14；
 > §5.9 皮肤 UV 布局，见 §7.13；
 > **pack_format 表错位已按 minecraft.wiki 更正**，见 §7.12；
 > §6.4 材质改走官方 Texture Set，见 §7.11；
 > §6.2 基岩导入网关导入前校验落地，见 §7.10；§7.2 代理层上一版是假实现已重写，见 §7.9。
-> 全绿 326/5574。
+> 全绿 327/5598。
 > NeoForge 端到端**本机不可验**（maven.neoforged.net 不通），见 §7.8
 
 > 📄 **设计文档已找到**：`D:\Downloads\MC全链路AI工作台-设计文档-v3.1.md`（931 行）。
@@ -29,7 +28,7 @@
 
 | 门禁                             | 状态      | 实测                                                                |
 | -------------------------------- | --------- | ------------------------------------------------------------------- |
-| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 326 files / 5574 passed + 43 skipped                         |
+| `pnpm -r test`                   | ✅ exit 0 | 18 包/ 327 files / 5598 passed + 45 skipped                         |
 | `pnpm -r typecheck`              | ✅ exit 0 | all 18 packages Done                                                |
 | `pnpm lint`                      | ✅ exit 0 | **0 errors**（45 warnings，不影响退出码）                           |
 | `pnpm format:check`              | ✅ exit 0 | All matched files use Prettier code style                           |
@@ -1293,6 +1292,75 @@ PowerShell 进程传值）是对的，**机制**（`for /f` + `'%%i'` 直拼）�
 
 > 机制被更好的方案取代时，**不要为了让旧断言变绿而退回旧机制**，
 > 也不要直接删断言 —— 要把断言迁移到它当初守护的那个**意图**上。
+
+---
+
+## 7.19 maven 布局里没有 `latest` 目录（commit `3367186`）
+
+### 实测证据
+
+```
+https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar
+  → 404
+https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.1.2/fabric-installer-1.1.2.jar
+  → 200 (212123 bytes)
+```
+
+**根因**：maven 的 `<latest>1.1.2</latest>` 是「最新版本号是多少」这个**字段**，
+不是「存在一个叫 `latest` 的目录」。把字段值当路径段拼进去 = 把元数据语义误当目录名。
+
+> 与 §7.9「按想象造格式」同型：**脑子里那个模型是对的，但那个模型描述的是元数据，
+> 不是文件系统。** 尤其在「版本解析器」这类地方，人脑会自动补上 `latest` 这种
+> 看起来天经地义的路径段，而它恰恰不存在。
+
+### 仓内旁证比外部文档更硬
+
+`scripts/fetch_server_assets.ts` 用的是**显式版本号**
+（`fabric-installer/1.0.1/fabric-installer-1.0.1.jar`，实测仍 200），
+而 `launcher-service.ts` 与 `server-generator.ts` 用的是死链。
+**同一仓一份对两份错** —— 死链是后写的。
+
+> **方法学**：发现可疑 URL 时，先在**仓内**找同类调用。
+> 同一仓里已经有正确写法，说明这不是知识问题而是**疏忽**，定位会快得多，
+> 而且正确解法已经现成。
+
+### 「实测样本相同」会导致某类 bug 测不出来
+
+实测样本里 `<release>` 与 `<latest>` **都是 `1.1.2`**。
+若实现把两者混为一谈（或缺 `<release>` 时回退到 `<latest>`），
+**用这份真实样本永远测不出来** —— 因为它们本来就一样。
+
+所以专门造了分叉样本（`<latest>9.9.9-SNAPSHOT</latest>`）来断言分别取到各自的值。
+
+> **推论**：当两个字段在当前样本里取值相同时，必须**造分叉样本**才能验证区分逻辑。
+> 否则「测试全绿」只是证明了「它们恰好相等」。这与 §7.16 同源：
+> 绿测试可能什么都没验证。
+
+### 别把两个 `latest` 弄混
+
+同一段脚本里同时出现两个 `latest`：
+
+- URL 路径段 `fabric-installer/latest/` → **实测 404，是 bug**
+- Fabric CLI 参数 `-loader latest` → **合法，是「用最新版 loader」的意思**
+
+修前者时很容易顺手把后者也「统一」掉，那是引入新 bug。
+所以专门加断言钉住 `-loader latest` 仍在（变异 M3 验证：改它会红）。
+
+### 又一次「只钉了一半」
+
+生成器原有断言只查 `toContain('maven.fabricmc.net')` + 一段命令文本 ——
+钉了域名没钉版本，死链照样绿。现钉死：必须是 `<数字版本>/<artifact>-<同版本>.jar`
+形态、显式 `not.toContain('fabric-installer/latest/')`、下载必须带失败标志。
+
+### 顺带的阻塞项定性：环境按 SNI 拦截
+
+实测四个 mojang 主机 `piston-meta` / `launchermeta` / `sessionserver` /
+`resources.download.minecraft.net` **TLS 握手直接 EOF**（DNS 通、TCP 443 通、
+SSL 建不起来），而 `libraries.minecraft.net` 与 `textures.minecraft.net` TLS 正常
+（返回 404/400，服务端有响应）。
+
+即本环境**按 SNI 拦截特定主机**，与 §7.9 记录的 `maven.neoforged.net` DNS 污染同类。
+**属环境封锁，不是代码缺陷** —— 明确记录这点，不据此改动任何 mojang 相关实现。
 
 ### §5.4 / §6.3 复核结论：不是缺口
 
