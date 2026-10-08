@@ -8,6 +8,15 @@ import { LEGACY_MANIFEST_PATH, PAPER_MANIFEST_PATH } from './plugin-generator.js
 export interface PluginStructureValidation {
   ok: boolean;
   errors: string[];
+  /**
+   * 不阻断构建的告警（2026-10 新增）。
+   *
+   * 与 `errors` 的区别是**是否已由权威源确认**：
+   * `errors` 里的每一条都对着可查证的规则（如清单缺 `main`、api-version 格式非法）；
+   * `warnings` 收的是「我们无法确认，但产物里写了可能有影响」的情况 ——
+   * 典型是 `folia-supported`（§21 #10 核实结论，见下方第 3 条）。
+   */
+  warnings: string[];
 }
 
 /**
@@ -37,6 +46,7 @@ function readTargetMarker(content: string): 'paper' | 'folia' | 'spigot' | null 
 
 export function validatePluginStructure(files: FileNode[]): PluginStructureValidation {
   const errors: string[] = [];
+  const warnings: string[] = [];
   const byPath = new Map<string, string>();
   for (const f of files) byPath.set(f.path, f.content);
 
@@ -79,9 +89,38 @@ export function validatePluginStructure(files: FileNode[]): PluginStructureValid
     );
   }
 
-  // 3. Folia 硬开关（§7.3）：folia 目标必须声明 folia-supported: true。
-  // 目标来源：清单首行 `# target:` 生成器标记；无标记时，若源码含 Folia
-  // 运行时检测（RegionizedServer）则视为意图上 Folia，同样要求声明。
+  // 3. Folia 声明检查（§7.3）。
+  //
+  // ⚠️ **这一条曾经是「硬失败」，现已降级为告警**（2026-10，§21 #10 核实后）。
+  //
+  // 原实现：工程目标为 Folia 而清单未声明 `folia-supported: true` 即校验失败。
+  // 问题不在于「要不要写这个键」，而在于**我无法从任何可达的权威源确认这个键存在**。
+  //
+  // 核实范围（全部实查，均为「不存在」）：
+  //   - Paper 官方文档 paper-plugins 页        → 无
+  //   - Folia 官方文档                          → 无
+  //   - Paper 源码 org/bukkit/plugin/PluginDescriptionFile.java（plugin.yml 的 22 个
+  //     权威键常量：name/provides/version/main/commands/class-loader-of/depend/
+  //     softdepend/loadbefore/website/description/load/authors/author/contributors/
+  //     default-permission/awareness/api-version/libraries/paper-plugin-loader/
+  //     paper-skip-libraries/permissions/prefix/order）  → 无
+  //   - Paper 源码 io/papermc/paper/plugin/configuration/PluginMeta.java
+  //     （paper-plugin.yml 的模型类，只有 getAPIVersion()） → 无
+  //   - Paper 仓库全树 5520 个文件              → 相关候选均无
+  //   - paper-api jar（26.3-pre-2，2345 class）与 Paper 服务端 jar（26.3-159）
+  //     的 class 常量池                         → 无
+  //   - Folia 仓库（默认分支 ver/26.2.x，仅 71 条，是版本分支，Paper 为上游）
+  //     → 无法 grep
+  //
+  // 与 MEMORY §7.2（velocity `config.json` 造键）、§6.4（MER 贴图）同类：
+  // **凭「大家都这么写」或凭记忆认定一个字段存在，然后拿它当硬门禁。**
+  // 一旦字段不存在，被卡住的是用户的构建，而报错文案还会「自信」地解释原因。
+  //
+  // 为什么**保留**生成但不**保留**门禁：
+  //   - 写进去的成本极低且无害 —— YAML 解析器忽略未知键，Paper/Folia 不会因此报错；
+  //   - 万一该键真实存在（社区广泛使用），写进去是对的；
+  //   - 但在无法确认它被识别之前，**不能拿它否决别人的构建**。
+  // 所以：仍然生成 `folia-supported`（best-effort），缺失时给 warning 而非 error。
   if (paper !== undefined) {
     const marker = readTargetMarker(paper);
     const wantsFolia =
@@ -89,8 +128,15 @@ export function validatePluginStructure(files: FileNode[]): PluginStructureValid
       (marker === null && [...byPath.values()].some((c) => c.includes('RegionizedServer')));
     const declared = (getScalar(paper, 'folia-supported') ?? '').toLowerCase();
     if (wantsFolia && declared !== 'true') {
-      errors.push(
-        'paper-plugin.yml 未声明 folia-supported: true，但工程目标为 Folia（§7.3 硬开关：不声明则无法在 Folia 上运行）',
+      warnings.push(
+        'paper-plugin.yml 未声明 folia-supported: true，但工程目标为 Folia。' +
+          '注意：该键无法从 Paper/Folia 官方文档或源码确认存在（见本文件 §21 #10 核实记录），' +
+          '因此此处只告警不判失败；若你在 Folia 上运行后被拒绝加载，请手动确认该键是否受支持。',
+      );
+    } else if (wantsFolia) {
+      warnings.push(
+        '已声明 folia-supported: true，但该键未经官方源确认（Folia 侧判读逻辑未能在可达源码中定位）。' +
+          '若 Folia 仍拒绝加载该插件，请以其实际报错为准。',
       );
     }
   }
@@ -128,5 +174,5 @@ export function validatePluginStructure(files: FileNode[]): PluginStructureValid
     }
   }
 
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, warnings };
 }

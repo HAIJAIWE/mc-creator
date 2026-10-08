@@ -4,7 +4,10 @@
  * 只做“组装 prompt / 轮次预算 / 修复决策 / 成功判据”四件事：
  * - 无 LLM 调用（模型接入走 §10.0 推理网关，由调用方编排）；
  * - 无 I/O、无跨包依赖（本包禁依赖 generator-plugin，只借鉴其
- *   validatePluginStructure 返回 {ok, errors[]} 的形状作 validate 阶段范本）；
+ *   validatePluginStructure 返回 {ok, errors[], warnings[]} 的形状作 validate
+ *   阶段范本 —— 注意 errors 与 warnings 的区分：errors 每条都对着可查证的规则，
+ *   warnings 收「无法确认但产物里写了可能有影响」的情况，理由见
+ *   generator-plugin/src/validate.ts 第 3 条与 MEMORY §7.2）；
  * - 协作：prompt 的 contextPack 段直接吃 context-pack.ts 的
  *   buildContextPack 输出文本；planFixAttempt 复用 pipeline.ts 的
  *   StageResult 类型与 nextStep 的流转语义（generate→validate→diagnose→fix）；
