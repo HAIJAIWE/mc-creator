@@ -24,6 +24,48 @@
 import type { ModpackSpec } from '@mc-creator/shared';
 import type { MrpackPlan } from './types.js';
 
+/** Modrinth CDN 根（实测可达；形如 /data/<projectId>/versions/<版本段>/<filename>）。 */
+export const MODRINTH_CDN_BASE = 'https://cdn.modrinth.com/data';
+
+/**
+ * RFC 3986 明确不允许出现在 URI path 段里的字符（官方 mrpack 规范：
+ * "URIs MUST NOT contain unencoded spaces or any other illegal characters
+ * according to RFC 3986"）。
+ *
+ * 注意 `%` **不在**这个集合里，且必须刻意排除在编码范围之外 ——
+ * Modrinth API 的 `filename` 字段**可能已经带百分号编码**
+ * （实测 `fabric-api-0.29.5%2B1.17.jar`，即原名里的 `+` 已被编码成 `%2B`）。
+ * 若对这种 filename 调 `encodeURIComponent`，`%2B` 会变成 `%252B`（双重编码），
+ * 反而 404。所以只编码「确定非法」的那批，`%` 序列原样保留。
+ */
+const ILLEGAL_URI_CHARS = /[\s"<>`\\^|{}]/g;
+
+/** 把文件名编码成合法的 URI path 段（保留已有的 `%xx` 编码，不做二次编码）。 */
+export function encodeCdnPathSegment(name: string): string {
+  return name.replace(ILLEGAL_URI_CHARS, (c) => encodeURIComponent(c).replace(/%20/g, '%20'));
+}
+
+/**
+ * 校验一个下载 URI 是否满足官方 mrpack 规范对 `downloads` 的要求。
+ *
+ * 返回错误文案数组（空数组 = 合法）。
+ */
+export function validateDownloadUri(uri: unknown): string[] {
+  const errs: string[] = [];
+  if (typeof uri !== 'string' || uri === '') return ['downloads 元素不是非空字符串'];
+  let u: URL;
+  try {
+    u = new URL(uri);
+  } catch {
+    return [`downloads 元素不是合法 URI: ${uri}`];
+  }
+  if (u.protocol !== 'https:') errs.push(`downloads 必须是 https（规范要求 HTTPS URLs）: ${uri}`);
+  // 解码后再查：未编码的空格在 URL 解析时会被转成 %20，必须看原始串才能发现
+  if (ILLEGAL_URI_CHARS.test(uri)) errs.push(`downloads 含 RFC 3986 非法字符: ${uri}`);
+  if (uri.includes('..')) errs.push(`downloads 含路径穿越片段 '..': ${uri}`);
+  return errs;
+}
+
 /** loader → mrpack dependencies 键名（Modrinth 规范用 fabric-loader/quilt-loader） */
 export function loaderToMrpackKey(loader: string): string {
   switch (loader) {
@@ -80,12 +122,32 @@ export function buildMrpackPlan(spec: ModpackSpec): MrpackPlan {
       if (!hashes.sha512) hashes.sha512 = MISSING_SHA512;
       if (!hashes.sha1) hashes.sha1 = MISSING_SHA1;
     }
-    const downloads =
-      m.downloadUrl && m.downloadUrl.length > 0
-        ? [m.downloadUrl]
-        : [`https://cdn.modrinth.com/data/${m.projectId}/versions/${m.versionId}/${m.fileName}`];
-    if (!m.downloadUrl) {
-      warnings.push(`${m.name} 缺少直链，已按 Modrinth CDN 约定拼接（离线安装可能失败）`);
+    // ⚠️ 优先用 Modrinth **自己给的** files[].url —— 那是权威且已正确编码的地址。
+    // 实测证据：官方 API 文档里 url 的示例版本段是 version_number
+    // （`.../versions/1.0.0/my_file.jar`），而真实响应里 72/72 都是 version_id；
+    // 少数文件（如 fabric-api 0.29.5+1.17）的 url 用的是 version_number，
+    // 此时用 version_id 拼出来的路径 **404**。CDN 只认生成该 url 时用的那个标识，
+    // 而这个标识无法从我们手上仅有的 projectId/versionId 推断出来。
+    // 所以：能拿到直链就用直链，拿不到才退化拼接，并**明确告警**。
+    let downloads: string[];
+    if (m.downloadUrl && m.downloadUrl.length > 0) {
+      downloads = [m.downloadUrl];
+      const bad = validateDownloadUri(m.downloadUrl);
+      if (bad.length > 0) {
+        warnings.push(`${m.name} 的直链不合 mrpack 规范：${bad[0]}`);
+      }
+    } else {
+      const seg = encodeCdnPathSegment(m.fileName);
+      downloads = [`${MODRINTH_CDN_BASE}/${m.projectId}/versions/${m.versionId}/${seg}`];
+      const bad = validateDownloadUri(downloads[0] ?? '');
+      if (bad.length > 0) {
+        warnings.push(`${m.name} 拼接出的下载链接不合法：${bad[0]}`);
+      }
+      warnings.push(
+        `${m.name} 缺少直链，已按 Modrinth CDN 约定拼接。` +
+          `注意：实测部分文件（如 fabric-api 0.29.5+1.17）的 CDN 路径用的是版本号而非 versionId，` +
+          `此时该拼接会 404 —— 离线/离线缓存场景请确保直链可用。`,
+      );
     }
     return {
       path: `mods/${m.fileName}`,
@@ -140,7 +202,17 @@ export function validateModrinthIndex(index: unknown): { ok: boolean; errors: st
       if (!hashes || (typeof hashes.sha512 !== 'string' && typeof hashes.sha1 !== 'string')) {
         errors.push(`files[${i}].hashes 缺少 sha512/sha1`);
       }
-      if (!Array.isArray(fo.downloads)) errors.push(`files[${i}].downloads 缺失`);
+      if (!Array.isArray(fo.downloads)) {
+        errors.push(`files[${i}].downloads 缺失`);
+      } else {
+        // 官方规范对 downloads 的 MUST（此前只查了「是不是数组」，没查内容）：
+        // "An array containing HTTPS URLs ... URIs MUST NOT contain unencoded
+        // spaces or any other illegal characters according to RFC 3986."
+        (fo.downloads as unknown[]).forEach((d, j) => {
+          for (const err of validateDownloadUri(d))
+            errors.push(`files[${i}].downloads[${j}] ${err}`);
+        });
+      }
     });
   }
   const deps = o.dependencies as Record<string, unknown> | undefined;
