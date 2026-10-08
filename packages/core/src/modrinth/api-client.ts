@@ -41,6 +41,83 @@ export interface ModrinthVersion {
   }>;
 }
 
+/**
+ * Modrinth 官方限流（2026-10 实测 + 官方文档核实）：
+ *
+ * - **按 IP 计，当前 300 请求/分钟**，带 token 与否相同
+ * - 响应头给出窗口状态：
+ *   `X-Ratelimit-Limit` / `X-Ratelimit-Remaining` / `X-Ratelimit-Reset`（秒）
+ * - 实测：`x-ratelimit-limit: 300`、`x-ratelimit-remaining` 逐次递减
+ *
+ * ⚠️ 旧实现有个真实缺陷：429 时固定退避 300ms / 600ms，而配额窗口是**一分钟**
+ * ——两次重试必然仍打在耗尽的窗口上，白费 2 次请求，最后还抛出一个看起来像
+ * 「接口坏了」的错误。现在改为尊重 `x-ratelimit-reset`。
+ */
+const RATE_LIMIT_WAIT_CAP_MS = 65_000;
+
+/**
+ * 安全读取响应头。
+ *
+ * `X-Ratelimit-*` 按官方文档是**可选**的（只在 API 网关下发时才带），所以
+ * 「读不到」是正常情况，必须容忍 —— 不能因为缺头就抛错。同时也保证非标准
+ * fetch 实现（测试替身等）不会把整个请求搞崩。
+ */
+function header(res: Response, name: string): string | null {
+  const h = (res as { headers?: { get?: (n: string) => string | null } }).headers;
+  if (h === undefined || typeof h.get !== 'function') return null;
+  try {
+    return h.get(name);
+  } catch {
+    return null;
+  }
+}
+
+/** 从响应头解析「还需等待多久配额才重置」，解析不出来返回 undefined。 */
+function parseRateLimitResetMs(res: Response): number | undefined {
+  const raw = header(res, 'x-ratelimit-reset');
+  if (raw === null) return undefined;
+  const secs = Number.parseInt(raw, 10);
+  if (!Number.isFinite(secs) || secs < 0) return undefined;
+  // 上限保护：绝不让调用方无限期挂起
+  return Math.min(secs * 1000, RATE_LIMIT_WAIT_CAP_MS);
+}
+
+/** 从响应头解析限流窗口状态（用于展示 / 预判），缺失字段为 null。 */
+function parseRateLimit(res: Response): ModrinthRateLimit | null {
+  const num = (name: string): number | null => {
+    const raw = header(res, name);
+    if (raw === null) return null;
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) ? n : null;
+  };
+  const limit = num('x-ratelimit-limit');
+  const remaining = num('x-ratelimit-remaining');
+  const reset = num('x-ratelimit-reset');
+  if (limit === null && remaining === null && reset === null) return null;
+  return { limit, remaining, resetSeconds: reset };
+}
+
+/** Modrinth 限流窗口状态（来自官方 `X-Ratelimit-*` 响应头）。 */
+export interface ModrinthRateLimit {
+  /** 窗口内最大请求数（官方当前为 300/分钟） */
+  limit: number | null;
+  /** 当前窗口剩余请求数 */
+  remaining: number | null;
+  /** 距窗口重置的秒数 */
+  resetSeconds: number | null;
+}
+
+/** 被限流（HTTP 429）且已等到窗口重置后仍失败。 */
+export class ModrinthRateLimitError extends Error {
+  override readonly name = 'ModrinthRateLimitError';
+  /** 官方给出的重置秒数（可能为 null 表示上游没给）。 */
+  readonly resetSeconds: number | null;
+  constructor(message: string, resetSeconds: number | null) {
+    super(message);
+    this.resetSeconds = resetSeconds;
+  }
+}
+
 export class ModrinthApiClient {
   private readonly baseUrl = 'https://api.modrinth.com/v2';
   private readonly userAgent = 'mc-creator/0.0.0 (https://github.com/mc-creator)';
@@ -73,30 +150,66 @@ export class ModrinthApiClient {
    * C-1 修复：带超时 + 重试的 fetch（网络错误 / 5xx / 429 重试，最多 2 次；4xx 直接抛错）。
    * 注意：4xx 错误用 NonRetryableError 包装并立刻抛出，避免被外层 catch 捕获后误判为可重试。
    */
+  private lastRateLimit: ModrinthRateLimit | null = null;
+
+  /**
+   * 最近一次响应携带的限流窗口状态（官方 `X-Ratelimit-*` 头）。
+   *
+   * 供上层在批量解析前预判「还够不够用」，以及在 UI 上说明为何变慢。
+   * 没有该响应头时为 null —— 不猜、不填默认值。
+   */
+  get rateLimit(): ModrinthRateLimit | null {
+    return this.lastRateLimit;
+  }
+
   private async fetchJson<T>(url: string): Promise<T> {
     let lastErr: unknown;
+    // 已按官方 x-ratelimit-reset 等过一次之后就不再等第二次：
+    // 窗口重置后本就该成功，仍失败说明不是限流问题，继续等只是白等。
+    let honoredRateLimitWait = false;
     for (let attempt = 0; attempt <= 2; attempt++) {
+      let waitMs = 300 * (attempt + 1);
       try {
         const res = await fetch(url, {
           headers: { 'User-Agent': this.userAgent },
           signal: AbortSignal.timeout(this.timeoutMs),
         });
+        const rl = parseRateLimit(res);
+        if (rl !== null) this.lastRateLimit = rl;
         if (res.ok) return (await res.json()) as T;
         if (res.status < 500 && res.status !== 429) {
           throw new ModrinthApiClient.NonRetryableError(
             `Modrinth API ${res.status} ${res.statusText}: ${url}`,
           );
         }
-        lastErr = new Error(`Modrinth API ${res.status} ${res.statusText}: ${url}`);
+        if (res.status === 429 && !honoredRateLimitWait) {
+          const resetMs = parseRateLimitResetMs(res);
+          if (resetMs !== undefined) {
+            honoredRateLimitWait = true;
+            waitMs = resetMs;
+          }
+        }
+        lastErr =
+          res.status === 429
+            ? new ModrinthRateLimitError(
+                `Modrinth API 429 限流（官方配额按 IP 计，剩余 ` +
+                  `${header(res, 'x-ratelimit-remaining') ?? '未知'}，` +
+                  `约 ${header(res, 'x-ratelimit-reset') ?? '?'} 秒后重置）: ${url}`,
+                parseRateLimit(res)?.resetSeconds ?? null,
+              )
+            : new Error(`Modrinth API ${res.status} ${res.statusText}: ${url}`);
       } catch (err) {
         if (err instanceof ModrinthApiClient.NonRetryableError) throw err; // 4xx 直接抛错，不重试
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (err instanceof ModrinthRateLimitError) {
+          // 保留为 lastErr 继续按 waitMs 退避；到最后一轮由循环外抛出
+          lastErr = err;
+        } else if (err instanceof Error && err.name === 'AbortError') {
           lastErr = new Error(`Modrinth API 请求超时（${this.timeoutMs}ms）: ${url}`);
         } else {
           lastErr = err;
         }
       }
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      if (attempt < 2) await new Promise((r) => setTimeout(r, waitMs));
     }
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
   }
