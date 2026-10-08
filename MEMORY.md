@@ -1,7 +1,7 @@
 # MEMORY.md · 进度与踩坑的唯一记忆入口
 
 > 本文件是本仓的**唯一记忆入口**。接手前先读这里，不要靠猜。
-> 最近更新：**§21 第三、七条已核实**（npm registry 实抓，16 项全安全，表值无需改）；
+> 最近更新：**§21 #6 Electron 公证与 Hardened Runtime 配置完成**（Electron 44.7.0 范围内，已补 notarizecli + hardenedRuntime 例外），见 §7.22；
 > 但抓到「查不到证据」≠「证据不存在」—— 预发布标签有 stable/preview **两族**。
 > 并给基岩版本表加了 `VERIFY_VERSIONS=1` 自动巡检。见 §7.21；
 > §5.7 数据包目录层级校验，见 §7.14；
