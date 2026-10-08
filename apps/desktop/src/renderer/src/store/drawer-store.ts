@@ -4,14 +4,21 @@ import { useNodeGraphStore } from './node-graph-store.js';
 import { getFieldSchemas } from '../domain/fieldSchemas.js';
 import { validateIdField } from '../domain/idRules.js';
 
+/** 历史记录项 */
+interface HistoryEntry {
+  draft: NodeData;
+  timestamp: number;
+}
+
 /**
  * 抽屉状态管理（草稿模式，契约 §4）。
  *
  * 数据流：
  * - openDrawer(nodeId) → 从 node-graph-store 深拷贝 node.data 到 draft
- * - updateField(key, value) → 修改 draft，标记 dirty
+ * - updateField(key, value) → 修改 draft，标记 dirty，记录历史
  * - saveDraft() → 校验通过后写回 node-graph-store.updateNode + commit + 关闭
  * - cancelDraft() → 丢弃 draft + 关闭
+ * - undo() / redo() → 撤销/重做草稿修改
  *
  * P0 dogfood 修复：saveDraft 增加字段级校验，有错误时拒绝保存并更新 errors。
  *
@@ -23,12 +30,26 @@ interface DrawerState {
   draft: NodeData | null;
   dirty: boolean;
   errors: Record<string, string>;
+  /** 历史栈（用于撤销/重做） */
+  history: HistoryEntry[];
+  /** 当前历史指针索引 */
+  historyIndex: number;
+  /** 最大历史记录数 */
+  maxHistorySize: number;
 
   openDrawer: (nodeId: string) => void;
   closeDrawer: () => void;
   updateField: (key: string, value: unknown) => void;
   saveDraft: () => boolean;
   cancelDraft: () => void;
+  /** 撤销上一步修改 */
+  undo: () => void;
+  /** 重做下一步修改 */
+  redo: () => void;
+  /** 是否可以撤销 */
+  canUndo: () => boolean;
+  /** 是否可以重做 */
+  canRedo: () => boolean;
 }
 
 /**
@@ -71,31 +92,61 @@ function validateDraft(draft: NodeData): Record<string, string> {
   return errors;
 }
 
+/** 将当前 draft 推入历史栈 */
+function pushHistory(get: () => DrawerState, set: (partial: Partial<DrawerState>) => void) {
+  const { draft, history, historyIndex, maxHistorySize } = get();
+  if (!draft) return;
+
+  // 截断当前指针之后的历史（重做栈）
+  const newHistory = history.slice(0, historyIndex + 1);
+  // 添加新记录
+  newHistory.push({ draft: structuredClone(draft), timestamp: Date.now() });
+  // 限制历史栈大小
+  if (newHistory.length > maxHistorySize) {
+    newHistory.shift();
+  }
+  set({ history: newHistory, historyIndex: newHistory.length - 1 });
+}
+
 export const useDrawerStore = createWithEqualityFn<DrawerState>((set, get) => ({
   open: false,
   nodeId: null,
   draft: null,
   dirty: false,
   errors: {},
+  history: [],
+  historyIndex: -1,
+  maxHistorySize: 50,
 
   openDrawer: (nodeId) => {
     const node = useNodeGraphStore.getState().graph.nodes.find((n) => n.id === nodeId);
     if (!node) return;
+    const initialDraft = structuredClone(node.data);
     set({
       open: true,
       nodeId,
-      draft: structuredClone(node.data),
+      draft: initialDraft,
       dirty: false,
       errors: {},
+      history: [{ draft: initialDraft, timestamp: Date.now() }],
+      historyIndex: 0,
     });
   },
 
   closeDrawer: () => {
-    set({ open: false, nodeId: null, draft: null, dirty: false, errors: {} });
+    set({
+      open: false,
+      nodeId: null,
+      draft: null,
+      dirty: false,
+      errors: {},
+      history: [],
+      historyIndex: -1,
+    });
   },
 
   updateField: (key, value) => {
-    const draft = get().draft;
+    const { draft } = get();
     if (!draft) return;
     let next = { ...draft, [key]: value } as NodeData;
     // U-3 修复：variable 节点切换 varType 时同步转换 value 类型，
@@ -129,6 +180,8 @@ export const useDrawerStore = createWithEqualityFn<DrawerState>((set, get) => ({
       // 避免用户修正字段后仍显示过期的 saveDraft 校验错误。
       errors: {},
     });
+    // 记录历史（在 state 更新后推入，避免闭包陷阱）
+    pushHistory(get, set);
   },
 
   /**
@@ -148,11 +201,57 @@ export const useDrawerStore = createWithEqualityFn<DrawerState>((set, get) => ({
 
     useNodeGraphStore.getState().commit();
     useNodeGraphStore.getState().updateNode(nodeId, draft);
-    set({ open: false, nodeId: null, draft: null, dirty: false, errors: {} });
+    set({ open: false, nodeId: null, draft: null, dirty: false, errors: {}, history: [], historyIndex: -1 });
     return true;
   },
 
   cancelDraft: () => {
-    set({ open: false, nodeId: null, draft: null, dirty: false, errors: {} });
+    set({
+      open: false,
+      nodeId: null,
+      draft: null,
+      dirty: false,
+      errors: {},
+      history: [],
+      historyIndex: -1,
+    });
+  },
+
+  undo: () => {
+    const { history, historyIndex, draft } = get();
+    if (historyIndex <= 0 || !draft) return;
+
+    const newIndex = historyIndex - 1;
+    const prevDraft = structuredClone(history[newIndex].draft);
+    set({
+      draft: prevDraft,
+      historyIndex: newIndex,
+      dirty: true,
+      errors: {},
+    });
+  },
+
+  redo: () => {
+    const { history, historyIndex, draft } = get();
+    if (historyIndex >= history.length - 1 || !draft) return;
+
+    const newIndex = historyIndex + 1;
+    const nextDraft = structuredClone(history[newIndex].draft);
+    set({
+      draft: nextDraft,
+      historyIndex: newIndex,
+      dirty: true,
+      errors: {},
+    });
+  },
+
+  canUndo: () => {
+    const { historyIndex } = get();
+    return historyIndex > 0;
+  },
+
+  canRedo: () => {
+    const { history, historyIndex } = get();
+    return historyIndex < history.length - 1;
   },
 }));

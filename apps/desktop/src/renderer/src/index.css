@@ -274,3 +274,40 @@ body {
   height: 100%;
   display: block;
 }
+
+/* ---- 抽屉/折叠动画 ---- */
+@keyframes mc-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.animate-mc-drawer-in {
+  animation: mc-drawer-in 0.18s var(--mc-ease) forwards;
+}
+
+@keyframes mc-collapse-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-mc-collapse-in {
+  animation: mc-collapse-in 0.12s var(--mc-ease) forwards;
+}
+
+/* Details/summary 自定义展开箭头 */
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}

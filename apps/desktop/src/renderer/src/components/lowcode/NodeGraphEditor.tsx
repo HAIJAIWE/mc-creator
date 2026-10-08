@@ -171,6 +171,8 @@ interface NodeGraphEditorProps {
   className?: string;
   /** 双击节点回调（如代码节点打开编辑器） */
   onNodeDoubleClick?: (nodeId: string, kind: NodeKind) => void;
+  /** 外部调用的聚焦节点回调，参数为 focusNode 函数 */
+  onFocusNode?: (focusNode: (nodeId: string) => void) => void;
 }
 
 export function NodeGraphEditor({
@@ -178,9 +180,37 @@ export function NodeGraphEditor({
   showMiniMap = true,
   className,
   onNodeDoubleClick,
+  /** 外部调用的聚焦节点回调 */
+  onFocusNode,
 }: NodeGraphEditorProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const rfInstanceRef = useRef<ReactFlowInstance | null>(null);
+
+  // 暴露聚焦节点方法供外部调用
+  const focusNode = useCallback(
+    (nodeId: string) => {
+      if (rfInstanceRef.current) {
+        rfInstanceRef.current.fitView({
+          nodes: [nodeId],
+          duration: 300,
+          padding: 0.2,
+        });
+        // 同时选中节点
+        const node = rfInstanceRef.current.getNodes().find((n) => n.id === nodeId);
+        if (node) {
+          rfInstanceRef.current.setNodes((nds) => nds.map((n) => (n.id === nodeId ? { ...n, selected: true } : { ...n, selected: false })));
+        }
+      }
+    },
+    [],
+  );
+
+  // 将 focusNode 暴露给外部（通过 ref 或回调）
+  useEffect(() => {
+    if (onFocusNode) {
+      onFocusNode(focusNode);
+    }
+  }, [onFocusNode, focusNode]);
 
   const graph = useNodeGraphStore((s) => s.graph);
   const addNode = useNodeGraphStore((s) => s.addNode);

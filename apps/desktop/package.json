@@ -22,6 +22,13 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:install": "playwright install"
   },
+  "vitest": {
+    "setupFiles": [
+      "src/test/setup.ts"
+    ],
+    "environment": "jsdom",
+    "globals": true
+  },
   "dependencies": {
     "@mc-creator/agent": "workspace:*",
     "@mc-creator/contract": "workspace:*",
@@ -60,6 +67,7 @@
     "@playwright/test": "^1.55.0",
     "@testing-library/jest-dom": "^6.4.0",
     "@testing-library/react": "^15.0.0",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^26.1.1",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",

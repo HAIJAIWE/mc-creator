@@ -3,7 +3,7 @@ import type { NodeData, NodeGraph } from '@mc-creator/shared';
 import { useDrawerStore } from '../../../../store/drawer-store.js';
 import { useNodeGraphStore } from '../../../../store/node-graph-store.js';
 import { getFieldSchemas } from '../../../../domain/fieldSchemas.js';
-import type { FieldSchema } from './editors/types.js';
+import type { FieldSchema, FieldGroup } from './editors/types.js';
 import { NumberStepperEditor } from './editors/NumberStepperEditor.js';
 import { DropdownEditor } from './editors/DropdownEditor.js';
 import { SegmentedEditor } from './editors/SegmentedEditor.js';
@@ -19,6 +19,10 @@ import { FieldLabel } from './FieldLabel.js';
 import { getTooltip } from '../../../../domain/fieldTooltips.js';
 import { ErrorRecovery } from './ErrorRecovery.js';
 import { getErrorSuggestion, getFixLabel } from './ErrorRecovery.utils.js';
+import { FieldGroup } from './FieldGroup.js';
+
+/** 分组顺序：基础信息 -> 外观 -> 行为 -> 高级 */
+const GROUP_ORDER: FieldGroup[] = ['basic', 'appearance', 'behavior', 'advanced'];
 
 /**
  * 字段级校验：返回错误文字或 undefined。
@@ -196,7 +200,8 @@ function FieldRow({ field, draft, updateField, graph, errors }: FieldRowProps) {
   const onChange = (v: unknown) => {
     updateField(field.key, coerceBooleanValue(field, v));
   };
-  const tooltip = getTooltip(draft.kind, field.key);
+  // 优先使用 schema.description，其次 fallback 到 domain/fieldTooltips.ts
+  const tooltip = getTooltip(draft.kind, field.key, field.description);
   const error = errors[field.key];
   const suggestion = getErrorSuggestion(field, error, value);
   const fixLabel = getFixLabel(field, error);
@@ -251,21 +256,48 @@ function NodeDetailFormComponent() {
   if (!draft) return null;
 
   const fields = getFieldSchemas(draft.kind);
+  const visibleFields = fields.filter((f) => shouldShow(f, draft));
+
+  // 按分组聚合字段
+  const fieldsByGroup = useMemo(() => {
+    const groups: Record<string, FieldSchema[]> = {};
+    for (const f of visibleFields) {
+      const g = f.group ?? 'basic';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(f);
+    }
+    return groups;
+  }, [visibleFields]);
+
+  // 计算每个分组是否有错误
+  const groupHasError = useMemo(() => {
+    const result: Record<string, boolean> = {};
+    for (const [group, groupFields] of Object.entries(fieldsByGroup)) {
+      result[group] = groupFields.some((f) => mergedErrors[f.key]);
+    }
+    return result;
+  }, [fieldsByGroup, mergedErrors]);
 
   return (
-    <div className="space-y-2">
-      {fields
-        .filter((f) => shouldShow(f, draft))
-        .map((field) => (
-          <FieldRow
-            key={field.key}
-            field={field}
-            draft={draft}
-            updateField={updateField}
-            graph={graph}
-            errors={mergedErrors}
-          />
-        ))}
+    <div className="space-y-1">
+      {GROUP_ORDER.map((group) => {
+        const groupFields = fieldsByGroup[group];
+        if (!groupFields || groupFields.length === 0) return null;
+        return (
+          <FieldGroup key={group} group={group} hasError={groupHasError[group]}>
+            {groupFields.map((field) => (
+              <FieldRow
+                key={field.key}
+                field={field}
+                draft={draft}
+                updateField={updateField}
+                graph={graph}
+                errors={mergedErrors}
+              />
+            ))}
+          </FieldGroup>
+        );
+      })}
     </div>
   );
 }

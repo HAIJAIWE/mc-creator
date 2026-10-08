@@ -7,6 +7,7 @@ import { NodeDetailDrawer } from './nodes/drawer/NodeDetailDrawer.js';
 import { CodeNodeEditor } from './CodeNodeEditor';
 import { ModeSwitcher } from './ModeSwitcher';
 import { GeneratedCodePreview } from './GeneratedCodePreview.js';
+import { OutlinePanel } from './outline';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 import { useEditorModeStore } from '../../store/editor-mode-store.js';
 import { downloadGraphAsJson } from '../../lib/nodeGraphSerializer.js';
@@ -96,8 +97,14 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
   const [paletteWidth] = useState(220);
   /** 预览面板宽度（右侧第 4 栏，仅 showPreview=true 时显示） */
   const [previewWidth] = useState(420);
+  /** 大纲面板宽度 */
+  const [outlineWidth] = useState(260);
   /** 是否显示生成代码实时预览面板 */
   const [showPreview, setShowPreview] = useState(false);
+  /** 是否显示大纲面板 */
+  const [showOutline, setShowOutline] = useState(true);
+  /** 画布聚焦节点函数（由 NodeGraphEditor 提供） */
+  const focusNodeRef = useRef<(nodeId: string) => void>(() => {});
   /** 隐藏的文件输入元素 ref（用于导入节点图 JSON） */
   const importInputRef = useRef<HTMLInputElement>(null);
   /** 是否展开「最近打开」下拉 */
@@ -689,6 +696,22 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
             👁 预览
           </button>
 
+          {/* 大纲面板切换按钮 */}
+          <button
+            type="button"
+            onClick={() => setShowOutline((v) => !v)}
+            aria-label={showOutline ? '隐藏大纲面板' : '显示大纲面板'}
+            aria-pressed={showOutline}
+            title={showOutline ? '隐藏大纲面板' : '显示大纲面板（节点树、搜索、定位）'}
+            className={`rounded-mc px-2 py-1 text-[11px] transition-colors ${
+              showOutline
+                ? 'bg-mc-accent/20 text-mc-accent'
+                : 'text-mc-mute hover:bg-mc-surface-2 hover:text-mc-text'
+            }`}
+          >
+            📋 大纲
+          </button>
+
           {/* 编译状态徽章 */}
           {compileStatus && (
             <span
@@ -748,7 +771,13 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
           {editingSubgraphId ? (
             <SubgraphWorkspace />
           ) : (
-            <NodeGraphEditor readOnly={readOnly} onNodeDoubleClick={handleNodeDoubleClick} />
+            <NodeGraphEditor
+              readOnly={readOnly}
+              onNodeDoubleClick={handleNodeDoubleClick}
+              onFocusNode={(fn) => {
+                focusNodeRef.current = fn;
+              }}
+            />
           )}
         </div>
 
@@ -777,6 +806,24 @@ export function LowcodeWorkspace({ readOnly = false }: LowcodeWorkspaceProps) {
               ▸
             </button>
           </aside>
+        )}
+
+        {/* 大纲面板 */}
+        {!readOnly && showOutline && (
+          <div
+            style={{ width: outlineWidth }}
+            className="shrink-0 border-l border-mc-border"
+            role="region"
+            aria-label="大纲面板"
+          >
+            <OutlinePanel
+              compileResult={compileResult}
+              onFocusNode={(nodeId) => {
+                focusNodeRef.current(nodeId);
+              }}
+              onRenameNode={() => {}}
+            />
+          </div>
         )}
 
         {/* 最右侧：生成代码实时预览面板（可切换显隐） */}

@@ -20,8 +20,10 @@ interface NodeDetailDrawerProps {
  * - 草稿模式：openDrawer 时深拷贝 data 到 draft，保存写回 store，取消丢弃
  * - schema 驱动表单：委托 NodeDetailForm 渲染
  * - 编译消息：显示与当前节点相关的错误/警告
+ * - 撤销/重做：支持表单修改的历史记录回退
  * - MC 风格：3D 凸起边框 + 降饱和配色 + 像素字体
  * - Esc 键关闭（触发 cancelDraft）
+ * - Ctrl+Z / Ctrl+Y 撤销/重做
  */
 function NodeDetailDrawerComponent({ compileMessages }: NodeDetailDrawerProps) {
   const open = useDrawerStore((s) => s.open);
@@ -29,6 +31,10 @@ function NodeDetailDrawerComponent({ compileMessages }: NodeDetailDrawerProps) {
   const dirty = useDrawerStore((s) => s.dirty);
   const saveDraft = useDrawerStore((s) => s.saveDraft);
   const cancelDraft = useDrawerStore((s) => s.cancelDraft);
+  const undo = useDrawerStore((s) => s.undo);
+  const redo = useDrawerStore((s) => s.redo);
+  const canUndo = useDrawerStore((s) => s.canUndo);
+  const canRedo = useDrawerStore((s) => s.canRedo);
 
   // P0 dogfood 修复：遮罩点击 / Esc / 关闭按钮时若有未保存修改，弹确认而非直接丢弃
   // Minor 修复：统一三处关闭入口（遮罩、Esc、× 按钮）都走 dirty 确认逻辑
@@ -40,21 +46,41 @@ function NodeDetailDrawerComponent({ compileMessages }: NodeDetailDrawerProps) {
     cancelDraft();
   }, [dirty, cancelDraft]);
 
-  // Esc 键关闭（走 handleClose 含 dirty 确认）
+  // 键盘快捷键：Esc 关闭，Ctrl+Z 撤销，Ctrl+Y/Ctrl+Shift+Z 重做
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose();
+      if (e.key === 'Escape') {
+        handleClose();
+        return;
+      }
+      // Ctrl+Z 撤销
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo()) undo();
+        return;
+      }
+      // Ctrl+Y 或 Ctrl+Shift+Z 重做
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key === 'y') ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')
+      ) {
+        e.preventDefault();
+        if (canRedo()) redo();
+        return;
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, handleClose]);
+  }, [open, handleClose, canUndo, canRedo, undo, redo]);
 
   // P2 修复：所有 hooks 必须在条件返回之前调用（Rules of Hooks），
   // 否则关闭抽屉时 useCallback 被跳过，导致 "Rendered fewer hooks than expected"。
   if (!open || !nodeId) return null;
 
   const nodeMessages = compileMessages.filter((m) => m.nodeId === nodeId);
+  const undoEnabled = canUndo();
+  const redoEnabled = canRedo();
 
   return (
     <>
@@ -71,6 +97,26 @@ function NodeDetailDrawerComponent({ compileMessages }: NodeDetailDrawerProps) {
           <h2 className="text-[12px] font-medium text-mc-text">节点详情</h2>
           <div className="flex items-center gap-2">
             {dirty && <span className="text-[10px] text-yellow-400">未保存</span>}
+            <button
+              type="button"
+              aria-label="撤销 (Ctrl+Z)"
+              onClick={undo}
+              disabled={!undoEnabled}
+              className="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2 text-[11px] hover:bg-mc-btn-hover disabled:opacity-40 disabled:cursor-not-allowed"
+              title="撤销 (Ctrl+Z)"
+            >
+              ↶
+            </button>
+            <button
+              type="button"
+              aria-label="重做 (Ctrl+Y)"
+              onClick={redo}
+              disabled={!redoEnabled}
+              className="border border-t-white border-l-white border-b-black border-r-black bg-mc-btn px-2 text-[11px] hover:bg-mc-btn-hover disabled:opacity-40 disabled:cursor-not-allowed"
+              title="重做 (Ctrl+Y)"
+            >
+              ↷
+            </button>
             <button
               type="button"
               aria-label="关闭"

@@ -41,6 +41,9 @@ export interface ListItemSchema {
   patternMessage?: string;
 }
 
+/** 字段分组枚举（用于属性面板折叠分组） */
+export type FieldGroup = 'basic' | 'appearance' | 'behavior' | 'advanced';
+
 /** 字段 schema（驱动 NodeDetailForm 渲染） */
 export interface FieldSchema {
   key: string;
@@ -67,4 +70,8 @@ export interface FieldSchema {
   patternMessage?: string;
   /** list 编辑器用：每行子字段定义 */
   listItemSchema?: ListItemSchema[];
+  /** 字段分组：用于属性面板折叠分组（basic/appearance/behavior/advanced） */
+  group?: FieldGroup;
+  /** 字段说明文本（用于 tooltip），优先级高于 domain/fieldTooltips.ts */
+  description?: string;
 }
