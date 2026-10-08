@@ -53,6 +53,7 @@ import {
   BehaviorEntityGenerator,
   BehaviorItemGenerator,
   BehaviorPackGenerator,
+  SkinPackGenerator,
 } from '@mc-creator/generator-bedrock';
 import type { FileNode, GeneratorContext } from '@mc-creator/shared';
 
@@ -85,8 +86,14 @@ export interface ConfirmRequest {
   risk: 'write' | 'execute';
 }
 
-/** generate_content 支持的产物种类（§6.3 Add-on / §6.4 材质与皮肤）。 */
-const GENERATE_KINDS = ['addon', 'skinpack', 'texturepack'] as const;
+/**
+ * generate_content 支持的产物种类（§6.3 Add-on / §6.4 材质与皮肤）。
+ *
+ * `entity` 对应 BehaviorEntityGenerator：它在 contract 里映射为 `addon` kind
+ * （与 behavior_pack 同类），但**必须**在这里单列 —— 否则该生成器会成为
+ * 无人能调用的孤儿（2026-10 补 skinpack 独立生成器时才暴露出来）。
+ */
+const GENERATE_KINDS = ['addon', 'skinpack', 'texturepack', 'entity'] as const;
 type GenerateKind = (typeof GENERATE_KINDS)[number];
 
 /** 带分类的任务内部异常：抛出后由 result() 统一转 TaskResult.error。 */
@@ -264,18 +271,21 @@ function riskOf(kind: string): 'write' | 'execute' {
  * kind → 生成器（§6.3/§6.4）。
  * - addon → BehaviorPackGenerator：产出 manifest + entities/recipes/loot_tables，行为包主战场（§11阶梯 1）；
  * - texturepack → BehaviorItemGenerator：产出 items/ + textures/ + lang，材质与自定义物品；
- * - skinpack → BehaviorEntityGenerator：**兜底**。仓内暂无独立 skinpack 生成器，
- *   基岩 skinpack 需要 skins.json + Persona/HD 字段（§6.4，且§21 待核实），
- *   故此处退到产出 BP+RP 成对的自定义实体包，由上层按 skinpack 语义二次封装。
+ * - skinpack → SkinPackGenerator：**独立生成器**（2026-10 补上，§6.4 / §21 #1）。
+ *   此前此处**兜底到 BehaviorEntityGenerator**，产出的是 BP+RP 成对的自定义实体包，
+ *   并不是皮肤包 —— 也就是说此前生成「皮肤包」得到的东西根本不含 skins.json。
+ *   现按官方 schema 产出 manifest(skin_pack) + skins.json + textures/*.png + texts/*.lang，
+ *   并落实官方 CSPJ101/103/105/106/107/110/111/113/115/116 各条强制规则。
+ *   HD / Persona 字段**刻意不做**（官方 CSPJ108「Creator Only」限制，公开文档未给字段定义）。
  */
-/** 三个基岩生成器共用的最小面（GeneratorContext 由调用方按 spec 现构造）。 */
+/** 基岩各生成器共用的最小面（GeneratorContext 由调用方按 spec 现构造）。 */
 interface MinimalBedrockGenerator {
   generate(ctx: GeneratorContext): Promise<{ files: FileNode[]; warnings: string[] }>;
 }
 
 function pickGenerator(kind: GenerateKind): {
   generator: MinimalBedrockGenerator;
-  generatorName: 'behavior_pack' | 'behavior_item' | 'behavior_entity';
+  generatorName: 'behavior_pack' | 'behavior_item' | 'behavior_entity' | 'skinpack';
   note: string | undefined;
 } {
   switch (kind) {
@@ -293,9 +303,15 @@ function pickGenerator(kind: GenerateKind): {
       };
     case 'skinpack':
       return {
+        generator: new SkinPackGenerator(),
+        generatorName: 'skinpack',
+        note: undefined,
+      };
+    case 'entity':
+      return {
         generator: new BehaviorEntityGenerator(),
         generatorName: 'behavior_entity',
-        note: 'skinpack 当前兜底到 behavior_entity 生成器：仓内暂无独立 skinpack 生成器（skins.json + Persona/HD 字段见 §6.4 / §21）',
+        note: undefined,
       };
   }
 }
@@ -496,6 +512,29 @@ export class BedrockKernel implements KernelContract {
           lang: { zh_CN: { 'item.my_pack:ruby_sword': '红宝石剑' } },
         };
       case 'skinpack':
+        // 这段此前返回的是**实体包形状**（my_beast）—— skinpack 兜底到
+        // behavior_entity 时代的遗留。补上独立 SkinPackGenerator 后必须改成
+        // 真正的 SkinPackSpec 形状，否则「specShape 示例」会把用户/智能体
+        // 引到错误的 spec 上 —— 而这个示例的唯一用途就是「不臆造 spec」。
+        return {
+          serializeName: 'my_pack',
+          packName: 'My Skin Pack',
+          description: '基岩皮肤包示例',
+          packFormat: 2,
+          textureSize: 64,
+          skins: [
+            {
+              skinKey: 'Knight',
+              displayName: '骑士铠甲',
+              geometry: 'custom',
+              primaryColor: '#334455',
+            },
+          ],
+          lang: { zh_CN: { Knight: '骑士铠甲' } },
+        };
+      case 'entity':
+        // behavior_entity 曾只能经由 skinpack 兜底触达；skinpack 独立后
+        // 若不补这个 kind，BehaviorEntityGenerator 会变成**无人能调用的孤儿**。
         return {
           ...base,
           entities: [

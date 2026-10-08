@@ -188,6 +188,11 @@ export const LEGACY_GENERATOR_TO_KIND = {
   enchantment: 'datapack',
   behavior_item: 'addon',
   behavior_entity: 'addon',
+  // §6.4 skinpack 此前没有独立生成器（kernel 侧兜底到 behavior_entity），
+  // 2026-10 补上 SkinPackGenerator 后在此登记为独立 kind。
+  // 它是 'skinpack' 而非 'addon'：contract 的 ALL_KINDS 里 skinpack 是单独一类
+  // （skin pack 的 manifest 模块类型是 skin_pack，与 add-on 的 resources/data 不同）。
+  skinpack: 'skinpack',
 } as const satisfies Record<string, ContentKind>;
 
 /** MCP 权限分级（§10.6）。R=只读免确认 / W=写实例可配置免确认 / X=执行须弹窗。 */

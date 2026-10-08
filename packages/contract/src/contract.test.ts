@@ -81,11 +81,17 @@ describe('contract §3 薄契约', () => {
     expect(bedrock).not.toContain('server-plugin');
   });
 
-  it('现有 13 生成器全部映射到 ContentKind（改造保留依据）', () => {
-    expect(Object.keys(LEGACY_GENERATOR_TO_KIND)).toHaveLength(13);
+  it('现有 14 生成器全部映射到 ContentKind（改造保留依据）', () => {
+    // 13 → 14：2026-10 补上 SkinPackGenerator 后在 LEGACY_GENERATOR_TO_KIND
+    // 登记了第 14 个条目 `skinpack`。这条断言的作用是「新增生成器必须在此登记」，
+    // 所以数量是**字面量**（改它等于显式声明「我又加了一个」）。
+    expect(Object.keys(LEGACY_GENERATOR_TO_KIND)).toHaveLength(14);
     for (const kind of Object.values(LEGACY_GENERATOR_TO_KIND)) {
       expect(EXPECTED_34).toContain(kind);
     }
+    // skinpack 映射到自己的 kind，不能并进 'addon' ——
+    // 皮肤包的 manifest 模块类型是 skin_pack，与 add-on 的 resources/data 不同。
+    expect(LEGACY_GENERATOR_TO_KIND.skinpack).toBe('skinpack');
   });
 
   it('MCP 工具权限分级 R/W/X 完整（§10.6）', () => {

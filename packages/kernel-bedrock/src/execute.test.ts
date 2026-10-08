@@ -106,6 +106,15 @@ const ITEM_SPEC = {
   lang: {},
 };
 
+/**
+ * 自定义实体包 spec。
+ *
+ * 原先它只被「skinpack 兜底到 behavior_entity」那条用例使用；该兜底在
+ * 2026-10 补上 SkinPackGenerator 后已移除。**不直接删掉这个 fixture** ——
+ * 它是 `behavior_entity` 生成器在 kernel 层的唯一真实调用样例，删了会让
+ * 「BehaviorEntityGenerator 仍能被 kernel 正确调度」这件事失去覆盖。
+ * 故保留，并新增一条用例直接测它（见下方「behavior_entity 仍可被调度」）。
+ */
 const ENTITY_SPEC = {
   packId: 'entity_pack',
   packName: 'Entity Pack',
@@ -254,23 +263,93 @@ describe('BedrockKernel generate_content 真实现', () => {
     expect((result.data as { generator: string }).generator).toBe('behavior_item');
   });
 
-  it('skinpack → 兜底 BehaviorEntityGenerator 且data.note 说明原因', async () => {
+  it('skinpack → 走 SkinPackGenerator（不再兜底到 behavior_entity）', async () => {
+    // 这条断言原来钉的是**旧兜底行为**：「skinpack 退到 behavior_entity，
+    // 产出一个不含 skins.json 的自定义实体包」。2026-10 补上 SkinPackGenerator
+    // 后该兜底被移除，故改钉新行为 —— 并且把「真的产出了皮肤包」作为主断言，
+    // 而不只是「generator 字段变了」。
     const sandboxDir = mkTmp();
     const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: YES })
       .dispatch({
         id: 'gc3',
         kind: 'generate_content',
-        payload: { prompt: 'beast', kind: 'skinpack', spec: ENTITY_SPEC },
+        payload: {
+          prompt: 'knight',
+          kind: 'skinpack',
+          spec: {
+            serializeName: 'AdventurePack',
+            packName: 'Adventure Pack',
+            skins: [{ skinKey: 'Knight', displayName: 'Knight Armor', primaryColor: '#334455' }],
+          },
+        },
       })
       .result();
     expect(result.ok).toBe(true);
-    const data = result.data as { generator: string; note: string };
+    const data = result.data as { generator: string; note?: string; dir: string };
+    expect(data.generator).toBe('skinpack');
+    // 不再出现「兜底到 behavior_entity / 仓内暂无独立 skinpack 生成器」这类说明
+    expect(data.note ?? '').not.toContain('兜底');
+    expect(data.note ?? '').not.toContain('behavior_entity');
+
+    // 目录名由 payload.name → spec.packId → prompt slug 依次推导，这里直接用
+    // kernel 回传的 dir，不硬编码 —— 硬编码会把「目录推导规则」也变成被钉死的契约。
+    const packDir = data.dir;
+    expect(packDir.startsWith(sandboxDir)).toBe(true);
+    // CSPJ101：skins.json 是皮肤包的核心，缺了它根本不是皮肤包
+    expect(existsSync(join(packDir, 'skins.json'))).toBe(true);
+    expect(existsSync(join(packDir, 'textures', 'Knight.png'))).toBe(true);
+    expect(existsSync(join(packDir, 'texts', 'en_US.lang'))).toBe(true);
+
+    // 旧兜底的产物（自定义实体包）不应再出现
+    expect(existsSync(join(sandboxDir, 'packs', 'entity_pack', 'manifest.json'))).toBe(false);
+
+    // manifest 模块类型必须是 skin_pack
+    const manifest = JSON.parse(readFileSync(join(packDir, 'manifest.json'), 'utf8')) as {
+      modules: Array<{ type: string }>;
+      header: Record<string, unknown>;
+    };
+    expect(manifest.modules[0]?.type).toBe('skin_pack');
+    expect(manifest.header).not.toHaveProperty('min_engine_version');
+  });
+
+  it('behavior_entity 仍可被 kernel 正确调度（skinpack 独立后未被挤成孤儿）', async () => {
+    // 补 skinpack 独立生成器时最容易犯的错：把 behavior_entity 的接线改坏却没人发现。
+    // 此前 BehaviorEntityGenerator **只能**经由 skinpack 兜底触达，兜底一撤就成了孤儿。
+    // 这条用 `entity` kind 真实调度，并断言真实产物落盘。
+    const sandboxDir = mkTmp();
+    const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: YES })
+      .dispatch({
+        id: 'gc-entity',
+        kind: 'generate_content',
+        payload: { prompt: 'beast', kind: 'entity', spec: ENTITY_SPEC },
+      })
+      .result();
+    expect(result.ok).toBe(true);
+    const data = result.data as { generator: string };
     expect(data.generator).toBe('behavior_entity');
-    expect(data.note).toMatch(/skinpack/);
     expect(existsSync(join(sandboxDir, 'packs', 'entity_pack', 'manifest.json'))).toBe(true);
     expect(
       existsSync(join(sandboxDir, 'packs', 'entity_pack', 'entities', 'my_beast.behavior.json')),
     ).toBe(true);
+  });
+
+  it('skinpack 的 specShape 示例是真正的 SkinPackSpec（不是实体包形状）', async () => {
+    // 这个示例的唯一用途是「缺 spec 时告诉调用方该长什么样」。skinpack 兜底
+    // 时代它返回的是实体包形状，会把用户/智能体引到错误的 spec 上。
+    const sandboxDir = mkTmp();
+    const result = await new BedrockKernel({ sandboxDir, mode: 'sandbox', confirm: YES })
+      .dispatch({
+        id: 'gc-shape',
+        kind: 'generate_content',
+        payload: { prompt: 'p', kind: 'skinpack' },
+      })
+      .result();
+    expect(result.ok).toBe(false);
+    const data = result.data as { specShape: Record<string, unknown> };
+    expect(data.specShape).toHaveProperty('serializeName');
+    expect(data.specShape).toHaveProperty('skins');
+    // 不该再有实体包的字段
+    expect(data.specShape).not.toHaveProperty('entities');
   });
 
   it('缺 spec → validation 且 data.specShape 给出形状示例（不臆造 spec）', async () => {

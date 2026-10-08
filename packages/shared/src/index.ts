@@ -8,3 +8,4 @@ export * from './presets/content-templates.js';
 export * from './validation/datapack-validator.js';
 export * from './validation/datapack-layout.js';
 export * from './validation/pack-format.js';
+export * from './validation/skin-layout.js';
