@@ -8,6 +8,7 @@ import type {
 import type { Generator } from '@mc-creator/shared';
 import { ServerSpec, MC_VERSIONS } from '@mc-creator/shared';
 import type { ServerSpec as ServerSpecType, OpEntry, WhitelistEntry } from '@mc-creator/shared';
+import { FABRIC_INSTALLER_PINNED_VERSION } from '@mc-creator/core';
 
 /**
  * 服务器配置生成器（P8）。
@@ -330,8 +331,15 @@ if [ -z "$PAPER_URL" ]; then
 fi
 curl -fL -o "\${jarName}" "$PAPER_URL"`;
     } else if (spec.serverType === 'fabric') {
+      // ⚠️ 这里曾用 `.../fabric-installer/latest/fabric-installer.jar`，**实测 404**：
+      // maven 布局没有 `latest` 这个版本目录（metadata 里的 <latest> 是「最新版本号」
+      // 这个字段，不是目录名）。必须用具体版本号。
+      // 这段脚本在**用户的远程服务器**上跑，不能指望那台机器能访问 maven 或解析 XML，
+      // 所以烘进一个钉住的版本号；防陈旧靠 verify-loader-versions.test.ts
+      // （VERIFY_VERSIONS=1）比对 maven-metadata 的最新 <release>。
+      // 注意与下面 `-loader latest` 区分：那是 Fabric CLI 的**参数**（合法），与 URL 无关。
       downloadCmd = `echo "下载 Fabric 服务端 (${shellEscape(spec.serverVersion)})..."
-curl -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar"
+curl -fL -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/${FABRIC_INSTALLER_PINNED_VERSION}/fabric-installer-${FABRIC_INSTALLER_PINNED_VERSION}.jar"
 java -jar fabric-installer.jar server -mcversion ${shellEscape(spec.serverVersion)} -dir . -loader latest
 if [ -f fabric-server-launch.jar ]; then
   mv fabric-server-launch.jar "\${jarName}"
@@ -445,7 +453,7 @@ echo "=============================================="
 powershell -Command "$j=Invoke-RestMethod -Uri 'https://fill.papermc.io/v3/projects/paper/versions/%MC_VERSION%/builds/latest'; $u=$j.downloads.'server:default'.url; if (-not $u) { Write-Error ('未取到 Paper 下载地址（该 MC 版本可能不存在于 PaperMC）'); exit 1 }; Invoke-WebRequest -Uri $u -OutFile '%JAR%'"`;
     } else if (spec.serverType === 'fabric') {
       downloadCmd = `echo 下载 Fabric 服务端 (%MC_VERSION%)...
-powershell -Command "Invoke-WebRequest -Uri 'https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar' -OutFile fabric-installer.jar"
+powershell -Command "Invoke-RestMethod -Uri 'https://maven.fabricmc.net/net/fabricmc/fabric-installer/${FABRIC_INSTALLER_PINNED_VERSION}/fabric-installer-${FABRIC_INSTALLER_PINNED_VERSION}.jar' -OutFile fabric-installer.jar"
 java -jar fabric-installer.jar server -mcversion %MC_VERSION% -dir . -loader latest
 echo Fabric 安装完成`;
     } else {

@@ -11,6 +11,10 @@ import { describe, it, expect } from 'vitest';
 import { LOADER_VERSIONS, MC_VERSIONS } from '@mc-creator/shared';
 import type { McVersion } from '@mc-creator/shared';
 import { ModrinthApiClient } from '../modrinth/api-client.js';
+import {
+  FABRIC_INSTALLER_PINNED_VERSION,
+  parseMavenMetadataRelease,
+} from '../fabric/fabric-installer.js';
 
 const enabled = process.env.VERIFY_VERSIONS === '1';
 const client = new ModrinthApiClient();
@@ -52,6 +56,39 @@ async function latestNeoForge(branch: string): Promise<string | null> {
 }
 
 describe.skipIf(!enabled)('LOADER_VERSIONS 过期检测（联网）', () => {
+  /**
+   * 生成的 install.sh / install.bat 跑在**用户的远程服务器**上，那台机器不保证能
+   * 访问 maven 或解析 XML，所以 installer 版本只能烘进一个具体值。它一旦陈旧，
+   * 用户拿到的脚本就会下载到 404 —— 而脚本本身跑在别人机器上，我们看不到。
+   * 这个检查是它唯一的自动巡检途径。
+   */
+  it('FABRIC_INSTALLER_PINNED_VERSION 与 maven-metadata 最新 <release> 一致', async () => {
+    let latest: string | null = null;
+    try {
+      const res = await fetch(
+        'https://maven.fabricmc.net/net/fabricmc/fabric-installer/maven-metadata.xml',
+        {
+          headers: { 'User-Agent': 'mc-creator/0.0.0' },
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+      if (res.ok) latest = parseMavenMetadataRelease(await res.text());
+    } catch {
+      /* 落到下面的 null 分支 */
+    }
+    if (latest === null) {
+      console.log(
+        `SKIP: fabric-installer maven-metadata 查询失败（快照 ${FABRIC_INSTALLER_PINNED_VERSION}，可能本机网络受限）`,
+      );
+      return;
+    }
+    expect(
+      latest,
+      `FABRIC_INSTALLER_PINNED_VERSION ${FABRIC_INSTALLER_PINNED_VERSION} 已过期，` +
+        `maven-metadata 最新 <release> 为 ${latest}，请更新 fabric-installer.ts`,
+    ).toBe(FABRIC_INSTALLER_PINNED_VERSION);
+  }, 30_000);
+
   it.each(MC_VERSIONS.map((v) => [v] as const))(
     '%s：fabric-api 快照与 Modrinth 最新一致',
     async (mc) => {

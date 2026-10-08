@@ -29,6 +29,10 @@ import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { ComplianceDeniedError, type ThirdPartyAuthGate } from './compliance-gate.js';
+import { resolveFabricInstallerRelease } from '@mc-creator/core';
+
+/** 请求外部 API 时的 User-Agent（Modrinth 等公共 API 要求标识来源）。 */
+const USER_AGENT = 'mc-creator/0.0.0 (https://github.com/mc-creator)';
 /** 下载进度回调 */
 export type DownloadProgress = (
   stage: 'versions' | 'client' | 'assets' | 'libraries',
@@ -373,8 +377,16 @@ export class LauncherService {
     if (loader === 'fabric') {
       const installerPath = join(this.baseDir, 'fabric-installer.jar');
       if (!(await exists(installerPath))) {
-        const url =
-          'https://maven.fabricmc.net/net/fabricmc/fabric-installer/latest/fabric-installer.jar';
+        // ⚠️ 这里曾硬编码 `.../fabric-installer/latest/fabric-installer.jar`，
+        // **实测 404**：maven 布局没有 `latest` 这个版本目录，metadata 里的
+        // `<latest>1.1.2</latest>` 是「最新版本号」这个字段，不是目录名。
+        // 改为解析 maven-metadata 取具体版本号 —— 本侧有网络，没必要背陈旧风险。
+        // 注意与下面传给 installer 的 `-loader latest` 区分：那是 Fabric CLI 的
+        // **参数**（合法），与 URL 路径段无关。
+        const { url } = await resolveFabricInstallerRelease(async (u) => {
+          const res = await fetch(u, { headers: { 'User-Agent': USER_AGENT } });
+          return { ok: res.ok, status: res.status, text: () => res.text() };
+        });
         const buf = await this.download(url);
         await writeFileAtomic(installerPath, buf);
       }

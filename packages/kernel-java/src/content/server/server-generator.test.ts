@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ServerGenerator } from './server-generator.js';
 import type { GeneratorContext, ServerSpec } from '@mc-creator/shared';
+import { FABRIC_INSTALLER_PINNED_VERSION } from '@mc-creator/core';
 
 function makeCtx(spec: Partial<ServerSpec>): GeneratorContext {
   return {
@@ -274,12 +275,39 @@ describe('ServerGenerator', () => {
     expect(bat!.content).not.toMatch(/\/downloads\/paper-/);
   });
 
-  it('一键部署: serverType=fabric 下载 fabric-installer', async () => {
+  it('一键部署: serverType=fabric 下载 fabric-installer（**具体版本号**，非 latest 死链）', async () => {
     const result = await gen.generate(
       makeCtx({ serverName: 'Srv', serverType: 'fabric', serverVersion: '1.21.1' }),
     );
     const sh = result.files.find((f) => f.path === 'install.sh');
-    expect(sh!.content).toContain('maven.fabricmc.net');
+    const bat = result.files.find((f) => f.path === 'install.bat');
+
+    // ⚠️ 这条原来只断言 toContain('maven.fabricmc.net') + 一段命令文本 ——
+    // **钉了域名、没钉版本**，所以 `.../fabric-installer/latest/fabric-installer.jar`
+    // 这个实测 404 的死链照样绿（MEMORY §7.18「只钉了一半的不变量」）。
+    for (const [name, f] of [
+      ['install.sh', sh],
+      ['install.bat', bat],
+    ] as const) {
+      expect(f, name).toBeDefined();
+      // 必须是 <版本>/<artifact>-<版本>.jar 的形态，且版本号是具体数字版本
+      expect(f!.content, name).toMatch(
+        /fabric-installer\/(\d+\.\d+\.\d+)\/fabric-installer-\1\.jar/,
+      );
+      // 绝不能出现 latest 目录（maven 没有这个版本目录，实测 404）
+      expect(f!.content, name).not.toContain('fabric-installer/latest/');
+      // 版本号必须与钉住的常量一致（改了要显式改常量 + 过 CI 巡检）
+      expect(f!.content, name).toContain(FABRIC_INSTALLER_PINNED_VERSION);
+      // 下载必须带失败标志，否则 HTTP 错误页会被写进 jar（表现为「jar 损坏」）
+      expect(f!.content, name).toMatch(
+        /curl -fL -o fabric-installer\.jar|Invoke-RestMethod -Uri .* -OutFile fabric-installer\.jar/,
+      );
+    }
+
+    // `-loader latest` 是 Fabric CLI 的**参数**（合法），与 URL 里的 latest 无关 ——
+    // 这条必须仍在，防止把上面修的死链「顺手」把 CLI 参数也改了。
+    expect(sh!.content).toContain('-loader latest');
+    expect(bat!.content).toContain('-loader latest');
     expect(sh!.content).toContain('fabric-installer.jar server -mcversion');
   });
   it('审查修复: install.sh 创建服务用户 + 精确 Java 检测 + 配置缺失警告', async () => {
