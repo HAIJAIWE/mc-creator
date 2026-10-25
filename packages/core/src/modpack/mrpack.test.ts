@@ -207,66 +207,96 @@ describe('validateModrinthIndex 现在会查 downloads 内容', () => {
 
 describe('真网络冒烟：Modrinth CDN 版本段的不统一（上游真实行为）', () => {
   const UA = 'mc-creator/0.0.0 (https://github.com/mc-creator)';
+  // 真网络往返没有确定耗时上限：单次请求给 15s 硬超时（与 verify-loader-versions.test.ts 一致），
+  // 用例整体给 30s，避免慢网下被 vitest 默认 5s testTimeout 误判为失败。
+  const NET_TIMEOUT = 30_000;
+  const getJson = async <T>(u: string): Promise<T> => {
+    const r = await fetch(u, {
+      headers: { 'User-Agent': UA },
+      signal: AbortSignal.timeout(15_000),
+    });
+    return (await r.json()) as T;
+  };
   const head = async (u: string) => {
-    const r = await fetch(u, { method: 'HEAD', headers: { 'User-Agent': UA } });
+    const r = await fetch(u, {
+      method: 'HEAD',
+      headers: { 'User-Agent': UA },
+      signal: AbortSignal.timeout(15_000),
+    });
     return r.status;
   };
 
-  it('API 给的直链 HEAD 200', async () => {
-    const r = await fetch('https://api.modrinth.com/v2/project/fabric-api/version', {
-      headers: { 'User-Agent': UA },
-    });
-    const vs = (await r.json()) as Array<{
-      id: string;
-      project_id: string;
-      version_number: string;
-      files: Array<{ filename: string; url: string }>;
-    }>;
-    const v = vs.find((x) => x.version_number.includes('0.29.5') && x.files.length);
-    expect(v, '找不到 fabric-api 0.29.5 版本样本').toBeDefined();
-    expect(await head(v!.files[0]!.url)).toBe(200);
-  });
+  it(
+    'API 给的直链 HEAD 200',
+    async () => {
+      const vs = await getJson<
+        Array<{
+          id: string;
+          project_id: string;
+          version_number: string;
+          files: Array<{ filename: string; url: string }>;
+        }>
+      >('https://api.modrinth.com/v2/project/fabric-api/version');
+      const v = vs.find((x) => x.version_number.includes('0.29.5') && x.files.length);
+      expect(v, '找不到 fabric-api 0.29.5 版本样本').toBeDefined();
+      expect(await head(v!.files[0]!.url)).toBe(200);
+    },
+    NET_TIMEOUT,
+  );
 
-  it('同一文件按 versionId 拼出的路径确实 404（这就是不能自行拼装的依据）', async () => {
-    // 必须**按版本号定位**这一个文件，不能取列表第一个：
-    // fabric-api 较新的版本 url 版本段都是 versionId（拼法可用），
-    // 只有 0.29.5+1.17 这类用版本号段 —— 取「第一个」会拿到可用样本，断言就失去意义。
-    const r = await fetch('https://api.modrinth.com/v2/project/fabric-api/version', {
-      headers: { 'User-Agent': UA },
-    });
-    const vs = (await r.json()) as Array<{
-      id: string;
-      project_id: string;
-      version_number: string;
-      files: Array<{ filename: string; url: string }>;
-    }>;
-    const v = vs.find((x) => x.version_number.includes('0.29.5') && x.files.length);
-    expect(v, '找不到 fabric-api 0.29.5 版本样本').toBeDefined();
-    const f = v!.files[0]!;
-    const naive = `${MODRINTH_CDN_BASE}/${v!.project_id}/versions/${v!.id}/${f.filename}`;
-    if (naive === f.url) {
-      // 上游若哪天把这个文件的 url 版本段统一成 versionId，依据就变了 ——
-      // 明示出来要求复核，而不是让断言悄悄变成「反正都 200」
-      throw new Error(
-        `上游已把 ${f.filename} 的 url 版本段统一成 versionId，` +
-          `「必须用直链而不能拼装」的依据已变化，请重新核对 mrpack.ts 的退化拼接是否还需要。`,
-      );
-    }
-    expect(await head(naive)).toBe(404);
-    expect(await head(f.url)).toBe(200);
-  });
-
-  it('上游给的直链本身一定通过我们的 RFC 3986 校验（不能误伤合法地址）', async () => {
-    const r = await fetch('https://api.modrinth.com/v2/project/sodium/version', {
-      headers: { 'User-Agent': UA },
-    });
-    const vs = (await r.json()) as Array<{ files: Array<{ url: string }> }>;
-    for (const v of vs.slice(0, 5)) {
-      for (const f of v.files) {
-        expect(validateDownloadUri(f.url), f.url).toEqual([]);
+  it(
+    '同一文件按 versionId 拼出的路径确实拿不到（这就是不能自行拼装的依据）',
+    async () => {
+      // 必须**按版本号定位**这一个文件，不能取列表第一个：
+      // fabric-api 较新的版本 url 版本段都是 versionId（拼法可用），
+      // 只有 0.29.5+1.17 这类用版本号段 —— 取「第一个」会拿到可用样本，断言就失去意义。
+      const vs = await getJson<
+        Array<{
+          id: string;
+          project_id: string;
+          version_number: string;
+          files: Array<{ filename: string; url: string }>;
+        }>
+      >('https://api.modrinth.com/v2/project/fabric-api/version');
+      const v = vs.find((x) => x.version_number.includes('0.29.5') && x.files.length);
+      expect(v, '找不到 fabric-api 0.29.5 版本样本').toBeDefined();
+      const f = v!.files[0]!;
+      const naive = `${MODRINTH_CDN_BASE}/${v!.project_id}/versions/${v!.id}/${f.filename}`;
+      if (naive === f.url) {
+        // 上游若哪天把这个文件的 url 版本段统一成 versionId，依据就变了 ——
+        // 明示出来要求复核，而不是让断言悄悄变成「反正都 200」
+        throw new Error(
+          `上游已把 ${f.filename} 的 url 版本段统一成 versionId，` +
+            `「必须用直链而不能拼装」的依据已变化，请重新核对 mrpack.ts 的退化拼接是否还需要。`,
+        );
       }
-    }
-  });
+      // 上游对这条拼出来的路径，2026-10 前后从 404 变成了 400（HEAD 仍然准）——
+      // 这里只关心「拿不到文件」，不把具体状态码写死：4xx 都说明不能自己拼路径。
+      const naiveStatus = await head(naive);
+      expect(
+        naiveStatus,
+        `拼出来的路径返回了 ${naiveStatus}，说明它其实可用，拼接依据已变化`,
+      ).not.toBe(200);
+      expect(naiveStatus).toBeGreaterThanOrEqual(400);
+      expect(await head(f.url)).toBe(200);
+    },
+    NET_TIMEOUT,
+  );
+
+  it(
+    '上游给的直链本身一定通过我们的 RFC 3986 校验（不能误伤合法地址）',
+    async () => {
+      const vs = await getJson<Array<{ files: Array<{ url: string }> }>>(
+        'https://api.modrinth.com/v2/project/sodium/version',
+      );
+      for (const v of vs.slice(0, 5)) {
+        for (const f of v.files) {
+          expect(validateDownloadUri(f.url), f.url).toEqual([]);
+        }
+      }
+    },
+    NET_TIMEOUT,
+  );
 });
 
 describe('buildMrpackPlan', () => {

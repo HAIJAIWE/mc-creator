@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { ModrinthApiClient, ModrinthRateLimitError } from './api-client.js';
+import { MIRROR_MODRINTH_API, OFFICIAL_MODRINTH_API } from '../sources/index.js';
 
 /**
  * Modrinth API 客户端测试。
@@ -34,20 +35,24 @@ describe('ModrinthApiClient', () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ hits }),
+      // 字段名必须是 `total_hits`：Modrinth v2 /search 实测返回的就是这个名，
+      // 写成 `total` 会让上层分页拿到 undefined（曾经真的这么错过）。
+      json: async () => ({ hits, total_hits: hits.length, limit: 5, offset: 0 }),
     } as Response);
 
     const result = await client.search('sodium', { limit: 5 });
 
-    expect(result).toEqual(hits);
-    expect(result[0].project_id).toBe('AABB');
+    // search 返回 { hits, total }：total 来自服务端的 total_hits，分页要用它
+    expect(result.hits).toEqual(hits);
+    expect(result.total).toBe(1);
+    expect(result.hits[0].project_id).toBe('AABB');
   });
 
   it('search 带 loader/mcVersion 时 URL 包含 facets', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ hits: [] }),
+      json: async () => ({ hits: [], total_hits: 0 }),
     } as Response);
 
     await client.search('sodium', { loader: 'fabric', mcVersion: '1.21.11' });
@@ -64,11 +69,46 @@ describe('ModrinthApiClient', () => {
     expect(calledUrl).toContain('query=sodium');
   });
 
+  /**
+   * 排序：`index` 参数必须真的进 URL。
+   *
+   * 这条钉的是一个**曾经的静默故障**：下载页一直传 `sort: 'downloads'`，
+   * 但客户端没有这个参数，UI 的意图全程落空（服务端默认 relevance）。
+   * 实测（2026-10-16，`api.modrinth.com/v2/search?query=optimization`）：
+   * `relevance` / `downloads` / `updated` 三种返回的排序明显不同，
+   * 证明这不是被上游忽略的野生参数。
+   */
+  it('search 带 index 时 URL 带上排序', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ hits: [], total_hits: 0 }),
+    } as Response);
+
+    await client.search('optimization', { index: 'downloads' });
+
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('index=downloads');
+  });
+
+  it('不传 index 时 URL 里没有这个参数（保持服务端默认）', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ hits: [], total_hits: 0 }),
+    } as Response);
+
+    await client.search('optimization');
+
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).not.toContain('index=');
+  });
+
   it('C-9：legacy_fabric 映射到 Modrinth fabric 分类，vanilla 不过滤', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ hits: [] }),
+      json: async () => ({ hits: [], total_hits: 0 }),
     } as Response);
 
     await client.search('sodium', { loader: 'legacy_fabric' });
@@ -88,11 +128,31 @@ describe('ModrinthApiClient', () => {
     expect(versionUrl).not.toContain('legacy_fabric');
   });
 
+  /**
+   * 数据包在 Modrinth 上 `project_type` 是 `mod`，唯一能区分"数据包构建"与
+   * "mod 构建"的就是 `loaders: ["datapack"]`（实测 `GET /project/veinminer/version?loaders=["datapack"]`
+   * → 16 个版本、文件名全是 `.zip`；拿 Sodium 去问则返回 0 条，说明是精确匹配）。
+   * 这个值下不去，数据包分类就会下到一个只能进 `mods/` 的 jar。
+   */
+  it('datapack 作为加载器过滤值下发给源站（loaders=["datapack"]）', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    } as Response);
+
+    await client.getVersions('AABB', { loader: 'datapack' });
+
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    expect(decodeURIComponent(calledUrl)).toContain('loaders=["datapack"]');
+    expect(ModrinthApiClient.loaderToCategory('datapack')).toBe('datapack');
+  });
+
   it('search 不带 loader/mcVersion 时不带 facets', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ hits: [] }),
+      json: async () => ({ hits: [], total_hits: 0 }),
     } as Response);
 
     await client.search('test');
@@ -165,7 +225,7 @@ describe('ModrinthApiClient', () => {
       ok: true,
       status: 200,
       headers: rlHeaders('300', '299', '12'),
-      json: async () => ({ hits: [] }),
+      json: async () => ({ hits: [], total_hits: 0 }),
     } as Response);
 
     await client.search('x');
@@ -177,7 +237,7 @@ describe('ModrinthApiClient', () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ hits: [] }),
+      json: async () => ({ hits: [], total_hits: 0 }),
     } as Response);
 
     await client.search('x');
@@ -203,7 +263,7 @@ describe('ModrinthApiClient', () => {
           ok: true,
           status: 200,
           headers: rlHeaders('300', '300', '0'),
-          json: async () => ({ hits: [] }),
+          json: async () => ({ hits: [], total_hits: 0 }),
         } as Response);
 
       const p = client.search('x');
@@ -221,7 +281,7 @@ describe('ModrinthApiClient', () => {
       // 到达官方给的 reset 才重试
       await vi.advanceTimersByTimeAsync(2);
       expect(fetchMock, 't=30s 应重试').toHaveBeenCalledTimes(2);
-      await expect(p).resolves.toEqual([]);
+      await expect(p).resolves.toEqual({ hits: [], total: 0 });
     } finally {
       vi.useRealTimers();
     }
@@ -307,6 +367,146 @@ describe('ModrinthApiClient', () => {
     } as Response);
 
     await expect(client.getVersions('missing')).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 候选根（官方 / 国内镜像 MCIM）。
+ *
+ * 这两条钉的是「换源」这件事本身：单根客户端只能干等，多根客户端要能
+ * 换个源把请求做完 —— 而**抛出的错误类型不能变**（上层按
+ * `instanceof ModrinthRateLimitError` 分辨并显示重置秒数）。
+ */
+describe('ModrinthApiClient · 镜像与官方的换源', () => {
+  let fetchMock: MockInstance;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('镜像优先：镜像挂了自动落回官方，两条 URL 都长得对', async () => {
+    const client = new ModrinthApiClient([MIRROR_MODRINTH_API, OFFICIAL_MODRINTH_API]);
+    // 镜像网络层失败（每次重试都失败），官方成功
+    fetchMock.mockImplementation(async (url: string) =>
+      url.startsWith(MIRROR_MODRINTH_API)
+        ? Promise.reject(new Error('mirror down'))
+        : ({
+            ok: true,
+            status: 200,
+            json: async () => ({ hits: [], total_hits: 0 }),
+          } as Response),
+    );
+
+    const r = await client.search('sodium');
+    expect(r.total).toBe(0);
+
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    // 先在镜像上重试 3 次（1 + 2），再换官方
+    expect(urls.slice(0, 3).every((u) => u.startsWith(MIRROR_MODRINTH_API))).toBe(true);
+    expect(urls[3]).toContain('/search?');
+    expect(urls[3]!.startsWith(OFFICIAL_MODRINTH_API)).toBe(true);
+    // 同一份路径，只是换了前缀
+    expect(urls[3]!.replace(OFFICIAL_MODRINTH_API, '')).toBe(
+      urls[0]!.replace(MIRROR_MODRINTH_API, ''),
+    );
+  });
+
+  it('官方被限流（429）时换到镜像，且不干等配额窗口', async () => {
+    vi.useFakeTimers();
+    try {
+      const client = new ModrinthApiClient([OFFICIAL_MODRINTH_API, MIRROR_MODRINTH_API]);
+      fetchMock.mockImplementation(async (url: string) =>
+        url.startsWith(OFFICIAL_MODRINTH_API)
+          ? ({
+              ok: false,
+              status: 429,
+              // 官方会带这个头；后面还有候选时**不该**按它睡满
+              headers: { get: (k: string) => (k === 'x-ratelimit-reset' ? '3600' : null) },
+              json: async () => ({}),
+            } as unknown as Response)
+          : ({
+              ok: true,
+              status: 200,
+              json: async () => ({ hits: [], total_hits: 0 }),
+            } as Response),
+      );
+
+      const p = client.search('sodium');
+      // 3 次尝试的退避一共 1.8 秒；要是真按 3600 秒睡，这里推进 5 秒是醒不来的
+      await vi.advanceTimersByTimeAsync(5_000);
+      await expect(p).resolves.toEqual({ hits: [], total: 0 });
+
+      const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+      expect(urls.slice(0, 3).every((u) => u.startsWith(OFFICIAL_MODRINTH_API))).toBe(true);
+      expect(urls[3]!.startsWith(MIRROR_MODRINTH_API)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('所有候选都失败时抛的是最后一个错误，且类型没被包壳', async () => {
+    vi.useFakeTimers();
+    try {
+      const client = new ModrinthApiClient([OFFICIAL_MODRINTH_API, MIRROR_MODRINTH_API]);
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: { get: () => null } as unknown as Headers,
+        json: async () => ({}),
+      } as Response);
+
+      const p = client.search('x').catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(20_000);
+      const err = await p;
+      expect(err).toBeInstanceOf(ModrinthRateLimitError);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('镜像 200 返回 HTML 时，不重试同一地址，直接换下一个源', async () => {
+    const client = new ModrinthApiClient([MIRROR_MODRINTH_API, OFFICIAL_MODRINTH_API]);
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: { get: () => 'text/html; charset=utf-8' } as unknown as Headers,
+        json: async () => {
+          throw new SyntaxError('Unexpected token < in JSON at position 0');
+        },
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ hits: [], total_hits: 0 }),
+      } as Response);
+
+    await expect(client.search('sodium')).resolves.toEqual({ hits: [], total: 0 });
+
+    // 同源 3 次重试是白等：只打镜像一次，第二次就落到官方源
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]![0]).startsWith(MIRROR_MODRINTH_API)).toBe(true);
+    expect(String(fetchMock.mock.calls[1]![0]).startsWith(OFFICIAL_MODRINTH_API)).toBe(true);
+  });
+
+  it('只有镜像且返回 HTML 时，错误明确说「非 JSON」', async () => {
+    const client = new ModrinthApiClient([MIRROR_MODRINTH_API]);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'text/html' } as unknown as Headers,
+      json: async () => {
+        throw new SyntaxError('Unexpected token <');
+      },
+    } as unknown as Response);
+
+    await expect(client.search('sodium')).rejects.toThrow(/非 JSON/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

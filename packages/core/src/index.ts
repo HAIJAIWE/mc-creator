@@ -1,4 +1,5 @@
 export * from './filesystem/index.js';
+export * from './sources/index.js';
 export * from './model-provider/index.js';
 export * from './orchestrator/index.js';
 export * from './rag/index.js';
@@ -9,3 +10,5 @@ export * from './curseforge/index.js';
 export * from './modpack/index.js';
 export * from './papermc/index.js';
 export * from './fabric/index.js';
+export * from './skin/index.js';
+export * from './mcmod/index.js';
