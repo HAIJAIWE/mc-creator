@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    setupFiles: ['src/test/setup.ts'],
     coverage: {
       provider: 'v8',
       // 基线门禁（2026-09-30 实测）：防回归，不代表目标覆盖率；

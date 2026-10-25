@@ -2,19 +2,36 @@ import { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react
 import { shallow } from 'zustand/shallow';
 import { McIcon } from '../../assets/mc-ui/McIcon';
 import { TabBar } from '../TabBar.js';
-import { CodePreview } from '../CodePreview.js';
-import { SplitCodeEditor } from '../SplitCodeEditor.js';
+// CodePreview / SplitCodeEditor / PurecodeWorkspace 静态闭包含 <Editor>，
+// 必须经 withMonacoSetup 包裹后再 lazy 化，否则 loader.init() 会走 CDN 分支被 CSP 拦掉。
+// LowcodeWorkspace 闭包 142 文件但不含 <Editor>，仅需 lazy 化减体积。
+// ResourcePackPreview / NbtEditor 无 Monaco 依赖，保持静态 import。
+const CodePreview = lazy(
+  withMonacoSetup(() => import('../CodePreview.js').then((m) => ({ default: m.CodePreview }))),
+);
+const SplitCodeEditor = lazy(
+  withMonacoSetup(() =>
+    import('../SplitCodeEditor.js').then((m) => ({ default: m.SplitCodeEditor })),
+  ),
+);
+const PurecodeWorkspace = lazy(
+  withMonacoSetup(() =>
+    import('../purecode/PurecodeWorkspace.js').then((m) => ({ default: m.PurecodeWorkspace })),
+  ),
+);
+const LowcodeWorkspace = lazy(() =>
+  import('../lowcode/LowcodeWorkspace.js').then((m) => ({ default: m.LowcodeWorkspace })),
+);
 import { ShortcutHelpDialog } from '../ShortcutHelpDialog.js';
 import { ResourcePackPreview } from '../ResourcePackPreview.js';
 import { NbtEditor } from '../NbtEditor.js';
 import { CommandPalette, type Command } from '../CommandPalette.js';
-import { LowcodeWorkspace } from '../lowcode/LowcodeWorkspace.js';
-import { PurecodeWorkspace } from '../purecode/PurecodeWorkspace.js';
 import { useModStore } from '../../store/mod-store.js';
 import { useEditorModeStore } from '../../store/editor-mode-store.js';
 import { useLayoutStore, selectMiddleTab, selectSetMiddleTab } from '../../shell/layout-store.js';
 import { ipcClient } from '../../lib/ipc-client.js';
 import { withUnimplementedMd } from '../../lib/unimplemented-md.js';
+import { withMonacoSetup } from '../../lib/lazy-monaco.js';
 import { getPreviewPanel } from '../../shell/preview-registry.js';
 import type { GeneratorType } from '@mc-creator/shared';
 import { GENERATOR_DESCRIPTORS } from '../../../../shared/generator-descriptors.js';
@@ -51,13 +68,19 @@ function PlaceholderPanel({ type }: { type: GeneratorType }) {
 function RenderPreviewPanel({ generatorType }: { generatorType: GeneratorType }) {
   const registration = getPreviewPanel(generatorType);
 
-  if (!registration) {
+  // useMemo 必须在 early return 之前调用（React Hooks 规则）。
+  // 固定 lazy 对象引用，防止每次渲染都新建导致 React 按
+  // elementType 引用比较判为不同组件 → 整棵子树卸载重建（用户按 F1 丢预览状态）。
+  // 收益为零的 lazy：RenderPreviewPanel 只在 middleTab==='preview' 时被调用，
+  // registry loader 的 import() 本来就不会在 tab 不激活时触发。
+  const LazyPreview = useMemo(
+    () => (registration ? lazy(registration.component) : null),
+    [registration],
+  );
+
+  if (!registration || LazyPreview === null) {
     return <PlaceholderPanel type={generatorType} />;
   }
-
-  const { component: PreviewComponent } = registration;
-
-  const LazyPreview = lazy(PreviewComponent);
 
   return (
     <Suspense fallback={<PreviewPanelFallback />}>
@@ -73,8 +96,32 @@ function RenderPreviewPanel({ generatorType }: { generatorType: GeneratorType })
  */
 export function MiddlePanel() {
   // 从 layout-store 读取/写入 middleTab（持久化）
-  const middleTab = useLayoutStore(selectMiddleTab);
+  // layout-store 的 middleTab 类型是 string（跨 localStorage 的持久化值），
+  // 这里收窄为 MiddleTab：MEMBER_OF_MIDDLE_TABS 是真值来源，
+  // 旧版本残留的非法值（如已删除的 'lowcode'）会被回落成 'preview' 而不是静默失配。
+  const rawMiddleTab = useLayoutStore(selectMiddleTab);
   const setMiddleTab = useLayoutStore(selectSetMiddleTab);
+  const middleTab = MIDDLE_TABS.includes(rawMiddleTab as MiddleTab)
+    ? (rawMiddleTab as MiddleTab)
+    : 'preview';
+
+  /**
+   * 已访问过的 tab。
+   *
+   * a11y 要求 5 个 tabpanel 容器同时存在（否则 tab 的 aria-controls 指向空气），
+   * 但内容不能无条件挂载 —— LowcodeWorkspace 的闭包 142 个文件，
+   * 无条件渲染等于用户停在 preview tab 时就把它加载了。
+   *
+   * 这个集合让「首次访问才挂载、之后保持挂载」：
+   * - 未访问：容器在（满足 a11y），内容不在（不付加载代价）
+   * - 已访问：内容保留，切走不丢状态（IDE 的编辑器行为）
+   */
+  const [visited, setVisited] = useState<ReadonlySet<MiddleTab>>(() => new Set([middleTab]));
+  useEffect(() => {
+    setVisited((prev: ReadonlySet<MiddleTab>) =>
+      prev.has(middleTab) ? prev : new Set<MiddleTab>(prev).add(middleTab),
+    );
+  }, [middleTab]);
 
   const { generatorType, splitFile } = useModStore(
     (s) => ({ generatorType: s.generatorType, splitFile: s.splitFile }),
@@ -333,45 +380,103 @@ export function MiddlePanel() {
         </button>
       </div>
 
-      {/* Tab 内容 */}
-      <div
-        className="flex flex-1 flex-col overflow-hidden"
-        role="tabpanel"
-        id={`middle-tabpanel-${middleTab}`}
-        aria-labelledby={`middle-tab-${middleTab}`}
-        tabIndex={0}
-      >
-        {middleTab === 'preview' ? (
-          <RenderPreviewPanel generatorType={generatorType} />
-        ) : middleTab === 'lowcode' ? (
-          editorMode === 'purecode' ? (
-            <PurecodeWorkspace />
-          ) : (
-            <LowcodeWorkspace />
-          )
-        ) : middleTab === 'resources' ? (
-          <ResourcePackPreview />
-        ) : middleTab === 'nbt' ? (
-          <NbtEditor
-            initialValue={(() => {
-              const s = useModStore.getState();
-              const f = s.files.find((x) => x.path === s.selectedFile);
-              return f && !f.path.endsWith('.png') ? f.content : '{}';
-            })()}
-            onChange={(snbt) => {
-              const s = useModStore.getState();
-              if (s.selectedFile) s.updateFileContent(s.selectedFile, snbt);
-            }}
-          />
-        ) : (
-          <>
-            <TabBar />
-            <div className="flex-1 overflow-hidden">
-              {splitFile ? <SplitCodeEditor /> : <CodePreview />}
-            </div>
-          </>
-        )}
-      </div>
+      {/* Tab 内容 —— 所有 tabpanel 容器同时渲染（未激活的 hidden），修复 aria-controls 指向不存在的元素。
+
+          重内容只在**访问过**该 tab 之后才挂载：LowcodeWorkspace 的静态闭包 142 个文件
+          （React Flow 节点体系 + Monaco），若 5 个 tabpanel 无条件渲染内容，
+          用户停在 preview tab 时它就已被 import —— 阶段 7 的 Monaco 体积优化会被抵消。
+          visited 让切过的 tab 保持挂载（IDE 行为：切走不丢状态）。 */}
+      <>
+        <div
+          role="tabpanel"
+          id="middle-tabpanel-preview"
+          aria-labelledby="middle-tab-preview"
+          tabIndex={0}
+          hidden={middleTab !== 'preview'}
+          className="min-h-0 flex-1 overflow-hidden"
+        >
+          <div className="flex h-full flex-col overflow-hidden">
+            {visited.has('preview') && <RenderPreviewPanel generatorType={generatorType} />}
+          </div>
+        </div>
+
+        <div
+          role="tabpanel"
+          id="middle-tabpanel-lowcode"
+          aria-labelledby="middle-tab-lowcode"
+          tabIndex={0}
+          hidden={middleTab !== 'lowcode'}
+          className="min-h-0 flex-1 overflow-hidden"
+        >
+          <div className="flex h-full flex-col overflow-hidden">
+            {visited.has('lowcode') && (
+              <Suspense fallback={<div className="p-3 text-mc-dim">加载低代码…</div>}>
+                {editorMode === 'purecode' ? <PurecodeWorkspace /> : <LowcodeWorkspace />}
+              </Suspense>
+            )}
+          </div>
+        </div>
+
+        <div
+          role="tabpanel"
+          id="middle-tabpanel-resources"
+          aria-labelledby="middle-tab-resources"
+          tabIndex={0}
+          hidden={middleTab !== 'resources'}
+          className="min-h-0 flex-1 overflow-hidden"
+        >
+          <div className="flex h-full flex-col overflow-hidden">
+            {visited.has('resources') && <ResourcePackPreview />}
+          </div>
+        </div>
+
+        <div
+          role="tabpanel"
+          id="middle-tabpanel-nbt"
+          aria-labelledby="middle-tab-nbt"
+          tabIndex={0}
+          hidden={middleTab !== 'nbt'}
+          className="min-h-0 flex-1 overflow-hidden"
+        >
+          <div className="flex h-full flex-col overflow-hidden">
+            {visited.has('nbt') && (
+              <NbtEditor
+                initialValue={(() => {
+                  const s = useModStore.getState();
+                  const f = s.files.find((x) => x.path === s.selectedFile);
+                  return f && !f.path.endsWith('.png') ? f.content : '{}';
+                })()}
+                onChange={(snbt) => {
+                  const s = useModStore.getState();
+                  if (s.selectedFile) s.updateFileContent(s.selectedFile, snbt);
+                }}
+              />
+            )}
+          </div>
+        </div>
+
+        <div
+          role="tabpanel"
+          id="middle-tabpanel-code"
+          aria-labelledby="middle-tab-code"
+          tabIndex={0}
+          hidden={middleTab !== 'code'}
+          className="min-h-0 flex-1 overflow-hidden"
+        >
+          <div className="flex h-full flex-col overflow-hidden">
+            {visited.has('code') && (
+              <>
+                <TabBar />
+                <Suspense fallback={<div className="p-3 text-mc-dim">加载编辑器…</div>}>
+                  <div className="flex-1 overflow-hidden">
+                    {splitFile ? <SplitCodeEditor /> : <CodePreview />}
+                  </div>
+                </Suspense>
+              </>
+            )}
+          </div>
+        </div>
+      </>
 
       {/* 命令面板（F1 触发） */}
       <CommandPalette

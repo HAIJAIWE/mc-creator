@@ -31,7 +31,7 @@ export function BodyPartVisibilityPanel({
 
           // 获取当前模型下的矩形，如果不存在则跳过
           const rect = getBodyPartRect(model, partId, false);
-          if (!rect || (rect.width === 0 && rect.height === 0)) return null;
+          if (!rect || (rect.w === 0 && rect.h === 0)) return null;
 
           return (
             <div key={partId} className="flex items-center gap-2">

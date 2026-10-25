@@ -9,6 +9,29 @@ import { useEditorModeStore } from '../../store/editor-mode-store.js';
 import { useLayoutStore } from '../../shell/layout-store.js';
 import { initPanelRegistries } from '../../shell/index.js';
 
+// withMonacoSetup 在 jsdom 中会尝试 import monaco-setup.js，
+// 而后者需要 document.queryCommandSupported（jsdom 没有），会直接抛错。
+// 测试中直接透传 loader，跳过 Monaco 配置步骤。
+vi.mock('../../lib/lazy-monaco.js', () => ({
+  withMonacoSetup: (load: () => Promise<unknown>) => load,
+}));
+
+// LowcodeWorkspace 有 142 文件闭包（React Flow 节点体系），PurecodeWorkspace 含 Monaco Editor ——
+// 在测试中加载真实组件不现实。Mock 为简单标记组件，
+// 让测试聚焦「MiddlePanel 根据 editorMode 选择正确组件」的逻辑。
+vi.mock('../../components/lowcode/LowcodeWorkspace.js', () => ({
+  LowcodeWorkspace: () => (
+    <div role="application" aria-label="低代码工作区" data-testid="mock-lowcode" />
+  ),
+}));
+vi.mock('../../components/purecode/PurecodeWorkspace.js', () => ({
+  PurecodeWorkspace: () => (
+    <div role="application" aria-label="纯代码工作区" data-testid="mock-purecode">
+      <div role="tree" aria-label="项目文件树" />
+    </div>
+  ),
+}));
+
 /** 包 ToastProvider 渲染（purecode 模式渲染 PurecodeWorkspace，其保存依赖 useToast context） */
 function renderMiddlePanel(ui: React.ReactElement) {
   return render(ui, { wrapper: ToastProvider });
@@ -142,6 +165,43 @@ describe('MiddlePanel', () => {
     expect(lowcodeTab.getAttribute('aria-selected')).toBe('true');
   });
 
+  /**
+   * a11y 与懒加载的平衡点：容器全在，内容按需挂载。
+   *
+   * 若去掉 `visited` 保护（无条件渲染 5 个 tabpanel 的内容），
+   * 用户停在 preview tab 时 LowcodeWorkspace 的 142 文件闭包就已经被 import ——
+   * 阶段 7 的 Monaco 体积优化被完全抵消，而这条测试会立刻变红。
+   */
+  it('未访问的 tab：容器存在但内容不挂载（守住 Monaco 懒加载）', async () => {
+    renderMiddlePanel(<MiddlePanel />);
+
+    // 5 个 tabpanel 容器必须都在（aria-controls 指向它们）
+    for (const id of ['preview', 'lowcode', 'resources', 'nbt', 'code']) {
+      expect(
+        document.getElementById(`middle-tabpanel-${id}`),
+        `tabpanel-${id} 容器必须存在`,
+      ).toBeTruthy();
+    }
+
+    // 但未访问的 lowcode tab 内容不应挂载
+    await Promise.resolve();
+    expect(
+      screen.queryByTestId('mock-lowcode'),
+      '未访问的 lowcode tab 不应挂载 LowcodeWorkspace',
+    ).toBeNull();
+  });
+
+  it('访问过的 tab 内容保持挂载（切走不丢状态）', async () => {
+    renderMiddlePanel(<MiddlePanel />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /低代码/ }));
+    expect(await screen.findByTestId('mock-lowcode')).toBeTruthy();
+
+    // 切到别的 tab 后，lowcode 内容应仍在（IDE 的编辑器行为）
+    fireEvent.click(screen.getByRole('tab', { name: /资源/ }));
+    expect(screen.getByTestId('mock-lowcode'), '切走后 lowcode 内容应保留').toBeTruthy();
+  });
+
   it('点击资源 tab 切换到资源视图', () => {
     renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByRole('tab', { name: /资源/ }));
@@ -271,23 +331,24 @@ describe('MiddlePanel', () => {
   });
 
   // === L3 纯代码模式分支测试 ===
-  it('lowcode/hybrid 模式下「低代码」tab 渲染 LowcodeWorkspace', () => {
+  it('lowcode/hybrid 模式下「低代码」tab 渲染 LowcodeWorkspace', async () => {
     useEditorModeStore.setState({ mode: 'lowcode', lastSwitchAt: Date.now() });
     renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByRole('tab', { name: /低代码/ }));
     // LowcodeWorkspace 顶层 role=application + aria-label "低代码工作区"
-    expect(screen.getByRole('application', { name: /低代码工作区/ })).toBeTruthy();
+    // lazy 化后需等 chunk 加载
+    expect(await screen.findByRole('application', { name: /低代码工作区/ })).toBeTruthy();
   });
 
-  it('purecode 模式下「低代码」tab 渲染 PurecodeWorkspace 而非 LowcodeWorkspace', () => {
+  it('purecode 模式下「低代码」tab 渲染 PurecodeWorkspace 而非 LowcodeWorkspace', async () => {
     useEditorModeStore.setState({ mode: 'purecode', lastSwitchAt: Date.now() });
     renderMiddlePanel(<MiddlePanel />);
     fireEvent.click(screen.getByRole('tab', { name: /低代码/ }));
     // PurecodeWorkspace 顶层 role=application + aria-label "纯代码工作区"
-    expect(screen.getByRole('application', { name: /纯代码工作区/ })).toBeTruthy();
+    expect(await screen.findByRole('application', { name: /纯代码工作区/ })).toBeTruthy();
     // LowcodeWorkspace 的 aria-label 不应出现
     expect(screen.queryByRole('application', { name: /低代码工作区/ })).toBeNull();
     // PurecodeWorkspace 文件树也应可见
-    expect(screen.getByRole('tree', { name: /项目文件树/ })).toBeTruthy();
+    expect(await screen.findByRole('tree', { name: /项目文件树/ })).toBeTruthy();
   });
 });

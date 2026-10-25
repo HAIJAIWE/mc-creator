@@ -1,32 +1,30 @@
 /**
- * Skin UV 映射系统
- * 定义 Minecraft 皮肤各部位在 64x64 纹理中的 UV 矩形区域
- * 支持 classic (4px arms) 和 slim (3px arms) 两种模型
+ * 皮肤编辑器用的**部位元数据 + 点击命中**。
+ *
+ * UV 数字**不在这个文件里** —— 12 个槽位的前脸全部来自 `lib/skin-layout.ts`
+ * （唯一来源，拿真皮肤图逐块核对过）。这里只负责：有哪些部位、叫什么名字、
+ * 谁是谁的第二层、点到的是哪一块。
+ *
+ * 之前这里手抄过一份 UV 表，漂了三处（`rightArmOverlay` 抄成手臂背面 `(52,20)`、
+ * `leftArmOverlay` 抄成 `(48,52)`、`leftLegOverlay` 抄成 `(20,36)` 撞进躯干外套），
+ * 而且 slim 左臂前脸写 37 跟自己的点击检测（36）都对不上。
  */
 
-export type BodyPartId =
-  | 'head'
-  | 'headOverlay'
-  | 'body'
-  | 'bodyOverlay'
-  | 'rightArm'
-  | 'rightArmOverlay'
-  | 'leftArm'
-  | 'leftArmOverlay'
-  | 'rightLeg'
-  | 'rightLegOverlay'
-  | 'leftLeg'
-  | 'leftLegOverlay';
+import {
+  SKIN_SLOT_IDS,
+  type SkinModel,
+  type SkinSlotId,
+  type SkinSlotRect,
+  slotRect,
+} from '../../lib/skin-layout.js';
 
-export type ModelType = 'classic' | 'slim';
+/** 部位标识。名字沿用 `lib/skin-layout.ts` 的槽位 id（玩家的右臂就是 `rightArm`）。 */
+export type BodyPartId = SkinSlotId;
 
-/** 纹理矩形区域 */
-export interface TextureRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+export type ModelType = SkinModel;
+
+/** 纹理矩形区域（前脸）。 */
+export type TextureRect = SkinSlotRect;
 
 /** 部位元数据 */
 export interface BodyPartInfo {
@@ -40,64 +38,15 @@ export interface BodyPartInfo {
   children?: BodyPartId[];
 }
 
-/** 获取模型的臂宽 */
-export function getArmWidth(model: ModelType): number {
-  return model === 'slim' ? 3 : 4;
-}
-
-/** 基础 UV 映射（classic 4px arms） */
-const CLASSIC_UV_MAP: Record<BodyPartId, TextureRect> = {
-  // Head (8x8x8) at (8,8) - 6 faces
-  head: { x: 8, y: 8, width: 8, height: 8 },
-  headOverlay: { x: 40, y: 8, width: 8, height: 8 },
-
-  // Body (12x8x4) front at (20,20) - 8x12
-  body: { x: 20, y: 20, width: 8, height: 12 },
-  bodyOverlay: { x: 20, y: 36, width: 8, height: 12 },
-
-  // Right Arm (12x4x4) front at (44,20) - 4x12 (classic)
-  rightArm: { x: 44, y: 20, width: 4, height: 12 },
-  rightArmOverlay: { x: 52, y: 20, width: 4, height: 12 },
-
-  // Left Arm (12x4x4) front at (36,52) - 4x12 (classic)
-  leftArm: { x: 36, y: 52, width: 4, height: 12 },
-  leftArmOverlay: { x: 48, y: 52, width: 4, height: 12 },
-
-  // Right Leg (12x4x4) front at (4,20) - 4x12
-  rightLeg: { x: 4, y: 20, width: 4, height: 12 },
-  rightLegOverlay: { x: 4, y: 36, width: 4, height: 12 },
-
-  // Left Leg (12x4x4) front at (20,52) - 4x12
-  leftLeg: { x: 20, y: 52, width: 4, height: 12 },
-  leftLegOverlay: { x: 20, y: 36, width: 4, height: 12 },
-};
-
-/** Slim (3px arms) UV 映射 */
-const SLIM_UV_MAP: Record<BodyPartId, TextureRect> = {
-  // Head (same as classic)
-  head: { x: 8, y: 8, width: 8, height: 8 },
-  headOverlay: { x: 40, y: 8, width: 8, height: 8 },
-
-  // Body (same as classic)
-  body: { x: 20, y: 20, width: 8, height: 12 },
-  bodyOverlay: { x: 20, y: 36, width: 8, height: 12 },
-
-  // Right Arm (12x3x4) front at (44,20) - 3x12 (slim)
-  rightArm: { x: 44, y: 20, width: 3, height: 12 },
-  rightArmOverlay: { x: 51, y: 20, width: 3, height: 12 },
-
-  // Left Arm (12x3x4) front at (37,52) - 3x12 (slim) - note: 37 not 36
-  leftArm: { x: 37, y: 52, width: 3, height: 12 },
-  leftArmOverlay: { x: 49, y: 52, width: 3, height: 12 },
-
-  // Right Leg (same as classic)
-  rightLeg: { x: 4, y: 20, width: 4, height: 12 },
-  rightLegOverlay: { x: 4, y: 36, width: 4, height: 12 },
-
-  // Left Leg (same as classic)
-  leftLeg: { x: 20, y: 52, width: 4, height: 12 },
-  leftLegOverlay: { x: 20, y: 36, width: 4, height: 12 },
-};
+/**
+ * classic（4px 手臂）的前脸矩形表。
+ *
+ * 数字来自 `lib/skin-layout.ts`；`BODY_PART_INFOS` 里那份静态元数据用它（那是
+ * 与模型无关的展示用数据，按模型取的地方走 `getBodyPartRect`）。
+ */
+const CLASSIC_UV_MAP: Record<BodyPartId, TextureRect> = Object.fromEntries(
+  SKIN_SLOT_IDS.map((slot) => [slot, slotRect('classic', slot)]),
+) as Record<BodyPartId, TextureRect>;
 
 /** 获取部位矩形 */
 export function getBodyPartRect(
@@ -105,11 +54,10 @@ export function getBodyPartRect(
   partId: BodyPartId,
   isOverlay = false,
 ): TextureRect {
-  const map = model === 'slim' ? SLIM_UV_MAP : CLASSIC_UV_MAP;
   const key = (
     isOverlay && !partId.endsWith('Overlay') ? `${partId}Overlay` : partId
   ) as BodyPartId;
-  return map[key];
+  return slotRect(model, key);
 }
 
 /** 部位元数据配置 */
@@ -228,134 +176,44 @@ export const BODY_PART_DISPLAY_ORDER: BodyPartId[] = [
   'leftLegOverlay',
 ];
 
-/** UV 坐标转换：纹理像素 (0-63) -> UV (0-1) */
-export function texToUV(x: number, y: number): { u: number; v: number } {
-  return { u: (x + 0.5) / 64, v: (y + 0.5) / 64 };
-}
-
-/** UV 转纹理像素 */
-export function uvToTex(u: number, v: number): { x: number; y: number } {
-  return {
-    x: Math.floor(u * 64),
-    y: Math.floor(v * 64),
-  };
-}
-
 /** 判断点是否在矩形内 */
 export function pointInRect(x: number, y: number, rect: TextureRect): boolean {
-  return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
+  return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
 }
 
-/** 获取点击位置对应的部位 */
+/**
+ * 点击命中的判定顺序：**第二层排在主层前面**。
+ *
+ * 第二层画在主层外面，点在两层叠着的地方应该命中第二层（用户点的是他看得见的那层）。
+ * 12 个槽位两两不重叠（`skin-layout.test.ts` 钉着），所以这个顺序只在
+ * 「主层 vs 同部位的第二层」之间有影响。
+ */
+const CLICK_ORDER: readonly BodyPartId[] = [
+  'headOverlay',
+  'head',
+  'bodyOverlay',
+  'body',
+  'rightArmOverlay',
+  'rightArm',
+  'leftArmOverlay',
+  'leftArm',
+  'rightLegOverlay',
+  'rightLeg',
+  'leftLegOverlay',
+  'leftLeg',
+];
+
+/**
+ * 取贴图坐标命中的部位。
+ *
+ * 只认**前脸**（编辑器编辑的就是前脸），没落在任何前脸上返回 `null`。
+ *
+ * 之前这里手写了两份 classic/slim 的坐标比较（同一个布局的第四份拷贝），
+ * 现在按唯一来源逐个矩形判。
+ */
 export function getBodyPartAt(model: ModelType, x: number, y: number): BodyPartId | null {
-  const map = getArmWidth(model) === 3 ? getSlimBodyPartAt : getClassicBodyPartAt;
-  return map(x, y);
-}
-
-/** Classic 模型点击检测 */
-function getClassicBodyPartAt(x: number, y: number): BodyPartId | null {
-  // Head overlay
-  if (x >= 40 && x < 48 && y >= 8 && y < 16) return 'headOverlay';
-  // Head
-  if (x >= 8 && x < 16 && y >= 8 && y < 16) return 'head';
-  // Body overlay
-  if (x >= 20 && x < 28 && y >= 36 && y < 48) return 'bodyOverlay';
-  // Body
-  if (x >= 20 && x < 28 && y >= 20 && y < 32) return 'body';
-  // Right arm overlay（前脸）
-  if (x >= 44 && x < 48 && y >= 36 && y < 48) return 'rightArmOverlay';
-  // Right arm
-  if (x >= 44 && x < 48 && y >= 20 && y < 32) return 'rightArm';
-  // Left arm overlay（前脸）
-  if (x >= 52 && x < 56 && y >= 52 && y < 64) return 'leftArmOverlay';
-  // Left arm
-  if (x >= 36 && x < 40 && y >= 52 && y < 64) return 'leftArm';
-  // Right leg overlay
-  if (x >= 4 && x < 8 && y >= 36 && y < 48) return 'rightLegOverlay';
-  // Right leg
-  if (x >= 4 && x < 8 && y >= 20 && y < 32) return 'rightLeg';
-  // Left leg overlay（前脸 x=4-7, y=52-63）
-  if (x >= 4 && x < 8 && y >= 52 && y < 64) return 'leftLegOverlay';
-  // Left leg
-  if (x >= 20 && x < 24 && y >= 52 && y < 64) return 'leftLeg';
-
-  return null;
-}
-
-/** Slim 模型点击检测 */
-function getSlimBodyPartAt(x: number, y: number): BodyPartId | null {
-  // Head overlay
-  if (x >= 40 && x < 48 && y >= 8 && y < 16) return 'headOverlay';
-  // Head
-  if (x >= 8 && x < 16 && y >= 8 && y < 16) return 'head';
-  // Body overlay
-  if (x >= 20 && x < 28 && y >= 36 && y < 48) return 'bodyOverlay';
-  // Body
-  if (x >= 20 && x < 28 && y >= 20 && y < 32) return 'body';
-  // Right arm overlay (3px，前脸)
-  if (x >= 44 && x < 47 && y >= 36 && y < 48) return 'rightArmOverlay';
-  // Right arm (3px)
-  if (x >= 44 && x < 47 && y >= 20 && y < 32) return 'rightArm';
-  // Left arm overlay (3px，前脸 x=52-54)
-  if (x >= 52 && x < 55 && y >= 52 && y < 64) return 'leftArmOverlay';
-  // Left arm (3px，前脸 x=36-38，像素探针验证）
-  if (x >= 36 && x < 39 && y >= 52 && y < 64) return 'leftArm';
-  // Right leg overlay
-  if (x >= 4 && x < 8 && y >= 36 && y < 48) return 'rightLegOverlay';
-  // Right leg
-  if (x >= 4 && x < 8 && y >= 20 && y < 32) return 'rightLeg';
-  // Left leg overlay（前脸 x=4-7, y=52-63）
-  if (x >= 4 && x < 8 && y >= 52 && y < 64) return 'leftLegOverlay';
-  // Left leg
-  if (x >= 20 && x < 24 && y >= 52 && y < 64) return 'leftLeg';
-
-  return null;
-}
-
-/** 镜像坐标转换：根据部位返回镜像后的坐标 */
-export function mirrorCoordinate(
-  model: ModelType,
-  partId: BodyPartId,
-  x: number,
-  y: number,
-): { x: number; y: number } {
-  const rect = getBodyPartRect(model, partId, false);
-  const overlayRect = getBodyPartRect(model, partId, true);
-
-  // 计算相对于部位的局部坐标
-  const localX = x - rect.x;
-
-  // 镜像：在部位矩形内水平翻转
-  const mirroredLocalX = rect.width - 1 - localX;
-  const mirroredX = rect.x + mirroredLocalX;
-
-  // 如果有 overlay，也镜像 overlay 区域（仅当点击点本身在 overlay 区域内）
-  if (overlayRect && pointInRect(x, y, overlayRect)) {
-    const overlayLocalX = x - overlayRect.x;
-    const mirroredOverlayLocalX = overlayRect.width - 1 - overlayLocalX;
-    return {
-      x: overlayRect.x + mirroredOverlayLocalX,
-      y: y,
-    };
+  for (const slot of CLICK_ORDER) {
+    if (pointInRect(x, y, slotRect(model, slot))) return slot;
   }
-
-  return { x: mirroredX, y: y };
-}
-
-/** 检查坐标是否在部位内（用于部位隔离） */
-export function isInBodyPart(
-  model: ModelType,
-  partId: BodyPartId,
-  x: number,
-  y: number,
-  includeOverlay = true,
-): boolean {
-  const rect = getBodyPartRect(model, partId, false);
-  if (pointInRect(x, y, rect)) return true;
-
-  if (includeOverlay) {
-    const overlayRect = getBodyPartRect(model, partId, true);
-    if (pointInRect(x, y, overlayRect)) return true;
-  }
-  return false;
+  return null;
 }

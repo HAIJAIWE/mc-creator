@@ -14,10 +14,16 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 if (typeof globalThis.DOMMatrix === 'undefined') {
   globalThis.DOMMatrix = class {
     constructor() {}
-    multiply() { return this; }
-    inverse() { return this; }
-    transformPoint() { return { x: 0, y: 0 }; }
-  };
+    multiply() {
+      return this;
+    }
+    inverse() {
+      return this;
+    }
+    transformPoint() {
+      return { x: 0, y: 0 };
+    }
+  } as unknown as typeof DOMMatrix;
 }
 
 // Mock matchMedia for components that use it

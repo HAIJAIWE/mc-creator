@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import {
   Pencil,
   Eraser,
@@ -311,6 +319,12 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
     const [touchStartDist, setTouchStartDist] = useState<number | null>(null);
     const [touchMid, setTouchMid] = useState<{ x: number; y: number } | null>(null);
     const [layers, setLayers] = useState<Layer[]>(() => initLayers());
+    // 初始化只认「当前」base 图层：图层增删改会换掉 layers 数组，
+    // 若把 layers 放进初始化 effect 的依赖里，加个图层就会重新载入初始纹理、抹掉已画像素。
+    const layersRef = useRef(layers);
+    useEffect(() => {
+      layersRef.current = layers;
+    }, [layers]);
 
     // === 撤销/重做历史（存储完整 layers 快照）===
     const [undoStack, setUndoStack] = useState<LayerShot[]>([]);
@@ -455,10 +469,15 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       [buildFilterString],
     );
 
+    // === 尺寸计算（redraw 依赖它：canvas 位图 = 64 × zoom）===
+    const size = 64 * zoom;
+
     const redraw = useCallback(() => {
       const view = viewRef.current;
       if (!view) return;
-      const z = view.width / 64;
+      // canvas 的位图尺寸 = 64 × zoom（size）；zoom 变化会重设 width/height 并清空位图，
+      // 所以 size 是 redraw 的真实依赖，必须参与触发重绘。
+      const z = size / 64;
       const ctx = view.getContext('2d');
       if (!ctx) return;
       ctx.imageSmoothingEnabled = false;
@@ -500,11 +519,14 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
         }
         ctx.stroke();
       }
-    }, [layers, showGrid, filterPipeline, applyFilters]);
+    }, [layers, showGrid, filterPipeline, applyFilters, size]);
 
-    useEffect(() => {
+    // canvas 是条件渲染的：ready=false 时不在 DOM 里。
+    // 必须等它真正挂载（ready 变 true）后再画首帧，否则 viewRef 为空、棋盘格都不会出现。
+    useLayoutEffect(() => {
+      if (!ready) return;
       redraw();
-    }, [redraw]);
+    }, [ready, redraw]);
 
     // === 初始化：载入起始纹理到 base 图层，其他图层空白 ===
     useEffect(() => {
@@ -514,7 +536,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       }
       const img = new Image();
       img.onload = () => {
-        const baseLayer = layers.find((l) => l.id === 'base');
+        const baseLayer = layersRef.current.find((l) => l.id === 'base');
         if (!baseLayer) {
           setReady(true);
           return;
@@ -536,7 +558,7 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       };
       img.onerror = () => setReady(true);
       img.src = initialUrl;
-    }, [initialUrl, layers]);
+    }, [initialUrl]);
 
     // === 合成数据URL ===
     const compositeDataUrl = useCallback((): string => {
@@ -875,205 +897,209 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
 
     useImperativeHandle(
       ref,
-      () =>
-        ({
-          // === 3D 直绘 ===
-          paintStart(x: number, y: number, isOverlay: boolean, partKey: string) {
-            const t = tool;
-            if (t === 'picker') {
-              pickAt(x, y);
-              return;
-            }
-            const layerId = isOverlay ? 'overlay' : activeLayerId;
-            const ctx = getLayerCtx(layerId);
-            if (!ctx || x < 0 || y < 0 || x >= 64 || y >= 64) return;
-            pushHistory();
-            painting3DRef.current = true;
-            painted3DRef.current = false;
-            last3DRef.current = { x, y };
-            lastPart3DRef.current = partKey;
-            if (t === 'pencil' || t === 'eraser') {
-              dab(ctx, x, y);
-              painted3DRef.current = true;
-              redraw();
-            } else if (t === 'fill') {
-              handleFloodFill(ctx, x, y);
-              painted3DRef.current = true;
-              redraw();
-              rememberColor(color);
-              emit();
-            } else {
-              // line/rect 在 3D 下退化为单点，避免跨面拉线污染贴图
-              dab(ctx, x, y);
-              painted3DRef.current = true;
-              redraw();
-            }
-          },
-          paintMove(x: number, y: number, isOverlay: boolean, partKey: string) {
-            if (!painting3DRef.current) return;
-            const t = tool;
-            if (t !== 'pencil' && t !== 'eraser') return;
-            const layerId = isOverlay ? 'overlay' : activeLayerId;
-            const ctx = getLayerCtx(layerId);
-            if (!ctx || x < 0 || y < 0 || x >= 64 || y >= 64) return;
-            // 跨部位/跨图层：只落单点，不连线
-            if (lastPart3DRef.current !== null && lastPart3DRef.current !== partKey) {
-              dab(ctx, x, y);
-            } else {
-              const last = last3DRef.current ?? { x, y };
-              strokeLine(ctx, last.x, last.y, x, y);
-            }
-            last3DRef.current = { x, y };
-            lastPart3DRef.current = partKey;
+      () => ({
+        // === 3D 直绘 ===
+        paintStart(x: number, y: number, isOverlay: boolean, partKey: string) {
+          const t = tool;
+          if (t === 'picker') {
+            pickAt(x, y);
+            return;
+          }
+          const layerId = isOverlay ? 'overlay' : activeLayerId;
+          const ctx = getLayerCtx(layerId);
+          if (!ctx || x < 0 || y < 0 || x >= 64 || y >= 64) return;
+          pushHistory();
+          painting3DRef.current = true;
+          painted3DRef.current = false;
+          last3DRef.current = { x, y };
+          lastPart3DRef.current = partKey;
+          if (t === 'pencil' || t === 'eraser') {
+            dab(ctx, x, y);
             painted3DRef.current = true;
             redraw();
+          } else if (t === 'fill') {
+            handleFloodFill(ctx, x, y);
+            painted3DRef.current = true;
+            redraw();
+            rememberColor(color);
+            emit();
+          } else {
+            // line/rect 在 3D 下退化为单点，避免跨面拉线污染贴图
+            dab(ctx, x, y);
+            painted3DRef.current = true;
+            redraw();
+          }
+        },
+        paintMove(x: number, y: number, isOverlay: boolean, partKey: string) {
+          if (!painting3DRef.current) return;
+          const t = tool;
+          if (t !== 'pencil' && t !== 'eraser') return;
+          const layerId = isOverlay ? 'overlay' : activeLayerId;
+          const ctx = getLayerCtx(layerId);
+          if (!ctx || x < 0 || y < 0 || x >= 64 || y >= 64) return;
+          // 跨部位/跨图层：只落单点，不连线
+          if (lastPart3DRef.current !== null && lastPart3DRef.current !== partKey) {
+            dab(ctx, x, y);
+          } else {
+            const last = last3DRef.current ?? { x, y };
+            strokeLine(ctx, last.x, last.y, x, y);
+          }
+          last3DRef.current = { x, y };
+          lastPart3DRef.current = partKey;
+          painted3DRef.current = true;
+          redraw();
+        },
+        paintEnd() {
+          if (!painting3DRef.current && !painted3DRef.current) return;
+          painting3DRef.current = false;
+          last3DRef.current = null;
+          lastPart3DRef.current = null;
+          if (painted3DRef.current) {
+            painted3DRef.current = false;
+            rememberColor(color);
+            emit();
+          }
+        },
+        // v1.1 姿势控制
+        setPose(preset: PosePreset) {
+          setPose(preset);
+        },
+        setCustomPose(joint: keyof JointAngles, axis: 'x' | 'y' | 'z', value: number) {
+          setCustomPose((prev) => ({
+            ...prev,
+            [joint]: { ...prev[joint], [axis]: value },
+          }));
+        },
+        resetPose() {
+          setPose('idle');
+          setCustomPose({
+            head: { x: 0, y: 0, z: 0 },
+            body: { x: 0, y: 0, z: 0 },
+            leftArm: { x: 0, y: 0, z: 0 },
+            rightArm: { x: 0, y: 0, z: 0 },
+            leftLeg: { x: 0, y: 0, z: 0 },
+            rightLeg: { x: 0, y: 0, z: 0 },
+          });
+        },
+        // v1.2 图层操作
+        layerOps: {
+          addLayer: (name?: string, type?: LayerType) => {
+            const newLayer = createCustomLayer(
+              name ?? `图层 ${layers.filter((l) => l.type === 'custom').length + 1}`,
+            );
+            if (type) newLayer.type = type;
+            setLayers((prev) => [...prev, newLayer]);
+            setActiveLayerId(newLayer.id);
+            pushHistory();
+            return newLayer.id;
           },
-          paintEnd() {
-            if (!painting3DRef.current && !painted3DRef.current) return;
-            painting3DRef.current = false;
-            last3DRef.current = null;
-            lastPart3DRef.current = null;
-            if (painted3DRef.current) {
-              painted3DRef.current = false;
-              rememberColor(color);
-              emit();
-            }
-          },
-          // v1.1 姿势控制
-          setPose(preset: PosePreset) {
-            setPose(preset);
-          },
-          setCustomPose(joint: keyof JointAngles, axis: 'x' | 'y' | 'z', value: number) {
-            setCustomPose((prev) => ({
-              ...prev,
-              [joint]: { ...prev[joint], [axis]: value },
-            }));
-          },
-          resetPose() {
-            setPose('idle');
-            setCustomPose({
-              head: { x: 0, y: 0, z: 0 },
-              body: { x: 0, y: 0, z: 0 },
-              leftArm: { x: 0, y: 0, z: 0 },
-              rightArm: { x: 0, y: 0, z: 0 },
-              leftLeg: { x: 0, y: 0, z: 0 },
-              rightLeg: { x: 0, y: 0, z: 0 },
+          duplicateLayer: (id: string) => {
+            const src = layers.find((l) => l.id === id);
+            if (!src) return '';
+            const newLayer = createCustomLayer(`${src.name} 副本`);
+            const dstCtx = newLayer.canvas.getContext('2d')!;
+            dstCtx.drawImage(src.canvas, 0, 0);
+            newLayer.opacity = src.opacity;
+            newLayer.blendMode = src.blendMode;
+            newLayer.visible = src.visible;
+            newLayer.locked = src.locked;
+            const insertIndex = layers.findIndex((l) => l.id === id) + 1;
+            setLayers((prev) => {
+              const next = [...prev];
+              next.splice(insertIndex, 0, newLayer);
+              return next;
             });
+            setActiveLayerId(newLayer.id);
+            pushHistory();
+            return newLayer.id;
           },
-          // v1.2 图层操作
-          layerOps: {
-            addLayer: (name?: string, type?: LayerType) => {
-              const newLayer = createCustomLayer(
-                name ?? `图层 ${layers.filter((l) => l.type === 'custom').length + 1}`,
-              );
-              if (type) newLayer.type = type;
-              setLayers((prev) => [...prev, newLayer]);
-              setActiveLayerId(newLayer.id);
-              pushHistory();
-              return newLayer.id;
-            },
-            duplicateLayer: (id: string) => {
-              const src = layers.find((l) => l.id === id);
-              if (!src) return '';
-              const newLayer = createCustomLayer(`${src.name} 副本`);
-              const dstCtx = newLayer.canvas.getContext('2d')!;
-              dstCtx.drawImage(src.canvas, 0, 0);
-              newLayer.opacity = src.opacity;
-              newLayer.blendMode = src.blendMode;
-              newLayer.visible = src.visible;
-              newLayer.locked = src.locked;
-              const insertIndex = layers.findIndex((l) => l.id === id) + 1;
-              setLayers((prev) => {
-                const next = [...prev];
-                next.splice(insertIndex, 0, newLayer);
-                return next;
-              });
-              setActiveLayerId(newLayer.id);
-              pushHistory();
-              return newLayer.id;
-            },
-            deleteLayer: (id: string) => {
-              if (layers.length <= 1) return;
-              if (id === 'base' || id === 'overlay') return; // 保护基础图层
-              setLayers((prev) => prev.filter((l) => l.id !== id));
-              setActiveLayerId(layers.find((l) => l.id !== id)?.id ?? 'base');
-              pushHistory();
-            },
-            clearLayer: (id: string) => {
-              const layer = layers.find((l) => l.id === id);
-              if (!layer) return;
-              const ctx = layer.canvas.getContext('2d')!;
-              ctx.clearRect(0, 0, 64, 64);
-              pushHistory();
-              redraw();
-              emit();
-            },
-            renameLayer: (id: string, name: string) => {
-              setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, name } : l)));
-            },
-            moveLayer: (fromIndex: number, toIndex: number) => {
-              setLayers((prev) => {
-                const next = [...prev];
-                const [removed] = next.splice(fromIndex, 1);
-                next.splice(toIndex, 0, removed);
-                return next;
-              });
-              pushHistory();
-            },
-            setLayerProps: (id: string, props: Partial<Layer>) => {
-              setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...props } : l)));
-            },
-            mergeDown: (id: string) => {
-              const index = layers.findIndex((l) => l.id === id);
-              if (index <= 0) return;
-              const upper = layers[index];
-              const lower = layers[index - 1];
-              const lowerCtx = lower.canvas.getContext('2d')!;
-              lowerCtx.globalAlpha = upper.opacity / 100;
-              lowerCtx.globalCompositeOperation = upper.blendMode;
-              lowerCtx.drawImage(upper.canvas, 0, 0);
-              lowerCtx.globalAlpha = 1;
-              lowerCtx.globalCompositeOperation = 'source-over';
-              setLayers((prev) => prev.filter((l) => l.id !== id));
-              pushHistory();
-              redraw();
-              emit();
-            },
-            mergeVisible: () => {
-              const visibleLayers = layers.filter((l) => l.visible && l.id !== 'base');
-              if (visibleLayers.length === 0) return;
-              const baseLayer = layers.find((l) => l.id === 'base');
-              if (!baseLayer) return;
-              const baseCtx = baseLayer.canvas.getContext('2d')!;
-              visibleLayers.forEach((l) => {
-                baseCtx.globalAlpha = l.opacity / 100;
-                baseCtx.globalCompositeOperation = l.blendMode;
-                baseCtx.drawImage(l.canvas, 0, 0);
-              });
-              baseCtx.globalAlpha = 1;
-              baseCtx.globalCompositeOperation = 'source-over';
-              setLayers((prev) =>
-                prev.filter((l) => l.id === 'base' || l.id === 'overlay' || !l.visible),
-              );
-              pushHistory();
-              redraw();
-              emit();
-            },
+          deleteLayer: (id: string) => {
+            if (layers.length <= 1) return;
+            if (id === 'base' || id === 'overlay') return; // 保护基础图层
+            setLayers((prev) => prev.filter((l) => l.id !== id));
+            setActiveLayerId(layers.find((l) => l.id !== id)?.id ?? 'base');
+            pushHistory();
           },
-        })[
-          // @ts-expect-error: dependency array false positive
-          (dab,
-          strokeLine,
-          handleFloodFill,
-          pickAt,
-          pushHistory,
-          rememberColor,
-          emit,
-          redraw,
-          layers,
-          activeLayerId,
-          createCustomLayer)
-        ],
+          clearLayer: (id: string) => {
+            const layer = layers.find((l) => l.id === id);
+            if (!layer) return;
+            const ctx = layer.canvas.getContext('2d')!;
+            ctx.clearRect(0, 0, 64, 64);
+            pushHistory();
+            redraw();
+            emit();
+          },
+          renameLayer: (id: string, name: string) => {
+            setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, name } : l)));
+          },
+          moveLayer: (fromIndex: number, toIndex: number) => {
+            setLayers((prev) => {
+              const next = [...prev];
+              const [removed] = next.splice(fromIndex, 1);
+              next.splice(toIndex, 0, removed);
+              return next;
+            });
+            pushHistory();
+          },
+          setLayerProps: (id: string, props: Partial<Layer>) => {
+            setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...props } : l)));
+          },
+          mergeDown: (id: string) => {
+            const index = layers.findIndex((l) => l.id === id);
+            if (index <= 0) return;
+            const upper = layers[index];
+            const lower = layers[index - 1];
+            const lowerCtx = lower.canvas.getContext('2d')!;
+            lowerCtx.globalAlpha = upper.opacity / 100;
+            lowerCtx.globalCompositeOperation = upper.blendMode;
+            lowerCtx.drawImage(upper.canvas, 0, 0);
+            lowerCtx.globalAlpha = 1;
+            lowerCtx.globalCompositeOperation = 'source-over';
+            setLayers((prev) => prev.filter((l) => l.id !== id));
+            pushHistory();
+            redraw();
+            emit();
+          },
+          mergeVisible: () => {
+            const visibleLayers = layers.filter((l) => l.visible && l.id !== 'base');
+            if (visibleLayers.length === 0) return;
+            const baseLayer = layers.find((l) => l.id === 'base');
+            if (!baseLayer) return;
+            const baseCtx = baseLayer.canvas.getContext('2d')!;
+            visibleLayers.forEach((l) => {
+              baseCtx.globalAlpha = l.opacity / 100;
+              baseCtx.globalCompositeOperation = l.blendMode;
+              baseCtx.drawImage(l.canvas, 0, 0);
+            });
+            baseCtx.globalAlpha = 1;
+            baseCtx.globalCompositeOperation = 'source-over';
+            setLayers((prev) =>
+              prev.filter((l) => l.id === 'base' || l.id === 'overlay' || !l.visible),
+            );
+            pushHistory();
+            redraw();
+            emit();
+          },
+        },
+      }),
+      // 依赖数组必须作为第三个参数 —— 之前被写成对象下标 `({...})[commaExpr]`，
+      // 工厂实际返回 undefined，ref.current 永远是 undefined（3D 直绘桥接整体失效）。
+      [
+        dab,
+        strokeLine,
+        handleFloodFill,
+        pickAt,
+        pushHistory,
+        rememberColor,
+        emit,
+        redraw,
+        layers,
+        activeLayerId,
+        createCustomLayer,
+        color,
+        getLayerCtx,
+        tool,
+      ],
     );
 
     // === 文件上传/下载 ===
@@ -1306,9 +1332,6 @@ export const SkinPixelEditor = forwardRef<SkinPixelEditorHandle, SkinPixelEditor
       { id: 'line', label: '直线', icon: <PenLine className="h-3.5 w-3.5" />, key: 'L' },
       { id: 'rect', label: '矩形', icon: <Square className="h-3.5 w-3.5" />, key: 'R' },
     ];
-
-    // === 尺寸计算 ===
-    const size = 64 * zoom;
 
     // === 渲染 ===
     return (

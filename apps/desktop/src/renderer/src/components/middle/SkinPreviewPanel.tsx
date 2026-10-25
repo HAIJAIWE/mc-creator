@@ -25,6 +25,7 @@ import { SkinHistoryPanel } from './SkinHistoryPanel.js';
 import { CollabPanel } from './CollabPanel.js';
 import { PanelErrorBoundary } from './PanelErrorBoundary.js';
 import { loadSkinImage, normalizeSkinPng } from './skin-normalize.js';
+import { convertLegacySkinToModern, isLegacySkinSize } from '../../lib/legacy-skin.js';
 import type { SkinSpec } from '@mc-creator/shared';
 import { BodyPartId } from './skin-uv.js';
 import {
@@ -572,6 +573,48 @@ const DEMO_SKIN: SkinSpec = {
 };
 
 /**
+ * 显示用的皮肤 URL：legacy `64×32` 自动转成现代 `64×64`。
+ *
+ * 3D 预览走 skinview3d，它只认现代布局（头 `(0,0)`、躯干 `(16,16)`、
+ * 右臂 `(40,16)`、右腿 `(0,16)`、左臂 `(32,48)`、左腿 `(16,48)`）。
+ * legacy 皮肤**没有左半身**，直接丢给它渲染出来的模型是「有头有躯干、
+ * 四肢透明」的残缺人 —— 实测过。
+ *
+ * 转换只发生在**显示**层：皮肤库里存的仍然是原始 PNG（1.6/1.7 的离线皮肤
+ * 资源包要的就是 64×32 原始文件，见 `offline-skin-pack.ts`）。
+ *
+ * 顺带把「这张图是 legacy」带出来：legacy 只有 Steve 模型，
+ * 用 slim 的 UV 画它会错位。
+ */
+function useModernSkinUrl(url: string | null): { url: string | null; isLegacy: boolean } {
+  const [state, setState] = useState<{ url: string | null; isLegacy: boolean }>({
+    url,
+    isLegacy: false,
+  });
+  useEffect(() => {
+    let cancelled = false;
+    if (url === null) {
+      setState({ url: null, isLegacy: false });
+      return;
+    }
+    // 先按原图显示，转换是异步的（要读图片尺寸）
+    setState({ url, isLegacy: false });
+    void (async () => {
+      const img = await loadSkinImage(url);
+      if (cancelled || img === null) return;
+      if (!isLegacySkinSize(img.naturalWidth, img.naturalHeight)) return;
+      const converted = convertLegacySkinToModern(img);
+      if (cancelled || converted === null) return;
+      setState({ url: converted, isLegacy: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return state;
+}
+
+/**
  * Skin 面板（启动器风格选择器 + 内置编辑器）：
  * - 选择器：左侧大 3D 预览 + Drag to rotate + 编辑皮肤入口；
  *   右侧「已保存皮肤 / 默认皮肤」卡片网格；底部演示账号横幅
@@ -839,11 +882,13 @@ export function SkinPreviewPanel() {
 
   // 编辑器 3D 预览纹理：已选上传皮肤优先（别人做的 PNG 也能改），
   // 其次官方原图（配色与预设一致时），否则跟随当前配色即时绘制，最后回退项目文件 PNG
-  const editorSkinUrl =
+  const rawEditorSkinUrl =
     savedSkins.find((x) => x.id === selectedId)?.dataUrl ??
     officialUrl ??
     liveTextureUrl ??
     skinUrl;
+  const editorSkin = useModernSkinUrl(rawEditorSkinUrl);
+  const editorSkinUrl = editorSkin.url;
 
   // 像素编辑器纹理（落笔即同步 3D）；spec/所选变化时失效回退到 editorSkinUrl
   const [pixelTextureUrl, setPixelTextureUrl] = useState<string | null>(null);
@@ -975,9 +1020,14 @@ export function SkinPreviewPanel() {
 
   // 选择器大预览：已保存皮肤用上传原图，否则用所选官方纹理（Steve 兜底）
   const selectedSaved = savedSkins.find((x) => x.id === selectedId) ?? null;
-  const bigPreviewUrl =
-    selectedSaved?.dataUrl ?? skinTextures.get(selectedId) ?? skinTextures.get('Steve') ?? null;
-  const bigPreviewModel = DEFAULT_SKINS.find((d) => d.name === selectedId)?.model ?? spec.model;
+  const bigPreview = useModernSkinUrl(
+    selectedSaved?.dataUrl ?? skinTextures.get(selectedId) ?? skinTextures.get('Steve') ?? null,
+  );
+  const bigPreviewUrl = bigPreview.url;
+  const bigPreviewModel = bigPreview.isLegacy
+    ? // legacy 只有 Steve 模型（见 core/skin/png.ts），用 slim 的 UV 画它会错位
+      'classic'
+    : (DEFAULT_SKINS.find((d) => d.name === selectedId)?.model ?? spec.model);
 
   // v1.3 广场过滤：名称搜索 + 仅看收藏
   const galleryQ = galleryQuery.trim().toLowerCase();

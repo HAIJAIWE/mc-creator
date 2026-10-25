@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import {
   Pencil,
   Eraser,
@@ -157,11 +165,16 @@ export const CapeEditor = forwardRef<CapeEditorHandle, CapeEditorProps>(function
     return offscreenRef.current?.getContext('2d') ?? null;
   }, []);
 
+  // 画布位图尺寸 = 纹理尺寸 × zoom；zoom 变化会重设 width/height 并清空位图，
+  // 所以 sizeW 是 redraw 的真实依赖，必须参与触发重绘。
+  const sizeW = CAPE_WIDTH * zoom;
+  const sizeH = CAPE_HEIGHT * zoom;
+
   const redraw = useCallback(() => {
     const view = viewRef.current;
     const canvas = offscreenRef.current;
     if (!view || !canvas) return;
-    const z = view.width / CAPE_WIDTH;
+    const z = sizeW / CAPE_WIDTH;
     const ctx = view.getContext('2d');
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
@@ -187,11 +200,14 @@ export const CapeEditor = forwardRef<CapeEditorHandle, CapeEditorProps>(function
       }
       ctx.stroke();
     }
-  }, [showGrid]);
+  }, [showGrid, sizeW]);
 
-  useEffect(() => {
+  // canvas 是条件渲染的：ready=false 时不在 DOM 里。
+  // 必须等它真正挂载（ready 变 true）后再画首帧，否则 viewRef 为空、棋盘格都不会出现。
+  useLayoutEffect(() => {
+    if (!ready) return;
     redraw();
-  }, [redraw]);
+  }, [ready, redraw]);
 
   useEffect(() => {
     const canvas = document.createElement('canvas');
@@ -704,9 +720,6 @@ export const CapeEditor = forwardRef<CapeEditorHandle, CapeEditorProps>(function
     { id: 'fill', label: '填充', icon: <PaintBucket className="h-3.5 w-3.5" />, key: 'F' },
     { id: 'picker', label: '取色', icon: <Pipette className="h-3.5 w-3.5" />, key: 'I' },
   ];
-
-  const sizeW = CAPE_WIDTH * zoom;
-  const sizeH = CAPE_HEIGHT * zoom;
 
   return (
     <div

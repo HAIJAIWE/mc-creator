@@ -1,60 +1,28 @@
-export type BodyPartName =
-  | 'head'
-  | 'headOverlay'
-  | 'body'
-  | 'bodyOverlay'
-  | 'rightArm'
-  | 'rightArmOverlay'
-  | 'leftArm'
-  | 'leftArmOverlay'
-  | 'rightLeg'
-  | 'rightLegOverlay'
-  | 'leftLeg'
-  | 'leftLegOverlay';
+import {
+  type SkinModel,
+  type SkinSlotId,
+  type SkinSlotRect,
+  slotRect,
+} from '../../lib/skin-layout.js';
 
-export interface PartRect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+/** 部位名。沿用 `lib/skin-layout.ts` 的槽位 id（玩家的右臂就是 `rightArm`）。 */
+export type BodyPartName = SkinSlotId;
+
+export type PartRect = SkinSlotRect;
 
 /**
- * 各部位正脸矩形（画布像素坐标），与官方 64x64 展开图一致
- * （slim 手臂前脸宽 3px，经官方 slim-alex.png 像素探针验证）。
+ * 各部位正脸矩形（画布像素坐标）。
+ *
+ * 数字全部来自 `lib/skin-layout.ts`（唯一来源，拿真皮肤图逐块核对过）。这里原本是
+ * **第三份**手抄表 —— 这份当时是对的（slim 左臂 36 也是对的），但手抄迟早漂，
+ * 现在直接取。
  */
 export function getPartUVRect(partName: BodyPartName, model: ModelType): PartRect {
-  const aw = model === 'slim' ? 3 : 4;
-  switch (partName) {
-    case 'head':
-      return { x: 8, y: 8, w: 8, h: 8 };
-    case 'headOverlay':
-      return { x: 40, y: 8, w: 8, h: 8 };
-    case 'body':
-      return { x: 20, y: 20, w: 8, h: 12 };
-    case 'bodyOverlay':
-      return { x: 20, y: 36, w: 8, h: 12 };
-    case 'rightArm':
-      return { x: 44, y: 20, w: aw, h: 12 };
-    case 'rightArmOverlay':
-      return { x: 44, y: 36, w: aw, h: 12 };
-    case 'leftArm':
-      return { x: 36, y: 52, w: aw, h: 12 };
-    case 'leftArmOverlay':
-      return { x: 52, y: 52, w: aw, h: 12 };
-    case 'rightLeg':
-      return { x: 4, y: 20, w: 4, h: 12 };
-    case 'rightLegOverlay':
-      return { x: 4, y: 36, w: 4, h: 12 };
-    case 'leftLeg':
-      return { x: 20, y: 52, w: 4, h: 12 };
-    case 'leftLegOverlay':
-      return { x: 4, y: 52, w: 4, h: 12 };
-  }
+  return slotRect(model, partName);
 }
 
 export type MirrorMode = 'off' | 'global' | 'bodypart';
-export type ModelType = 'classic' | 'slim';
+export type ModelType = SkinModel;
 
 /** 部位镜像映射表（源自 PMCSkin3D 的镜像逻辑） */
 const MIRROR_MAP: Record<BodyPartName, BodyPartName | null> = {
