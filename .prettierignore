@@ -26,3 +26,6 @@ release
 # 自动生成
 docs/superpowers/plans
 docs/superpowers/specs
+
+# 启动器运行时数据（程序自己写的实例表 / 游戏目录 / 皮肤），不该受代码风格管辖
+apps/desktop/mc-launcher
