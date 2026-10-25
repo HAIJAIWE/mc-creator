@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { InferRequest, InferResponse } from './infer.js';
-import type { StageResult } from './pipeline.js';
+import type { StageResult } from '../core/pipeline.js';
 import { runClosedLoop, type ClosedLoopStepEvent } from './closed-loop.js';
 import type { GeneratePromptInput } from './generate.js';
 

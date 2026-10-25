@@ -16,7 +16,7 @@ import {
   fetchContextState,
   normalizeContextState,
 } from './context-source.js';
-import { createMcpServer } from './mcp-server.js';
+import { createMcpServer } from '../transport/mcp-server.js';
 
 const dirs: string[] = [];
 afterEach(() => {

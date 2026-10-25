@@ -13,7 +13,7 @@
  *   运行中异常一律收敛为 abort（detail 带异常信息），不抛裸异常。
  */
 
-import { nextStep, type NextDecision, type StageResult } from './pipeline.js';
+import { nextStep, type NextDecision, type StageResult } from '../core/pipeline.js';
 import { buildGeneratePrompt, planFixAttempt, type GeneratePromptInput } from './generate.js';
 import type { InferRequest, InferResponse } from './infer.js';
 

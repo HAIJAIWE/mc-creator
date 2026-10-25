@@ -4,10 +4,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { MCP_TOOL_PERMISSIONS, VALIDATION_CRITERIA } from '@mc-creator/contract';
-import { MCP_TOOL_DEFS, requireConfirm } from './tools.js';
-import { MCP_READ_ROUTES, createMcpServer } from './mcp-server.js';
-import { buildContextPack } from './context-pack.js';
-import { nextStep } from './pipeline.js';
+import { MCP_TOOL_DEFS, requireConfirm } from './core/tools.js';
+import { MCP_READ_ROUTES, createMcpServer } from './transport/mcp-server.js';
+import { buildContextPack } from './context/context-pack.js';
+import { nextStep } from './core/pipeline.js';
 
 describe('tools.ts MCP 工具清单（§10.2 / §10.6）', () => {
   // 注：任务简报写“22 个”，但简报自列的名单与 contract MCP_TOOL_PERMISSIONS

@@ -21,18 +21,18 @@
 import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
-import { BedrockKernel } from '@mc-creator/kernel-bedrock';
+// 具体内核类已下沉到 kernel/adapters.ts —— 本层只认 KernelContract 接口。
+// 这里仍需各内核的 KernelContext 类型，仅用于 McpServerOptions 的构造参数透传。
 import type { KernelContext as BedrockKernelContext } from '@mc-creator/kernel-bedrock';
-import { JavaKernel } from '@mc-creator/kernel-java';
 import type { KernelContext as JavaKernelContext } from '@mc-creator/kernel-java';
-import { ServerKernel } from '@mc-creator/kernel-server';
 import type { KernelContext as ServerKernelContext } from '@mc-creator/kernel-server';
 import type { KernelContract, TaskResult } from '@mc-creator/contract';
-import { MCP_TOOL_DEFS, requireConfirm } from './tools.js';
-import type { McpToolDef } from './tools.js';
-import { buildContextPack } from './context-pack.js';
-import type { ContextParts } from './context-pack.js';
-import { normalizeContextState } from './context-source.js';
+import { createKernelBundle, type KernelBundle } from '../kernel/adapters.js';
+import { MCP_TOOL_DEFS, requireConfirm } from '../core/tools.js';
+import type { McpToolDef } from '../core/tools.js';
+import { buildContextPack } from '../context/context-pack.js';
+import type { ContextParts } from '../context/context-pack.js';
+import { normalizeContextState } from '../context/context-source.js';
 
 /** MCP 协议版本（initialize 握手返回）。 */
 export const MCP_PROTOCOL_VERSION = '2024-11-05';
@@ -50,6 +50,13 @@ export interface McpServerOptions {
   java?: JavaKernelContext;
   server?: ServerKernelContext;
   bedrock?: BedrockKernelContext;
+  /**
+   * 注入内核实现（依赖倒置）。
+   *
+   * 不传则由 `createKernelBundle` 造默认实现 —— 行为与改造前完全一致。
+   * 传了则用注入的，测试可在不触碰真实内核的前提下覆盖内核执行路径。
+   */
+  kernels?: KernelBundle;
 }
 
 /** JSON Schema 属性子集（手写最小实用形状，宽松为主）。 */
@@ -237,9 +244,11 @@ function unimplemented(def: McpToolDef): CallToolResult {
  * TaskSpec id 用 node:crypto randomUUID。
  */
 export function createMcpServer(opts: McpServerOptions = {}): McpServer {
-  const javaKernel = new JavaKernel(opts.java ?? {});
-  const serverKernel = new ServerKernel(opts.server ?? {});
-  const bedrockKernel = new BedrockKernel(opts.bedrock ?? {});
+  const {
+    java: javaKernel,
+    server: serverKernel,
+    bedrock: bedrockKernel,
+  } = createKernelBundle(opts, opts.kernels);
 
   function listTools(): McpToolListing[] {
     return MCP_TOOL_DEFS.map((def) => ({

@@ -15,7 +15,7 @@
  */
 
 import { VALIDATION_CRITERIA } from '@mc-creator/contract';
-import type { StageResult } from './pipeline.js';
+import type { StageResult } from '../core/pipeline.js';
 
 /**
  * 生成产物类别（§10.3 判据表 5 键，与 VALIDATION_CRITERIA 的 key 一一对应）。

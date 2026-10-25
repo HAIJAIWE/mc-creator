@@ -79,7 +79,7 @@ export function javaCapabilities(): EditionCapability[] {
       'structure',
     ],
     {
-      skin: 'Java 64×64 classic/slim；基岩 HD/Persona 另见 bedrock',
+      skin: 'Java 64×64（现代）/ 64×32（legacy，只有 classic 模型）；基岩 HD/Persona 另见 bedrock',
     },
   );
 }

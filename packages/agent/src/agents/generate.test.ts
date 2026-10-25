@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { VALIDATION_CRITERIA } from '@mc-creator/contract';
-import { buildContextPack } from './context-pack.js';
+import { buildContextPack } from '../context/context-pack.js';
 import {
   GENERATE_TRUNC_MARK,
   buildGeneratePrompt,

@@ -5,7 +5,7 @@
  */
 import { Readable, Writable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
-import { MCP_TOOL_DEFS } from './tools.js';
+import { MCP_TOOL_DEFS } from '../core/tools.js';
 import {
   JsonRpcError,
   createMcpServer,
