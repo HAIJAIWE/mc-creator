@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ServerGenerator } from './server-generator.js';
 import type { GeneratorContext, ServerSpec } from '@mc-creator/shared';
-import { FABRIC_INSTALLER_PINNED_VERSION } from '@mc-creator/core';
+import { FABRIC_INSTALLER_PINNED_VERSION } from '@mc-creator/shared';
 
 function makeCtx(spec: Partial<ServerSpec>): GeneratorContext {
   return {

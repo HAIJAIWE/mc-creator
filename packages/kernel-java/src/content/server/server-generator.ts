@@ -8,7 +8,7 @@ import type {
 import type { Generator } from '@mc-creator/shared';
 import { ServerSpec, MC_VERSIONS } from '@mc-creator/shared';
 import type { ServerSpec as ServerSpecType, OpEntry, WhitelistEntry } from '@mc-creator/shared';
-import { FABRIC_INSTALLER_PINNED_VERSION } from '@mc-creator/core';
+import { FABRIC_INSTALLER_PINNED_VERSION } from '@mc-creator/shared';
 
 /**
  * 服务器配置生成器（P8）。

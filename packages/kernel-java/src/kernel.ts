@@ -1138,8 +1138,14 @@ export class JavaKernel implements KernelContract {
     }
     const width = bytes.readUInt32BE(16);
     const height = bytes.readUInt32BE(20);
-    if (width !== 64 || height !== 64) {
-      verr(`皮肤尺寸必须为 64×64，实际 ${width}×${height}（§5.9）`, 'INVALID_SKIN_SIZE');
+    // Java 版只认两种：64×64（现代）与 64×32（legacy 旧格式，游戏自己镜像右肢）。
+    // 与启动器皮肤库同一套规则（`packages/core/src/skin/png.ts`）；**128×128 是 Bedrock 的**。
+    // 这里此前写死 64×64，把 Java 至今支持的 legacy 皮肤判成了非法尺寸。
+    if (width !== 64 || (height !== 64 && height !== 32)) {
+      verr(
+        `皮肤尺寸必须是 64×64 或 64×32（legacy），实际 ${width}×${height}（§5.9）`,
+        'INVALID_SKIN_SIZE',
+      );
     }
     step(1);
     const dest = this.guard(root, join('skins', `${name}.png`));

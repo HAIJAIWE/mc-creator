@@ -46,12 +46,39 @@ export function resolveJavaHome(env: NodeJS.ProcessEnv = process.env): string | 
 }
 
 /**
- * 检测本机 `java` 主版本（保留 packages/core/src/builder/jdk.ts 逻辑）。
+ * 从 `java -version` 的输出里解析主版本号（**纯函数**，无 I/O）。
  *
- * 正则思路（照搬 core，含其注释中的修复）：
- * `java -version` 输出形如 `openjdk version "21.0.3" ...` 或 `openjdk version "25" ...`
- * （注意输出在 stderr）；原 `(?:\.|$)` 无法匹配 `"25"`（数字后紧跟引号），
- * 故用 `(?:\.|")` 同时覆盖 `21.0.3"` 与 `25"` 两种形态。
+ * ## 为什么单独抽出来
+ *
+ * 这段正则在 `devkit` 与 `core` 各存了一份。两边各写各的必然漂移 ——
+ * 而且**已经漂移出 bug 了**：原正则 `version "(\d+)(?:\.|")` 在 Java 8 上
+ * 解析出 **1**（`1.8.0_402` → 捕获 `1`），而 {@link javaVersionFor} 对
+ * MC ≤1.16 恰好要求 8。也就是说「Java 8 跑老版 MC」这条唯一用得到 8 的路径，
+ * 拿到的却是 1。本函数是唯一权威实现，`core` 侧改为转调。
+ *
+ * ## 版本号形态
+ *
+ * | 实际输出 | 解析结果 |
+ * | --- | --- |
+ * | `openjdk version "1.8.0_402"` | 8 |
+ * | `openjdk version "1.7.0_80"` | 7 |
+ * | `openjdk version "11.0.21"` | 11 |
+ * | `openjdk version "21.0.3"` | 21 |
+ * | `openjdk version "25"` | 25 |
+ *
+ * Java 9 起废弃了 `1.x` 前缀，但 8 及更早仍报 `1.8`，所以 `(?:1\.)?` 前缀是必需的。
+ * 尾部 `(?:\.|"|_)` 保证 `"25"`（数字后直接跟引号）也能命中 ——
+ * 早先用 `(?:\.|$)` 就漏了这一种形态。
+ */
+export function parseJavaMajorVersion(output: string): number | null {
+  const m = output.match(/version "(?:1\.)?(\d+)(?:[._\d"])/);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * 检测本机 `java` 主版本。
+ *
+ * 解析交给 {@link parseJavaMajorVersion}（devkit 与 core 共用的唯一实现）。
  *
  * TODO（多 JDK / toolchain 待补，见 §8.1#1）：
  * - 扫描注册表 / PATH / 常见目录并存多版本，按 javaVersionFor(mcVersion) 自动选择；
@@ -62,8 +89,7 @@ export async function detectJavaVersion(
 ): Promise<number | null> {
   try {
     const out = await run('java -version');
-    const m = out.match(/version "(\d+)(?:\.|")/);
-    return m ? Number(m[1]) : null;
+    return parseJavaMajorVersion(out);
   } catch {
     return null;
   }

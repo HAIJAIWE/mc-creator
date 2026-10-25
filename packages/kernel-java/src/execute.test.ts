@@ -159,13 +159,13 @@ function buildZip(inputs: ZipInput[]): Buffer {
   return Buffer.concat([localPart, centralPart, eocd]);
 }
 
-/** 合法 64×64 PNG（IHDR + IDAT/IEND 齐全即可，内核只校验头与 IHDR 尺寸）。 */
-function build64Png(): Buffer {
+/** 合法皮肤 PNG（IHDR + IDAT/IEND 齐全即可，内核只校验头与 IHDR 尺寸）。 */
+function buildSkinPng(width = 64, height = 64): Buffer {
   const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const ihdr = Buffer.alloc(25);
   ihdr.write('IHDR', 0, 'latin1');
-  ihdr.writeUInt32BE(64, 4);
-  ihdr.writeUInt32BE(64, 8);
+  ihdr.writeUInt32BE(width, 4);
+  ihdr.writeUInt32BE(height, 8);
   ihdr[12] = 8; // bit depth
   ihdr[13] = 6; // color type RGBA
   ihdr.writeUInt32BE(0, 16); // crc（占位）
@@ -534,7 +534,7 @@ describe('JavaKernel install_addon / apply_skin / uninstall_content 真实现', 
   it('apply_skin 64×64 PNG → 落skins/<name>.png，ArtifactRef kind=skin', async () => {
     const dataDir = mkTmp();
     const src = join(mkTmp(), 'skin.png');
-    writeFileSync(src, build64Png());
+    writeFileSync(src, buildSkinPng());
     const result = await new JavaKernel({ dataDir, confirm: YES })
       .dispatch({ id: 's1', kind: 'apply_skin', payload: { name: 'steve', path: src } })
       .result();
@@ -542,6 +542,35 @@ describe('JavaKernel install_addon / apply_skin / uninstall_content 真实现', 
     expect(existsSync(join(dataDir, 'skins', 'steve.png'))).toBe(true);
     expect(result.artifacts?.[0]).toMatchObject({ kind: 'skin' });
     expect(result.data).toMatchObject({ width: 64, height: 64 });
+  });
+
+  it('apply_skin legacy 64×32 也收（Java 至今支持这个旧格式，游戏会镜像右肢）', async () => {
+    const dataDir = mkTmp();
+    const src = join(mkTmp(), 'legacy.png');
+    writeFileSync(src, buildSkinPng(64, 32));
+    const result = await new JavaKernel({ dataDir, confirm: YES })
+      .dispatch({ id: 's3', kind: 'apply_skin', payload: { name: 'notch', path: src } })
+      .result();
+    expect(result.ok).toBe(true);
+    expect(result.data).toMatchObject({ width: 64, height: 32 });
+  });
+
+  it('apply_skin 64×128 / 128×128 → validation（只有 64×64 与 legacy 64×32）', async () => {
+    for (const [w, h] of [
+      [64, 128],
+      [128, 128],
+    ] as const) {
+      const dataDir = mkTmp();
+      const src = join(mkTmp(), `bad-${w}x${h}.png`);
+      writeFileSync(src, buildSkinPng(w, h));
+      const result = await new JavaKernel({ dataDir, confirm: YES })
+        .dispatch({ id: 's4', kind: 'apply_skin', payload: { name: 'bad', path: src } })
+        .result();
+      expect(result, `${w}×${h}`).toMatchObject({
+        ok: false,
+        error: { category: 'validation', code: 'INVALID_SKIN_SIZE' },
+      });
+    }
   });
 
   it('apply_skin 非 PNG 内容 → validation（PNG 头校验）', async () => {

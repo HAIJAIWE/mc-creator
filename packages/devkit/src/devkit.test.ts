@@ -7,7 +7,12 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { detectJavaVersion, javaVersionFor, resolveJavaHome } from './jdk.js';
+import {
+  detectJavaVersion,
+  javaVersionFor,
+  parseJavaMajorVersion,
+  resolveJavaHome,
+} from './jdk.js';
 import { findBuiltJar, findJarInLog, runGradleBuild, verifyDistribution } from './gradle.js';
 import { assertWithinRoot, buildSandboxOptions } from './sandbox.js';
 import { makeArtifactRef, sha256File } from './artifact.js';
@@ -65,6 +70,42 @@ describe('jdk.ts 版本映射（§5：1.20.x→17，1.21.x→21，26.x→25）',
     await expect(detectJavaVersion(async () => 'openjdk version "25" 2025-09-16')).resolves.toBe(
       25,
     );
+  });
+
+  describe('parseJavaMajorVersion：各版本真实输出形态', () => {
+    /**
+     * 这些样本取自各版本 `java -version` 的**真实输出**（输出在 stderr）。
+     * 其中 Java 8 那一行是回归的核心：旧正则 `version "(\d+)(?:\.|")`
+     * 会把 `1.8.0_402` 解析成 **1**，而 javaVersionFor 对 MC ≤1.16 恰好要求 8。
+     */
+    const CASES: [label: string, output: string, expected: number][] = [
+      [
+        'Java 8',
+        'openjdk version "1.8.0_402"\nOpenJDK Runtime Environment (build 1.8.0_402-b06)',
+        8,
+      ],
+      ['Java 7', 'java version "1.7.0_80"', 7],
+      ['Java 11', 'openjdk version "11.0.21" 2024-01-16 LTS', 11],
+      ['Java 17', 'openjdk version "17.0.9" 2023-10-17', 17],
+      ['Java 21', 'openjdk version "21.0.3" 2024-04-16', 21],
+      ['Java 25（裸版本号）', 'openjdk version "25" 2025-09-16', 25],
+    ];
+
+    for (const [label, output, expected] of CASES) {
+      it(`${label} → ${expected}`, () => {
+        expect(parseJavaMajorVersion(output)).toBe(expected);
+      });
+    }
+
+    it('无法识别 / 空输出 → null', () => {
+      expect(parseJavaMajorVersion('no java here')).toBeNull();
+      expect(parseJavaMajorVersion('')).toBeNull();
+    });
+  });
+
+  it('detectJavaVersion：Java 8 输出不再被误判成 1', async () => {
+    // 变异测试：这行断言在旧正则下会失败（得到 1）
+    await expect(detectJavaVersion(async () => 'openjdk version "1.8.0_402"')).resolves.toBe(8);
   });
 
   it('detectJavaVersion：无匹配/抛错 → null', async () => {

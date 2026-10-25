@@ -55,18 +55,14 @@ export const FABRIC_INSTALLER_METADATA_PATH = '/fabric-installer/maven-metadata.
 /**
  * **钉住的** installer 发行版版本号，供**生成离线部署脚本**的场景使用。
  *
- * 为什么不动态解析：生成的 install.sh / install.bat 是在**用户的远程服务器**上跑的，
- * 那台机器不保证能访问 maven-fabricmc.net，更不该指望它会解析 XML。
- * 所以生成侧只能烘进一个具体版本号。
- *
- * 防陈旧靠 `packages/core/src/ci/verify-loader-versions.test.ts`
- * （`VERIFY_VERSIONS=1` 联网门控）比对 maven-metadata 的最新 `<release>`，
- * 与 LOADER_VERSIONS 用的是同一套机制。
+ * 定义在 `@mc-creator/shared`（与 LOADER_VERSIONS 同处），此处仅转出以保持
+ * 既有 `@mc-creator/core` 导入路径可用；内核层（kernel-java）直接用 shared 的那份，
+ * 避免内核反向依赖 core（§15 分层约束）。
  *
  * 钉 `1.1.2`（2026-10 实测 `<release>` 值；实测该版本 jar HTTP 200 / 212123 字节）。
- * **注意：这里必须是字面量，不能写成 `<latest>`** —— 那个路径实测 404。
+ * 防陈旧靠 `packages/core/src/ci/verify-loader-versions.test.ts`（`VERIFY_VERSIONS=1` 联网门控）。
  */
-export const FABRIC_INSTALLER_PINNED_VERSION = '1.1.2';
+export { FABRIC_INSTALLER_PINNED_VERSION } from '@mc-creator/shared';
 
 export class FabricMetadataError extends Error {
   override readonly name = 'FabricMetadataError';

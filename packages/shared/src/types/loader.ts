@@ -256,6 +256,25 @@ export function getLoaderVersions(mcVersion: string): LoaderVersionConfig {
 }
 
 /**
+ * **钉住的** Fabric installer 发行版版本号，供**生成离线部署脚本**的场景使用。
+ *
+ * 为什么不动态解析：生成的 install.sh / install.bat 是在**用户的远程服务器**上跑的，
+ * 那台机器不保证能访问 maven.fabricmc.net，更不该指望它会解析 XML。
+ * 所以生成侧只能烘进一个具体版本号。
+ *
+ * 防陈旧靠 `packages/core/src/ci/verify-loader-versions.test.ts`
+ * （`VERIFY_VERSIONS=1` 联网门控）比对 maven-metadata 的最新 `<release>`，
+ * 与 LOADER_VERSIONS 用的是同一套机制。
+ *
+ * 钉 `1.1.2`（2026-10 实测 `<release>` 值；实测该版本 jar HTTP 200 / 212123 字节）。
+ * **注意：这里必须是字面量，不能写成 `<latest>`** —— 那个路径实测 404。
+ *
+ * 放在 shared 而非 core：内核层（kernel-java）生成安装脚本时也要用它，
+ * 按 §15 分层内核只允许依赖 contract/shared/devkit 这类底层包，不能反向依赖 core。
+ */
+export const FABRIC_INSTALLER_PINNED_VERSION = '1.1.2';
+
+/**
  * 各 MC 版本建议的 Gradle 版本（gradle-wrapper.properties distributionUrl 用）。
  *
  * 约束来源（2026-07 在线核验）：
