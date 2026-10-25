@@ -114,6 +114,9 @@ export function createTaskPoller(opts: TaskPollerOptions): TaskPoller {
   const now = opts.now;
   let timer: ReturnType<typeof setInterval> | null = null;
 
+  /** 本轮是否已经写过"到期任务"日志（同一 taskId 不重复刷） */
+  let loggedAnyFired = false;
+
   async function dispatchOne(item: DueTaskItem): Promise<FiredOutcome> {
     const base = { taskId: item.taskId, serverId: item.serverId, action: item.action };
     try {
@@ -199,6 +202,8 @@ export function createTaskPoller(opts: TaskPollerOptions): TaskPoller {
       } catch {
         // 观察者异常不得影响轮询结果。
       }
+      // 默认观察者：没人订阅 onFired 时，至少别让结果无声消失。
+      noteFiredOnce(fired);
       return { ran: true, fired };
     } catch (e) {
       return { ran: false, error: msg(e) };
@@ -219,6 +224,46 @@ export function createTaskPoller(opts: TaskPollerOptions): TaskPoller {
     if (timer === null) return;
     clearInterval(timer);
     timer = null;
+  }
+
+  /**
+   * 记一条「本轮真的执行了到期任务」。
+   *
+   * 为什么要有：轮询器每 60 秒跑一次，而 `onFired` 是**可选**的 ——
+   * 此前生产接线（`index.ts`）压根没传，于是每轮算出来的 `fired[]` 被直接丢弃，
+   * **包括失败**。
+   *
+   * 实测可达的静默失败链：
+   *   用户经内核 `schedule_task` 建一个 restart 任务（W 类，过确认闸门后记账）
+   *     → 轮询器取到 `fired: [{ action: 'restart', serverId: 'srv-x' }]`
+   *     → `supervisor.restartServer('srv-x')` 返回 `SERVER_NOT_FOUND`
+   *       （生产里没有任何代码调 `launchServer`，单例 supervisor 里从来没有进程）
+   *     → 结果记进 `fired[]` 后丢弃，日志与 UI 里零痕迹
+   *
+   * 只在**第一轮真有任务到期**时打一行，避免每 60 秒刷屏；空轮次本来就该安静。
+   */
+  function noteFiredOnce(fired: FiredOutcome[]): void {
+    if (loggedAnyFired || fired.length === 0) return;
+    loggedAnyFired = true;
+    const failed = fired.filter((f) => !f.ok);
+    if (failed.length === 0) {
+      console.log(
+        `[定时任务] 本轮执行 ${fired.length} 条，全部成功：` +
+          fired.map((f) => `${f.action}@${f.serverId}`).join(', '),
+      );
+      return;
+    }
+    console.warn(
+      `[定时任务] 本轮执行 ${fired.length} 条，其中 ${failed.length} 条失败：` +
+        failed
+          .map(
+            (f) =>
+              `${f.action}@${f.serverId}（${
+                f.skipped ? (f.reason ?? 'skipped') : msg(f.error ?? '未知原因')
+              }）`,
+          )
+          .join('; '),
+    );
   }
 
   return { start, stop, pollOnce };

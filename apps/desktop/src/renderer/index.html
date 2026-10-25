@@ -1,14 +1,19 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- P0 安全：CSP 限制资源加载范围，阻止远程脚本/内联脚本注入（Monaco 需 unsafe-eval + blob worker） -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: http: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'" />
-  <title>MC Creator</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="./src/main.tsx"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- P0 安全：CSP 限制资源加载范围，阻止远程脚本/内联脚本注入（Monaco 需 unsafe-eval + blob worker）。
+       img-src 放行 https 外链：Modrinth 图标在 cdn.modrinth.com、CurseForge 在 media.forgecdn.net，
+       两者都是搜索结果自带的 icon_url。只放行图片，不动 script-src —— 远程脚本仍然是禁的。 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' ws: http: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'"
+    />
+    <title>MC Creator</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
 </html>

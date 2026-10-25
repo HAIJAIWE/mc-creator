@@ -56,6 +56,8 @@ import {
 import { createProcessSupervisor, ProcessSupervisorError } from '../process-supervisor.js';
 import {
   PROCESS_LIST,
+  PROCESS_LAUNCH,
+  PROCESS_STOP,
   PROCESS_STATUS,
   PROCESS_LOGS,
   PROCESS_LOG_EVENT,
@@ -64,6 +66,10 @@ import {
   ProcessLogsRequest,
   ProcessStatusRequest,
 } from '../../shared/ipc-channels.js';
+import {
+  LAUNCHER_LIST_SERVER_INSTANCES,
+  LAUNCHER_DELETE_SERVER_INSTANCE,
+} from '../../shared/ipc/launcher.js';
 
 const NODE = process.execPath;
 /** 打印一行后自然退出的假进程（绝不真启动 Minecraft）。 */
@@ -96,6 +102,17 @@ const t = setInterval(() => {}, 1000);
 
 let dirs: string[] = [];
 let svc: ReturnType<typeof createProcessSupervisor> | null = null;
+
+/**
+ * 原生确认框在这里被替换成可编程的门。
+ *
+ * 本文件要验的是**契约**：「不确认就不许停、确认了才停」，
+ * 而不是 Electron 对话框怎么画（那是 kernel-confirm.ts 的事）。
+ */
+const confirmGate = vi.hoisted(() => ({ fn: vi.fn(async (_req: unknown) => true) }));
+vi.mock('../kernel-confirm.js', () => ({
+  createNativeConfirm: () => confirmGate.fn,
+}));
 
 async function fakeScript(src: string, name: string): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), 'mc-sup-ipc-'));
@@ -160,6 +177,8 @@ beforeEach(() => {
   dirs = [];
   svc = null;
   setProcessSupervisor(null);
+  confirmGate.fn.mockReset();
+  confirmGate.fn.mockResolvedValue(true);
 });
 
 afterEach(async () => {
@@ -168,20 +187,63 @@ afterEach(async () => {
   for (const d of dirs) await rm(d, { recursive: true, force: true });
 });
 
-describe('进程托管 IPC：只读通道（§10.2）', () => {
-  it('注册了 PROCESS_LIST / PROCESS_STATUS / PROCESS_LOGS 三个只读通道', () => {
+describe('进程托管 IPC：通道面（§10.2 / §10.6）', () => {
+  /**
+   * 允许存在的**执行类通道**：启动与停止，且都**必经 §10.6**。
+   *
+   * - `PROCESS_LAUNCH`：从磁盘推导 cmd → 原生弹窗逐字展示 → 一次性令牌
+   *   → supervisor 闸门消费；
+   * - `PROCESS_STOP`：按 serverId 取托管进程 → 原生弹窗展示 PID/动作
+   *   → 确认后才发送 `stop`。
+   *
+   * 两者都不接受渲染层传 cmd/PID，所以不是"裸 spawn / kill 通道"。
+   * 除它们之外仍不得出现 start/stop/kill 等执行语义动词——
+   * 以后有人加 `process:start` / `process:spawn` 照样会红。
+   */
+  const ALLOWED_EXEC_CHANNELS = new Set<string>([PROCESS_LAUNCH, PROCESS_STOP]);
+
+  it('注册 PROCESS_LIST / PROCESS_STATUS / PROCESS_LOGS / PROCESS_LAUNCH / PROCESS_STOP', () => {
     registerProcessSupervisorHandlers();
+    // 两个服务端实例管理通道也在此文件注册（launcher:listServerInstances / launcher:deleteServerInstance）
     expect([...handlers.keys()].sort()).toEqual(
-      [PROCESS_LIST, PROCESS_LOGS, PROCESS_STATUS].sort(),
+      [
+        PROCESS_LIST,
+        PROCESS_LOGS,
+        PROCESS_LAUNCH,
+        PROCESS_STOP,
+        PROCESS_STATUS,
+        LAUNCHER_LIST_SERVER_INSTANCES,
+        LAUNCHER_DELETE_SERVER_INSTANCE,
+      ].sort(),
     );
   });
 
-  it('不注册任何 start/stop/kill 通道：确认闸门不被绕过（§10.6）', () => {
+  it('除 PROCESS_LAUNCH / PROCESS_STOP 外不注册 start/stop/kill 通道：确认闸门不被绕过（§10.6）', () => {
     registerProcessSupervisorHandlers();
     for (const ch of handlers.keys()) {
-      expect(ch.startsWith('process:')).toBe(true);
-      expect(ch).not.toMatch(/start|stop|kill|launch|restart|spawn/i);
+      // launcher:* 通道属于另一层，不在此检查范围内
+      if (!ch.startsWith('process:')) continue;
+      if (ALLOWED_EXEC_CHANNELS.has(ch)) continue;
+      expect(ch, `${ch} 是未经确认闸门的执行通道`).not.toMatch(
+        /start|stop|kill|launch|restart|spawn/i,
+      );
     }
+  });
+
+  it('单例的 confirm 是「一次性批准令牌」闸门：未批准一律拒绝（§10.6 兜底）', () => {
+    // 这条守的是**漏接线 / 误接线 / 渲染层绕过通道直接调 launch** 三种情况：
+    // 无论怎么走到 launchServer，没有用户批准过的令牌就必须是 PERMISSION_DENIED。
+    setProcessSupervisor(null);
+    const gate = getProcessSupervisor();
+    // 通过公开 API 证明它拒绝未批准的启动，而不是"碰巧没人调"
+    expect(() =>
+      gate.launchServer({
+        serverId: 'srv-x',
+        cmd: 'java',
+        args: ['-jar', 'server.jar', 'nogui'],
+        cwd: 'C:/data/servers/srv-x',
+      }),
+    ).toThrow(/未确认|拒绝|PERMISSION/i);
   });
 
   it('PROCESS_LIST 返回被托管进程列表', async () => {
@@ -378,6 +440,62 @@ describe('进程托管状态流转经 IPC 可观测（§3 status）', () => {
 });
 
 // =========================================================================
+// §10.6 停止通道：确认是**前置条件**，不是装饰
+// =========================================================================
+
+describe('PROCESS_STOP 通道（确认后才停，§10.6）', () => {
+  interface StopRes {
+    ok: boolean;
+    denied?: boolean;
+    error: string | null;
+    stop: { graceful: boolean; forced: boolean } | null;
+  }
+
+  async function startFakeServer(name: string): Promise<void> {
+    svc = createProcessSupervisor({ confirm: () => true });
+    setProcessSupervisor(svc);
+    registerProcessSupervisorHandlers();
+    const script = await fakeScript(FAKE_ALIVE, name);
+    svc.launchServer({ serverId: 'srv-1', cmd: NODE, args: [script] });
+    await waitForLine(svc, 'srv-1', (l) => l === 'up');
+  }
+
+  it('用户取消 → denied，进程一个字节都没动', async () => {
+    await startFakeServer('stop-denied');
+    confirmGate.fn.mockResolvedValueOnce(false);
+
+    const res = (await handlers.get(PROCESS_STOP)?.({}, { serverId: 'srv-1' })) as StopRes;
+
+    expect(res.ok).toBe(false);
+    expect(res.denied).toBe(true);
+    expect(svc?.status('srv-1')?.state).toBe('running');
+  });
+
+  it('用户确认 → 走优雅停机并回报停机报告', async () => {
+    await startFakeServer('stop-ok');
+    confirmGate.fn.mockResolvedValueOnce(true);
+
+    const res = (await handlers.get(PROCESS_STOP)?.({}, { serverId: 'srv-1' })) as StopRes;
+
+    expect(res.ok).toBe(true);
+    expect(res.stop?.graceful).toBe(true);
+    expect(svc?.status('srv-1')?.state).toBe('stopped');
+    // 停机也走确认闸门：弹窗内容带 serverId 与 PID
+    expect(confirmGate.fn).toHaveBeenCalledTimes(1);
+    const req = confirmGate.fn.mock.calls[0]?.[0] as { kind: string; summary: string };
+    expect(req.kind).toBe('stop_server');
+    expect(req.summary).toContain('srv-1');
+  });
+
+  it('实例本来就没在跑 → 直接成功，不打扰用户', async () => {
+    registerProcessSupervisorHandlers();
+    const res = (await handlers.get(PROCESS_STOP)?.({}, { serverId: 'ghost' })) as StopRes;
+    expect(res).toMatchObject({ ok: true, stop: null });
+    expect(confirmGate.fn).not.toHaveBeenCalled();
+  });
+});
+
+// =========================================================================
 // §7.1 新增两项能力（崩溃自动重启 / 控制台注入）的 IPC 边界
 //
 // 核心立场：渲染层只能**读**这两项能力的状态，**不能**点火。
@@ -388,10 +506,19 @@ describe('进程托管状态流转经 IPC 可观测（§3 status）', () => {
 describe('§7.1 新增能力的 IPC 边界（只读状态，不暴露触发通道，§10.6）', () => {
   it('不注册 restart / reload / send / inject 触发通道：闸门不被绕过', () => {
     registerProcessSupervisorHandlers();
-    // 通道名集合与第一组用例一致（只有三个只读通道 + 一个 logEvent 转发）
+    // 两个服务端实例管理通道也在此文件注册（launcher:listServerInstances / launcher:deleteServerInstance）
     expect([...handlers.keys()].sort()).toEqual(
-      [PROCESS_LIST, PROCESS_LOGS, PROCESS_STATUS].sort(),
+      [
+        PROCESS_LIST,
+        PROCESS_LOGS,
+        PROCESS_LAUNCH,
+        PROCESS_STOP,
+        PROCESS_STATUS,
+        LAUNCHER_LIST_SERVER_INSTANCES,
+        LAUNCHER_DELETE_SERVER_INSTANCE,
+      ].sort(),
     );
+    // PROCESS_LAUNCH / PROCESS_STOP 不属于这些动词：重启/注入/发命令仍然**没有**通道
     for (const ch of handlers.keys()) {
       expect(ch).not.toMatch(/restart|reload|inject|send|command/i);
     }
@@ -546,12 +673,20 @@ describe('§7.1 新增能力的 IPC 边界（只读状态，不暴露触发通�
     expect(svc.status('srv-1')?.state).toBe('crashed');
   });
 
-  it('状态事件**不含**任何点火语义：不注册 start/stop 触发通道', () => {
-    // 转发通道走 webContents.send 而非 ipcMain.handle —— 渲染层只能被动收通知，
-    // 无法反过来要求主进程做动作（§10.6）
+  it('状态事件只是通知：不额外注册 start/stop 触发通道', () => {
+    // 转发通道走 webContents.send 而非 ipcMain.handle —— 渲染层只能被动收通知；
+    // 启动/停止另有显式通道，且都要过 §10.6 确认框。
     registerProcessSupervisorHandlers();
     expect([...handlers.keys()].sort()).toEqual(
-      [PROCESS_LIST, PROCESS_LOGS, PROCESS_STATUS].sort(),
+      [
+        PROCESS_LIST,
+        PROCESS_LOGS,
+        PROCESS_LAUNCH,
+        PROCESS_STOP,
+        PROCESS_STATUS,
+        LAUNCHER_LIST_SERVER_INSTANCES,
+        LAUNCHER_DELETE_SERVER_INSTANCE,
+      ].sort(),
     );
     expect(PROCESS_STATE_EVENT).toBe('process:stateEvent');
   });

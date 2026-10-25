@@ -37,10 +37,22 @@ export interface ProjectChangedPayload {
   projectId: string;
 }
 
-// === 进程托管（外壳层只读查询，§7.1 / §7.4 / §10.2）===
-// 只列只读通道：列被托管进程 / 读状态 / 读日志尾部 / 控制台流式日志。
-// 刻意不提供「直接启动/停止」通道：那必须先经内核确认闸门弹窗（§10.6）。
+// === 进程托管（外壳层，§7.1 / §7.4 / §10.2）===
+// 查询通道只读：列被托管进程 / 读状态 / 读日志尾部 / 控制台流式日志。
+// 有副作用的启动/停止都必须先经主进程原生确认闸门（§10.6）。
 export const PROCESS_LIST = 'process:list';
+/**
+ * 启动服务端（X 类，§10.6：主进程弹原生确认框后才真正 spawn）。
+ *
+ * 只传 serverId，不传 cmd —— 见 `ProcessLaunchRequest` 的注释。
+ */
+export const PROCESS_LAUNCH = 'process:launch';
+/**
+ * 停止服务端（X 类，§10.6：主进程弹原生确认框后才发送 stop）。
+ *
+ * 只传 serverId，不传 PID/信号/命令 —— 目标进程由 supervisor 按 id 解析。
+ */
+export const PROCESS_STOP = 'process:stop';
 export const PROCESS_STATUS = 'process:status';
 export const PROCESS_LOGS = 'process:logs';
 export const PROCESS_LOG_EVENT = 'process:logEvent';

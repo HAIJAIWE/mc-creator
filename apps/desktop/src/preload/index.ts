@@ -8,6 +8,9 @@ import {
   IMPORT_SPEC,
   LAUNCHER_LIST_VERSIONS,
   LAUNCHER_DOWNLOAD,
+  LAUNCHER_DOWNLOAD_PROGRESS,
+  LAUNCHER_DOWNLOAD_SERVER,
+  LAUNCHER_CREATE_SERVER_INSTANCE,
   LAUNCHER_LAUNCH,
   LAUNCHER_INSTALL_LOADER,
   LAUNCHER_LIST_MODS,
@@ -48,8 +51,11 @@ import {
   MODRINTH_VERSIONS,
   CURSEFORGE_SEARCH,
   CURSEFORGE_FILES,
+  CURSEFORGE_TEST_KEY,
   LOAD_CURSEFORGE_CONFIG,
   SAVE_CURSEFORGE_CONFIG,
+  LOAD_SOURCE_PREFERENCE,
+  SAVE_SOURCE_PREFERENCE,
   MODPACK_RESOLVE,
   MODPACK_CHECK_CONFLICTS,
   MODPACK_EXPORT_MRPACK,
@@ -76,6 +82,101 @@ import {
   MC_CHOOSE_DIR,
   INSTALL_MOD,
   LAUNCH_MC,
+  LAUNCHER_TOGGLE_MOD,
+  LAUNCHER_LIST_INSTANCE_FILES,
+  LAUNCHER_LIST_WORLDS,
+  type LauncherListWorldsRes,
+  type LauncherListWorldsReq,
+  LAUNCHER_LOG_STREAM,
+  LAUNCHER_LOG_STREAM_CHUNK,
+  LAUNCHER_GAME_EXIT,
+  LAUNCHER_READ_LATEST_LOG,
+  LAUNCHER_LIST_CRASH_REPORTS,
+  LAUNCHER_READ_CRASH_REPORT,
+  LAUNCHER_LIST_INSTANCES,
+  LAUNCHER_CREATE_INSTANCE,
+  LAUNCHER_UPDATE_INSTANCE,
+  LAUNCHER_DELETE_INSTANCE,
+  LAUNCHER_OPEN_INSTANCE_FOLDER,
+  type LauncherListInstancesRes,
+  type LauncherCreateInstanceReq,
+  type LauncherCreateInstanceRes,
+  type LauncherUpdateInstanceReq,
+  type LauncherUpdateInstanceRes,
+  type LauncherDeleteInstanceReq,
+  type LauncherDeleteInstanceRes,
+  type LauncherOpenInstanceFolderReq,
+  type LauncherOpenInstanceFolderRes,
+  type LauncherLogStreamChunkT,
+  type LauncherGameExit,
+  type LauncherLaunchRequest,
+  type LauncherInstallLoaderRequest,
+  type LauncherInstallSkinRequest,
+  type LauncherSkinListRes,
+  type LauncherSkinAddLocalReq,
+  type LauncherSkinAddLocalRes,
+  type LauncherSkinAddUrlReq,
+  type LauncherSkinAddUrlRes,
+  type LauncherSkinAddMineskinReq,
+  type LauncherSkinAddMineskinRes,
+  type LauncherSkinAddOfficialReq,
+  type LauncherSkinAddOfficialRes,
+  type LauncherSkinMineskinPageReq,
+  type LauncherSkinMineskinPageRes,
+  type LauncherSkinRemoveReq,
+  type LauncherSkinRemoveRes,
+  type LauncherSkinUpdateReq,
+  type LauncherSkinUpdateRes,
+  type LauncherSkinApplyReq,
+  type LauncherSkinApplyRes,
+  type LauncherSkinUnapplyReq,
+  type LauncherSkinUnapplyRes,
+  type LauncherSkinListAppliedReq,
+  type LauncherSkinListAppliedRes,
+  type LauncherSkinReadPngReq,
+  type LauncherSkinReadPngRes,
+  type LauncherPickFilesReq,
+  type LauncherPickFilesRes,
+  LAUNCHER_SKIN_LIST,
+  LAUNCHER_SKIN_ADD_LOCAL,
+  LAUNCHER_SKIN_ADD_URL,
+  LAUNCHER_SKIN_ADD_MINESKIN,
+  LAUNCHER_SKIN_ADD_OFFICIAL,
+  LAUNCHER_SKIN_REMOVE,
+  LAUNCHER_SKIN_UPDATE,
+  LAUNCHER_SKIN_MINESKIN_PAGE,
+  LAUNCHER_SKIN_APPLY,
+  LAUNCHER_SKIN_UNAPPLY,
+  LAUNCHER_SKIN_LIST_APPLIED,
+  LAUNCHER_SKIN_READ_PNG,
+  LAUNCHER_PICK_FILES,
+  type LauncherReadLatestLogReq,
+  type LauncherReadLatestLogRes,
+  type LauncherListCrashReportsReq,
+  type LauncherListCrashReportsRes,
+  type LauncherReadCrashReportReq,
+  type LauncherReadCrashReportRes,
+  type LauncherListModsReq,
+  type LauncherListModsRes,
+  type LauncherInstallModReq,
+  type LauncherInstallModRes,
+  type LauncherRemoveModReq,
+  type LauncherRemoveModRes,
+  type LauncherToggleModReq,
+  type LauncherToggleModRes,
+  type LauncherListInstanceFilesReq,
+  type LauncherListInstanceFilesRes,
+  type LauncherSearchModsReq,
+  type LauncherSearchModsRes,
+  type LauncherDownloadModReq,
+  type LauncherDownloadModRes,
+  type LauncherGetModDetailReq,
+  type LauncherGetModDetailRes,
+  type LauncherDownloadUrlReq,
+  type LauncherInstallModpackReq,
+  type LauncherInstallModpackRes,
+  type LauncherModpackProgress,
+  type LauncherDownloadUrlRes,
   IMPORT_RESOURCE_FILES,
   RAG_SEARCH,
   type GeneratorType,
@@ -85,16 +186,25 @@ import {
   type RagSearchRes,
   type ProcessLogEventT,
   type ProcessStateEventT,
+  type LauncherDownloadProgress,
+  type ProcessLaunchReq,
+  type ProcessLaunchRes,
+  type ProcessStopReq,
+  type ProcessStopRes,
   NODE_GRAPH_SAVE,
   NODE_GRAPH_LOAD,
   NODE_GRAPH_SHOW_SAVE_DIALOG,
   NODE_GRAPH_SHOW_OPEN_DIALOG,
   PROJECT_CHANGED,
   PROCESS_LIST,
+  PROCESS_LAUNCH,
+  PROCESS_STOP,
   PROCESS_STATUS,
   PROCESS_LOGS,
   PROCESS_LOG_EVENT,
   PROCESS_STATE_EVENT,
+  LAUNCHER_LIST_SERVER_INSTANCES,
+  LAUNCHER_DELETE_SERVER_INSTANCE,
   KERNEL_LIST_KINDS,
   KERNEL_READ,
   KERNEL_EXECUTE,
@@ -109,6 +219,20 @@ import {
   type KernelConfirmRes,
 } from '../shared/ipc-channels.js';
 import { AGENT_RUN_LOOP } from '../shared/ipc/agent-loop.js';
+import {
+  LAUNCHER_SEARCH_MODS,
+  LAUNCHER_DOWNLOAD_MOD,
+  LAUNCHER_GET_MOD_DETAIL,
+  LAUNCHER_DOWNLOAD_URL,
+  LAUNCHER_INSTALL_MODPACK,
+  LAUNCHER_CANCEL_MODPACK,
+  LAUNCHER_MODPACK_PROGRESS,
+  LAUNCHER_MOD_CN_ALIAS,
+  type LauncherCancelModpackReq,
+  type LauncherCancelModpackRes,
+  type LauncherModCnAliasReq,
+  type LauncherModCnAliasRes,
+} from '../shared/ipc/launcher.js';
 
 /**
  * 流式请求的并发隔离 id（见 shared/ipc/stream.ts）。
@@ -262,17 +386,209 @@ const api = {
   importSpec: () => ipcRenderer.invoke(IMPORT_SPEC),
   launcherListVersions: () => ipcRenderer.invoke(LAUNCHER_LIST_VERSIONS),
   launcherDownload: (req: { version: string }) => ipcRenderer.invoke(LAUNCHER_DOWNLOAD, req),
-  launcherLaunch: (req: { version: string; username: string; memory: string; gameDir?: string }) =>
-    ipcRenderer.invoke(LAUNCHER_LAUNCH, req),
-  launcherInstallLoader: (req: { version: string; loader: 'fabric' | 'neoforge' }) =>
+  /**
+   * 下载服务端 jar（PCL 的「下载服务端」按钮）。
+   * 只传 version —— 路径、地址、校验信息全部由主进程从清单推导，
+   * 渲染层不参与（与 §10.6 同一条纪律）。
+   */
+  launcherDownloadServer: (req: { version: string }) =>
+    ipcRenderer.invoke(LAUNCHER_DOWNLOAD_SERVER, req),
+  /**
+   * 由已下载的 server.jar 建一个能启动的服务端实例。
+   *
+   * `acceptEula` 是**用户的决定**：这里只是把用户点了哪个按钮如实传下去，
+   * 主进程据此决定写不写 `eula=true`。渲染层不能自己假定「已同意」。
+   */
+  launcherCreateServerInstance: (req: {
+    serverId: string;
+    version: string;
+    port?: number;
+    motd?: string;
+    maxPlayers?: number;
+    onlineMode?: boolean;
+    levelName?: string;
+    acceptEula?: boolean;
+  }) => ipcRenderer.invoke(LAUNCHER_CREATE_SERVER_INSTANCE, req),
+  /**
+   * 订阅下载进度。返回取消订阅函数。
+   *
+   * 进度必须靠事件而非 promise 返回值：这一步动辄几分钟，
+   * promise 期间界面毫无反馈。**失败也会发 finished:true**，所以调用方
+   * 不必自己判断该不该收尾。
+   */
+  onLauncherDownloadProgress: (handler: (p: LauncherDownloadProgress) => void) => {
+    const wrapper = (_e: unknown, payload: LauncherDownloadProgress) => handler(payload);
+    ipcRenderer.on(LAUNCHER_DOWNLOAD_PROGRESS, wrapper);
+    return () => {
+      // 块体而非简写箭头：removeListener 返回 IpcRenderer 而不是 void，
+      // 简写箭头会把它透传出去，而 useEffect 的清理函数要求返回 void。
+      ipcRenderer.removeListener(LAUNCHER_DOWNLOAD_PROGRESS, wrapper);
+    };
+  },
+  launcherLaunch: (req: LauncherLaunchRequest) => ipcRenderer.invoke(LAUNCHER_LAUNCH, req),
+  /** 订阅「游戏进程退出」。返回取消订阅函数。 */
+  onLauncherGameExit: (handler: (event: LauncherGameExit) => void) => {
+    const wrapper = (_e: unknown, payload: LauncherGameExit) => handler(payload);
+    ipcRenderer.on(LAUNCHER_GAME_EXIT, wrapper);
+    return () => {
+      ipcRenderer.removeListener(LAUNCHER_GAME_EXIT, wrapper);
+    };
+  },
+  launcherInstallLoader: (req: LauncherInstallLoaderRequest) =>
     ipcRenderer.invoke(LAUNCHER_INSTALL_LOADER, req),
-  launcherListMods: (version: string) => ipcRenderer.invoke(LAUNCHER_LIST_MODS, { version }),
-  launcherInstallMod: (req: { version: string; name: string; url: string }) =>
+  // 注意：`ipcRenderer.invoke` 返回 `Promise<any>`，不给显式返回类型的话
+  // 渲染层拿到的就是 `any`，IPC 契约错误（如 listMods 从 string[] 变 ModInfo[]）
+  // 在编译期完全不可见 —— 只能在运行时炸。这里逐个标注 zod 推导类型。
+  launcherListMods: (req: LauncherListModsReq): Promise<LauncherListModsRes> =>
+    ipcRenderer.invoke(LAUNCHER_LIST_MODS, req),
+  launcherInstallMod: (req: LauncherInstallModReq): Promise<LauncherInstallModRes> =>
     ipcRenderer.invoke(LAUNCHER_INSTALL_MOD, req),
-  launcherRemoveMod: (req: { version: string; name: string }) =>
+  launcherRemoveMod: (req: LauncherRemoveModReq): Promise<LauncherRemoveModRes> =>
     ipcRenderer.invoke(LAUNCHER_REMOVE_MOD, req),
-  launcherInstallSkin: (req: { version: string; skinApiUrl?: string }) =>
+  launcherToggleMod: (req: LauncherToggleModReq): Promise<LauncherToggleModRes> =>
+    ipcRenderer.invoke(LAUNCHER_TOGGLE_MOD, req),
+  /** 世界列表：解析 saves 目录下各存档的 level.dat，单个损坏不影响其余 */
+  launcherListWorlds: (req: LauncherListWorldsReq): Promise<LauncherListWorldsRes> =>
+    ipcRenderer.invoke(LAUNCHER_LIST_WORLDS, req),
+  launcherListInstanceFiles: (
+    req: LauncherListInstanceFilesReq,
+  ): Promise<LauncherListInstanceFilesRes> => ipcRenderer.invoke(LAUNCHER_LIST_INSTANCE_FILES, req),
+
+  // ===== L7 日志 =====
+  /**
+   * 启动游戏并把 stdout/stderr 实时推给 `onChunk`。
+   *
+   * 与 CHAT_STREAM / BUILD_STREAM 同一套路：`invoke` 发起 + 监听 `*_CHUNK` 收分片。
+   * 分片带 requestId，用于并发流过滤（同 CHAT_STREAM 的 nextStreamRequestId 机制）。
+   * 返回一个停止函数，避免组件卸载后监听器残留。
+   */
+  launcherLogStream: (
+    req: { instance: string },
+    onChunk: (chunk: LauncherLogStreamChunkT) => void,
+  ): (() => void) => {
+    const requestId = nextStreamRequestId();
+    const handler = (_e: unknown, data: LauncherLogStreamChunkT) => {
+      if (data.requestId && data.requestId !== requestId) return;
+      onChunk(data);
+      // 进程退出后不再需要分片，立即摘监听
+      if (data.done) ipcRenderer.removeListener(LAUNCHER_LOG_STREAM_CHUNK, handler);
+    };
+    ipcRenderer.on(LAUNCHER_LOG_STREAM_CHUNK, handler);
+    ipcRenderer.invoke(LAUNCHER_LOG_STREAM, { instance: req.instance, requestId }).catch(() => {
+      // 启动失败由主进程推 done 分片告知；这里只防止 unhandled rejection
+      ipcRenderer.removeListener(LAUNCHER_LOG_STREAM_CHUNK, handler);
+    });
+    return () => ipcRenderer.removeListener(LAUNCHER_LOG_STREAM_CHUNK, handler);
+  },
+  launcherReadLatestLog: (req: LauncherReadLatestLogReq): Promise<LauncherReadLatestLogRes> =>
+    ipcRenderer.invoke(LAUNCHER_READ_LATEST_LOG, req),
+  launcherListCrashReports: (
+    req: LauncherListCrashReportsReq,
+  ): Promise<LauncherListCrashReportsRes> => ipcRenderer.invoke(LAUNCHER_LIST_CRASH_REPORTS, req),
+  launcherReadCrashReport: (req: LauncherReadCrashReportReq): Promise<LauncherReadCrashReportRes> =>
+    ipcRenderer.invoke(LAUNCHER_READ_CRASH_REPORT, req),
+
+  // ===== L1 实例注册表 =====
+  launcherListInstances: (): Promise<LauncherListInstancesRes> =>
+    ipcRenderer.invoke(LAUNCHER_LIST_INSTANCES, {}),
+  launcherCreateInstance: (req: LauncherCreateInstanceReq): Promise<LauncherCreateInstanceRes> =>
+    ipcRenderer.invoke(LAUNCHER_CREATE_INSTANCE, req),
+  launcherUpdateInstance: (req: LauncherUpdateInstanceReq): Promise<LauncherUpdateInstanceRes> =>
+    ipcRenderer.invoke(LAUNCHER_UPDATE_INSTANCE, req),
+  /** 删除实例。`deleteFiles` 会连同存档目录一起删，UI 必须二次确认后才传 true。 */
+  launcherDeleteInstance: (req: LauncherDeleteInstanceReq): Promise<LauncherDeleteInstanceRes> =>
+    ipcRenderer.invoke(LAUNCHER_DELETE_INSTANCE, req),
+  /** 在系统文件管理器里打开实例目录（只读）。 */
+  launcherOpenInstanceFolder: (
+    req: LauncherOpenInstanceFolderReq,
+  ): Promise<LauncherOpenInstanceFolderRes> =>
+    ipcRenderer.invoke(LAUNCHER_OPEN_INSTANCE_FOLDER, req),
+  launcherInstallSkin: (req: LauncherInstallSkinRequest) =>
     ipcRenderer.invoke(LAUNCHER_INSTALL_SKIN, req),
+
+  // ===== §5.9 本地皮肤库 =====
+  // 库在 `skins/library/`（全局），应用在 `game/<实例>/CustomSkinLoader/LocalSkin/`（实例）。
+  // preload 侧只是透传：读盘、下载、复制 PNG 全在主进程。
+  launcherSkinList: (): Promise<LauncherSkinListRes> => ipcRenderer.invoke(LAUNCHER_SKIN_LIST),
+  launcherSkinAddLocal: (req: LauncherSkinAddLocalReq): Promise<LauncherSkinAddLocalRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_ADD_LOCAL, req),
+  launcherSkinAddUrl: (req: LauncherSkinAddUrlReq): Promise<LauncherSkinAddUrlRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_ADD_URL, req),
+  launcherSkinAddMineskin: (req: LauncherSkinAddMineskinReq): Promise<LauncherSkinAddMineskinRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_ADD_MINESKIN, req),
+  /**
+   * 按 UUID 导入正版皮肤（Mojang sessionserver）。
+   *
+   * 只有 UUID，没有「按玩家名」的路子 —— Mojang 的名字→UUID 接口已废弃。
+   */
+  launcherSkinAddOfficial: (req: LauncherSkinAddOfficialReq): Promise<LauncherSkinAddOfficialRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_ADD_OFFICIAL, req),
+  launcherSkinMineskinPage: (
+    req: LauncherSkinMineskinPageReq,
+  ): Promise<LauncherSkinMineskinPageRes> => ipcRenderer.invoke(LAUNCHER_SKIN_MINESKIN_PAGE, req),
+  launcherSkinRemove: (req: LauncherSkinRemoveReq): Promise<LauncherSkinRemoveRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_REMOVE, req),
+  launcherSkinUpdate: (req: LauncherSkinUpdateReq): Promise<LauncherSkinUpdateRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_UPDATE, req),
+  launcherSkinApply: (req: LauncherSkinApplyReq): Promise<LauncherSkinApplyRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_APPLY, req),
+  launcherSkinUnapply: (req: LauncherSkinUnapplyReq): Promise<LauncherSkinUnapplyRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_UNAPPLY, req),
+  launcherSkinListApplied: (req: LauncherSkinListAppliedReq): Promise<LauncherSkinListAppliedRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_LIST_APPLIED, req),
+  launcherSkinReadPng: (req: LauncherSkinReadPngReq): Promise<LauncherSkinReadPngRes> =>
+    ipcRenderer.invoke(LAUNCHER_SKIN_READ_PNG, req),
+  launcherPickFiles: (req: LauncherPickFilesReq): Promise<LauncherPickFilesRes> =>
+    ipcRenderer.invoke(LAUNCHER_PICK_FILES, req),
+
+  /**
+   * 中文词 → 英文项目名（MC百科 别名查询）。
+   *
+   * 只有 MC百科 有中文名，但它不托管文件，所以只拿它查词 ——
+   * 数据仍走 Modrinth / CurseForge。
+   */
+  launcherModCnAlias: (req: LauncherModCnAliasReq): Promise<LauncherModCnAliasRes> =>
+    ipcRenderer.invoke(LAUNCHER_MOD_CN_ALIAS, req),
+
+  // ===== 在线模组搜索/下载（Modrinth / CurseForge 聚合）=====
+  /**
+   * 搜索在线模组/整合包/数据包/资源包/光影包（聚合 Modrinth + CurseForge）。
+   *
+   * 返回统一的 ModEntry 列表，已去重（按 id 去重，mr_ 优先）。
+   */
+  launcherSearchMods: (req: LauncherSearchModsReq): Promise<LauncherSearchModsRes> =>
+    ipcRenderer.invoke(LAUNCHER_SEARCH_MODS, req),
+  /**
+   * 下载模组文件到实例的 mods 目录。
+   *
+   * 使用搜索结果中的 ModEntry.id（带前缀 mr_ / cf_），主进程负责解析来源并下载。
+   * 返回落盘路径与模组元数据。
+   */
+  launcherDownloadMod: (req: LauncherDownloadModReq): Promise<LauncherDownloadModRes> =>
+    ipcRenderer.invoke(LAUNCHER_DOWNLOAD_MOD, req),
+  launcherGetModDetail: (req: LauncherGetModDetailReq): Promise<LauncherGetModDetailRes> =>
+    ipcRenderer.invoke(LAUNCHER_GET_MOD_DETAIL, req),
+  launcherDownloadUrl: (req: LauncherDownloadUrlReq): Promise<LauncherDownloadUrlRes> =>
+    ipcRenderer.invoke(LAUNCHER_DOWNLOAD_URL, req),
+
+  /**
+   * 安装整合包（**新建**一个实例；与单个 mod 下载是两条路）。
+   *
+   * 耗时以分钟计（实测 55 个文件 + 客户端下载），所以配一条进度通道，
+   * 否则界面在装的过程中是没反应的。
+   */
+  launcherInstallModpack: (req: LauncherInstallModpackReq): Promise<LauncherInstallModpackRes> =>
+    ipcRenderer.invoke(LAUNCHER_INSTALL_MODPACK, req),
+  /** 取消正在安装的整合包；已经结束的安装返回 `ok:false`，不算错误。 */
+  launcherCancelModpack: (req: LauncherCancelModpackReq): Promise<LauncherCancelModpackRes> =>
+    ipcRenderer.invoke(LAUNCHER_CANCEL_MODPACK, req),
+  onLauncherModpackProgress: (cb: (p: LauncherModpackProgress) => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, p: LauncherModpackProgress): void => cb(p);
+    ipcRenderer.on(LAUNCHER_MODPACK_PROGRESS, listener);
+    return () => {
+      ipcRenderer.removeListener(LAUNCHER_MODPACK_PROGRESS, listener);
+    };
+  },
   saveAllFiles: (req: { files: { path: string; content: string }[] }) =>
     ipcRenderer.invoke(SAVE_ALL_FILES, req),
   prepareBuildDir: (files: { path: string; content: string }[]) =>
@@ -294,6 +610,13 @@ const api = {
   loadCurseForgeConfig: () => ipcRenderer.invoke(LOAD_CURSEFORGE_CONFIG),
   saveCurseForgeConfig: (config: { apiKey: string }) =>
     ipcRenderer.invoke(SAVE_CURSEFORGE_CONFIG, config),
+  /** 用官方根验证 key（不受下载源偏好影响），只验证不保存。 */
+  curseforgeTestKey: (req: { apiKey: string }): Promise<{ ok: boolean; error?: string | null }> =>
+    ipcRenderer.invoke(CURSEFORGE_TEST_KEY, req),
+  // === 下载源偏好（官方源 / 国内镜像） ===
+  loadSourcePreference: () => ipcRenderer.invoke(LOAD_SOURCE_PREFERENCE),
+  saveSourcePreference: (pref: { preferOfficial: boolean }) =>
+    ipcRenderer.invoke(SAVE_SOURCE_PREFERENCE, pref),
   // === 整合包：依赖解析 + 冲突检测 + mrpack 导出 ===
   modpackResolve: (req: {
     mods: { projectId: string; name?: string }[];
@@ -436,12 +759,34 @@ const api = {
     return () => ipcRenderer.removeListener(PROJECT_CHANGED, handlerWrapper);
   },
 
-  // === 进程托管（外壳层只读，§7.1 / §10.2）===
-  // 白名单里**只有只读查询**：列被托管进程 / 读状态 / 读日志尾部。
-  // 故意不暴露 start/stop —— 启动服务端必须先弹窗确认（§10.6），
-  // 那条路必须经内核的确认闸门，不能由渲染进程直接 spawn（§4.3 白名单原则）。
+  // === 进程托管（外壳层，§7.1 / §10.2）===
+  // 查询通道只读：列被托管进程 / 读状态 / 读日志尾部。
+  // 启动/停止是有副作用的 X 类操作，主进程都必须先弹原生确认框（§10.6）；
+  // 渲染进程只能传 serverId，不能指定 cmd/PID（§4.3 白名单原则）。
   processList: () => ipcRenderer.invoke(PROCESS_LIST),
   processStatus: (serverId: string) => ipcRenderer.invoke(PROCESS_STATUS, { serverId }),
+  /**
+   * 请求启动服务端（§10.6 X 类）。
+   *
+   * 注意这里**只传 serverId**：可执行文件由主进程从磁盘推导后在原生弹窗里
+   * 逐字展示，用户看到什么就批准什么。渲染进程无法指定 cmd。
+   * `denied: true` 表示用户点了取消（与「启动失败」是两回事，UI 要分开显示）。
+   */
+  processLaunch: (req: ProcessLaunchReq): Promise<ProcessLaunchRes> =>
+    ipcRenderer.invoke(PROCESS_LAUNCH, req),
+  /**
+   * 请求停止服务端（§10.6 X 类）。
+   *
+   * 只传 serverId；主进程解析 PID 后弹窗，确认后发送 `stop`。
+   * `denied: true` 表示用户点了取消（与「停止失败」分开显示）。
+   */
+  processStop: (req: ProcessStopReq): Promise<ProcessStopRes> =>
+    ipcRenderer.invoke(PROCESS_STOP, req),
+  /** 列出服务端实例（mc-creator/servers/ 下的目录）。 */
+  launcherListServerInstances: () => ipcRenderer.invoke(LAUNCHER_LIST_SERVER_INSTANCES),
+  /** 删除服务端实例。 */
+  launcherDeleteServerInstance: (req: { id: string; deleteFiles?: boolean }) =>
+    ipcRenderer.invoke(LAUNCHER_DELETE_SERVER_INSTANCE, req),
   processLogs: (serverId: string, limit?: number) =>
     ipcRenderer.invoke(PROCESS_LOGS, limit === undefined ? { serverId } : { serverId, limit }),
   onProcessLog: (handler: (e: ProcessLogEventT) => void) => {

@@ -3,6 +3,8 @@ import { McIcon } from '../assets/mc-ui/McIcon';
 import type { ModEntry } from '@mc-creator/shared';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ErrorBanner } from './ErrorBanner.js';
+import { sourceLoaderLabel } from './launcher/detail-shared.js';
+import { PLAY_LOADER_FILTERS } from '../../../shared/play-loaders.js';
 import { Loader2, Search, Clock, X, Star, Download, Filter } from 'lucide-react';
 
 interface Props {
@@ -380,9 +382,17 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
               </div>
 
               {/* Loader 筛选 */}
+              {/*
+                只列 NeoForge + Fabric，清单来自 `shared/play-loaders.ts` —— 与
+                下载页那个下拉是**同一个清单**（顺手改一边就会各漂各的）。
+
+                注意默认是「全部」：`loaderFilter` 只在文件列表上做**客户端**过滤，
+                「全部」= 不过滤，所以拿掉某个选项不会让谁的文件看不见，
+                只是不能再「只看它」。
+              */}
               <div className="mb-2 flex items-center gap-1">
                 <span className="text-[10px] text-mc-mute">Loader:</span>
-                {['all', 'fabric', 'forge', 'neoforge', 'quilt'].map((l) => (
+                {['all', ...PLAY_LOADER_FILTERS].map((l) => (
                   <button
                     key={l}
                     onClick={() => setLoaderFilter(l)}
@@ -392,7 +402,7 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                         : 'bg-mc-surface-2 text-mc-dim hover:text-mc-text'
                     }`}
                   >
-                    {l === 'all' ? '全部' : l}
+                    {l === 'all' ? '全部' : sourceLoaderLabel(l)}
                   </button>
                 ))}
               </div>
@@ -440,7 +450,10 @@ export function CurseForgeSearchPanel({ onPick, onClose, loader, mcVersion }: Pr
                         </div>
                         {f.gameVersions.length > 0 && (
                           <div className="mt-0.5 text-[10px] text-mc-mute">
-                            MC: {f.gameVersions.filter((v) => v.startsWith('1.')).join(', ')}
+                            {/* 不再 `startsWith('1.')` 过滤：那会把 26.x 这类
+                                新版本号整个藏起来（列表本来就已经过滤掉了
+                                Client/Server/loader 名，见 CurseForgeApiClient）。 */}
+                            MC: {f.gameVersions.join(', ')}
                           </div>
                         )}
                       </button>

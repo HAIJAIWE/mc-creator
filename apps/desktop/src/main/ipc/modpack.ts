@@ -16,8 +16,6 @@ import JSZip from 'jszip';
 import { writeFileAtomic } from '@mc-creator/shell';
 import { ModpackSpec } from '@mc-creator/shared';
 import {
-  ModrinthApiClient,
-  CurseForgeApiClient,
   resolveFromMetadata,
   detectConflicts,
   buildMrpackPlan,
@@ -25,7 +23,7 @@ import {
   curseforgeToMetadata,
   type VersionMetadata,
 } from '@mc-creator/core';
-import { loadCurseForgeConfig } from '../curseforge-config.js';
+import { createCurseForgeClient, createModrinthClient } from '../market-clients.js';
 import { FileManager } from '../file-manager.js';
 import {
   MODPACK_RESOLVE,
@@ -82,14 +80,13 @@ export function registerModpackHandlers(): void {
     for (const m of req.mods) {
       if (m.name) nameByProject[m.projectId] = m.name;
     }
-    const modrinth = new ModrinthApiClient();
+    const modrinth = createModrinthClient();
     let networkFailed = false;
 
     for (const m of req.mods) {
       try {
         if (/^\d+$/.test(m.projectId)) {
-          const { apiKey } = loadCurseForgeConfig();
-          const client = new CurseForgeApiClient(apiKey);
+          const client = createCurseForgeClient();
           const files = await client.getFiles(Number(m.projectId), {
             loader: req.loader,
             mcVersion: req.mcVersion,

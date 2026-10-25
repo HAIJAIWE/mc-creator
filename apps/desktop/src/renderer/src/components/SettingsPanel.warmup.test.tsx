@@ -74,6 +74,7 @@ beforeEach(() => {
     testModelProfile: vi.fn(async () => ({ ok: true, message: 'ok' })),
     saveCurseForgeKey: vi.fn(async () => ({ ok: true })),
     loadCurseForgeConfig: vi.fn(async () => ({ apiKey: '', hasKey: false })),
+    loadSourcePreference: vi.fn(async () => ({ preferOfficial: false })),
   };
 });
 

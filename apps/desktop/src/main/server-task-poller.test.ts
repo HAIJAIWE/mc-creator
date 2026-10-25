@@ -299,3 +299,75 @@ describe('server-task-poller（R2c 定时轮询器）', () => {
     });
   });
 });
+
+/**
+ * 「算了就丢」的回归。
+ *
+ * 修复前 `onFired` 是可选的，而生产接线（index.ts）压根没传 ——
+ * 每 60 秒算出来的 `fired[]`（**包括失败**）被直接丢弃。
+ *
+ * 真实可达的失败链：用户经内核 `schedule_task` 建一个 restart 任务
+ * → 轮询器取到 `fired` → `restartServer()` 返回 `SERVER_NOT_FOUND`
+ * （生产里没有任何代码调 `launchServer`）→ 零痕迹。
+ */
+describe('createTaskPoller · 到期任务不得无声消失', () => {
+  it('任务失败时把原因打进 console.warn（含 action@serverId）', async () => {
+    const rt = makeRuntime([
+      { taskId: 't1', serverId: 'srv-x', action: 'restart', error: { message: '未托管 srv-x' } },
+    ]);
+    const svc = makeSupervisor();
+    svc.restartServer.mockResolvedValue({ ok: false, reason: 'SERVER_NOT_FOUND' } as never);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const poller = createTaskPoller({ getRuntime: () => rt, supervisor: svc });
+    await poller.pollOnce();
+
+    // 注意：在 restore **之后**再读 mock.calls 是读不到的 —— mockRestore() 会清空它。
+    // 恢复交给本文件顶部的全局 afterEach(vi.restoreAllMocks)。
+    const said = warn.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(said, '失败原因一个字都没进日志').toContain('restart@srv-x');
+    expect(said).toContain('SERVER_NOT_FOUND');
+  });
+
+  it('全部成功时打 console.log 而不是 warn', async () => {
+    const rt = makeRuntime([{ taskId: 't1', serverId: 'srv-1', action: 'stop' }]);
+    const svc = makeSupervisor();
+    svc.stopServer.mockResolvedValue({ ok: true } as never);
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const poller = createTaskPoller({ getRuntime: () => rt, supervisor: svc });
+    await poller.pollOnce();
+
+    expect(log.mock.calls.map((c) => String(c[0])).join('\n')).toContain('stop@srv-1');
+    expect(warn, '成功的一轮不该 warn').not.toHaveBeenCalled();
+  });
+
+  it('空轮次保持安静（每 60 秒刷屏没人受得了）', async () => {
+    const rt = makeRuntime([]);
+    const svc = makeSupervisor();
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const poller = createTaskPoller({ getRuntime: () => rt, supervisor: svc });
+    await poller.pollOnce();
+
+    expect(log).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('只记第一次，之后的轮次不再刷', async () => {
+    const rt = makeRuntime([
+      { taskId: 't1', serverId: 'srv-x', action: 'restart', error: '未托管' },
+    ]);
+    const svc = makeSupervisor();
+    svc.restartServer.mockResolvedValue({ ok: false, reason: 'SERVER_NOT_FOUND' } as never);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const poller = createTaskPoller({ getRuntime: () => rt, supervisor: svc });
+    await poller.pollOnce();
+    await poller.pollOnce();
+    await poller.pollOnce();
+
+    expect(warn, `刷了 ${warn.mock.calls.length} 次`).toHaveBeenCalledTimes(1);
+  });
+});

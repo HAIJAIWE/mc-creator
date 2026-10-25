@@ -22,7 +22,7 @@ import {
   testModelConnection,
   type ModelConfigFull,
   type ModelProfile,
-} from '../model-config.js';
+} from '../credentials/model-config.js';
 import { buildChatSystemMessage, type ChatStreamContext } from '../chat-system-message.js';
 import { loadBuildCacheSnapshot, saveBuildCacheSnapshot } from '../build-cache-store.js';
 import {

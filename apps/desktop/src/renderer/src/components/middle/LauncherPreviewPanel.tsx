@@ -13,6 +13,7 @@ import {
 } from './shared/index.js';
 import type { LauncherSpec } from '@mc-creator/shared';
 import type { TabItem } from './shared/index.js';
+import { loaderLabel } from '../../../../shared/generator-descriptors.js';
 import { Copy, Terminal, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 
 type SubTab = 'basic' | 'jvm' | 'account' | 'launch' | 'command';
@@ -29,14 +30,6 @@ const LAUNCHER_TYPE_LABELS: Record<LauncherSpec['launcherType'], string> = {
   official: '官方启动器',
   pcl2: 'PCL2',
   hmcl: 'HMCL',
-};
-
-const LOADER_LABELS: Record<LauncherSpec['loader'], string> = {
-  vanilla: '原版',
-  fabric: 'Fabric',
-  neoforge: 'NeoForge',
-  quilt: 'Quilt',
-  legacy_fabric: 'Legacy Fabric',
 };
 
 /**
@@ -91,7 +84,7 @@ export function LauncherPreviewPanel() {
           <span className="text-xs text-mc-mute">·</span>
           <span className="text-xs text-mc-dim">MC {launcher.mcVersion}</span>
           <span className="rounded-mc bg-mc-surface-2 px-1.5 py-0.5 text-[9px] text-mc-accent">
-            {LOADER_LABELS[launcher.loader]}
+            {loaderLabel(launcher.loader)}
           </span>
         </div>
         <div className="mt-1 text-xs text-mc-mute">配置文件: {launcher.profileName}</div>
@@ -414,7 +407,7 @@ export function LauncherPreviewPanel() {
 
       {/* Footer */}
       <div className="border-t border-mc-border px-4 py-2 text-xs text-mc-mute">
-        {LAUNCHER_TYPE_LABELS[launcher.launcherType]} · {LOADER_LABELS[launcher.loader]} ·{' '}
+        {LAUNCHER_TYPE_LABELS[launcher.launcherType]} · {loaderLabel(launcher.loader)} ·{' '}
         {launcher.accountType === 'microsoft' ? '微软账号' : '离线'} · {launcher.memoryMin}/
         {launcher.memoryMax} MB
       </div>

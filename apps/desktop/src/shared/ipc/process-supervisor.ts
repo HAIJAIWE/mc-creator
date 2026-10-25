@@ -3,15 +3,17 @@ import { z } from 'zod';
 /**
  * 进程托管的 IPC 契约（外壳层，§7.1 / §7.4 / §10.2）。
  *
- * **只有只读通道**：列被托管进程 / 读状态快照 / 读日志尾部。
- * 刻意**不**暴露「直接启动 / 停止」通道——启动服务端属 X 类任务，
- * 必须先经内核的确认闸门弹窗（§10.6「执行/写实例目录外 → 必须弹窗确认」）。
- * 若绕过内核直接给渲染层一个 spawn 通道，等于把 §10.6 的闸门作废。
+ * 查询通道只读：列被托管进程 / 读状态快照 / 读日志尾部。
  *
- * 同理**不**暴露「触发自动重启 / 触发控制台注入」通道（§7.1 新增两项能力）：
- * 这两件事都是有副作用的执行类操作，一旦能从渲染层直接点火，§10.6 就形同虚设。
- * 渲染层只能**读**它们的状态（快照里的 autoRestart* 与 lastCommandOutcome），
- * 是否执行永远由主进程侧的 confirm 闸门与用户实际点过的那个「启动」按钮决定。
+ * 有副作用的通道只有两个，且都**必须经主进程原生确认闸门**（§10.6）：
+ *   - `processLaunch`：启动服务端，cmd 从磁盘推导，不接受渲染层传 cmd；
+ *   - `processStop`：停止已托管服务端，只接受 serverId，主进程先弹窗
+ *     展示 PID/动作，确认后才写 `stop` 并等待退出。
+ * 两者都**不**接受可执行文件或任意命令，因此不是"裸 spawn / kill 通道"。
+ *
+ * 仍**不**暴露「触发自动重启 / 触发控制台注入」通道：这两件事没有对应的
+ * 用户动作入口，一旦能从渲染层直接点火，§10.6 就形同虚设。渲染层只能**读**
+ * 它们的状态（快照里的 autoRestart* 与 lastCommandOutcome）。
  */
 
 // === 进程托管：只读查询通道 ===
@@ -113,6 +115,55 @@ export const ProcessStatusResponse = z.object({
 });
 export type ProcessStatusReq = z.infer<typeof ProcessStatusRequest>;
 export type ProcessStatusRes = z.infer<typeof ProcessStatusResponse>;
+
+/**
+ * 启动服务端的请求（§10.6 X 类，必须弹窗确认）。
+ *
+ * **刻意不接受 cmd / args** —— supervisor 以当前用户权限 spawn，
+ * 让渲染层自己指定可执行文件等于把任意程序执行权交给前端。
+ * cmd 由主进程从磁盘上的服务端目录推导，再逐字展示在确认弹窗里。
+ *
+ * `serverId` 的合法性在主进程 `buildServerLaunchSpec` 里再判一次
+ * （拒绝 `..` / 分隔符 / 盘符，与 kernel-server 同规则），
+ * schema 这里只挡明显畸形的输入，不承担安全职责。
+ */
+export const ProcessLaunchRequest = z.object({
+  serverId: z.string().min(1),
+  /** Java 可执行文件；不传则用 `java`（走 PATH）。 */
+  javaPath: z.string().optional(),
+  /** JVM 堆，如 `2G`；不传用 `2G`。白名单在主进程侧再校验一次。 */
+  memory: z.string().optional(),
+});
+export const ProcessLaunchResponse = z.object({
+  ok: z.boolean(),
+  /** 已托管时的进程 pid；未启动为 null。 */
+  pid: z.number().nullable(),
+  /** 用户在弹窗点了取消时为 true（区别于「失败」）。 */
+  denied: z.boolean().optional(),
+  error: z.string().nullable(),
+});
+export type ProcessLaunchReq = z.infer<typeof ProcessLaunchRequest>;
+export type ProcessLaunchRes = z.infer<typeof ProcessLaunchResponse>;
+
+/**
+ * 停止服务端（X 类，§10.6 确认闸门）。
+ *
+ * 只接受 serverId：渲染层不能指定 PID 或命令。主进程从 supervisor 取
+ * 当前托管进程，弹窗展示 serverId/PID/动作，确认后才发送 `stop`。
+ */
+export const ProcessStopRequest = z.object({
+  serverId: z.string().min(1),
+});
+export const ProcessStopResponse = z.object({
+  ok: z.boolean(),
+  /** 用户在弹窗点了取消时为 true（区别于「停止失败」）。 */
+  denied: z.boolean().optional(),
+  error: z.string().nullable(),
+  /** 停机报告；实例本就不在运行时为 null。 */
+  stop: ProcessStopReportSchema.nullable(),
+});
+export type ProcessStopReq = z.infer<typeof ProcessStopRequest>;
+export type ProcessStopRes = z.infer<typeof ProcessStopResponse>;
 
 export const ProcessLogsRequest = z.object({
   serverId: z.string(),

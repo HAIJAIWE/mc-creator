@@ -6,7 +6,7 @@
  * 通道名保持不变，前端零改动。
  */
 import { Orchestrator, MockProvider, VercelAiProvider } from '@mc-creator/core';
-import { loadModelConfig } from './model-config.js';
+import { loadModelConfig } from './credentials/model-config.js';
 import { registerGenerateHandlers, registerSandboxedMustacheHandler } from './ipc/generate.js';
 import { registerBuildHandlers } from './ipc/build.js';
 import { registerProjectHandlers } from './ipc/project.js';

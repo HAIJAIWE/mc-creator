@@ -907,7 +907,6 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
       throw new ProcessSupervisorError(`spawn 失败：${(e as Error).message}`, 'SPAWN_FAILED');
     }
     entry.child = child;
-    entry.pid = child.pid ?? null;
 
     // 捕获日志：stdout/stderr 按到达顺序合并（§7.4 控制台流式 I/O）。
     child.stdout?.on('data', (chunk: Buffer) =>
@@ -946,6 +945,35 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
       this.setState(entry, 'crashed');
     });
 
+    entry.pid = child.pid ?? null;
+
+    /**
+     * spawn 失败（可执行文件不存在 / 不可执行）时，Node **同步**返回 pid=undefined，
+     * 错误要到下一个 tick 才以 'error' 发出（上面那个监听器会兜住）。
+     *
+     * 实测（win32 / Node 24）：成功时 pid 是**同步**赋值的真实值，失败时为 undefined。
+     * 因此 `pid === undefined` 是可靠的「没起来」信号，而不是需要等的竞态。
+     *
+     * 此前这里返回 `{ pid: 0 }`，而调用方无法区分「启动成功」与「根本没启动」——
+     * 唯一的生产调用方（agent-host.ts:202）会照常打印「已拉起」。
+     * 改为同步抛错，调用链上已有接收点：
+     *   - `restartServer` → 已包 try/catch，映射为 SPAWN_FAILED
+     *   - `startAgentHost`（index.ts）→ 已有 catch，会如实打印启动失败
+     *
+     * 位置在监听器**之后**是刻意的：先抛再挂监听器的话，随后到达的 'error'
+     * 就没有监听者，EventEmitter 会抛未捕获异常掀翻主进程。
+     */
+    if (entry.pid === null) {
+      this.finishExit(entry, null, null);
+      this.setState(entry, 'crashed');
+      throw new ProcessSupervisorError(
+        `无法启动 ${spec.cmd}：可执行文件不存在或不可执行`,
+        'SPAWN_FAILED',
+      );
+    }
+    // 收窄到局部常量：返回值里的 pid 此后不可能是 0
+    const pid: number = entry.pid;
+
     entry.startedAt = this.now();
     if (child.pid !== undefined) this.setState(entry, 'running');
     else {
@@ -959,7 +987,7 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
 
     return {
       serverId: entry.serverId,
-      pid: entry.pid ?? 0,
+      pid,
       exited: entry.exited,
       logs: (limit?: number) => this.logs(entry.serverId, limit),
       stop: (options?: { gracefulMs?: number }) => this.stopPublic(entry, options),
@@ -1278,7 +1306,24 @@ class Supervisor extends EventEmitter implements ProcessSupervisor {
     entry.autoRestartCount = attempt;
     // crashed → starting 是合法流转（LEGAL 里已开这条边），所以直接复用 doSpawn：
     // 日志环形缓冲与 crashCount 自动跨重启保留（用户要能看到"上次为什么崩"）。
-    this.doSpawn(entry.spec, entry.cwd);
+    //
+    // 必须 try/catch：本函数可能从**定时器回调**进来（见 scheduleRestart），
+    // 那条路径上没有外层 catch 兜着，抛出去就是未捕获异常 —— 主进程整体退出。
+    // 同文件另外两条调用路径（restartServer / spawnManaged）都有接收点，
+    // 只有这里裸奔。此处把它转成状态与事件，让 UI 能看见"自动重启也失败了"。
+    try {
+      this.doSpawn(entry.spec, entry.cwd);
+    } catch (e) {
+      this.appendLog(entry, 'stderr', `自动重启失败：${(e as Error).message}\n`);
+      this.finishExit(entry, null, null);
+      this.setState(entry, 'crashed');
+      this.emit('auto-restart-rejected', {
+        serverId: entry.serverId,
+        attempt,
+        at: new Date(this.now()).toISOString(),
+        reason: (e as Error).message,
+      });
+    }
   }
 
   /** 掐掉挂起的自动重启（停机 / 手工重启 / 关服时都要调）。 */

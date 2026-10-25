@@ -17,7 +17,7 @@ import { ensureGradleWrapper, warmForgeGradleCache } from '@mc-creator/devkit';
 import type { McVersion } from '@mc-creator/shared';
 import { javaVersionFor, LOADER_VERSIONS } from '@mc-creator/shared';
 import { assertWithin } from '../ipc-utils.js';
-import { loadModelConfig } from '../model-config.js';
+import { loadModelConfig } from '../credentials/model-config.js';
 import {
   IPC,
   BuildRequest,

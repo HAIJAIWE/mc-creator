@@ -995,17 +995,34 @@ describe('崩溃可观测（状态 + 退出码 + 日志尾部；自动重启本�
     await handle.stop();
   });
 
-  it('spawn 不存在的可执行 → 落 crashed 并把错误写进日志尾部', async () => {
+  it('spawn 不存在的可执行 → launch() 同步抛 SPAWN_FAILED，且崩溃证据仍留痕', async () => {
+    /**
+     * 契约变更（2026-10-11）：此前 launch() 会带着 `{ pid: 0 }` **正常返回**，
+     * 调用方无法区分「启动成功」与「根本没起来」。唯一的生产调用方
+     * agent-host.ts:202 于是照常打印「已拉起」—— 日志说谎且无 UI 通路。
+     *
+     * 现在改为同步抛错：pid 为 null 就是 spawn 失败的可靠信号（成功时
+     * Node 同步赋真实 pid），调用链上已有接收点（restartServer 的 try/catch、
+     * index.ts 的 startAgentHost）。
+     *
+     * 注意「同步抛」不等于「不管」：状态与日志仍必须留下崩溃证据，
+     * 否则 UI 侧就真的什么都查不到了。
+     */
     const svc = makeService();
-    const handle = svc.launch({
-      serverId: 's1',
-      cmd: path.join(tmpdir(), 'definitely-not-here-9d2f.exe'),
-      args: [],
-    });
-    const res = await handle.exited;
-    expect(res.code).toBeNull();
+    expect(() =>
+      svc.launch({
+        serverId: 's1',
+        cmd: path.join(tmpdir(), 'definitely-not-here-9d2f.exe'),
+        args: [],
+      }),
+    ).toThrow(/definitely-not-here-9d2f\.exe/);
+
     await waitForState(svc, 's1', (s) => s === 'crashed');
-    expect(svc.logs('s1').some((l) => l.startsWith('spawn error:'))).toBe(true);
+    expect(svc.status('s1')?.exitCode).toBeNull();
+    // 'error' 事件在下一个 tick 才到，日志尾部由那个监听器写入
+    await vi.waitFor(() => {
+      expect(svc.logs('s1').some((l) => l.startsWith('spawn error:'))).toBe(true);
+    });
   });
 
   it('spawn 注入器同步抛错 → SPAWN_FAILED', () => {

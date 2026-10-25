@@ -20,6 +20,7 @@ import type {
   CurseForgeSearchRes,
   CurseForgeFilesRes,
   CurseForgeConfig,
+  SourcePreferencePayload,
   ModpackResolveRes,
   ModpackCheckConflictsRes,
   ModpackExportMrpackRes,
@@ -45,7 +46,65 @@ import type {
   KernelExecuteRes,
   KernelTaskResultT,
 } from '../../../shared/ipc-channels.js';
+import type {
+  LauncherCreateInstanceReq,
+  LauncherUpdateInstanceReq,
+  LauncherDeleteInstanceReq,
+  LauncherOpenInstanceFolderReq,
+  LauncherDownloadProgress,
+  LauncherListServerInstancesResponse,
+  LauncherSearchModsReq,
+  LauncherSearchModsRes,
+  LauncherDownloadModReq,
+  LauncherDownloadModRes,
+  LauncherGetModDetailReq,
+  LauncherGetModDetailRes,
+  LauncherDownloadUrlReq,
+  LauncherDownloadUrlRes,
+  LauncherInstallModpackReq,
+  LauncherInstallModpackRes,
+  LauncherCancelModpackReq,
+  LauncherCancelModpackRes,
+  LauncherModpackProgress,
+  LauncherDownloadRequest,
+  LauncherInstallLoaderRequest,
+  LauncherInstallSkinRequest,
+  LauncherSkinListRes,
+  LauncherSkinAddLocalReq,
+  LauncherSkinAddUrlReq,
+  LauncherSkinAddMineskinReq,
+  LauncherSkinAddOfficialReq,
+  LauncherSkinMineskinPageReq,
+  LauncherSkinRemoveReq,
+  LauncherSkinUpdateReq,
+  LauncherSkinApplyReq,
+  LauncherSkinUnapplyReq,
+  LauncherSkinListAppliedReq,
+  LauncherSkinReadPngReq,
+  LauncherPickFilesReq,
+  LauncherPickFilesRes,
+  LauncherModCnAliasReq,
+  LauncherModCnAliasRes,
+  LauncherLaunchRequest,
+  LauncherGameExit,
+  LauncherListModsReq,
+  LauncherInstallModReq,
+  LauncherRemoveModReq,
+  LauncherToggleModReq,
+  LauncherListInstanceFilesReq,
+  LauncherListWorldsReq,
+  LauncherReadLatestLogReq,
+  LauncherListCrashReportsReq,
+  LauncherReadCrashReportReq,
+} from '../../../shared/ipc/launcher.js';
 import type { AgentRunLoopRes } from '../../../shared/ipc/agent-loop.js';
+import type {
+  ProcessLaunchReq,
+  ProcessLaunchRes,
+  ProcessStateEventT,
+  ProcessStatusRes,
+  ProcessStopRes,
+} from '../../../shared/ipc/process-supervisor.js';
 
 /**
  * 预览模式下的简单规则式 Spec 生成：根据描述关键词 + 生成器类型返回模板 spec。
@@ -413,18 +472,196 @@ export const ipcClient = {
     window.mcApi.exportSpec(req),
   importSpec: () => window.mcApi.importSpec(),
   launcherListVersions: () => window.mcApi.launcherListVersions(),
-  launcherDownload: (req: { version: string }) => window.mcApi.launcherDownload(req),
-  launcherLaunch: (req: { version: string; username: string; memory: string; gameDir?: string }) =>
-    window.mcApi.launcherLaunch(req),
-  launcherInstallLoader: (req: { version: string; loader: 'fabric' | 'neoforge' }) =>
+  /**
+   * 下载客户端产物（jar / assets / libraries）+ 建或更新实例。
+   *
+   * `version` 是 MC 版本号（产物按它共享）；`instanceId` / `instanceName`
+   * 决定这个实例是谁。两者多实例之后不再相等。
+   */
+  launcherDownload: (req: LauncherDownloadRequest) => window.mcApi.launcherDownload(req),
+  /**
+   * 下载服务端 jar（PCL 的「下载服务端」按钮）。
+   * 只传 version；地址与落盘路径由主进程从清单推导。
+   */
+  launcherDownloadServer: (req: { version: string }) => window.mcApi.launcherDownloadServer(req),
+  /**
+   * 由已下载的 server.jar 建一个能启动的服务端实例。
+   * `acceptEula` 必须来自用户的实际选择，渲染层不代填 true。
+   */
+  launcherCreateServerInstance: (req: {
+    serverId: string;
+    version: string;
+    port?: number;
+    motd?: string;
+    maxPlayers?: number;
+    onlineMode?: boolean;
+    levelName?: string;
+    acceptEula?: boolean;
+  }) => window.mcApi.launcherCreateServerInstance(req),
+  /** 订阅下载进度（返回取消订阅函数）。失败也会发 finished:true。 */
+  onLauncherDownloadProgress: (handler: (p: LauncherDownloadProgress) => void) =>
+    window.mcApi.onLauncherDownloadProgress(handler),
+  /**
+   * 启动游戏。
+   *
+   * ⚠️ `instance` 是**实例名**不是 MC 版本号。多实例之后主进程要据此分别拿
+   * versionId（跑哪个 jar）与 gameDir（mods / 存档在哪），传版本号会找不到实例。
+   */
+  launcherLaunch: (req: LauncherLaunchRequest) => window.mcApi.launcherLaunch(req),
+  onLauncherGameExit: (handler: (event: LauncherGameExit) => void): (() => void) =>
+    window.mcApi.onLauncherGameExit(handler),
+  launcherInstallLoader: (req: LauncherInstallLoaderRequest) =>
     window.mcApi.launcherInstallLoader(req),
-  launcherListMods: (version: string) => window.mcApi.launcherListMods(version),
-  launcherInstallMod: (req: { version: string; name: string; url: string }) =>
-    window.mcApi.launcherInstallMod(req),
-  launcherRemoveMod: (req: { version: string; name: string }) =>
-    window.mcApi.launcherRemoveMod(req),
-  launcherInstallSkin: (req: { version: string; skinApiUrl?: string }) =>
-    window.mcApi.launcherInstallSkin(req),
+  launcherListMods: (req: LauncherListModsReq) => window.mcApi.launcherListMods(req),
+  /**
+   * 搜索在线模组/整合包/数据包/资源包/光影包（聚合 Modrinth + CurseForge）。
+   * 返回统一的 ModEntry 列表，已去重（按 id 去重，mr_ 优先）。
+   */
+  launcherSearchMods: (req: LauncherSearchModsReq): Promise<LauncherSearchModsRes> =>
+    window.mcApi.launcherSearchMods(req),
+
+  /** 项目详情（点击搜索结果进入的那个页面：描述 + 全部版本 + 可下载文件）。 */
+  launcherGetModDetail: (req: LauncherGetModDetailReq): Promise<LauncherGetModDetailRes> =>
+    window.mcApi.launcherGetModDetail(req),
+
+  /** 按 URL 直接下载一个文件（详情页点具体版本时用）。 */
+  launcherDownloadUrl: (req: LauncherDownloadUrlReq): Promise<LauncherDownloadUrlRes> =>
+    window.mcApi.launcherDownloadUrl(req),
+
+  /**
+   * 安装整合包 —— **新建**一个实例，与单个 mod 下载是两条路。
+   * 耗时以分钟计（实测 55 个文件 + 客户端下载），必须有进度反馈。
+   */
+  launcherInstallModpack: (req: LauncherInstallModpackReq): Promise<LauncherInstallModpackRes> =>
+    window.mcApi.launcherInstallModpack(req),
+  launcherCancelModpack: (req: LauncherCancelModpackReq): Promise<LauncherCancelModpackRes> =>
+    window.mcApi.launcherCancelModpack(req),
+  onLauncherModpackProgress: (cb: (p: LauncherModpackProgress) => void): (() => void) =>
+    window.mcApi.onLauncherModpackProgress(cb),
+
+  /**
+   * 下载模组文件到实例的 mods 目录。
+   * 使用搜索结果中的 ModEntry.id（带前缀 mr_ / cf_），主进程负责解析来源并下载。
+   * 返回落盘路径与模组元数据。
+   */
+  launcherDownloadMod: (req: LauncherDownloadModReq): Promise<LauncherDownloadModRes> =>
+    window.mcApi.launcherDownloadMod(req),
+
+  launcherInstallMod: (req: LauncherInstallModReq) => window.mcApi.launcherInstallMod(req),
+  launcherRemoveMod: (req: LauncherRemoveModReq) => window.mcApi.launcherRemoveMod(req),
+  launcherToggleMod: (req: LauncherToggleModReq) => window.mcApi.launcherToggleMod(req),
+  /** 实例目录浏览：`path` 传 '' 表示 `game/<实例名>/` 根目录 */
+  launcherListInstanceFiles: (req: LauncherListInstanceFilesReq) =>
+    window.mcApi.launcherListInstanceFiles(req),
+  /** 世界列表：真实世界名 / 最后游玩 / 游戏模式来自 level.dat */
+  launcherListWorlds: (req: LauncherListWorldsReq) => window.mcApi.launcherListWorlds(req),
+  // ===== L7 日志 =====
+  /**
+   * 启动游戏并实时收日志分片。返回停止函数，组件卸载时务必调用。
+   * 分片含 `done: true` 表示进程已退出（含启动失败）。
+   */
+  launcherLogStream: (
+    req: { instance: string },
+    onChunk: (chunk: { requestId: string; source: string; line: string; done: boolean }) => void,
+  ): (() => void) => window.mcApi.launcherLogStream(req, onChunk),
+  launcherReadLatestLog: (req: LauncherReadLatestLogReq) => window.mcApi.launcherReadLatestLog(req),
+  launcherListCrashReports: (req: LauncherListCrashReportsReq) =>
+    window.mcApi.launcherListCrashReports(req),
+  launcherReadCrashReport: (req: LauncherReadCrashReportReq) =>
+    window.mcApi.launcherReadCrashReport(req),
+  // ===== L1 实例注册表 =====
+  launcherListInstances: () => window.mcApi.launcherListInstances(),
+  launcherCreateInstance: (req: LauncherCreateInstanceReq) =>
+    window.mcApi.launcherCreateInstance(req),
+  launcherUpdateInstance: (req: LauncherUpdateInstanceReq) =>
+    window.mcApi.launcherUpdateInstance(req),
+  /** `deleteFiles: true` 会连同存档目录一起删除，不可撤销 —— UI 须二次确认。 */
+  launcherDeleteInstance: (req: LauncherDeleteInstanceReq) =>
+    window.mcApi.launcherDeleteInstance(req),
+  launcherOpenInstanceFolder: (req: LauncherOpenInstanceFolderReq) =>
+    window.mcApi.launcherOpenInstanceFolder(req),
+
+  // ===== L7 服务端启动（§10.6 闸门）=====
+  /**
+   * 启动服务端实例。
+   *
+   * 只传 serverId + 可选 javaPath/memory；主进程从磁盘推导 cmd/args/cwd，
+   * 逐字展示在原生确认弹窗，用户点确定 → 登记一次性令牌 → supervisor 闸门放行。
+   * 渲染层**不得**传 cmd（§10.6 同一纪律）。
+   */
+  processLaunch: (req: ProcessLaunchReq): Promise<ProcessLaunchRes> =>
+    window.mcApi.processLaunch(req),
+
+  /** 请求停止服务端（主进程会先弹原生确认框）。 */
+  processStop: (serverId: string): Promise<ProcessStopRes> =>
+    window.mcApi.processStop({ serverId }),
+
+  /** 服务端进程状态（只读）。 */
+  processStatus: (serverId: string): Promise<ProcessStatusRes> =>
+    window.mcApi.processStatus(serverId),
+
+  /**
+   * 订阅服务端进程状态变化。
+   *
+   * `launchServer` 返回 pid 时进程往往还在 `starting`，真正进入 `running`
+   * / `crashed` 是异步事件；不订阅的话服务端页签只能显示一句「已启动」，
+   * 用户看不到随后的崩溃原因。
+   */
+  onProcessState: (handler: (e: ProcessStateEventT) => void): (() => void) =>
+    window.mcApi.onProcessState(handler),
+
+  /**
+   * 列出服务端实例（mc-creator/servers/ 下的目录）。
+   *
+   * ⚠️ 主进程返回的是**信封** `{ instances, error }`（见
+   * `LauncherListServerInstancesResponse`），不是裸数组。以前这里声明成
+   * `Promise<ServerInstanceSummary[]>`，渲染层照着声明把信封塞进 state，
+   * 点「服务端」页签就 `serverInstances.map is not a function` 白屏。
+   */
+  launcherListServerInstances: (): Promise<LauncherListServerInstancesResponse> =>
+    window.mcApi.launcherListServerInstances(),
+
+  /** 删除服务端实例。 */
+  launcherDeleteServerInstance: (req: { id: string; deleteFiles?: boolean }) =>
+    window.mcApi.launcherDeleteServerInstance(req),
+
+  launcherInstallSkin: (req: LauncherInstallSkinRequest) => window.mcApi.launcherInstallSkin(req),
+
+  // ===== §5.9 本地皮肤库 =====
+  launcherSkinList: (): Promise<LauncherSkinListRes> => window.mcApi.launcherSkinList(),
+  launcherSkinAddLocal: (req: LauncherSkinAddLocalReq) => window.mcApi.launcherSkinAddLocal(req),
+  launcherSkinAddUrl: (req: LauncherSkinAddUrlReq) => window.mcApi.launcherSkinAddUrl(req),
+  launcherSkinAddMineskin: (req: LauncherSkinAddMineskinReq) =>
+    window.mcApi.launcherSkinAddMineskin(req),
+  /** 按 UUID 导入正版皮肤（Mojang sessionserver）。 */
+  launcherSkinAddOfficial: (req: LauncherSkinAddOfficialReq) =>
+    window.mcApi.launcherSkinAddOfficial(req),
+  launcherSkinMineskinPage: (req: LauncherSkinMineskinPageReq) =>
+    window.mcApi.launcherSkinMineskinPage(req),
+  launcherSkinRemove: (req: LauncherSkinRemoveReq) => window.mcApi.launcherSkinRemove(req),
+  launcherSkinUpdate: (req: LauncherSkinUpdateReq) => window.mcApi.launcherSkinUpdate(req),
+  launcherSkinApply: (req: LauncherSkinApplyReq) => window.mcApi.launcherSkinApply(req),
+  launcherSkinUnapply: (req: LauncherSkinUnapplyReq) => window.mcApi.launcherSkinUnapply(req),
+  launcherSkinListApplied: (req: LauncherSkinListAppliedReq) =>
+    window.mcApi.launcherSkinListApplied(req),
+  /** 读库里的 PNG 为 data URL（供 2D/3D 预览）。 */
+  launcherSkinReadPng: (req: LauncherSkinReadPngReq) => window.mcApi.launcherSkinReadPng(req),
+  /**
+   * 通用文件选择器（Electron dialog）。
+   *
+   * 不复用 `api.nodeGraph.showOpenDialog`：那个锁死 `.json` filters，
+   * 皮肤要 `.png`。
+   */
+  launcherPickFiles: (req: LauncherPickFilesReq): Promise<LauncherPickFilesRes> =>
+    window.mcApi.launcherPickFiles(req),
+  /**
+   * 中文词 → 英文项目名（MC百科 别名查询）。
+   *
+   * 只有 MC百科 有中文名，但它不托管文件，所以只拿它查词 ——
+   * 数据仍走 Modrinth / CurseForge。
+   */
+  launcherModCnAlias: (req: LauncherModCnAliasReq): Promise<LauncherModCnAliasRes> =>
+    window.mcApi.launcherModCnAlias(req),
   modrinthSearch: (req: {
     query: string;
     loader?: string;
@@ -450,6 +687,12 @@ export const ipcClient = {
   loadCurseForgeConfig: (): Promise<CurseForgeConfig> => window.mcApi.loadCurseForgeConfig(),
   saveCurseForgeConfig: (config: CurseForgeConfig): Promise<{ ok: true }> =>
     window.mcApi.saveCurseForgeConfig(config),
+  curseforgeTestKey: (req: { apiKey: string }): Promise<{ ok: boolean; error?: string | null }> =>
+    window.mcApi.curseforgeTestKey(req),
+  // === 下载源偏好（官方源 / 国内镜像） ===
+  loadSourcePreference: (): Promise<SourcePreferencePayload> => window.mcApi.loadSourcePreference(),
+  saveSourcePreference: (pref: SourcePreferencePayload): Promise<{ ok: true }> =>
+    window.mcApi.saveSourcePreference(pref),
   // === 整合包：依赖解析 + 冲突检测 + mrpack 导出 ===
   modpackResolve: (req: {
     mods: { projectId: string; name?: string }[];

@@ -24,7 +24,14 @@ import {
   type ColorMode,
 } from '../lib/themes.js';
 import type { ModelProfile } from '../../../shared/ipc-channels.js';
-import { LOADER_VERSIONS, type McVersion } from '@mc-creator/shared';
+import { LOADER_VERSIONS, MC_VERSIONS, type McVersion } from '@mc-creator/shared';
+import { shallow } from 'zustand/shallow';
+import { useModStore } from '../store/mod-store.js';
+import {
+  GENERATOR_TYPES,
+  GENERATOR_DESCRIPTORS,
+  pickLocalized,
+} from '../../../shared/generator-descriptors.js';
 
 /** 可预热的版本：只取 LOADER_VERSIONS 里有 forgeVersion 条目的（表即真相，不硬编码列表）。 */
 const WARMABLE_VERSIONS = (Object.keys(LOADER_VERSIONS) as McVersion[]).filter(
@@ -40,6 +47,7 @@ import {
   selectSetLeftWidth,
   selectSetRightWidth,
 } from '../shell/layout-store.js';
+import { generatorLoaderOptions } from '../../../shared/generator-descriptors.js';
 
 interface Preset {
   name: string;
@@ -159,14 +167,36 @@ const LAYOUT_PRESETS = [
  * 而预热绝不能落在用户工程里（会写他的 build/、还可能被算进 lastBuildHash）。
  * 这里直接用 `LOADER_VERSIONS` 表做下拉 —— 数据来源唯一，不解析文本。
  */
-type Tab = 'model' | 'curseforge' | 'appearance' | 'warmup';
+type Tab = 'project' | 'model' | 'curseforge' | 'downloadSource' | 'appearance' | 'warmup';
 
 export function SettingsPanel() {
   const leftWidth = useLayoutStore(selectLeftWidth);
   const rightWidth = useLayoutStore(selectRightWidth);
   const setLeftWidth = useLayoutStore(selectSetLeftWidth);
   const setRightWidth = useLayoutStore(selectSetRightWidth);
-  const [activeTab, setActiveTab] = useState<Tab>('model');
+  // 默认落在「项目」—— 内容类型/加载器/版本原在 TopToolbar 的三个下拉框，
+  // 按 IDE 惯例（VS Code / IntelliJ 顶部都不放项目配置）迁到这里，
+  // 这里是它们**唯一**的编辑入口。
+  const [activeTab, setActiveTab] = useState<Tab>('project');
+
+  // === 项目配置（内容类型 / 加载器 / MC 版本）===
+  // 这三个字段原先是 TopToolbar 中间的三个下拉框。按 IDE 惯例迁到这里：
+  // VS Code 与 IntelliJ 的顶部都不放项目配置，且本组件此前**只读**这三个字段
+  // （里面的 mcVersion 是「依赖预热」的局部 state，与项目版本无关），
+  // 所以这里是它们唯一的编辑入口。底部 StatusBar 只做只读展示。
+  const project = useModStore(
+    (s) => ({
+      generatorType: s.generatorType,
+      loader: s.loader,
+      mcVersion: s.mcVersion,
+      loading: s.loading,
+      setGeneratorType: s.setGeneratorType,
+      setLoader: s.setLoader,
+      setMcVersion: s.setMcVersion,
+    }),
+    shallow,
+  );
+  const needsLoader = GENERATOR_DESCRIPTORS[project.generatorType]?.needsLoader ?? false;
 
   // === 依赖预热（W3） ===
   // 只列 Forge 组合：devkit 的 warmForgeGradleCache 覆盖 ForgeGradle 6，
@@ -177,7 +207,7 @@ export function SettingsPanel() {
   const [warmMsg, setWarmMsg] = useState<string | null>(null);
   const [warmErr, setWarmErr] = useState<string | null>(null);
   const [warmDone, setWarmDone] = useState<boolean | null>(null);
-  const { t, tCommon } = useTranslation();
+  const { t, tCommon, locale } = useTranslation();
 
   // === 模型配置（多套并存，可切换/测试） ===
   const { setConfig, setProfiles, profiles, activeId } = useModelConfigStore();
@@ -228,6 +258,15 @@ export function SettingsPanel() {
   const [cfApiKey, setCfApiKey] = useState('');
   const [cfSaving, setCfSaving] = useState(false);
   const [cfSaved, setCfSaved] = useState(false);
+  const [cfTesting, setCfTesting] = useState(false);
+  const [cfTest, setCfTest] = useState<{ ok: boolean; error?: string | null } | null>(null);
+  /**
+   * 下载源偏好。默认 false = 国内镜像优先（与主进程 `DEFAULT_SOURCE_PREFERENCE`
+   * 一致；这里只是**首帧**的占位值，挂载后会从主进程读回真实值）。
+   */
+  const [preferOfficial, setPreferOfficial] = useState(false);
+  const [srcSaving, setSrcSaving] = useState(false);
+  const [srcSaved, setSrcSaved] = useState(false);
 
   // === 外观：颜色模式 + 主题 ===
   const [activeMode, setActiveMode] = useState<ColorMode>(() => getCurrentMode());
@@ -257,6 +296,7 @@ export function SettingsPanel() {
         );
       });
     ipcClient.loadCurseForgeConfig().then((c) => setCfApiKey(c.apiKey));
+    ipcClient.loadSourcePreference().then((p) => setPreferOfficial(p.preferOfficial));
   }, [setConfig, setProfiles]);
 
   // 系统模式变化时（仅 system 模式下）同步 UI 状态：effectiveMode + activeTheme
@@ -390,10 +430,55 @@ export function SettingsPanel() {
 
   const saveCf = async () => {
     setCfSaving(true);
-    await ipcClient.saveCurseForgeConfig({ apiKey: cfApiKey });
-    setCfSaving(false);
-    setCfSaved(true);
-    setTimeout(() => setCfSaved(false), 2000);
+    setCfTest(null);
+    try {
+      const apiKey = cfApiKey.trim();
+      await ipcClient.saveCurseForgeConfig({ apiKey });
+      // 把 trim 后的值回填，避免界面上留着一段「看起来有、实际没存」的空白
+      setCfApiKey(apiKey);
+      setCfSaved(true);
+      setTimeout(() => setCfSaved(false), 2000);
+    } finally {
+      setCfSaving(false);
+    }
+  };
+
+  /**
+   * 测试 key。**强制走官方根**（主进程实现），所以镜像优先时也能测出这把
+   * key 本身有没有效；测试不会保存，失败原因原样显示。
+   */
+  const testCf = async () => {
+    const apiKey = cfApiKey.trim();
+    if (apiKey === '') {
+      setCfTest({ ok: false, error: '先填 API Key 再测试' });
+      return;
+    }
+    setCfTesting(true);
+    setCfTest(null);
+    try {
+      setCfTest(await ipcClient.curseforgeTestKey({ apiKey }));
+    } catch (e) {
+      setCfTest({ ok: false, error: (e as Error).message });
+    } finally {
+      setCfTesting(false);
+    }
+  };
+
+  /**
+   * 切换下载源。**立刻落盘**（没有「保存」按钮）：这是个即时生效的开关，
+   * 让用户点完还要再点一次保存，只会让人怀疑到底切没切。
+   */
+  const chooseSourceOfficial = async (official: boolean) => {
+    if (official === preferOfficial) return;
+    setPreferOfficial(official);
+    setSrcSaving(true);
+    try {
+      await ipcClient.saveSourcePreference({ preferOfficial: official });
+      setSrcSaved(true);
+      setTimeout(() => setSrcSaved(false), 2000);
+    } finally {
+      setSrcSaving(false);
+    }
   };
 
   const applyLayoutPreset = (preset: (typeof LAYOUT_PRESETS)[0]) => {
@@ -432,8 +517,10 @@ export function SettingsPanel() {
       <div className="flex border-b border-mc-border">
         {(
           [
+            { id: 'project', label: t('settings.projectSection') },
             { id: 'model', label: tCommon('model') },
             { id: 'curseforge', label: 'CurseForge' },
+            { id: 'downloadSource', label: t('settings.downloadSource') },
             { id: 'appearance', label: tCommon('appearance') },
             { id: 'warmup', label: '依赖预热' },
           ] as { id: Tab; label: string }[]
@@ -453,6 +540,75 @@ export function SettingsPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3">
+        {/* Tab 0: 项目（内容类型 / 加载器 / MC 版本） */}
+        {activeTab === 'project' && (
+          <div className="space-y-4">
+            <div className="rounded-mc border border-mc-border bg-mc-surface-2/40 p-2.5 text-[11px] leading-relaxed text-mc-mute">
+              {t('settings.projectSectionHint')}
+            </div>
+
+            <div>
+              <label htmlFor="settings-generator-type" className="mb-1 block text-xs text-mc-dim">
+                {t('settings.contentType')}
+              </label>
+              <select
+                id="settings-generator-type"
+                value={project.generatorType}
+                onChange={(e) =>
+                  project.setGeneratorType(e.target.value as typeof project.generatorType)
+                }
+                disabled={project.loading}
+                className="mc-select w-full"
+              >
+                {GENERATOR_TYPES.map((value) => (
+                  <option key={value} value={value}>
+                    {pickLocalized(GENERATOR_DESCRIPTORS[value].label, locale)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="settings-loader" className="mb-1 block text-xs text-mc-dim">
+                {t('settings.loader')}
+              </label>
+              <select
+                id="settings-loader"
+                value={project.loader}
+                onChange={(e) => project.setLoader(e.target.value as typeof project.loader)}
+                disabled={project.loading || !needsLoader}
+                title={needsLoader ? undefined : t('settings.loaderNotApplicable')}
+                className="mc-select w-full"
+              >
+                {generatorLoaderOptions(project.loader).map((o) => (
+                  <option key={o.value} value={o.value} disabled={o.disabled}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="settings-mc-version" className="mb-1 block text-xs text-mc-dim">
+                {t('settings.mcVersion')}
+              </label>
+              <select
+                id="settings-mc-version"
+                value={project.mcVersion}
+                onChange={(e) => project.setMcVersion(e.target.value as typeof project.mcVersion)}
+                disabled={project.loading}
+                className="mc-select w-full"
+              >
+                {MC_VERSIONS.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* Tab 1: 模型配置（多套并存 + 切换 + 测试） */}
         {activeTab === 'model' && (
           <div className="space-y-3">
@@ -608,7 +764,7 @@ export function SettingsPanel() {
           <div className="space-y-3">
             <div>
               <label className="text-xs text-mc-dim">
-                CurseForge API Key（去{' '}
+                CurseForge API Key（{t('settings.optional')} —— 去{' '}
                 <a
                   href="https://console.curseforge.com/"
                   target="_blank"
@@ -622,17 +778,95 @@ export function SettingsPanel() {
               <input
                 type="password"
                 value={cfApiKey}
-                onChange={(e) => setCfApiKey(e.target.value)}
+                onChange={(e) => {
+                  setCfApiKey(e.target.value);
+                  // 输入变了，上一次的测试结论就不再对应当前内容
+                  setCfTest(null);
+                }}
                 className="mc-input"
                 placeholder="$2a$10$..."
               />
             </div>
+            <p className="text-[10px] text-mc-text-dim">
+              不填也能用 CurseForge：走国内镜像时用的是镜像自己的 key（PCL 同款做法）。
+              填了不会自动切换下载源 —— 还挂在国内镜像上时，用的仍是镜像的 key；
+              到「下载源」切到官方源，CurseForge 请求才会带上你填的这个 key。
+              它只会发给官方地址，绝不转发给镜像。
+            </p>
             <div className="flex items-center gap-2">
               <button onClick={saveCf} disabled={cfSaving} className="mc-btn-primary">
                 {cfSaving ? tCommon('saving') : tCommon('save')}
               </button>
+              <button
+                onClick={() => void testCf()}
+                disabled={cfTesting || cfApiKey.trim() === ''}
+                className="mc-btn-ghost"
+                title="用官方地址验证这把 key；不会保存，也不受「下载源」偏好影响"
+              >
+                {cfTesting ? '测试中…' : '测试'}
+              </button>
               {cfSaved && <span className="text-xs text-mc-accent">{tCommon('saved')}</span>}
+              {cfTest?.ok === true && (
+                <span className="text-xs text-mc-green">key 可用（官方源）</span>
+              )}
+              {cfTest?.ok === false && (
+                <span className="min-w-0 flex-1 break-all text-xs text-mc-redstone">
+                  {cfTest.error ?? 'key 不可用'}
+                </span>
+              )}
             </div>
+          </div>
+        )}
+
+        {/* Tab 3: 下载源（官方 / 国内镜像）
+            这里只放一个开关，理由见主进程 `download-sources.ts` 的 SourcePreference：
+            两家镜像（BMCLAPI / MCIM）是同一件事，让用户跑两个地方各切一次是糟糕的 UI。 */}
+        {activeTab === 'downloadSource' && (
+          <div className="space-y-3">
+            <div className="text-xs text-mc-text-dim">{t('settings.downloadSourceHint')}</div>
+            <div className="space-y-1.5">
+              {(
+                [
+                  {
+                    official: false,
+                    name: t('settings.downloadSourceMirror'),
+                    desc: t('settings.downloadSourceMirrorDesc'),
+                  },
+                  {
+                    official: true,
+                    name: t('settings.downloadSourceOfficial'),
+                    desc: t('settings.downloadSourceOfficialDesc'),
+                  },
+                ] as { official: boolean; name: string; desc: string }[]
+              ).map((opt) => {
+                const isActive = preferOfficial === opt.official;
+                return (
+                  <button
+                    key={String(opt.official)}
+                    onClick={() => void chooseSourceOfficial(opt.official)}
+                    aria-pressed={isActive}
+                    className={`w-full rounded-mc p-2 text-left transition-all ${
+                      isActive
+                        ? 'bg-mc-accent/20 border border-mc-accent/50'
+                        : 'bg-mc-surface-2/50 border border-transparent hover:bg-mc-surface-2'
+                    }`}
+                  >
+                    <div
+                      className={`text-xs font-medium ${isActive ? 'text-mc-accent-bright' : 'text-mc-text'}`}
+                    >
+                      {opt.name}
+                    </div>
+                    <div className="text-xs text-mc-text-dim">{opt.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-mc-text-dim">{t('settings.downloadSourceTrust')}</p>
+            {srcSaved && !srcSaving && (
+              <span className="text-xs text-mc-accent" role="status">
+                {tCommon('saved')}
+              </span>
+            )}
           </div>
         )}
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { EventEmitter } from 'node:events';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -38,8 +39,9 @@ import {
  * 2. 离线模式（§1.2 第 2 条）—— 不传凭据时行为与改造前**完全一致**；
  * 3. 第三方认证站闸门（§1.2 / §19）—— `enableThirdPartyAuth` fail-closed。
  *
- * 既有的 `launcher-service.test.ts` **未被修改**（那里断言的
- * `installSkinSupport` 行为一字未动），本文件是新增的旁路覆盖。
+ * 闸门放行后 `installSkinSupport` 会按实例**实际装的加载器**去取 CSL 构建
+ * （不再写死 loader/MC 版本），所以走到「写配置」那一步的用例需要先
+ * `seedFabricLoader`。合规闸门本身的语义没变。
  *
  * spawn 通过构造参数注入（`LauncherServiceDeps.spawn`）而不是 mock 模块：
  * `vi.mock('node:child_process')` 在本仓 vitest 2.1 上会静默失效，
@@ -52,6 +54,13 @@ const DETAIL: VersionDetail = {
   assetsUrl: '',
   clientUrl: 'https://launcher.mojang.com/client.jar',
   libraryUrls: [],
+  clientSha1: null,
+  clientSize: null,
+  // 本文件只关心启动参数里的凭据，不设 Java 版本要求 → launchGame 跳过预检
+  javaMajor: null,
+  serverUrl: null,
+  serverSha1: null,
+  serverSize: null,
 };
 
 const CREDENTIALS = {
@@ -65,7 +74,12 @@ const CREDENTIALS = {
 const spawned: { cmd: string; args: string[] }[] = [];
 const fakeSpawn = ((cmd: string, args: string[]) => {
   spawned.push({ cmd, args });
-  return { pid: 4242, on: () => undefined } as unknown as ReturnType<typeof spawn>;
+  // 真实 ChildProcess 在成功 spawn 后会发一次 'spawn'，launchGame 现在等这个事件
+  // 才能区分「起来了」与「二进制不存在」。替身必须发，否则 launchGame 永远挂住。
+  const child = new EventEmitter() as unknown as ReturnType<typeof spawn>;
+  (child as unknown as { pid: number }).pid = 4242;
+  queueMicrotask(() => child.emit('spawn'));
+  return child;
 }) as unknown as typeof spawn;
 
 /** 不触发真实下载的假 fetch（所有 jar 命中都返回假字节）。 */
@@ -113,6 +127,41 @@ function makeService(dir: string, thirdPartyAuth?: ThirdPartyAuthGate): Launcher
     spawn: fakeSpawn,
     ...(thirdPartyAuth === undefined ? {} : { thirdPartyAuth }),
   });
+}
+
+/**
+ * 写一个 Fabric 加载器档案，让 `isLoaderInstalled` 认得出它。
+ *
+ * 为什么需要：`installSkinSupport` 会按实例**实际装的加载器**去 Modrinth 找
+ * 对应的 CSL 构建 —— 没有加载器时它会直接拒绝（装一个加载不了的 mod 比不装更糟）。
+ * 这条路径要走到「写配置」那一步，就得先有加载器。
+ *
+ * 档案内容（`inheritsFrom` + `mainClass`）就是 `isLoaderInstalled` 的判据，
+ * 目录名无关。
+ */
+function seedFabricLoader(dir: string, mcVersion: string): void {
+  const id = `${mcVersion}-seeded-fabric`;
+  const vdir = join(dir, 'versions', id);
+  mkdirSync(vdir, { recursive: true });
+  writeFileSync(
+    join(vdir, `${id}.json`),
+    JSON.stringify({
+      id,
+      inheritsFrom: mcVersion,
+      mainClass: 'net.fabricmc.loader.impl.launch.knot.KnotClient',
+      libraries: [],
+      releaseTime: '2024-01-01T00:00:00Z',
+      type: 'release',
+      assets: 'indexes',
+      assetIndex: {
+        id: 'indexes',
+        sha1: 'x',
+        size: 1,
+        url: 'https://example.invalid/i.json',
+        totalSize: 1,
+      },
+    }),
+  );
 }
 
 beforeEach(() => {
@@ -277,6 +326,8 @@ describe('enableThirdPartyAuth · §1.2 / §19 合规闸门', () => {
 
   it('确认框展示 §1.2 风险提示全文后才放行并写配置', async () => {
     const dir = join(tmpDir, 'confirmed');
+    // 过了合规闸门之后要走 installSkinSupport，而它按实例实际加载器取 CSL。
+    seedFabricLoader(dir, '26.2');
     const details: string[] = [];
     const gate = new ThirdPartyAuthGate({
       enabled: true,

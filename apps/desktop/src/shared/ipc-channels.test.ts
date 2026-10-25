@@ -204,6 +204,41 @@ describe('IPC schema 校验', () => {
     ).toBe(true);
     // files 缺失拒绝
     expect(CurseForgeFilesResponse.safeParse({}).success).toBe(false);
+
+    /**
+     * 依赖的形状：`{modId, relationType}`。
+     *
+     * `relationType` 是"必需还是可选"的唯一依据（实测 3=必需 / 2=可选，见
+     * `packages/core/src/curseforge/dependencies.ts`）。老 schema 是
+     * `z.array(z.number())`，配着客户端把标记丢掉的老实现 —— 两边一起错，
+     * 于是可选依赖也被报成"缺前置会启动失败"。
+     */
+    const fileWithDeps = (dependencies: unknown): unknown => ({
+      files: [
+        {
+          id: 1,
+          displayName: 'v1',
+          fileName: 'a.jar',
+          fileLength: 1024,
+          downloadUrl: 'https://example.com/a.jar',
+          gameVersions: ['26.3'],
+          modLoaderNames: ['NeoForge'],
+          dependencies,
+        },
+      ],
+    });
+    expect(
+      CurseForgeFilesResponse.safeParse(
+        fileWithDeps([
+          { modId: 1689768, relationType: 3 },
+          { modId: 1700987, relationType: 2 },
+        ]),
+      ).success,
+    ).toBe(true);
+    // relationType 缺失也允许（源站将来删字段时不至于整条 IPC 崩掉）
+    expect(CurseForgeFilesResponse.safeParse(fileWithDeps([{ modId: 1 }])).success).toBe(true);
+    // 裸数字是老形状 —— 现在必须被拒（它意味着"标记已丢失"）
+    expect(CurseForgeFilesResponse.safeParse(fileWithDeps([1689768])).success).toBe(false);
   });
 
   // === 流式通道并发隔离（requestId）===
