@@ -205,7 +205,11 @@ describe('validateModrinthIndex 现在会查 downloads 内容', () => {
   });
 });
 
-describe('真网络冒烟：Modrinth CDN 版本段的不统一（上游真实行为）', () => {
+// 真网络冒烟默认不跑：`VERIFY_VERSIONS=1` 时启用（与 verify-loader-versions.test.ts 同约定）。
+// 默认门禁不能让上游一次连接超时把整个测试套件判红，但联网核验仍要保留入口。
+const networkEnabled = process.env.VERIFY_VERSIONS === '1';
+
+describe.skipIf(!networkEnabled)('真网络冒烟：Modrinth CDN 版本段的不统一（上游真实行为）', () => {
   const UA = 'mc-creator/0.0.0 (https://github.com/mc-creator)';
   // 真网络往返没有确定耗时上限：单次请求给 15s 硬超时（与 verify-loader-versions.test.ts 一致），
   // 用例整体给 30s，避免慢网下被 vitest 默认 5s testTimeout 误判为失败。

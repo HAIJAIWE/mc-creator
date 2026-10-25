@@ -218,7 +218,11 @@ describe('网络封装：非 2xx 抛错并带上状态与 URL', () => {
   });
 });
 
-describe('真网络冒烟（端点此刻是否真可用）', () => {
+// 真网络冒烟默认不跑：`VERIFY_VERSIONS=1` 时启用（与 verify-loader-versions.test.ts 同约定）。
+// 默认门禁不能让上游一次连接超时把整个测试套件判红，但联网核验仍要保留入口。
+const networkEnabled = process.env.VERIFY_VERSIONS === '1';
+
+describe.skipIf(!networkEnabled)('真网络冒烟（端点此刻是否真可用）', () => {
   const fetchImpl: FetchLike = async (url) => {
     const res = await globalThis.fetch(url);
     return { ok: res.ok, status: res.status, json: () => res.json() };
