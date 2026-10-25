@@ -201,7 +201,15 @@ export const useDrawerStore = createWithEqualityFn<DrawerState>((set, get) => ({
 
     useNodeGraphStore.getState().commit();
     useNodeGraphStore.getState().updateNode(nodeId, draft);
-    set({ open: false, nodeId: null, draft: null, dirty: false, errors: {}, history: [], historyIndex: -1 });
+    set({
+      open: false,
+      nodeId: null,
+      draft: null,
+      dirty: false,
+      errors: {},
+      history: [],
+      historyIndex: -1,
+    });
     return true;
   },
 

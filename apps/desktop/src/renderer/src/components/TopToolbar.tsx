@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import { shallow } from 'zustand/shallow';
 import { Loader2 } from 'lucide-react';
-import type { Loader, McVersion } from '@mc-creator/shared';
-import { MC_VERSIONS } from '@mc-creator/shared';
-import { GENERATOR_TYPES, type GeneratorType } from '../../../shared/ipc-channels.js';
-import { GENERATOR_DESCRIPTORS, pickLocalized } from '../../../shared/generator-descriptors.js';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useModStore } from '../store/mod-store.js';
 import { useModelConfigStore } from '../store/model-config-store.js';
@@ -15,27 +11,30 @@ import { useTranslation } from '../hooks/useTranslation.js';
 interface TopToolbarProps {
   /** 点击 API 状态指示时跳转到 settings activity */
   onOpenSettings: () => void;
+  /**
+   * 是否展示「构建」入口。由 App 按当前工作域决定 —— `build` 面板只归属 `dev` 域，
+   * 在别的域里点它会被 App.tsx 的域纠偏 effect 弹回默认面板，按钮就成了假入口。
+   * 阶段 4 的 DomainTabs 落地后，域面板会有常驻 tab 条；本按钮届时可评估是否保留
+   * （VS Code 标题栏 / IntelliJ 菜单栏同样保留常驻 build 动作，故倾向于保留）。
+   */
+  canOpenBuild?: boolean;
+  /** 跳转到 build 面板（本地编译 .jar / 装进 mods / 启动游戏） */
+  onOpenBuild?: () => void;
 }
 
-export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
-  const { t, tCommon, locale } = useTranslation();
-  // 全局设置：类型 / Loader / 版本
-  const { generatorType, loader, mcVersion, loading, setGeneratorType, setLoader, setMcVersion } =
-    useModStore(
-      (s) => ({
-        generatorType: s.generatorType,
-        loader: s.loader,
-        mcVersion: s.mcVersion,
-        loading: s.loading,
-        setGeneratorType: s.setGeneratorType,
-        setLoader: s.setLoader,
-        setMcVersion: s.setMcVersion,
-      }),
-      shallow,
-    );
-
-  // 仅 mod 的产物由 loader 决定，其余类型下拉置灰（见 generator-descriptors）
-  const needsLoader = GENERATOR_DESCRIPTORS[generatorType].needsLoader;
+export function TopToolbar({ onOpenSettings, canOpenBuild = false, onOpenBuild }: TopToolbarProps) {
+  const { t, tCommon } = useTranslation();
+  // 只剩 loading（全局忙碌反馈）与三项的**值**——值用于「另存为项目」时写入项目文件，
+  // 以及 26.2 实验版提示条。它们的**编辑入口**已迁至 SettingsPanel「项目」分组。
+  const { generatorType, loader, mcVersion, loading } = useModStore(
+    (s) => ({
+      generatorType: s.generatorType,
+      loader: s.loader,
+      mcVersion: s.mcVersion,
+      loading: s.loading,
+    }),
+    shallow,
+  );
 
   // 项目菜单
   const {
@@ -202,44 +201,24 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
         </div>
       </div>
 
-      {/* 中间：全局设置 类型 / Loader / 版本 */}
+      {/*
+       * 中间：原为「内容类型 / Loader / MC 版本」三个下拉框，现已移除。
+       *
+       * 依据 VS Code 与 IntelliJ 的官方文档：两者的顶部都**不放项目配置**。
+       * - VS Code 官方列出的六个区域（Editor / Primary Side Bar / Secondary Side Bar /
+       *   Status Bar / Activity Bar / Panel）里没有「工具栏」；标题栏只有
+       *   菜单 + Command Center（项目名）+ 布局控制按钮。
+       * - IntelliJ 主工具栏是运行/调试动作按钮，同样不含项目配置。
+       *
+       * 且项目上下文（VS Code 显示语言/缩进/行列，IntelliJ 显示编码/行号）一律在**底部状态栏**。
+       *
+       * 三个字段的去处：
+       * - 只读值 → 底部 `StatusBar`（见 components/StatusBar.tsx）
+       * - 编辑入口 → `SettingsPanel` 的「项目」分组（唯一编辑入口）
+       *
+       * 保留 loading 指示器：它是全局忙碌反馈，不属于项目配置。
+       */}
       <div className="flex items-center gap-2">
-        <select
-          value={generatorType}
-          onChange={(e) => setGeneratorType(e.target.value as GeneratorType)}
-          disabled={loading}
-          className="mc-select"
-        >
-          {GENERATOR_TYPES.map((value) => (
-            <option key={value} value={value}>
-              {pickLocalized(GENERATOR_DESCRIPTORS[value].label, locale)}
-            </option>
-          ))}
-        </select>
-        <select
-          value={loader}
-          onChange={(e) => setLoader(e.target.value as Loader)}
-          disabled={loading || !needsLoader}
-          title={needsLoader ? undefined : t('topToolbar.loaderNotApplicable')}
-          className="mc-select"
-        >
-          <option value="fabric">Fabric</option>
-          <option value="neoforge">NeoForge</option>
-          <option value="quilt">Quilt</option>
-          <option value="legacy_fabric">Legacy Fabric</option>
-        </select>
-        <select
-          value={mcVersion}
-          onChange={(e) => setMcVersion(e.target.value as McVersion)}
-          disabled={loading}
-          className="mc-select"
-        >
-          {MC_VERSIONS.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
         {mcVersion === '26.2' && (
           <span className="text-[10px] text-mc-gold" title={t('topToolbar.experimentalTooltip')}>
             {t('topToolbar.experimental')}
@@ -248,8 +227,18 @@ export function TopToolbar({ onOpenSettings }: TopToolbarProps) {
         {loading && <Loader2 className="h-3 w-3 animate-spin text-mc-mute" />}
       </div>
 
-      {/* 右侧：语言切换 + API Key 状态指示 */}
+      {/* 右侧：构建入口 + 语言切换 + API Key 状态指示 */}
       <div className="flex items-center gap-2">
+        {canOpenBuild && onOpenBuild && (
+          <button
+            onClick={onOpenBuild}
+            className="mc-btn-ghost !px-2 !py-1"
+            title={t('activityBar.build')}
+          >
+            <McIcon scope="pixel" name="anvil" size={14} />
+            <span className="text-xs text-mc-dim">{t('topToolbar.build')}</span>
+          </button>
+        )}
         <LanguageSwitcher variant="compact" showLabel={false} />
         <button
           onClick={onOpenSettings}

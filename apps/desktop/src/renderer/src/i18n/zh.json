@@ -57,6 +57,9 @@
     "close": "关闭",
     "loading": "加载中...",
     "save": "保存",
+    "saving": "保存中...",
+    "saved": "已保存",
+    "testing": "测试中...",
     "delete": "删除",
     "edit": "编辑",
     "create": "创建",
@@ -89,7 +92,6 @@
     "select_all": "全选",
     "clear": "清空",
     "refresh": "刷新",
-    "loading": "加载中...",
     "no_data": "暂无数据",
     "not_found": "未找到",
     "permission_denied": "权限不足",
@@ -106,7 +108,6 @@
     "exporting": "导出中...",
     "new_project": "新建项目",
     "open": "打开",
-    "export": "导出",
     "delete_confirm": "确定删除项目「{name}」？此操作不可撤销。",
     "loader": {
       "fabric": "Fabric",
@@ -134,6 +135,12 @@
     "deleteConfirm": "确定删除项目「{name}」？此操作不可撤销。"
   },
   "settings": {
+    "projectSection": "项目",
+    "projectSectionHint": "内容类型、加载器与 Minecraft 版本决定生成、预览与构建的目标。它们原先挂在顶部工具栏，按 IDE 惯例（VS Code / IntelliJ 顶部均不放项目配置）迁到这里。底部状态栏会只读展示当前值。",
+    "contentType": "内容类型",
+    "loader": "模组加载器",
+    "mcVersion": "Minecraft 版本",
+    "loaderNotApplicable": "当前内容类型不使用 loader，无需选择",
     "noProfiles": "还没有配置，从下方服务商任选一个开始填写",
     "switchToActive": "切换为生效配置：{baseURL}",
     "deleteProfile": "删除配置 {name}",
@@ -148,10 +155,15 @@
     "apiKey": "API Key",
     "apiKeyPlaceholder": "留空 = 保留已保存的 Key；本地模型可不填",
     "testConnection": "测试连接",
-    "saving": "保存中...",
-    "testing": "测试中...",
-    "saved": "已保存",
     "curseforgeFreeApply": "免费申请",
+    "optional": "可选",
+    "downloadSource": "下载源",
+    "downloadSourceHint": "元数据和文件都按这里的顺序尝试；另一个源仍在候选列表里兜底，不是二选一。",
+    "downloadSourceMirror": "国内镜像优先（默认）",
+    "downloadSourceMirrorDesc": "原版游戏走 BMCLAPI（bmclapi2.bangbang93.com），Mod / 整合包 / 资源包等走 MCIM（mod.mcimirror.top）。国内网络通常快得多。",
+    "downloadSourceOfficial": "官方源优先",
+    "downloadSourceOfficialDesc": "直连 Mojang / Modrinth / CurseForge 官方地址；连不上或太慢时才落到镜像。",
+    "downloadSourceTrust": "镜像只是转发：文件仍按清单给的 sha1 / sha512 校验，对不上就落不了盘；换了源也不会把已装的文件改坏。",
     "layoutPresets": "布局预设",
     "panelSize": "面板尺寸",
     "leftPanel": "左侧",
@@ -174,6 +186,7 @@
     "entity": "实体 AI",
     "audio": "音效事件",
     "cicd": "CI/CD",
+    "build": "构建与部署",
     "game": "游戏启动器",
     "settings": "设置",
     "backToDashboard": "返回项目仪表盘"
@@ -190,15 +203,21 @@
       "dev": "产出内容本身：物品、方块、实体、音效与它们的构建流水线。"
     }
   },
+  "statusBar": {
+    "label": "状态栏",
+    "noProject": "未打开项目",
+    "openProjectSettings": "点击打开项目设置",
+    "agentHint": "智能体 · 三域常驻"
+  },
   "topToolbar": {
     "projectManagement": "项目管理",
     "saveProject": "保存项目",
+    "build": "构建",
     "existingProjects": "已有项目",
     "experimental": "实验性",
     "experimentalTooltip": "26.2 的 NeoForge 版本为 beta，构建配置可能需手动调整",
     "apiKeyConfigured": "API Key 已配置",
-    "apiKeyNotConfigured": "未配置 API Key，点击设置",
-    "loaderNotApplicable": "当前内容类型不使用 loader，无需选择"
+    "apiKeyNotConfigured": "未配置 API Key，点击设置"
   },
   "createDialog": {
     "title": "新建项目",

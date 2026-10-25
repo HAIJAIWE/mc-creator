@@ -10,8 +10,21 @@ import type { FieldSchema } from './field-types.js';
  * - 排除 comment 节点（不参与编译，codeLock 无意义）
  */
 const COMMON_FIELDS: FieldSchema[] = [
-  { key: 'label', label: '标签', type: 'text', required: true, group: 'basic', description: '节点显示名（仅用于画布展示，不影响编译产物）' },
-  { key: 'note', label: '备注', type: 'text', group: 'basic', description: '节点备注，仅文档用途，不影响编译' },
+  {
+    key: 'label',
+    label: '标签',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '节点显示名（仅用于画布展示，不影响编译产物）',
+  },
+  {
+    key: 'note',
+    label: '备注',
+    type: 'text',
+    group: 'basic',
+    description: '节点备注，仅文档用途，不影响编译',
+  },
   {
     key: 'codeLocked',
     label: '锁定代码',
@@ -37,8 +50,23 @@ const COMMON_FIELDS: FieldSchema[] = [
 
 /** item 节点字段 */
 const ITEM_FIELDS: FieldSchema[] = [
-  { key: 'itemId', label: '物品 ID', type: 'localId', required: true, group: 'basic', description: '物品标识的本地名，只填小写字母/数字/下划线（如 iron_sword）。命名空间固定为当前 mod，无需手写' },
-  { key: 'displayName', label: '显示名', type: 'text', required: true, group: 'basic', description: '游戏中显示的名称（支持中文，如「红宝石剑」）' },
+  {
+    key: 'itemId',
+    label: '物品 ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description:
+      '物品标识的本地名，只填小写字母/数字/下划线（如 iron_sword）。命名空间固定为当前 mod，无需手写',
+  },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '游戏中显示的名称（支持中文，如「红宝石剑」）',
+  },
   {
     key: 'rarity',
     label: '稀有度',
@@ -55,52 +83,197 @@ const ITEM_FIELDS: FieldSchema[] = [
     group: 'behavior',
     description: '物品分类，决定行为模式：tool/weapon/armor/food/material/misc',
   },
-  { key: 'maxStackSize', label: '最大堆叠', type: 'number', min: 1, max: 64, step: 1, group: 'behavior', description: '最大堆叠数量（1-64），工具/武器通常为 1，材料/食物通常为 64' },
-  { key: 'maxDamage', label: '最大耐久', type: 'number', min: 0, max: 99999, step: 1, group: 'behavior', description: '最大耐久度，0 表示不可损坏。工具/武器通常 >0（如铁剑 250，钻石镐 1561）' },
-  { key: 'glow', label: '发光', type: 'segmented', options: ['false', 'true'], group: 'appearance', description: '是否发光（附魔光辉效果，像附魔书一样发出紫色光晕）' },
+  {
+    key: 'maxStackSize',
+    label: '最大堆叠',
+    type: 'number',
+    min: 1,
+    max: 64,
+    step: 1,
+    group: 'behavior',
+    description: '最大堆叠数量（1-64），工具/武器通常为 1，材料/食物通常为 64',
+  },
+  {
+    key: 'maxDamage',
+    label: '最大耐久',
+    type: 'number',
+    min: 0,
+    max: 99999,
+    step: 1,
+    group: 'behavior',
+    description: '最大耐久度，0 表示不可损坏。工具/武器通常 >0（如铁剑 250，钻石镐 1561）',
+  },
+  {
+    key: 'glow',
+    label: '发光',
+    type: 'segmented',
+    options: ['false', 'true'],
+    group: 'appearance',
+    description: '是否发光（附魔光辉效果，像附魔书一样发出紫色光晕）',
+  },
 ];
 
 /** block 节点字段 */
 const BLOCK_FIELDS: FieldSchema[] = [
-  { key: 'blockId', label: '方块 ID', type: 'localId', required: true, group: 'basic', description: '方块 ID，格式同物品（小写+下划线），如 ruby_block' },
-  { key: 'displayName', label: '显示名', type: 'text', required: true, group: 'basic', description: '游戏中显示的方块名称' },
-  { key: 'hardness', label: '硬度', type: 'number', min: 0, max: 999, step: 0.5, group: 'behavior', description: '硬度，决定挖掘时间。硬度越高挖掘越慢，-1 表示不可破坏（如基岩），铁块 5，石头 1.5' },
-  { key: 'blastResistance', label: '抗爆性', type: 'number', min: 0, max: 9999, step: 0.5, group: 'behavior', description: '爆炸抗性，抵抗 TNT/苦力怕爆炸的能力。石头 6，黑曜石 1200' },
-  { key: 'luminance', label: '发光等级', type: 'number', min: 0, max: 15, step: 1, group: 'appearance', description: '发光等级（0-15），15 为最亮（类似荧石），0 为不发光' },
-  { key: 'transparent', label: '透明', type: 'segmented', options: ['false', 'true'], group: 'appearance', description: '是否透明（如玻璃、树叶），影响渲染和光照穿透' },
-  { key: 'solid', label: '固体', type: 'segmented', options: ['true', 'false'], group: 'behavior', description: '是否固体（可碰撞），非固体如水、空气' },
+  {
+    key: 'blockId',
+    label: '方块 ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description: '方块 ID，格式同物品（小写+下划线），如 ruby_block',
+  },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '游戏中显示的方块名称',
+  },
+  {
+    key: 'hardness',
+    label: '硬度',
+    type: 'number',
+    min: 0,
+    max: 999,
+    step: 0.5,
+    group: 'behavior',
+    description:
+      '硬度，决定挖掘时间。硬度越高挖掘越慢，-1 表示不可破坏（如基岩），铁块 5，石头 1.5',
+  },
+  {
+    key: 'blastResistance',
+    label: '抗爆性',
+    type: 'number',
+    min: 0,
+    max: 9999,
+    step: 0.5,
+    group: 'behavior',
+    description: '爆炸抗性，抵抗 TNT/苦力怕爆炸的能力。石头 6，黑曜石 1200',
+  },
+  {
+    key: 'luminance',
+    label: '发光等级',
+    type: 'number',
+    min: 0,
+    max: 15,
+    step: 1,
+    group: 'appearance',
+    description: '发光等级（0-15），15 为最亮（类似荧石），0 为不发光',
+  },
+  {
+    key: 'transparent',
+    label: '透明',
+    type: 'segmented',
+    options: ['false', 'true'],
+    group: 'appearance',
+    description: '是否透明（如玻璃、树叶），影响渲染和光照穿透',
+  },
+  {
+    key: 'solid',
+    label: '固体',
+    type: 'segmented',
+    options: ['true', 'false'],
+    group: 'behavior',
+    description: '是否固体（可碰撞），非固体如水、空气',
+  },
   {
     key: 'modelType',
     label: '模型类型',
     type: 'dropdown',
     options: ['cube_all', 'cube_column', 'cross', 'door', 'fence', 'stairs'],
     group: 'appearance',
-    description: '方块模型类型：cube_all=六面同贴图，cube_column=柱状（上下/侧面不同），cross=十字（植物）',
+    description:
+      '方块模型类型：cube_all=六面同贴图，cube_column=柱状（上下/侧面不同），cross=十字（植物）',
   },
-  { key: 'isBlockEntity', label: '方块实体', type: 'segmented', options: ['false', 'true'], group: 'advanced', description: '是否为方块实体（如箱子、熔炉），可存储额外 NBT 数据，机器节点必须为 true' },
+  {
+    key: 'isBlockEntity',
+    label: '方块实体',
+    type: 'segmented',
+    options: ['false', 'true'],
+    group: 'advanced',
+    description: '是否为方块实体（如箱子、熔炉），可存储额外 NBT 数据，机器节点必须为 true',
+  },
 ];
 
 /** entity 节点字段 */
 const ENTITY_FIELDS: FieldSchema[] = [
-  { key: 'entityId', label: '实体 ID', type: 'localId', required: true, group: 'basic', description: '实体 ID，格式同物品（小写+下划线），如 ruby_golem' },
-  { key: 'displayName', label: '显示名', type: 'text', required: true, group: 'basic', description: '游戏中显示的生物名称' },
+  {
+    key: 'entityId',
+    label: '实体 ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description: '实体 ID，格式同物品（小写+下划线），如 ruby_golem',
+  },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '游戏中显示的生物名称',
+  },
   {
     key: 'classification',
     label: '分类',
     type: 'dropdown',
     options: ['mob', 'animal', 'monster', 'boss', 'projectile', 'other'],
     group: 'behavior',
-    description: '阵营：animal=动物（被动），monster=怪物（敌对），water_creature=水生，ambient=环境生物，misc=其他',
+    description:
+      '阵营：animal=动物（被动），monster=怪物（敌对），water_creature=水生，ambient=环境生物，misc=其他',
   },
-  { key: 'maxHealth', label: '最大血量', type: 'number', min: 1, max: 9999, step: 1, group: 'behavior', description: '最大生命值，玩家默认 20（10 颗心），僵尸 20，末影龙 200' },
-  { key: 'attackDamage', label: '攻击力', type: 'number', min: 0, max: 999, step: 0.5, group: 'behavior', description: '攻击伤害（每次攻击扣除的目标生命值）' },
-  { key: 'movementSpeed', label: '移动速度', type: 'number', min: 0, max: 10, step: 0.05, group: 'behavior', description: '移动速度，玩家默认 0.3，僵尸 0.23，猎犬 0.35' },
-  { key: 'fireImmune', label: '免疫火焰', type: 'segmented', options: ['false', 'true'], group: 'behavior', description: '是否免疫火焰伤害' },
+  {
+    key: 'maxHealth',
+    label: '最大血量',
+    type: 'number',
+    min: 1,
+    max: 9999,
+    step: 1,
+    group: 'behavior',
+    description: '最大生命值，玩家默认 20（10 颗心），僵尸 20，末影龙 200',
+  },
+  {
+    key: 'attackDamage',
+    label: '攻击力',
+    type: 'number',
+    min: 0,
+    max: 999,
+    step: 0.5,
+    group: 'behavior',
+    description: '攻击伤害（每次攻击扣除的目标生命值）',
+  },
+  {
+    key: 'movementSpeed',
+    label: '移动速度',
+    type: 'number',
+    min: 0,
+    max: 10,
+    step: 0.05,
+    group: 'behavior',
+    description: '移动速度，玩家默认 0.3，僵尸 0.23，猎犬 0.35',
+  },
+  {
+    key: 'fireImmune',
+    label: '免疫火焰',
+    type: 'segmented',
+    options: ['false', 'true'],
+    group: 'behavior',
+    description: '是否免疫火焰伤害',
+  },
 ];
 
 /** recipe 节点字段 */
 const RECIPE_FIELDS: FieldSchema[] = [
-  { key: 'recipeId', label: '配方 ID', type: 'localId', required: true, group: 'basic', description: '配方 ID，格式同物品，如 ruby_sword_recipe' },
+  {
+    key: 'recipeId',
+    label: '配方 ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description: '配方 ID，格式同物品，如 ruby_sword_recipe',
+  },
   {
     key: 'recipeType',
     label: '配方类型',
@@ -118,9 +291,19 @@ const RECIPE_FIELDS: FieldSchema[] = [
       'brewing',
     ],
     group: 'basic',
-    description: '配方类型：crafting_shaped=有序合成，crafting_shapeless=无序合成，smelting=熔炉烧炼，blasting=高炉，smoking=烟熏炉，stonecutting=切石机',
+    description:
+      '配方类型：crafting_shaped=有序合成，crafting_shapeless=无序合成，smelting=熔炉烧炼，blasting=高炉，smoking=烟熏炉，stonecutting=切石机',
   },
-  { key: 'outputCount', label: '产出数量', type: 'number', min: 1, max: 64, step: 1, group: 'behavior', description: '产出数量（一次合成/烧炼产出的物品数）' },
+  {
+    key: 'outputCount',
+    label: '产出数量',
+    type: 'number',
+    min: 1,
+    max: 64,
+    step: 1,
+    group: 'behavior',
+    description: '产出数量（一次合成/烧炼产出的物品数）',
+  },
   {
     key: 'cookTime',
     label: '烧制时间',
@@ -197,12 +380,62 @@ const RECIPE_FIELDS: FieldSchema[] = [
 
 /** machine 节点字段 */
 const MACHINE_FIELDS: FieldSchema[] = [
-  { key: 'machineId', label: '机器 ID', type: 'localId', required: true, group: 'basic', description: '机器 ID，格式同物品，如 ruby_furnace' },
-  { key: 'displayName', label: '显示名', type: 'text', required: true, group: 'basic', description: '游戏中显示的机器名称' },
-  { key: 'energyCapacity', label: '能源容量', type: 'number', min: 0, max: 999999, step: 100, group: 'behavior', description: '能源容量（FE 单位，Forge Energy 标准），决定可存储的最大能量' },
-  { key: 'inputSlots', label: '输入槽位数', type: 'number', min: 0, max: 27, step: 1, group: 'behavior', description: '输入槽数量（0-27），如熔炉 1 个输入槽' },
-  { key: 'outputSlots', label: '输出槽位数', type: 'number', min: 0, max: 27, step: 1, group: 'behavior', description: '输出槽数量（0-27），如熔炉 1 个输出槽' },
-  { key: 'defaultProcessTime', label: '默认处理时间', type: 'number', min: 1, max: 9999, step: 1, group: 'behavior', description: '默认加工时间（tick），200 tick = 10 秒' },
+  {
+    key: 'machineId',
+    label: '机器 ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description: '机器 ID，格式同物品，如 ruby_furnace',
+  },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '游戏中显示的机器名称',
+  },
+  {
+    key: 'energyCapacity',
+    label: '能源容量',
+    type: 'number',
+    min: 0,
+    max: 999999,
+    step: 100,
+    group: 'behavior',
+    description: '能源容量（FE 单位，Forge Energy 标准），决定可存储的最大能量',
+  },
+  {
+    key: 'inputSlots',
+    label: '输入槽位数',
+    type: 'number',
+    min: 0,
+    max: 27,
+    step: 1,
+    group: 'behavior',
+    description: '输入槽数量（0-27），如熔炉 1 个输入槽',
+  },
+  {
+    key: 'outputSlots',
+    label: '输出槽位数',
+    type: 'number',
+    min: 0,
+    max: 27,
+    step: 1,
+    group: 'behavior',
+    description: '输出槽数量（0-27），如熔炉 1 个输出槽',
+  },
+  {
+    key: 'defaultProcessTime',
+    label: '默认处理时间',
+    type: 'number',
+    min: 1,
+    max: 9999,
+    step: 1,
+    group: 'behavior',
+    description: '默认加工时间（tick），200 tick = 10 秒',
+  },
   {
     key: 'defaultEnergyPerTick',
     label: '每 tick 能耗',
@@ -225,12 +458,60 @@ const MACHINE_FIELDS: FieldSchema[] = [
 
 /** multiblock 节点字段 */
 const MULTIBLOCK_FIELDS: FieldSchema[] = [
-  { key: 'structureId', label: '结构 ID', type: 'localId', required: true, group: 'basic', description: '多方块结构 ID，格式同物品，如 industrial_furnace' },
-  { key: 'displayName', label: '显示名', type: 'text', required: true, group: 'basic', description: '多方块结构显示名' },
-  { key: 'width', label: '宽', type: 'number', min: 1, max: 16, step: 1, group: 'appearance', description: '结构宽度（1-16，X 轴方向方块数）' },
-  { key: 'height', label: '高', type: 'number', min: 1, max: 16, step: 1, group: 'appearance', description: '结构高度（1-16，Y 轴方向方块数）' },
-  { key: 'depth', label: '深', type: 'number', min: 1, max: 16, step: 1, group: 'appearance', description: '结构深度（1-16，Z 轴方向方块数）' },
-  { key: 'hollow', label: '空心', type: 'segmented', options: ['false', 'true'], group: 'behavior', description: '是否空心结构（true=外壳，false=实心）' },
+  {
+    key: 'structureId',
+    label: '结构 ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description: '多方块结构 ID，格式同物品，如 industrial_furnace',
+  },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '多方块结构显示名',
+  },
+  {
+    key: 'width',
+    label: '宽',
+    type: 'number',
+    min: 1,
+    max: 16,
+    step: 1,
+    group: 'appearance',
+    description: '结构宽度（1-16，X 轴方向方块数）',
+  },
+  {
+    key: 'height',
+    label: '高',
+    type: 'number',
+    min: 1,
+    max: 16,
+    step: 1,
+    group: 'appearance',
+    description: '结构高度（1-16，Y 轴方向方块数）',
+  },
+  {
+    key: 'depth',
+    label: '深',
+    type: 'number',
+    min: 1,
+    max: 16,
+    step: 1,
+    group: 'appearance',
+    description: '结构深度（1-16，Z 轴方向方块数）',
+  },
+  {
+    key: 'hollow',
+    label: '空心',
+    type: 'segmented',
+    options: ['false', 'true'],
+    group: 'behavior',
+    description: '是否空心结构（true=外壳，false=实心）',
+  },
 ];
 
 /** event 节点字段 */
@@ -255,9 +536,16 @@ const EVENT_FIELDS: FieldSchema[] = [
       'custom',
     ],
     group: 'basic',
-    description: '事件触发器类型：player_right_click_block=右键方块，entity_death=实体死亡，player_join=玩家加入，tick=每 tick 等',
+    description:
+      '事件触发器类型：player_right_click_block=右键方块，entity_death=实体死亡，player_join=玩家加入，tick=每 tick 等',
   },
-  { key: 'eventArgs', label: '事件参数 (JSON)', type: 'nbt', group: 'advanced', description: '事件参数（JSON 字符串），由具体事件类型决定字段，如 {"hand":"main_hand"}' },
+  {
+    key: 'eventArgs',
+    label: '事件参数 (JSON)',
+    type: 'nbt',
+    group: 'advanced',
+    description: '事件参数（JSON 字符串），由具体事件类型决定字段，如 {"hand":"main_hand"}',
+  },
 ];
 
 /** condition 节点字段 */
@@ -280,9 +568,16 @@ const CONDITION_FIELDS: FieldSchema[] = [
       'custom',
     ],
     group: 'basic',
-    description: '条件判断类型：has_item=持有物品，health_below=生命值低于，is_day=白天，biome_is=在特定群系 等',
+    description:
+      '条件判断类型：has_item=持有物品，health_below=生命值低于，is_day=白天，biome_is=在特定群系 等',
   },
-  { key: 'conditionArgs', label: '条件参数 (JSON)', type: 'nbt', group: 'advanced', description: '条件参数（JSON 字符串），如 {"item":"minecraft:stick","hand":"main_hand"}' },
+  {
+    key: 'conditionArgs',
+    label: '条件参数 (JSON)',
+    type: 'nbt',
+    group: 'advanced',
+    description: '条件参数（JSON 字符串），如 {"item":"minecraft:stick","hand":"main_hand"}',
+  },
   {
     key: 'customCode',
     label: '自定义 Java 条件',
@@ -294,7 +589,14 @@ const CONDITION_FIELDS: FieldSchema[] = [
     group: 'advanced',
     description: '自定义 Java 条件表达式，仅在条件类型为 custom 时生效',
   },
-  { key: 'invert', label: '取反', type: 'segmented', options: ['false', 'true'], group: 'behavior', description: '是否取反（true=条件为假时走真分支，false=正常逻辑）' },
+  {
+    key: 'invert',
+    label: '取反',
+    type: 'segmented',
+    options: ['false', 'true'],
+    group: 'behavior',
+    description: '是否取反（true=条件为假时走真分支，false=正常逻辑）',
+  },
 ];
 
 /** action 节点字段 */
@@ -319,9 +621,17 @@ const ACTION_FIELDS: FieldSchema[] = [
       'custom',
     ],
     group: 'basic',
-    description: '动作类型：spawn_entity=生成实体，give_item=给予物品，teleport=传送，damage=造成伤害，play_sound=播放声音 等',
+    description:
+      '动作类型：spawn_entity=生成实体，give_item=给予物品，teleport=传送，damage=造成伤害，play_sound=播放声音 等',
   },
-  { key: 'actionArgs', label: '动作参数 (JSON)', type: 'nbt', group: 'advanced', description: '动作参数（JSON 字符串），如 {"entity":"minecraft:lightning_bolt","offset":{"x":0,"y":1,"z":0}}' },
+  {
+    key: 'actionArgs',
+    label: '动作参数 (JSON)',
+    type: 'nbt',
+    group: 'advanced',
+    description:
+      '动作参数（JSON 字符串），如 {"entity":"minecraft:lightning_bolt","offset":{"x":0,"y":1,"z":0}}',
+  },
   {
     key: 'customCode',
     label: '自定义 Java 动作',
@@ -337,15 +647,47 @@ const ACTION_FIELDS: FieldSchema[] = [
 
 /** code 节点字段 */
 const CODE_FIELDS: FieldSchema[] = [
-  { key: 'methodName', label: '方法名', type: 'text', required: true, group: 'basic', description: '生成的 Java 方法名（合法标识符，如 process / onTick）' },
-  { key: 'language', label: '语言', type: 'dropdown', options: ['java', 'kotlin', 'javascript'], group: 'basic', description: '代码语言：java（推荐，功能完整）/javascript/kotlin' },
-  { key: 'inputSignature', label: '输入签名 (JSON)', type: 'nbt', group: 'advanced', description: '输入端口类型签名（JSON，如 {"in":"item_stack"}），定义输入端口的数据类型' },
-  { key: 'outputSignature', label: '输出签名 (JSON)', type: 'nbt', group: 'advanced', description: '输出端口类型签名（JSON，如 {"out":"item_stack"}），定义输出端口的数据类型' },
+  {
+    key: 'methodName',
+    label: '方法名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '生成的 Java 方法名（合法标识符，如 process / onTick）',
+  },
+  {
+    key: 'language',
+    label: '语言',
+    type: 'dropdown',
+    options: ['java', 'kotlin', 'javascript'],
+    group: 'basic',
+    description: '代码语言：java（推荐，功能完整）/javascript/kotlin',
+  },
+  {
+    key: 'inputSignature',
+    label: '输入签名 (JSON)',
+    type: 'nbt',
+    group: 'advanced',
+    description: '输入端口类型签名（JSON，如 {"in":"item_stack"}），定义输入端口的数据类型',
+  },
+  {
+    key: 'outputSignature',
+    label: '输出签名 (JSON)',
+    type: 'nbt',
+    group: 'advanced',
+    description: '输出端口类型签名（JSON，如 {"out":"item_stack"}），定义输出端口的数据类型',
+  },
 ];
 
 /** comment 节点字段 */
 const COMMENT_FIELDS: FieldSchema[] = [
-  { key: 'text', label: '文本', type: 'text', group: 'basic', description: '备注文本（仅文档用途，不参与编译）' },
+  {
+    key: 'text',
+    label: '文本',
+    type: 'text',
+    group: 'basic',
+    description: '备注文本（仅文档用途，不参与编译）',
+  },
   {
     key: 'color',
     label: '颜色',
@@ -358,7 +700,14 @@ const COMMENT_FIELDS: FieldSchema[] = [
 
 /** variable 节点字段（阶段 C，P2 dogfood 修复：value 字段根据 varType 动态切换编辑器类型） */
 const VARIABLE_FIELDS: FieldSchema[] = [
-  { key: 'varName', label: '变量名', type: 'text', required: true, group: 'basic', description: '变量名（Java 标识符，字母/下划线开头）' },
+  {
+    key: 'varName',
+    label: '变量名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '变量名（Java 标识符，字母/下划线开头）',
+  },
   {
     key: 'varType',
     label: '变量类型',
@@ -424,14 +773,34 @@ const VARIABLE_FIELDS: FieldSchema[] = [
     group: 'behavior',
     description: '方块类型初始值（如 minecraft:diamond_block）',
   },
-  { key: 'isConstant', label: '常量', type: 'segmented', options: ['false', 'true'], group: 'advanced', description: '是否为常量（不可修改）' },
+  {
+    key: 'isConstant',
+    label: '常量',
+    type: 'segmented',
+    options: ['false', 'true'],
+    group: 'advanced',
+    description: '是否为常量（不可修改）',
+  },
 ];
 
 /** subgraph 节点字段（阶段 C） */
 const SUBGRAPH_FIELDS: FieldSchema[] = [
-  { key: 'label', label: '显示名', type: 'text', required: true, group: 'basic', description: '子图节点显示名' },
+  {
+    key: 'label',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '子图节点显示名',
+  },
   { key: 'subgraphName', label: '子图名', type: 'text', group: 'basic', description: '子图名称' },
-  { key: 'subgraphId', label: '子图 ID', type: 'text', group: 'basic', description: '子图唯一标识' },
+  {
+    key: 'subgraphId',
+    label: '子图 ID',
+    type: 'text',
+    group: 'basic',
+    description: '子图唯一标识',
+  },
 ];
 
 /** P1-3：procedure 节点字段（对标 MCreator procedure） */
@@ -444,9 +813,16 @@ const PROCEDURE_FIELDS: FieldSchema[] = [
     pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$',
     patternMessage: '须为合法 Java 标识符：字母/下划线开头，仅含字母/数字/下划线',
     group: 'basic',
-    description: '过程名（Java 标识符），编译为方法名 procedure_<name>(Object event)。字母/下划线开头，仅含字母/数字/下划线',
+    description:
+      '过程名（Java 标识符），编译为方法名 procedure_<name>(Object event)。字母/下划线开头，仅含字母/数字/下划线',
   },
-  { key: 'displayName', label: '显示名', type: 'text', group: 'basic', description: 'UI 显示名（可选，默认同过程名），仅用于画布展示，不影响编译产物' },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    group: 'basic',
+    description: 'UI 显示名（可选，默认同过程名），仅用于画布展示，不影响编译产物',
+  },
   // P40：输入参数列表（name + type，编译为方法形参；每参数自动生成 in_<name> 数据端口）
   {
     key: 'inputs',
@@ -485,8 +861,22 @@ const PROCEDURE_FIELDS: FieldSchema[] = [
 
 /** biome 节点字段（世界生成） */
 const BIOME_FIELDS: FieldSchema[] = [
-  { key: 'biomeId', label: '生物群系 ID', type: 'localId', required: true, group: 'basic', description: '生物群系 ID，格式同物品（小写+下划线），如 ruby_forest' },
-  { key: 'displayName', label: '显示名', type: 'text', required: true, group: 'basic', description: '游戏中显示的生物群系名称' },
+  {
+    key: 'biomeId',
+    label: '生物群系 ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description: '生物群系 ID，格式同物品（小写+下划线），如 ruby_forest',
+  },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '游戏中显示的生物群系名称',
+  },
   {
     key: 'precipitation',
     label: '降水',
@@ -495,7 +885,16 @@ const BIOME_FIELDS: FieldSchema[] = [
     group: 'appearance',
     description: '降水类型：none=无，rain=雨，snow=雪',
   },
-  { key: 'temperature', label: '温度', type: 'number', min: -2, max: 2, step: 0.1, group: 'appearance', description: '基础温度（-2 到 2），影响降水和植被' },
+  {
+    key: 'temperature',
+    label: '温度',
+    type: 'number',
+    min: -2,
+    max: 2,
+    step: 0.1,
+    group: 'appearance',
+    description: '基础温度（-2 到 2），影响降水和植被',
+  },
   {
     key: 'temperatureModifier',
     label: '温度修饰',
@@ -504,18 +903,74 @@ const BIOME_FIELDS: FieldSchema[] = [
     group: 'appearance',
     description: '温度修饰：none=正常，frozen=冻结（如冰原）',
   },
-  { key: 'downfall', label: '降水量', type: 'number', min: 0, max: 1, step: 0.05, group: 'appearance', description: '降水量（0-1），影响植被密度和降水频率' },
-  { key: 'skyColor', label: '天空颜色', type: 'color', group: 'appearance', description: '天空颜色（十六进制 RGB）' },
-  { key: 'waterColor', label: '水面颜色', type: 'color', group: 'appearance', description: '水面颜色（十六进制 RGB）' },
-  { key: 'fogColor', label: '雾颜色', type: 'color', group: 'appearance', description: '雾颜色（十六进制 RGB）' },
-  { key: 'surfaceBuilder', label: '地表构建器', type: 'text', group: 'advanced', description: '地表构建器 ID（如 minecraft:overworld）' },
-  { key: 'spawnWeight', label: '生成权重', type: 'number', min: 0, max: 100, step: 1, group: 'behavior', description: '生成权重（0=不自然生成，越大越常见）' },
+  {
+    key: 'downfall',
+    label: '降水量',
+    type: 'number',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    group: 'appearance',
+    description: '降水量（0-1），影响植被密度和降水频率',
+  },
+  {
+    key: 'skyColor',
+    label: '天空颜色',
+    type: 'color',
+    group: 'appearance',
+    description: '天空颜色（十六进制 RGB）',
+  },
+  {
+    key: 'waterColor',
+    label: '水面颜色',
+    type: 'color',
+    group: 'appearance',
+    description: '水面颜色（十六进制 RGB）',
+  },
+  {
+    key: 'fogColor',
+    label: '雾颜色',
+    type: 'color',
+    group: 'appearance',
+    description: '雾颜色（十六进制 RGB）',
+  },
+  {
+    key: 'surfaceBuilder',
+    label: '地表构建器',
+    type: 'text',
+    group: 'advanced',
+    description: '地表构建器 ID（如 minecraft:overworld）',
+  },
+  {
+    key: 'spawnWeight',
+    label: '生成权重',
+    type: 'number',
+    min: 0,
+    max: 100,
+    step: 1,
+    group: 'behavior',
+    description: '生成权重（0=不自然生成，越大越常见）',
+  },
 ];
 
 /** dimension 节点字段（世界生成） */
 const DIMENSION_FIELDS: FieldSchema[] = [
-  { key: 'dimensionId', label: '维度 ID', type: 'localId', required: true, group: 'basic', description: '维度 ID，格式同物品，如 ruby_dimension' },
-  { key: 'displayName', label: '显示名', type: 'text', required: true, group: 'basic', description: '游戏中显示的维度名称' },
+  {
+    key: 'dimensionId',
+    label: '维度 ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description: '维度 ID，格式同物品，如 ruby_dimension',
+  },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '游戏中显示的维度名称',
+  },
   {
     key: 'baseType',
     label: '类型模板',
@@ -524,7 +979,16 @@ const DIMENSION_FIELDS: FieldSchema[] = [
     group: 'basic',
     description: '维度类型模板：overworld=主世界，nether=下界，end=末地',
   },
-  { key: 'fixedTime', label: '固定时间 (tick)', type: 'number', min: -1, max: 24000, step: 100, group: 'appearance', description: '固定时间（-1=随时间变化，0-24000=固定一天中的时间）' },
+  {
+    key: 'fixedTime',
+    label: '固定时间 (tick)',
+    type: 'number',
+    min: -1,
+    max: 24000,
+    step: 100,
+    group: 'appearance',
+    description: '固定时间（-1=随时间变化，0-24000=固定一天中的时间）',
+  },
   {
     key: 'hasSkyLight',
     label: '天空光',
@@ -549,8 +1013,26 @@ const DIMENSION_FIELDS: FieldSchema[] = [
     group: 'behavior',
     description: '是否为超热维度（水会蒸发，如下界）',
   },
-  { key: 'minY', label: '最小 Y', type: 'number', min: -2048, max: 2047, step: 16, group: 'appearance', description: '最小 Y 坐标（必须是 16 的倍数）' },
-  { key: 'height', label: '高度', type: 'number', min: 16, max: 4064, step: 16, group: 'appearance', description: '维度高度（必须是 16 的倍数）' },
+  {
+    key: 'minY',
+    label: '最小 Y',
+    type: 'number',
+    min: -2048,
+    max: 2047,
+    step: 16,
+    group: 'appearance',
+    description: '最小 Y 坐标（必须是 16 的倍数）',
+  },
+  {
+    key: 'height',
+    label: '高度',
+    type: 'number',
+    min: 16,
+    max: 4064,
+    step: 16,
+    group: 'appearance',
+    description: '维度高度（必须是 16 的倍数）',
+  },
   {
     key: 'effects',
     label: '效果',
@@ -563,12 +1045,59 @@ const DIMENSION_FIELDS: FieldSchema[] = [
 
 /** fluid 节点字段（流体） */
 const FLUID_FIELDS: FieldSchema[] = [
-  { key: 'fluidId', label: '流体 ID', type: 'localId', required: true, group: 'basic', description: '流体 ID，格式同物品，如 ruby_oil' },
-  { key: 'displayName', label: '显示名', type: 'text', required: true, group: 'basic', description: '游戏中显示的流体名称' },
-  { key: 'color', label: '颜色', type: 'color', group: 'appearance', description: '流体颜色（十六进制 ARGB，如 0xFF000000）' },
-  { key: 'temperature', label: '温度 (K)', type: 'number', min: 0, max: 2000, step: 10, group: 'behavior', description: '流体温度（开尔文），影响实体接触时的伤害' },
-  { key: 'viscosity', label: '黏度', type: 'number', min: 1, max: 10000, step: 10, group: 'behavior', description: '流体黏度，影响实体在流体中的移动速度' },
-  { key: 'density', label: '密度', type: 'number', min: 1, max: 10000, step: 10, group: 'behavior', description: '流体密度，影响浮力和实体下沉速度' },
+  {
+    key: 'fluidId',
+    label: '流体 ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description: '流体 ID，格式同物品，如 ruby_oil',
+  },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '游戏中显示的流体名称',
+  },
+  {
+    key: 'color',
+    label: '颜色',
+    type: 'color',
+    group: 'appearance',
+    description: '流体颜色（十六进制 ARGB，如 0xFF000000）',
+  },
+  {
+    key: 'temperature',
+    label: '温度 (K)',
+    type: 'number',
+    min: 0,
+    max: 2000,
+    step: 10,
+    group: 'behavior',
+    description: '流体温度（开尔文），影响实体接触时的伤害',
+  },
+  {
+    key: 'viscosity',
+    label: '黏度',
+    type: 'number',
+    min: 1,
+    max: 10000,
+    step: 10,
+    group: 'behavior',
+    description: '流体黏度，影响实体在流体中的移动速度',
+  },
+  {
+    key: 'density',
+    label: '密度',
+    type: 'number',
+    min: 1,
+    max: 10000,
+    step: 10,
+    group: 'behavior',
+    description: '流体密度，影响浮力和实体下沉速度',
+  },
   {
     key: 'luminous',
     label: '发光',
@@ -581,17 +1110,50 @@ const FLUID_FIELDS: FieldSchema[] = [
 
 /** gui 节点字段（容器界面） */
 const GUI_FIELDS: FieldSchema[] = [
-  { key: 'guiId', label: 'GUI ID', type: 'localId', required: true, group: 'basic', description: 'GUI ID，格式同物品，如 ruby_furnace_gui' },
-  { key: 'displayName', label: '显示名', type: 'text', required: true, group: 'basic', description: '游戏中显示的 GUI 标题' },
-  { key: 'width', label: '宽度', type: 'number', min: 176, max: 256, step: 1, group: 'appearance', description: 'GUI 宽度（像素），标准为 176' },
-  { key: 'height', label: '高度', type: 'number', min: 166, max: 256, step: 1, group: 'appearance', description: 'GUI 高度（像素），标准为 166' },
+  {
+    key: 'guiId',
+    label: 'GUI ID',
+    type: 'localId',
+    required: true,
+    group: 'basic',
+    description: 'GUI ID，格式同物品，如 ruby_furnace_gui',
+  },
+  {
+    key: 'displayName',
+    label: '显示名',
+    type: 'text',
+    required: true,
+    group: 'basic',
+    description: '游戏中显示的 GUI 标题',
+  },
+  {
+    key: 'width',
+    label: '宽度',
+    type: 'number',
+    min: 176,
+    max: 256,
+    step: 1,
+    group: 'appearance',
+    description: 'GUI 宽度（像素），标准为 176',
+  },
+  {
+    key: 'height',
+    label: '高度',
+    type: 'number',
+    min: 166,
+    max: 256,
+    step: 1,
+    group: 'appearance',
+    description: 'GUI 高度（像素），标准为 166',
+  },
   {
     key: 'slotsJson',
     label: '槽位布局 (JSON)',
     type: 'nbt',
     placeholder: '[{"slotId":"in_0","slotType":"input","x":0,"y":0}]',
     group: 'advanced',
-    description: '槽位布局 JSON 数组，每个槽位包含 slotId、slotType(input/output/fuel/result)、x、y',
+    description:
+      '槽位布局 JSON 数组，每个槽位包含 slotId、slotType(input/output/fuel/result)、x、y',
   },
   {
     key: 'showEnergyBar',
@@ -622,7 +1184,13 @@ const LOOP_FIELDS: FieldSchema[] = [
     group: 'basic',
     description: '循环类型：for=计数循环，forEach=遍历循环，while=条件循环',
   },
-  { key: 'loopVarName', label: '循环变量名', type: 'text', group: 'basic', description: '循环变量名（Java 标识符）' },
+  {
+    key: 'loopVarName',
+    label: '循环变量名',
+    type: 'text',
+    group: 'basic',
+    description: '循环变量名（Java 标识符）',
+  },
   {
     key: 'loopVarType',
     label: '循环变量类型',
@@ -639,7 +1207,14 @@ const LOOP_FIELDS: FieldSchema[] = [
     group: 'behavior',
     description: 'for 循环初始化表达式（如 i = 0）',
   },
-  { key: 'condition', label: '条件', type: 'text', required: true, group: 'behavior', description: '循环条件表达式（如 i < 10）' },
+  {
+    key: 'condition',
+    label: '条件',
+    type: 'text',
+    required: true,
+    group: 'behavior',
+    description: '循环条件表达式（如 i < 10）',
+  },
   {
     key: 'update',
     label: '更新',
@@ -656,7 +1231,13 @@ const LOOP_FIELDS: FieldSchema[] = [
     group: 'behavior',
     description: 'forEach 循环遍历的对象（如数组变量名）',
   },
-  { key: 'bodySubgraphId', label: '循环体子图', type: 'noderef', group: 'advanced', description: '循环体对应的子图节点 ID' },
+  {
+    key: 'bodySubgraphId',
+    label: '循环体子图',
+    type: 'noderef',
+    group: 'advanced',
+    description: '循环体对应的子图节点 ID',
+  },
 ];
 
 /** 按 kind 获取字段 schema 列表（已按 excludeKinds 过滤） */

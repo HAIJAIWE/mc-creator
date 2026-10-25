@@ -8,12 +8,13 @@
  * 3. 点击切域 → 回调参数正确
  * 4. 左右箭头切域（含循环）、Home/End
  * 5. 键盘可达：整组只占一个 Tab 停靠点，方向键后焦点跟到新激活 tab
- * 6. 非受控模式写 domain-store（tabs 之外的实际接线）
+ * 6. 非受控模式写 workbench-store（tabs 之外的实际接线）
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { DomainSwitcher } from './DomainSwitcher.js';
-import { useDomainStore, DEFAULT_DOMAIN } from '../store/domain-store.js';
+import { useWorkbenchStore } from '../shell/workbench-store.js';
+import { DEFAULT_DOMAIN_ID } from '../shell/domains.js';
 
 /** 切换器上三个 tab 的中文名 */
 const TAB_LABELS = ['启动器', '服务器', 'MC 开发'] as const;
@@ -24,7 +25,7 @@ const tab = (name: string) => screen.getByRole('tab', { name });
 
 beforeEach(() => {
   // store 是模块级单例 + 持久化，这里显式回到默认值，免得用例互相污染
-  useDomainStore.setState({ domain: DEFAULT_DOMAIN });
+  useWorkbenchStore.setState({ domain: DEFAULT_DOMAIN_ID });
   // 同 ActivityBar.test.tsx：让 rAF 同步执行，焦点断言才不用 await
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
     cb(0);
@@ -198,14 +199,14 @@ describe('DomainSwitcher 键盘导航（自动激活 + 左右箭头）', () => {
   });
 });
 
-describe('DomainSwitcher 非受控模式接 domain-store', () => {
-  it('不传 value/onChange 时读写 domain-store', () => {
+describe('DomainSwitcher 非受控模式接 workbench-store', () => {
+  it('不传 value/onChange 时读写 workbench-store', () => {
     render(<DomainSwitcher />);
     // store 默认域是 dev
     expect(tab('MC 开发').getAttribute('aria-selected')).toBe('true');
 
     fireEvent.click(tab('服务器'));
-    expect(useDomainStore.getState().domain).toBe('server');
+    expect(useWorkbenchStore.getState().domain).toBe('server');
     expect(tab('服务器').getAttribute('aria-selected')).toBe('true');
     expect(tab('MC 开发').getAttribute('aria-selected')).toBe('false');
   });
@@ -213,7 +214,7 @@ describe('DomainSwitcher 非受控模式接 domain-store', () => {
   it('store 域变化后 tab 选中态同步', () => {
     render(<DomainSwitcher />);
     act(() => {
-      useDomainStore.setState({ domain: 'launcher' });
+      useWorkbenchStore.setState({ domain: 'launcher' });
     });
     expect(tab('启动器').getAttribute('aria-selected')).toBe('true');
     expect(tab('MC 开发').getAttribute('aria-selected')).toBe('false');

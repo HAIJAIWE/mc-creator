@@ -2,14 +2,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BuildPanel } from './BuildPanel.js';
-import { useModStore } from '../store/mod-store.js';
-import { ipcClient } from '../lib/ipc-client.js';
+import { useModStore } from '../../store/mod-store.js';
+import { ipcClient } from '../../lib/ipc-client.js';
 
-vi.mock('../store/mod-store.js', () => ({
+vi.mock('../../store/mod-store.js', () => ({
   useModStore: vi.fn(),
 }));
 
-vi.mock('../lib/ipc-client.js', () => ({
+vi.mock('../../lib/ipc-client.js', () => ({
   ipcClient: {
     checkJava: vi
       .fn()

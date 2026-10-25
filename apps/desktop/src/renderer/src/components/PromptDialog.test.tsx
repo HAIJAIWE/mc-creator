@@ -192,4 +192,102 @@ describe('PromptDialog', () => {
     renderPrompt({ placeholder: undefined });
     expect(await scanAxeViolations()).toEqual([]);
   });
+
+  /**
+   * `validate`：把「校验」这件事放进对话框本身，而不是让每个调用方在
+   * 确认回调里自己判、自己弹 Toast。校验是**随输入实时**算的，
+   * 有错误就禁用确认 —— 调用方拿到的一定是已经通过校验的值。
+   */
+  describe('validate（输入校验）', () => {
+    /** 不许出现「bad」字样的校验器 */
+    const noBad = (v: string) => (v.includes('bad') ? { error: '不能含 bad' } : {});
+
+    it('校验不通过时禁用确认按钮，并红字显示原因', () => {
+      renderPrompt({ validate: noBad });
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'this is bad' } });
+
+      expect(screen.getByRole('button', { name: '确定' })).toBeDisabled();
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('不能含 bad');
+      expect(screen.getByRole('textbox')).toHaveAttribute('aria-invalid', 'true');
+    });
+
+    it('校验不通过时点确认也不回调', () => {
+      const onConfirm = vi.fn();
+      const onClose = vi.fn();
+      renderPrompt({ validate: noBad, onConfirm, onClose });
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'bad' } });
+      fireEvent.click(screen.getByRole('button', { name: '确定' }));
+      expect(onConfirm).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('校验不通过时按回车也不回调', () => {
+      const onConfirm = vi.fn();
+      renderPrompt({ validate: noBad, onConfirm });
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'bad' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it('改回合法值后恢复可确认', () => {
+      const onConfirm = vi.fn();
+      renderPrompt({ validate: noBad, onConfirm });
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'bad' } });
+      expect(screen.getByRole('button', { name: '确定' })).toBeDisabled();
+
+      fireEvent.change(input, { target: { value: 'good' } });
+      expect(screen.getByRole('button', { name: '确定' })).toBeEnabled();
+      expect(screen.queryByRole('alert')).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: '确定' }));
+      expect(onConfirm).toHaveBeenCalledWith('good');
+    });
+
+    it('hint 只作提示，不挡确认（用于「会更新已有实例」这类非阻断信息）', () => {
+      const onConfirm = vi.fn();
+      renderPrompt({ validate: () => ({ hint: '已有同名实例，下载会更新它' }), onConfirm });
+      expect(screen.getByText('已有同名实例，下载会更新它')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.getByRole('button', { name: '确定' })).toBeEnabled();
+
+      fireEvent.click(screen.getByRole('button', { name: '确定' }));
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it('error 优先于 hint 显示（两者同时有值时只显示 error）', () => {
+      renderPrompt({ validate: () => ({ error: '名字不合法', hint: '顺带一提' }) });
+      expect(screen.getByRole('alert')).toHaveTextContent('名字不合法');
+      expect(screen.queryByText('顺带一提')).toBeNull();
+    });
+
+    it('不传 validate 时行为不变（始终可确认）', () => {
+      const onConfirm = vi.fn();
+      renderPrompt({ onConfirm });
+      expect(screen.getByRole('button', { name: '确定' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: '确定' }));
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it('confirm 模式（无输入框）不调用 validate', () => {
+      const validate = vi.fn(() => ({ error: '不该被调用' }));
+      renderPrompt({ placeholder: undefined, message: '确定要清空吗？', validate });
+      expect(validate).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: '确定' })).toBeEnabled();
+    });
+
+    it('用 defaultValue 初值时校验立即生效（不是等用户打字才算）', () => {
+      renderPrompt({ placeholder: undefined, defaultValue: 'bad', validate: noBad });
+      expect(screen.getByRole('button', { name: '确定' })).toBeDisabled();
+      expect(screen.getByRole('alert')).toHaveTextContent('不能含 bad');
+    });
+
+    it('a11y：带校验错误的对话框无 WCAG 违规', async () => {
+      renderPrompt({ validate: noBad });
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'bad' } });
+      expect(await scanAxeViolations()).toEqual([]);
+    });
+  });
 });

@@ -2,7 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { McIcon } from '../assets/mc-ui/McIcon';
 import { useTranslation } from '../hooks/useTranslation.js';
 import type { GeneratorType, Loader, McVersion } from '@mc-creator/shared';
-import { GENERATOR_DESCRIPTORS, GENERATOR_TYPES } from '../../../shared/generator-descriptors.js';
+import {
+  GENERATOR_DESCRIPTORS,
+  GENERATOR_TYPES,
+  SUPPORTED_GENERATOR_LOADERS,
+} from '../../../shared/generator-descriptors.js';
 
 interface Props {
   onClose: () => void;
@@ -34,29 +38,11 @@ export function ProjectCreateDialog({ onClose, onCreate }: Props) {
   const [creating, setCreating] = useState(false);
   const [step, setStep] = useState<'basic' | 'advanced'>('basic');
 
-  // 基于生成器类型过滤可用的加载器
-  const availableLoaders = useMemo((): Loader[] => {
-    switch (generatorType) {
-      case 'mod':
-      case 'modpack':
-      case 'server':
-      case 'resource_pack':
-      case 'skin':
-      case 'launcher':
-      case 'datapack':
-        return ['fabric', 'neoforge', 'quilt', 'legacy_fabric', 'forge', 'vanilla'];
-      case 'kubejs':
-      case 'crafttweaker':
-      case 'enchantment':
-        return ['fabric', 'neoforge', 'legacy_fabric'];
-      case 'behavior_pack':
-      case 'behavior_item':
-      case 'behavior_entity':
-        return ['legacy_fabric', 'vanilla'];
-      default:
-        return ['fabric'];
-    }
-  }, [generatorType]);
+  // 产品决策（用户拍板）：生成器只开放 Fabric + NeoForge，与启动器保持一致。
+  // 单一来源见 `shared/generator-descriptors.ts` 的 SUPPORTED_GENERATOR_LOADERS ——
+  // 这里**不要再手写列表**：历史上两处各写一份，结果都给错了（一个含会抛错的
+  // vanilla，一个漏了 forge）。
+  const availableLoaders = useMemo((): Loader[] => [...SUPPORTED_GENERATOR_LOADERS], []);
 
   // 如果当前 loader 不在可用列表中，重置为第一个可用的
   useEffect(() => {

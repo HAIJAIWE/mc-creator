@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ModNode } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store';
 
@@ -19,19 +19,30 @@ export function useOutlineSelection() {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
+  // 记录已消费过的画布选中值：只响应 store 的真实变化，
+  // 否则大纲本地选中（handleSelect）在 store 尚未回写时会被立刻覆盖回旧值。
+  // 初值为 undefined，保证挂载时的首次同步一定会执行。
+  const lastSyncedIdRef = useRef<string | null | undefined>(undefined);
+
+  // focusedIndex 的同步镜像：navigate 需要读到最新值，
+  // 否则同一批处理内的连续导航会重复基于同一个旧值计算（keydown 快速连按会跳格）。
+  const focusedIndexRef = useRef(focusedIndex);
+
   // 当画布选中变化时，同步到大纲并展开路径
   useEffect(() => {
-    if (selectedNodeId !== outlineSelectedId) {
-      setOutlineSelectedId(selectedNodeId);
-      if (selectedNodeId) {
-        // 计算并展开所有祖先路径
-        const ancestors = getAncestorIds(graph.nodes, selectedNodeId);
-        setExpandedPaths((prev) => new Set([...prev, ...ancestors]));
-        // 更新聚焦索引（需要在渲染后计算，这里标记需要更新）
-        setFocusedIndex(-1); // 触发重新计算
-      }
+    if (selectedNodeId === lastSyncedIdRef.current) return;
+    lastSyncedIdRef.current = selectedNodeId;
+
+    setOutlineSelectedId(selectedNodeId);
+    if (selectedNodeId) {
+      // 计算并展开所有祖先路径
+      const ancestors = getAncestorIds(graph.nodes, selectedNodeId);
+      setExpandedPaths((prev) => new Set([...prev, ...ancestors]));
+      // 更新聚焦索引（需要在渲染后计算，这里标记需要更新）
+      setFocusedIndex(-1); // 触发重新计算
+      focusedIndexRef.current = -1;
     }
-  }, [selectedNodeId, outlineSelectedId, graph.nodes]);
+  }, [selectedNodeId, graph.nodes]);
 
   // 处理大纲点击选择
   const handleSelect = useCallback(
@@ -61,10 +72,7 @@ export function useOutlineSelection() {
   }, []);
 
   // 检查是否展开
-  const isExpanded = useCallback(
-    (nodeId: string) => expandedPaths.has(nodeId),
-    [expandedPaths],
-  );
+  const isExpanded = useCallback((nodeId: string) => expandedPaths.has(nodeId), [expandedPaths]);
 
   // 展开指定路径
   const expandPath = useCallback((nodeIds: string[]) => {
@@ -89,11 +97,11 @@ export function useOutlineSelection() {
     (direction: 'up' | 'down' | 'left' | 'right' | 'enter', visibleNodes: ModNode[]) => {
       if (visibleNodes.length === 0) return;
 
-      let currentIndex = focusedIndex;
+      let currentIndex = focusedIndexRef.current;
       if (currentIndex === -1) {
-        // 如果没有聚焦项，尝试找到选中项
+        // 没有聚焦项时从当前选中项出发；若也没有选中，保持 -1，
+        // 这样首个上/下移动都落在 index 0（否则 down 会直接跳到 index 1，漏掉第一项）。
         currentIndex = visibleNodes.findIndex((n) => n.id === outlineSelectedId);
-        if (currentIndex === -1) currentIndex = 0;
       }
 
       let nextIndex = currentIndex;
@@ -124,6 +132,7 @@ export function useOutlineSelection() {
 
       if (nextIndex !== currentIndex) {
         setFocusedIndex(nextIndex);
+        focusedIndexRef.current = nextIndex; // 立即生效，批处理内可累积
         const node = visibleNodes[nextIndex];
         if (node) {
           handleSelect(node.id);
@@ -131,11 +140,12 @@ export function useOutlineSelection() {
         }
       }
     },
-    [focusedIndex, outlineSelectedId, handleSelect, toggleExpanded],
+    [outlineSelectedId, handleSelect, toggleExpanded],
   );
 
   // 设置聚焦索引（外部调用，如渲染后计算）
   const setFocusedIndexRef = useCallback((index: number) => {
+    focusedIndexRef.current = index;
     setFocusedIndex(index);
   }, []);
 

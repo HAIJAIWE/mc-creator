@@ -3,7 +3,7 @@ import type { NodeData, NodeGraph } from '@mc-creator/shared';
 import { useDrawerStore } from '../../../../store/drawer-store.js';
 import { useNodeGraphStore } from '../../../../store/node-graph-store.js';
 import { getFieldSchemas } from '../../../../domain/fieldSchemas.js';
-import type { FieldSchema, FieldGroup } from './editors/types.js';
+import type { FieldSchema, FieldGroup as FieldGroupKey } from './editors/types.js';
 import { NumberStepperEditor } from './editors/NumberStepperEditor.js';
 import { DropdownEditor } from './editors/DropdownEditor.js';
 import { SegmentedEditor } from './editors/SegmentedEditor.js';
@@ -22,7 +22,7 @@ import { getErrorSuggestion, getFixLabel } from './ErrorRecovery.utils.js';
 import { FieldGroup } from './FieldGroup.js';
 
 /** 分组顺序：基础信息 -> 外观 -> 行为 -> 高级 */
-const GROUP_ORDER: FieldGroup[] = ['basic', 'appearance', 'behavior', 'advanced'];
+const GROUP_ORDER: FieldGroupKey[] = ['basic', 'appearance', 'behavior', 'advanced'];
 
 /**
  * 字段级校验：返回错误文字或 undefined。
@@ -253,21 +253,20 @@ function NodeDetailFormComponent() {
     [computedErrors, storeErrors],
   );
 
-  if (!draft) return null;
-
-  const fields = getFieldSchemas(draft.kind);
-  const visibleFields = fields.filter((f) => shouldShow(f, draft));
-
   // 按分组聚合字段
+  // 注意：所有 Hook 必须排在 `if (!draft) return null` 之前，
+  // 否则 draft 在 null/非 null 之间切换时 Hook 顺序会变，React 直接崩。
   const fieldsByGroup = useMemo(() => {
     const groups: Record<string, FieldSchema[]> = {};
-    for (const f of visibleFields) {
+    if (!draft) return groups;
+    for (const f of getFieldSchemas(draft.kind)) {
+      if (!shouldShow(f, draft)) continue;
       const g = f.group ?? 'basic';
       if (!groups[g]) groups[g] = [];
       groups[g].push(f);
     }
     return groups;
-  }, [visibleFields]);
+  }, [draft]);
 
   // 计算每个分组是否有错误
   const groupHasError = useMemo(() => {
@@ -277,6 +276,8 @@ function NodeDetailFormComponent() {
     }
     return result;
   }, [fieldsByGroup, mergedErrors]);
+
+  if (!draft) return null;
 
   return (
     <div className="space-y-1">

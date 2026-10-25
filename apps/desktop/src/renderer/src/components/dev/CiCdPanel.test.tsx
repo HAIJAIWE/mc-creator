@@ -2,16 +2,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CiCdPanel } from './CiCdPanel.js';
-import { suggestJavaVersion } from './CiCdPanel.utils.js';
-import { useModStore } from '../store/mod-store.js';
+import { suggestJavaVersion } from '../CiCdPanel.utils.js';
+import { useModStore } from '../../store/mod-store.js';
 
-vi.mock('../lib/ipc-client.js', () => ({
+vi.mock('../../lib/ipc-client.js', () => ({
   ipcClient: {
     saveFile: vi.fn(),
   },
 }));
 
-import { ipcClient } from '../lib/ipc-client.js';
+import { ipcClient } from '../../lib/ipc-client.js';
 
 const mockSaveFile = ipcClient.saveFile as ReturnType<typeof vi.fn>;
 
@@ -103,5 +103,29 @@ describe('CiCdPanel', () => {
       expect(writeText).toHaveBeenCalled();
       expect(screen.getByText('已复制')).toBeTruthy();
     });
+  });
+
+  /**
+   * loader 下拉 = **项目加载器**（由 mod-store 播种），跟 SettingsPanel 读同一个
+   * store 字段，两边选项必须一致。此前这里手写 `['fabric','forge','neoforge',
+   * 'quilt']` —— 给了项目根本target 不了的 quilt/forge，却连 `vanilla`/
+   * `legacy_fabric` 都没有，原版项目直接显示空白。
+   */
+  it('loader 下拉与项目加载器同源：只开放 Fabric + NeoForge', () => {
+    render(<CiCdPanel />);
+    const select = document.querySelectorAll('select')[1] as HTMLSelectElement;
+    const values = Array.from(select.querySelectorAll('option')).map((o) => o.value);
+    expect(values).toEqual(['fabric', 'neoforge']);
+  });
+
+  it('原版 / 旧加载器项目不会显示空白下拉', () => {
+    // vanilla 是 launcher 侧的合法取值（ModGenerator 做不到，但项目可以存 vanilla）
+    useModStore.setState({ loader: 'vanilla' });
+    render(<CiCdPanel />);
+    const select = document.querySelectorAll('select')[1] as HTMLSelectElement;
+    expect(select.value).toBe('vanilla');
+    const opt = select.querySelector('option[value="vanilla"]');
+    expect(opt, '旧值要显式列出，否则下拉空白').toBeTruthy();
+    expect(opt).toHaveProperty('disabled', true);
   });
 });

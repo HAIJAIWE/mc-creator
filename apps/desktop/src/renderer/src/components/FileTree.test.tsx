@@ -202,13 +202,33 @@ describe('FileTree 空状态', () => {
     });
   });
 
-  it('有项目但树为空 → “项目目录为空” + 提示右键新建', async () => {
+  it('有项目但树为空 → “项目目录为空” + 引导去生成 + 可见的新建按钮', async () => {
     await renderWithTree([]);
     expect(screen.getByTestId('filetree-empty')).toBeTruthy();
     expect(screen.getByText('项目目录为空')).toBeTruthy();
-    expect(screen.getByText('右键新建文件或文件夹')).toBeTruthy();
     // 空树仍会写回缓存（[] 也是有效快照）
     expect(cacheMocks.setCache).toHaveBeenCalledWith('p1', '', []);
+
+    // 文案必须指出「该先生成」——目录为空对生成器而言意味着「还没生成」，
+    // 只说「右键新建」会把用户引向手动造文件这条最费力的路
+    expect(screen.getByText(/用右侧智能体生成内容/)).toBeTruthy();
+
+    // 「右键」是隐藏手势（VS Code 的 Explorer 空了不这么写，它给可见按钮），
+    // 所以空态里必须有真正可点的按钮，而不是让用户去猜右键
+    const newFile = screen.getByRole('button', { name: '新建文件' });
+    const newFolder = screen.getByRole('button', { name: '新建文件夹' });
+    expect(newFile).toBeTruthy();
+    expect(newFolder).toBeTruthy();
+    expect(screen.queryByText('右键新建文件或文件夹')).toBeNull();
+  });
+
+  it('空态的「新建文件」按钮真的走新建流程（不是装饰）', async () => {
+    vi.mocked(window.prompt).mockReturnValue('from-empty-state.json');
+    await renderWithTree([]);
+    fireEvent.click(screen.getByRole('button', { name: '新建文件' }));
+    await waitFor(() => {
+      expect(mockMcApi.fileProjectWriteTextWithMeta).toHaveBeenCalled();
+    });
   });
 });
 

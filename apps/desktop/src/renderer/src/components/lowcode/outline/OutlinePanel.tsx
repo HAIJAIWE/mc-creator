@@ -9,7 +9,7 @@ import { useOutlineFilter } from './useOutlineFilter.js';
 import { McIcon } from '../../../assets/mc-ui/McIcon.js';
 import { useToast } from '../../useToast.js';
 
-interface OutlinePanelProps {
+export interface OutlinePanelProps {
   /** 编译结果（用于错误/警告标记） */
   compileResult: CompileResult | null;
   /** 是否显示搜索框 */
@@ -107,7 +107,9 @@ export function OutlinePanel({
         setRenameValue(node.data.label ?? '');
         // 下一帧聚焦输入框
         setTimeout(() => {
-          const input = document.querySelector(`[data-rename-input="${nodeId}"]`) as HTMLInputElement;
+          const input = document.querySelector(
+            `[data-rename-input="${nodeId}"]`,
+          ) as HTMLInputElement;
           input?.focus();
           input?.select();
         }, 0);
@@ -118,12 +120,15 @@ export function OutlinePanel({
   );
 
   // 处理右键菜单
-  const handleContextMenu = useCallback((e: React.MouseEvent, nodeId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    selection.handleSelect(nodeId);
-    setContextMenu({ x: e.clientX, y: e.clientY, nodeId, visible: true });
-  }, [selection]);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, nodeId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selection.handleSelect(nodeId);
+      setContextMenu({ x: e.clientX, y: e.clientY, nodeId, visible: true });
+    },
+    [selection],
+  );
 
   // 关闭右键菜单
   const closeContextMenu = useCallback(() => {
@@ -309,7 +314,9 @@ export function OutlinePanel({
         >
           <McIcon scope="pixel" name="edit" size={12} aria-hidden="true" />
           <span>重命名</span>
-          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">F2</kbd>
+          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">
+            F2
+          </kbd>
         </button>
         <button
           type="button"
@@ -319,7 +326,9 @@ export function OutlinePanel({
         >
           <McIcon scope="pixel" name="copy" size={12} aria-hidden="true" />
           <span>复制</span>
-          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">Ctrl+D</kbd>
+          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">
+            Ctrl+D
+          </kbd>
         </button>
         <button
           type="button"
@@ -329,7 +338,9 @@ export function OutlinePanel({
         >
           <McIcon scope="pixel" name="clipboard" size={12} aria-hidden="true" />
           <span>复制 ID</span>
-          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">Ctrl+Shift+C</kbd>
+          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">
+            Ctrl+Shift+C
+          </kbd>
         </button>
         <button
           type="button"
@@ -339,7 +350,9 @@ export function OutlinePanel({
         >
           <McIcon scope="pixel" name="crosshair" size={12} aria-hidden="true" />
           <span>聚焦画布</span>
-          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">Enter</kbd>
+          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">
+            Enter
+          </kbd>
         </button>
         {isContainer && (
           <button
@@ -348,7 +361,12 @@ export function OutlinePanel({
             onClick={() => handleToggleCollapse(contextMenu.nodeId)}
             className="w-full px-3 py-1.5 text-left text-[11px] text-mc-text hover:bg-mc-surface-2 flex items-center gap-2"
           >
-            <McIcon scope="pixel" name={isCollapsed ? 'chevron-right' : 'chevron-down'} size={12} aria-hidden="true" />
+            <McIcon
+              scope="pixel"
+              name={isCollapsed ? 'chevron-right' : 'chevron-down'}
+              size={12}
+              aria-hidden="true"
+            />
             <span>{isCollapsed ? '展开' : '折叠'}</span>
           </button>
         )}
@@ -361,11 +379,23 @@ export function OutlinePanel({
         >
           <McIcon scope="pixel" name="trash" size={12} aria-hidden="true" />
           <span>删除</span>
-          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">Delete</kbd>
+          <kbd className="ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">
+            Delete
+          </kbd>
         </button>
       </div>
     );
-  }, [contextMenu, graph.nodes, handleNodeDoubleClick, handleDuplicate, handleCopyId, handleFocusCanvas, handleToggleCollapse, handleDelete, closeContextMenu]);
+  }, [
+    contextMenu,
+    graph.nodes,
+    handleNodeDoubleClick,
+    handleDuplicate,
+    handleCopyId,
+    handleFocusCanvas,
+    handleToggleCollapse,
+    handleDelete,
+    closeContextMenu,
+  ]);
 
   return (
     <div
@@ -377,7 +407,9 @@ export function OutlinePanel({
       {showToolbar && (
         <div className="flex items-center gap-1 border-b border-mc-border bg-mc-bg px-2 py-1.5">
           <div className="flex-1 flex items-center gap-1">
-            <span className="text-[10px] font-medium text-mc-mute uppercase tracking-wide">大纲</span>
+            <span className="text-[10px] font-medium text-mc-mute uppercase tracking-wide">
+              大纲
+            </span>
             {stats.total > 0 && (
               <span className="text-[10px] text-mc-dim font-mono">
                 {stats.filtered} / {stats.total}
@@ -438,26 +470,62 @@ export function OutlinePanel({
       {(stats.errors > 0 || stats.warnings > 0 || isDebugMode) && (
         <div className="flex flex-wrap gap-2 px-2 py-1.5 border-b border-mc-border bg-mc-bg">
           {stats.errors > 0 && (
-            <span className="flex items-center gap-1 text-[10px] text-red-400" title={`${stats.errors} 个错误节点`}>
-              <McIcon scope="pixel" name="alert-circle" size={10} style={{ color: '#ef4444' }} aria-hidden="true" />
+            <span
+              className="flex items-center gap-1 text-[10px] text-red-400"
+              title={`${stats.errors} 个错误节点`}
+            >
+              <McIcon
+                scope="pixel"
+                name="alert-circle"
+                size={10}
+                style={{ color: '#ef4444' }}
+                aria-hidden="true"
+              />
               错误 {stats.errors}
             </span>
           )}
           {stats.warnings > 0 && (
-            <span className="flex items-center gap-1 text-[10px] text-yellow-400" title={`${stats.warnings} 个警告节点`}>
-              <McIcon scope="pixel" name="alert-triangle" size={10} style={{ color: '#facc15' }} aria-hidden="true" />
+            <span
+              className="flex items-center gap-1 text-[10px] text-yellow-400"
+              title={`${stats.warnings} 个警告节点`}
+            >
+              <McIcon
+                scope="pixel"
+                name="alert-triangle"
+                size={10}
+                style={{ color: '#facc15' }}
+                aria-hidden="true"
+              />
               警告 {stats.warnings}
             </span>
           )}
           {isDebugMode && debugCurrentNodeId && (
-            <span className="flex items-center gap-1 text-[10px] text-cyan-400" title="调试当前节点">
-              <McIcon scope="pixel" name="play-circle" size={10} style={{ color: '#22d3ee' }} aria-hidden="true" />
+            <span
+              className="flex items-center gap-1 text-[10px] text-cyan-400"
+              title="调试当前节点"
+            >
+              <McIcon
+                scope="pixel"
+                name="play-circle"
+                size={10}
+                style={{ color: '#22d3ee' }}
+                aria-hidden="true"
+              />
               调试中
             </span>
           )}
           {debugBreakpoints.size > 0 && (
-            <span className="flex items-center gap-1 text-[10px] text-purple-400" title={`${debugBreakpoints.size} 个断点`}>
-              <McIcon scope="pixel" name="bookmark" size={10} style={{ color: '#c084fc' }} aria-hidden="true" />
+            <span
+              className="flex items-center gap-1 text-[10px] text-purple-400"
+              title={`${debugBreakpoints.size} 个断点`}
+            >
+              <McIcon
+                scope="pixel"
+                name="bookmark"
+                size={10}
+                style={{ color: '#c084fc' }}
+                aria-hidden="true"
+              />
               断点 {debugBreakpoints.size}
             </span>
           )}
@@ -474,7 +542,13 @@ export function OutlinePanel({
       >
         {visibleNodes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-mc-mute py-8">
-            <McIcon scope="pixel" name={filter.searchQuery ? 'search-x' : 'cube'} size={32} className="mb-2 opacity-30" aria-hidden="true" />
+            <McIcon
+              scope="pixel"
+              name={filter.searchQuery ? 'search-x' : 'cube'}
+              size={32}
+              className="mb-2 opacity-30"
+              aria-hidden="true"
+            />
             <p className="text-sm text-center px-4">
               {filter.searchQuery ? '没有匹配的节点' : '画布中暂无节点'}
             </p>
@@ -490,14 +564,22 @@ export function OutlinePanel({
           </div>
         ) : (
           <div className="space-y-0.5" role="group" aria-label="节点列表">
-            {visibleNodes.map((node, index) => {
+            {visibleNodes.map((node) => {
               const isSelected = selection.outlineSelectedId === node.id;
-              const hasError = compileResult?.errors.some((err: string) =>
-                new RegExp(`(?:^|[^a-z0-9_])${node.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-z0-9_])`, 'i').test(err)
-              ) ?? false;
-              const hasWarning = compileResult?.warnings.some((warn: string) =>
-                new RegExp(`(?:^|[^a-z0-9_])${node.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-z0-9_])`, 'i').test(warn)
-              ) ?? false;
+              const hasError =
+                compileResult?.errors.some((err: string) =>
+                  new RegExp(
+                    `(?:^|[^a-z0-9_])${node.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-z0-9_])`,
+                    'i',
+                  ).test(err),
+                ) ?? false;
+              const hasWarning =
+                compileResult?.warnings.some((warn: string) =>
+                  new RegExp(
+                    `(?:^|[^a-z0-9_])${node.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-z0-9_])`,
+                    'i',
+                  ).test(warn),
+                ) ?? false;
               const isDebugCurrent = isDebugMode && debugCurrentNodeId === node.id;
               const hasBreakpoint = debugBreakpoints.has(node.id);
               const isContainer = ['subgraph', 'loop', 'comment'].includes(node.type);
@@ -532,9 +614,13 @@ export function OutlinePanel({
 
       {/* 底部状态栏 */}
       <div className="border-t border-mc-border bg-mc-bg px-2 py-1.5 text-[10px] text-mc-mute flex items-center justify-between">
-        <span>{stats.filtered} / {stats.total} 个节点</span>
+        <span>
+          {stats.filtered} / {stats.total} 个节点
+        </span>
         <span className="flex items-center gap-1">
-          <kbd className="text-[9px] px-1.5 py-0.5 rounded bg-mc-surface border border-mc-border font-mono">⌘F</kbd>
+          <kbd className="text-[9px] px-1.5 py-0.5 rounded bg-mc-surface border border-mc-border font-mono">
+            ⌘F
+          </kbd>
           <span className="hidden sm:inline">搜索</span>
         </span>
       </div>

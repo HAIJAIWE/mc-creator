@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { McIcon } from '../../../assets/mc-ui/McIcon.js';
 
-interface OutlineSearchProps {
+export interface OutlineSearchProps {
   /** 当前搜索关键词 */
   value: string;
   /** 搜索变化回调 */
@@ -101,11 +101,15 @@ export function OutlineSearch({
           {showCount}
         </span>
       )}
-      {!isFocused && !value && (
-        <kbd className="hidden xs:inline-flex ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono">
-          ⌘F
-        </kbd>
-      )}
+      {/* 快捷键提示：始终渲染（保持布局稳定），聚焦或有关键字时用 hidden 隐藏 */}
+      <kbd
+        aria-hidden={isFocused || value ? true : undefined}
+        className={`ml-auto text-[9px] text-mc-dim px-1.5 py-0.5 rounded bg-mc-bg border border-mc-border font-mono ${
+          isFocused || value ? 'hidden' : 'hidden xs:inline-flex'
+        }`}
+      >
+        ⌘F
+      </kbd>
     </div>
   );
 }

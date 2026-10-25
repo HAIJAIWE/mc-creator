@@ -189,20 +189,29 @@ afterEach(() => {
 describe('P9.3 a11y 自动化扫描', () => {
   describe('ActivityBar', () => {
     it('默认状态无 a11y 违规', async () => {
-      const { container } = render(<ActivityBar active="explorer" onChange={() => {}} />);
+      const { container } = render(
+        <ActivityBar leftCollapsed={false} activePanel="items" onChange={() => {}} />,
+      );
       const violations = await runAxe(container);
       expectNoViolations(violations);
     });
 
     it('settings 激活时无 a11y 违规', async () => {
-      const { container } = render(<ActivityBar active="settings" onChange={() => {}} />);
+      const { container } = render(
+        <ActivityBar leftCollapsed={false} activePanel="settings" onChange={() => {}} />,
+      );
       const violations = await runAxe(container);
       expectNoViolations(violations);
     });
 
     it('带 onHome 回调时无 a11y 违规', async () => {
       const { container } = render(
-        <ActivityBar active="explorer" onChange={() => {}} onHome={() => {}} />,
+        <ActivityBar
+          leftCollapsed={false}
+          activePanel="items"
+          onChange={() => {}}
+          onHome={() => {}}
+        />,
       );
       const violations = await runAxe(container);
       expectNoViolations(violations);

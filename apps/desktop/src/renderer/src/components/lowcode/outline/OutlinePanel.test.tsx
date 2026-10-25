@@ -1,25 +1,13 @@
-import { vi } from 'vitest';
+import '@testing-library/jest-dom';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 import { OutlinePanel } from './OutlinePanel';
-import type { CompileResult } from '@mc-creator/shared';
+import type { CompileResult } from '../../../lib/compileNodeGraph.js';
+import { ModSpec } from '@mc-creator/shared';
 
-// Mock the store
-vi.mock('../../../store/node-graph-store.js');
-vi.mock('../../../store/debugger-store.js');
-vi.mock('../../useToast.js', () => ({
-  useToast: vi.fn(() => ({
-    info: vi.fn(),
-    success: vi.fn(),
-    warning: vi.fn(),
-    error: vi.fn(),
-  })),
-}));
-
-const mockUseNodeGraphStore = useNodeGraphStore as vi.MockedFunction<typeof useNodeGraphStore>;
-
-describe('OutlinePanel', () => {
-  const mockNodes = [
+// Create a mock graph that can be used by both the hook and getState
+const mockGraph = {
+  nodes: [
     {
       id: 'item_1',
       type: 'item',
@@ -44,39 +32,88 @@ describe('OutlinePanel', () => {
       selected: false,
       ports: [],
     },
-  ];
+  ],
+  edges: [],
+  viewport: { x: 0, y: 0, zoom: 1 },
+  modId: 'test_mod',
+  subgraphs: {},
+  version: 1,
+};
 
-  const mockGraph = {
-    nodes: mockNodes,
-    edges: [],
-    viewport: { x: 0, y: 0, zoom: 1 },
-    modId: 'test_mod',
-    subgraphs: {},
-    version: 1,
-  };
+// Mock store state
+const mockStoreState = {
+  graph: mockGraph,
+  selectedNodeId: null,
+  selectNode: vi.fn(),
+  removeNode: vi.fn(),
+  duplicateNode: vi.fn().mockReturnValue('new_id'),
+  toggleCollapse: vi.fn(),
+  updateNode: vi.fn(),
+};
 
-  const mockCompileResult: CompileResult = {
-    spec: null,
-    errors: ['物品节点 item_1 编译失败：缺少材质'],
-    warnings: ['方块节点 block_2 没有设置硬度'],
-  };
+// Mock the stores - need to mock both the hook and the static getState
+vi.mock('../../../store/node-graph-store.js', () => ({
+  useNodeGraphStore: Object.assign(
+    vi.fn((selector) => selector(mockStoreState)),
+    { getState: vi.fn(() => mockStoreState) },
+  ),
+}));
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUseNodeGraphStore.mockImplementation((selector) => {
-      const state = {
-        graph: mockGraph,
-        selectedNodeId: null,
-        selectNode: vi.fn(),
-        removeNode: vi.fn(),
-        duplicateNode: vi.fn().mockReturnValue('new_id'),
-        toggleCollapse: vi.fn(),
-        updateNode: vi.fn(),
-      };
-      return selector(state);
-    });
-  });
+vi.mock('../../../store/debugger-store.js', () => ({
+  useDebuggerStore: vi.fn((selector) =>
+    selector({
+      state: null,
+      breakpoints: new Map(),
+    }),
+  ),
+}));
 
+vi.mock('../../../store/outline-selection-store.js', () => ({
+  useOutlineSelection: vi.fn(() => ({
+    outlineSelectedId: null,
+    focusedIndex: 0,
+    handleSelect: vi.fn(),
+    navigate: vi.fn(),
+    collapseAll: vi.fn(),
+    expandAllContainers: vi.fn(),
+    isExpanded: vi.fn(() => true),
+  })),
+}));
+
+vi.mock('../../../store/outline-filter-store.js', () => ({
+  useOutlineFilter: vi.fn(() => ({
+    filteredNodes: mockGraph.nodes,
+    stats: { total: 3, filtered: 3, errors: 1, warnings: 1 },
+    searchQuery: '',
+    setSearchQuery: vi.fn(),
+    clearFilters: vi.fn(),
+  })),
+}));
+
+vi.mock('../../useToast.js', () => ({
+  useToast: vi.fn(() => ({
+    info: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+  })),
+}));
+
+// ModSpec 有二十多个带默认值的数组字段，这里直接过一遍 zod schema 拿到合法最小实例，
+// 避免在测试里手写一遍结构（也顺带校验 schema 本身可用）。
+const emptySpec = ModSpec.parse({ modId: 'test_mod', name: 'Test Mod' });
+
+const mockCompileResult: CompileResult = {
+  spec: emptySpec,
+  errors: ['物品节点 item_1 编译失败：缺少材质'],
+  warnings: ['方块节点 block_2 没有设置硬度'],
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('OutlinePanel', () => {
   it('renders node list with correct labels', () => {
     render(
       <OutlinePanel

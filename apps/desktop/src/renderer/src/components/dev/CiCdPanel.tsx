@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { McIcon } from '../assets/mc-ui/McIcon';
+import { McIcon } from '../../assets/mc-ui/McIcon';
 import { Copy, CheckCircle2, Save, Loader2, AlertTriangle } from 'lucide-react';
-import { useModStore } from '../store/mod-store.js';
-import { ipcClient } from '../lib/ipc-client.js';
-import { suggestJavaVersion } from './CiCdPanel.utils.js';
+import { useModStore } from '../../store/mod-store.js';
+import { ipcClient } from '../../lib/ipc-client.js';
+import { generatorLoaderOptions } from '../../../../shared/generator-descriptors.js';
+import { suggestJavaVersion } from '../CiCdPanel.utils.js';
 
 type CiPlatform = 'github' | 'gitlab' | 'jenkins';
 
@@ -245,9 +246,15 @@ export function CiCdPanel() {
               onChange={(e) => setLoader(e.target.value)}
               className="w-full rounded-mc border border-mc-border bg-mc-surface-2 px-1 py-0.5 text-[11px] text-mc-text outline-none"
             >
-              {['fabric', 'forge', 'neoforge', 'quilt'].map((v) => (
-                <option key={v} value={v}>
-                  {v}
+              {/*
+                ⚠️ 这里选的是**项目加载器**（上面的 useState 由 mod-store 的
+                loader 播种），跟 SettingsPanel 读的是同一个 store 字段 ——
+                两边必须用同一份选项列表。此前这里手写 4 个，连 `vanilla` /
+                `legacy_fabric` 都没有，原版 / Legacy Fabric 项目会显示空白。
+              */}
+              {generatorLoaderOptions(loader).map((o) => (
+                <option key={o.value} value={o.value} disabled={o.disabled}>
+                  {o.label}
                 </option>
               ))}
             </select>

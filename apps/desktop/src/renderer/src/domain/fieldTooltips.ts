@@ -122,7 +122,11 @@ export const FIELD_TOOLTIPS: Record<string, string> = {
 };
 
 /** 获取字段 tooltip，优先级：schema.description > ${kind}.${fieldKey} > common.${fieldKey} */
-export function getTooltip(kind: string, fieldKey: string, schemaDescription?: string): string | undefined {
+export function getTooltip(
+  kind: string,
+  fieldKey: string,
+  schemaDescription?: string,
+): string | undefined {
   if (schemaDescription) return schemaDescription;
   return FIELD_TOOLTIPS[`${kind}.${fieldKey}`] ?? FIELD_TOOLTIPS[`common.${fieldKey}`];
 }

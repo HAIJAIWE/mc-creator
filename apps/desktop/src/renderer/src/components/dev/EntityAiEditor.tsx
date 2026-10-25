@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { McIcon } from '../assets/mc-ui/McIcon';
+import { McIcon } from '../../assets/mc-ui/McIcon';
 import { Plus, Trash2, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 
 /** AI 目标类型 */

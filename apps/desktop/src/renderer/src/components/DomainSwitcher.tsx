@@ -26,12 +26,12 @@ import {
   type DomainDefinition,
   type DomainId,
 } from '../shell/domains.js';
-import { useDomainStore, selectDomain, selectSetDomain } from '../store/domain-store.js';
+import { useWorkbenchStore, selectDomain, selectSetDomain } from '../shell/workbench-store.js';
 
 interface DomainSwitcherProps {
-  /** 受控覆盖（不传则读 domain-store）—— 便于单测与将来做外壳级联动的场景 */
+  /** 受控覆盖（不传则读 workbench-store）—— 便于单测与将来做外壳级联动的场景 */
   value?: DomainId;
-  /** 切域回调（不传则直接写 domain-store） */
+  /** 切域回调（不传则直接写 workbench-store） */
   onChange?: (domain: DomainId) => void;
 }
 
@@ -49,8 +49,8 @@ function domainSummary(def: DomainDefinition, t: (key: string) => string): strin
 
 export function DomainSwitcher({ value, onChange }: DomainSwitcherProps = {}) {
   const { t } = useTranslation();
-  const storeDomain = useDomainStore(selectDomain);
-  const setStoreDomain = useDomainStore(selectSetDomain);
+  const storeDomain = useWorkbenchStore(selectDomain);
+  const setStoreDomain = useWorkbenchStore(selectSetDomain);
   const active = value ?? storeDomain;
   const listRef = useRef<HTMLDivElement | null>(null);
 

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { McInventory, type McInventoryItem } from './McInventory';
-import { McIcon } from '../assets/mc-ui/McIcon';
-import { listAssets, type McAssetScope } from '../assets/mc-ui/mc-ui';
-import { useModStore } from '../store/mod-store.js';
+import { McInventory, type McInventoryItem } from '../McInventory';
+import { McIcon } from '../../assets/mc-ui/McIcon';
+import { listAssets, type McAssetScope } from '../../assets/mc-ui/mc-ui';
+import { useModStore } from '../../store/mod-store.js';
 import type { ItemSpec } from '@mc-creator/shared';
 import {
   TOOL_TYPES,
@@ -30,7 +30,7 @@ import {
   Toggle,
   AssetBinder,
   RecipeRefNote,
-} from './SpecEditorFields';
+} from '../SpecEditorFields';
 
 type Tab = 'inventory' | 'recipe' | 'items';
 type GridId = 'main' | 'hotbar' | 'recipe' | 'result';

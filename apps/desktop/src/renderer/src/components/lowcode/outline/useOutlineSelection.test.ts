@@ -1,43 +1,115 @@
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useOutlineSelection } from './useOutlineSelection';
 import type { ModNode } from '@mc-creator/shared';
+import {
+  ActionNodeData,
+  ConditionNodeData,
+  EventNodeData,
+  SubgraphNodeData,
+} from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 
 vi.mock('../../../store/node-graph-store.js');
 
-const mockUseNodeGraphStore = useNodeGraphStore as vi.MockedFunction<typeof useNodeGraphStore>;
+const mockUseNodeGraphStore = useNodeGraphStore as unknown as ReturnType<typeof vi.fn>;
 
-const mockNodes: ModNode[] = [
-  {
-    id: 'event_1',
-    type: 'event',
-    position: { x: 100, y: 100 },
-    data: { kind: 'event', nodeId: 'event_1', label: '开始', eventType: 'tick', eventArgs: '{}', disabled: false, collapsed: false, codeLocked: false, formatVersion: 1, note: '' },
-    selected: false,
-    ports: [],
-  },
-  {
-    id: 'action_2',
-    type: 'action',
-    position: { x: 200, y: 200 },
-    data: { kind: 'action', nodeId: 'action_2', label: '生成实体', actionType: 'spawn_entity', actionArgs: '{}', disabled: false, collapsed: false, codeLocked: false, formatVersion: 1, note: '' },
-    selected: false,
-    ports: [],
-  },
-  {
-    id: 'condition_3',
-    type: 'condition',
-    position: { x: 300, y: 300 },
-    data: { kind: 'condition', nodeId: 'condition_3', label: '判断', conditionType: 'has_item', conditionArgs: '{}', invert: false, disabled: false, collapsed: false, codeLocked: false, formatVersion: 1, note: '' },
-    selected: false,
-    ports: [],
-  },
-];
+/**
+ * 给自动 mock 的 store 补上静态 getState。
+ * Hook 内部的 getAncestorIds 走 useNodeGraphStore.getState().graph 读边，
+ * 自动 mock 会把它变成返回 undefined 的 spy，必须显式提供。
+ */
+function setStoreState(state: Record<string, unknown>) {
+  mockUseNodeGraphStore.mockImplementation((selector: (s: unknown) => unknown) => selector(state));
+  (mockUseNodeGraphStore as unknown as { getState: () => unknown }).getState = () => state;
+}
+
+// 节点 data 走 zod schema 生成：BaseNodeData 上有二十多个带默认值的字段，
+// 手写既冗长又容易与 schema 漂移；parse 一次即可得到合法最小实例。
+const eventNode: ModNode = {
+  id: 'event_1',
+  type: 'event',
+  position: { x: 100, y: 100 },
+  data: EventNodeData.parse({
+    kind: 'event',
+    nodeId: 'event_1',
+    label: '开始',
+    eventType: 'tick',
+    eventArgs: '{}',
+  }),
+  selected: false,
+  ports: [],
+};
+
+const actionNode: ModNode = {
+  id: 'action_2',
+  type: 'action',
+  position: { x: 200, y: 200 },
+  data: ActionNodeData.parse({
+    kind: 'action',
+    nodeId: 'action_2',
+    label: '生成实体',
+    actionType: 'spawn_entity',
+    actionArgs: '{}',
+  }),
+  selected: false,
+  ports: [],
+};
+
+const conditionNode: ModNode = {
+  id: 'condition_3',
+  type: 'condition',
+  position: { x: 300, y: 300 },
+  data: ConditionNodeData.parse({
+    kind: 'condition',
+    nodeId: 'condition_3',
+    label: '判断',
+    conditionType: 'has_item',
+    conditionArgs: '{}',
+    invert: false,
+  }),
+  selected: false,
+  ports: [],
+};
+
+const subgraphNode: ModNode = {
+  id: 'subgraph_4',
+  type: 'subgraph',
+  position: { x: 400, y: 400 },
+  data: SubgraphNodeData.parse({
+    kind: 'subgraph',
+    nodeId: 'subgraph_4',
+    label: '子图',
+    subgraphId: 'sg_1',
+    subgraphName: '子图',
+    customTypeId: null,
+    customFields: {},
+  }),
+  selected: false,
+  ports: [],
+};
+
+const mockNodes: ModNode[] = [eventNode, actionNode, conditionNode];
 
 const mockEdges = [
-  { id: 'edge_1', source: 'event_1', target: 'action_2', sourceHandle: 'out', targetHandle: 'in', kind: 'control' as const, disabled: false },
-  { id: 'edge_2', source: 'action_2', target: 'condition_3', sourceHandle: 'out', targetHandle: 'in', kind: 'control' as const, disabled: false },
+  {
+    id: 'edge_1',
+    source: 'event_1',
+    target: 'action_2',
+    sourceHandle: 'out',
+    targetHandle: 'in',
+    kind: 'control' as const,
+    disabled: false,
+  },
+  {
+    id: 'edge_2',
+    source: 'action_2',
+    target: 'condition_3',
+    sourceHandle: 'out',
+    targetHandle: 'in',
+    kind: 'control' as const,
+    disabled: false,
+  },
 ];
 
 const mockGraph = {
@@ -52,13 +124,10 @@ const mockGraph = {
 describe('useOutlineSelection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseNodeGraphStore.mockImplementation((selector) => {
-      const state = {
-        graph: mockGraph,
-        selectedNodeId: null,
-        selectNode: vi.fn(),
-      };
-      return selector(state);
+    setStoreState({
+      graph: mockGraph,
+      selectedNodeId: null,
+      selectNode: vi.fn(),
     });
   });
 
@@ -71,13 +140,10 @@ describe('useOutlineSelection', () => {
   });
 
   it('syncs selection from store', () => {
-    mockUseNodeGraphStore.mockImplementation((selector) => {
-      const state = {
-        graph: mockGraph,
-        selectedNodeId: 'action_2',
-        selectNode: vi.fn(),
-      };
-      return selector(state);
+    setStoreState({
+      graph: mockGraph,
+      selectedNodeId: 'action_2',
+      selectNode: vi.fn(),
     });
 
     const { result } = renderHook(() => useOutlineSelection());
@@ -87,13 +153,10 @@ describe('useOutlineSelection', () => {
   });
 
   it('expands ancestor paths when node selected', () => {
-    mockUseNodeGraphStore.mockImplementation((selector) => {
-      const state = {
-        graph: mockGraph,
-        selectedNodeId: 'condition_3',
-        selectNode: vi.fn(),
-      };
-      return selector(state);
+    setStoreState({
+      graph: mockGraph,
+      selectedNodeId: 'condition_3',
+      selectNode: vi.fn(),
     });
 
     const { result } = renderHook(() => useOutlineSelection());
@@ -105,13 +168,10 @@ describe('useOutlineSelection', () => {
 
   it('handleSelect calls selectNode and updates local state', () => {
     const selectNode = vi.fn();
-    mockUseNodeGraphStore.mockImplementation((selector) => {
-      const state = {
-        graph: mockGraph,
-        selectedNodeId: null,
-        selectNode,
-      };
-      return selector(state);
+    setStoreState({
+      graph: mockGraph,
+      selectedNodeId: null,
+      selectNode,
     });
 
     const { result } = renderHook(() => useOutlineSelection());
@@ -175,25 +235,12 @@ describe('useOutlineSelection', () => {
   });
 
   it('expandAllContainers expands container nodes', () => {
-    const containerNodes = [
-      ...mockNodes,
-      {
-        id: 'subgraph_4',
-        type: 'subgraph',
-        position: { x: 400, y: 400 },
-        data: { kind: 'subgraph', nodeId: 'subgraph_4', label: '子图', subgraphId: 'sg_1', subgraphName: '子图', customTypeId: null, customFields: {}, disabled: false, collapsed: false, codeLocked: false, formatVersion: 1, note: '' },
-        selected: false,
-        ports: [],
-      },
-    ];
+    const containerNodes = [...mockNodes, subgraphNode];
 
-    mockUseNodeGraphStore.mockImplementation((selector) => {
-      const state = {
-        graph: { ...mockGraph, nodes: containerNodes },
-        selectedNodeId: null,
-        selectNode: vi.fn(),
-      };
-      return selector(state);
+    setStoreState({
+      graph: { ...mockGraph, nodes: containerNodes },
+      selectedNodeId: null,
+      selectNode: vi.fn(),
     });
 
     const { result } = renderHook(() => useOutlineSelection());
@@ -206,13 +253,10 @@ describe('useOutlineSelection', () => {
 
   it('navigate up/down changes focusedIndex and selects node', () => {
     const selectNode = vi.fn();
-    mockUseNodeGraphStore.mockImplementation((selector) => {
-      const state = {
-        graph: mockGraph,
-        selectedNodeId: null,
-        selectNode,
-      };
-      return selector(state);
+    setStoreState({
+      graph: mockGraph,
+      selectedNodeId: null,
+      selectNode,
     });
 
     const { result } = renderHook(() => useOutlineSelection());
@@ -242,33 +286,22 @@ describe('useOutlineSelection', () => {
   });
 
   it('navigate left/right toggles expanded for container nodes', () => {
-    const containerNodes = [
-      ...mockNodes,
-      {
-        id: 'subgraph_4',
-        type: 'subgraph',
-        position: { x: 400, y: 400 },
-        data: { kind: 'subgraph', nodeId: 'subgraph_4', label: '子图', subgraphId: 'sg_1', subgraphName: '子图', customTypeId: null, customFields: {}, disabled: false, collapsed: false, codeLocked: false, formatVersion: 1, note: '' },
-        selected: false,
-        ports: [],
-      },
-    ];
+    const containerNodes = [...mockNodes, subgraphNode];
 
-    mockUseNodeGraphStore.mockImplementation((selector) => {
-      const state = {
-        graph: { ...mockGraph, nodes: containerNodes },
-        selectedNodeId: null,
-        selectNode: vi.fn(),
-      };
-      return selector(state);
+    setStoreState({
+      graph: { ...mockGraph, nodes: containerNodes },
+      selectedNodeId: null,
+      selectNode: vi.fn(),
     });
 
     const { result } = renderHook(() => useOutlineSelection());
 
     const visibleNodes = containerNodes;
 
-    // Focus on subgraph node (index 3)
+    // 聚焦到子图节点（index 3）。
+    // 注意：首次 down 落在 index 0（不跳过第一项），4 个节点需按 4 次才能到 index 3。
     act(() => {
+      result.current.navigate('down', visibleNodes);
       result.current.navigate('down', visibleNodes);
       result.current.navigate('down', visibleNodes);
       result.current.navigate('down', visibleNodes);
@@ -290,13 +323,10 @@ describe('useOutlineSelection', () => {
 
   it('navigate enter selects current focused node', () => {
     const selectNode = vi.fn();
-    mockUseNodeGraphStore.mockImplementation((selector) => {
-      const state = {
-        graph: mockGraph,
-        selectedNodeId: null,
-        selectNode,
-      };
-      return selector(state);
+    setStoreState({
+      graph: mockGraph,
+      selectedNodeId: null,
+      selectNode,
     });
 
     const { result } = renderHook(() => useOutlineSelection());

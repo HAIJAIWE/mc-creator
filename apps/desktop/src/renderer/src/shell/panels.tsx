@@ -1,5 +1,8 @@
 import { type ComponentType } from 'react';
 import { McIcon } from '../assets/mc-ui/McIcon';
+// 类型单向导入（编译期擦除，无运行时循环依赖）：domains.ts 在运行时会 import
+// 本文件的 getAllPanels() 来派生域面板列表，所以这里只能用 import type 回指 DomainId。
+import type { DomainId } from './domains.js';
 
 /**
  * 面板分组：core 基础设施 / domain 领域编辑器 / middle 中部功能
@@ -39,6 +42,59 @@ export interface PanelRegistration {
   shortcut?: string;
   /** 分组：core 基础设施 / domain 领域编辑器 / middle 中部功能 */
   kind: PanelKind;
+  /**
+   * §0.2 域归属（launcher / server / dev）。
+   *
+   * 跨域常驻的基础设施面板（explorer/search/git/settings）填 `null`；
+   * 业务面板必须显式填一个域 —— `domains.ts` 据此派生各域的 tab 列表，
+   * 新增面板漏填会被 `domains.test.ts` 的完整性断言当场拦下。
+   *
+   * 刻意与 `kind` 正交：`packages` 是 core（活动栏基础设施）但归 launcher，
+   * `preview` 是 middle 但归 dev。详见 domains.ts 文件头「面板为什么这么归」。
+   */
+  domain?: DomainId | null;
+  /**
+   * **域内**顺序（数值越小越靠前），决定该面板在本域 tab 条里的位置。
+   *
+   * 为什么不能直接用 `order`：`order` 是跨组的全局排序键，而 `getAllPanels()` 按
+   * `(kind, order)` 排。server 域里 kernel 是 middle/order=140，resources 是
+   * middle/order=120 —— 用 `order` 排出来 kernel 落在**最后**，可它正是该域的
+   * 默认面板。用户切进 server 域看到的第一眼不该是资源包而不是链路自检屏。
+   *
+   * 省略时回落到 `order`，再省略则 999（保持向后兼容，但域内 tab 顺序需显式声明）。
+   */
+  domainOrder?: number;
+  /**
+   * 该面板是否需要左侧文件树可见。
+   *
+   * ## 判据（不是「这个面板要不要用到 files」）
+   *
+   * 严格按「**点文件树里的一个文件，对这个面板有没有意义**」来判：
+   *
+   * - 消费 `selectedFile`（点开即编辑/预览该文件）→ `true`
+   * - 只 `files.find(...)` 读某个特定文件、或把全部 files 打包 → 不算，
+   *   用户不需要「浏览目录层级」，树在那儿只是个 200px 的展示位
+   *
+   * 核查结论（全仓 `selectFile(` 的生产调用点只有 3 处）：
+   *
+   * | 面板 | 判据 | needsFileTree |
+   * | --- | --- | --- |
+   * | `preview`（代码编辑） | `PurecodeWorkspace` 消费 `selectedFile` | ✅ |
+   * | `nbt` | `NbtPanelWithStore` 消费 `selectedFile` | ✅ |
+   * | `resources` | `selectedFile`×6 | ✅ |
+   * | `skin` | 读 files 生成资源包，产物要能看到 | ✅ |
+   * | `build` | 读 files 打包，产物要能看到 | ✅ |
+   * | `game`（游戏启动器） | 只找一个 `.jar` 路径 | ❌ |
+   * | `packages`（包管理） | 只用 loader/版本/spec 做版本匹配 | ❌ |
+   * | `kernel`（内核自检） | 完全不碰项目文件 | ❌ |
+   *
+   * ## 为什么默认 false
+   *
+   * 宁可漏显示（用户可手动展开）也不默认占位 —— 若默认 `true`，
+   * 游戏启动器、包管理、内核自检都会白白占掉 200px，
+   * 而这正是用户反馈的「启动器那边为什么还要这个」。
+   */
+  needsFileTree?: boolean;
   /** 显示顺序（数值越小越靠前） */
   order?: number;
   /** 是否启用（可按权限/环境动态控制） */
@@ -88,19 +144,11 @@ export function getDomainPanels(): PanelRegistration[] {
   return getPanelsByGroup('domain');
 }
 
-/** 预定义的 core 面板 ID（基础设施） */
-export const CORE_PANEL_IDS = ['explorer', 'search', 'git', 'packages', 'settings'] as const;
-
-/** 预定义的 domain 面板 ID（领域编辑器） */
-export const DOMAIN_PANEL_IDS = ['items', 'blocks', 'entity', 'audio', 'cicd', 'game'] as const;
-
-/** 预定义的 middle 面板 ID（中部功能） */
-export const MIDDLE_PANEL_IDS = ['preview', 'lowcode', 'purecode', 'code'] as const;
-
-/** 类型别名 */
-export type CorePanelId = (typeof CORE_PANEL_IDS)[number];
-export type DomainPanelId = (typeof DOMAIN_PANEL_IDS)[number];
-export type MiddlePanelId = (typeof MIDDLE_PANEL_IDS)[number];
+/** 类型别名 —— 直接用字面量联合，不再依赖数组（避免维护两份名单） */
+export type CorePanelId = 'explorer' | 'search' | 'git' | 'packages' | 'settings';
+export type DomainPanelId =
+  'items' | 'blocks' | 'entity' | 'skin' | 'audio' | 'build' | 'cicd' | 'game';
+export type MiddlePanelId = 'preview' | 'resources' | 'nbt' | 'kernel';
 export type AnyPanelId = CorePanelId | DomainPanelId | MiddlePanelId;
 
 /** 创建标准的惰性加载器（统一 Suspense fallback 行为） */

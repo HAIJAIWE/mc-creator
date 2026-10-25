@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X, Copy, ChevronDown, ChevronRight } from 'lucide-react';
-import { listAssets, type McAssetScope } from '../assets/mc-ui/mc-ui';
-import { McIcon } from '../assets/mc-ui/McIcon';
-import { useModStore } from '../store/mod-store.js';
+import { listAssets, type McAssetScope } from '../../assets/mc-ui/mc-ui';
+import { McIcon } from '../../assets/mc-ui/McIcon';
+import { useModStore } from '../../store/mod-store.js';
 import type { BlockSpec } from '@mc-creator/shared';
 import {
   TOOL_TYPES,
@@ -31,7 +31,7 @@ import {
   Toggle,
   AssetBinder,
   RecipeRefNote,
-} from './SpecEditorFields';
+} from '../SpecEditorFields';
 
 /** 方块行为类型（BlockSpec.blockType 全集） */
 const BLOCK_TYPES = [

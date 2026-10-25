@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { shallow } from 'zustand/shallow';
 import { Wrench, X, Loader2 } from 'lucide-react';
-import { useModStore } from '../store/mod-store.js';
-import { ipcClient } from '../lib/ipc-client.js';
-import { ErrorBanner } from './ErrorBanner.js';
-import { extractJarPath, renderLog } from '../lib/build-utils.js';
-import type { BuildStreamChunkT, LocateMcRes } from '../../../shared/ipc-channels.js';
+import { useModStore } from '../../store/mod-store.js';
+import { ipcClient } from '../../lib/ipc-client.js';
+import { ErrorBanner } from '../ErrorBanner.js';
+import { extractJarPath, renderLog } from '../../lib/build-utils.js';
+import type { BuildStreamChunkT, LocateMcRes } from '../../../../shared/ipc-channels.js';
 
 /** 启动器种类 → 中文标签 */
 const LAUNCHER_LABEL: Record<string, string> = {

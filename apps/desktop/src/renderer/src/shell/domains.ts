@@ -36,14 +36,39 @@
  * 是实例目录，所以归 launcher；`preview` 在 PanelKind 里是 middle，但它预览的是内容产物，所以归 dev。
  * **归属与 PanelKind 正交** —— 这也是本文件独立存在、而不是把域塞进 PanelKind 的原因（详见 panels.tsx 头注释）。
  *
- * 本文件是纯数据 + 纯函数，不 import 面板注册表，所以单测不需要先跑 registerAllPanels()。
+ * ## 为什么改成派生
+ *
+ * 本文件原先同时手写两份列表：`DomainDefinition.panelIds` 与 `COMMON_PANEL_IDS`。
+ * 这意味着**新增一个面板要改两个地方**，而漏改不会立刻报错——它只会让面板静默失联。
+ * 阶段 0A 恢复 `build` 构建入口时就被这个坑绊了一次：
+ * 注册表加了 `build`，忘了同步 `panelIds`，`domains.test.ts` 的「不重不漏」断言当场变红。
+ *
+ * 现在归属的真源是**注册表里的 `PanelRegistration.domain` 字段**，
+ * 本文件退化为它的一层视图：`panelsOfDomain` / `commonPanelIds` / `knownPanelIds`
+ * 全部现算。`COMMON_PANEL_IDS` 这个概念也消失了——
+ * 「跨域常驻」等价于「`domain` 为 null」，不必再维护第二份名单。
+ *
+ * 留在数据里不派生的只有 `defaultPanelId`：它是产品决策
+ * （「用户说『我要跑起来』时最该看到什么」），推不出来。
+ *
+ * 代价：消费方需先跑过 `initPanelRegistries()`（`App.tsx:198` 在模块级调用，
+ * 早于任何渲染，所以运行时无顺序问题；单测需自行调用）。
  */
+import { getAllPanels, getPanel } from './panels.js';
 
 /** 域 ID（三域并列）。刻意与 PanelKind 分开 —— 见文件头「面板为什么这么归」最后一段。 */
 export type DomainId = 'launcher' | 'server' | 'dev';
 
 /** 域顺序 = 顶部切换器从左到右的顺序 */
 export const DOMAIN_IDS: readonly DomainId[] = ['launcher', 'server', 'dev'];
+
+/**
+ * 默认域：MC 开发。
+ *
+ * 选它而不是 launcher，是因为工作台首屏仍由 project-store 的 dashboard/editor 决定，
+ * 而用户手上的心智默认是「我要做内容」。
+ */
+export const DEFAULT_DOMAIN_ID: DomainId = 'dev';
 
 /** 域定义 */
 export interface DomainDefinition {
@@ -57,18 +82,20 @@ export interface DomainDefinition {
   readonly labelKey: string;
   /** 职责的 i18n key */
   readonly summaryKey: string;
-  /** 切到本域且当前面板不适用时，落到的默认面板（**保证属于本域**，见 defaultPanelOfDomain） */
+  /**
+   * 切到本域且当前面板不适用时，落到的默认面板。
+   *
+   * 这是**不可派生的产品决策**（「用户说『我要跑起来』时最该看到什么」），
+   * 所以留在数据里；而「本域有哪些面板」是可派生的，见 `panelsOfDomain`。
+   */
   readonly defaultPanelId: string;
-  /** 本域独占面板（不含 common） */
-  readonly panelIds: readonly string[];
 }
 
 /**
  * 三域定义表。
  *
- * 覆盖 register-all-panels.ts 的全部 16 个已注册面板 id：
- * launcher 3 + server 3 + dev 6 = 12 个域内面板，common 4 个（explorer/search/git/settings），
- * 合计 16 —— 不重不漏由 domains.test.ts 断言。
+ * 只含**不可派生**的部分（文案、默认面板）。域面板列表由 `panelsOfDomain()`
+ * 从注册表的 `PanelRegistration.domain` 派生，见文件头「为什么改成派生」。
  */
 export const DOMAINS: readonly DomainDefinition[] = [
   {
@@ -79,7 +106,6 @@ export const DOMAINS: readonly DomainDefinition[] = [
     summaryKey: 'domains.summary.launcher',
     // game = 这个域的「门面」：用户说「我要跑起来」时最该看到的就是启动器面板
     defaultPanelId: 'game',
-    panelIds: ['game', 'packages', 'skin'],
   },
   {
     id: 'server',
@@ -89,7 +115,6 @@ export const DOMAINS: readonly DomainDefinition[] = [
     summaryKey: 'domains.summary.server',
     // kernel = 服务端链路的自检屏，切进 server 域先看「链路通没通」
     defaultPanelId: 'kernel',
-    panelIds: ['kernel', 'resources', 'nbt'],
   },
   {
     id: 'dev',
@@ -99,24 +124,41 @@ export const DOMAINS: readonly DomainDefinition[] = [
     summaryKey: 'domains.summary.dev',
     // items = 内容编辑器里最基础的一个，作为 MC 开发域门面
     defaultPanelId: 'items',
-    panelIds: ['items', 'blocks', 'entity', 'audio', 'cicd', 'preview'],
   },
 ];
 
 /**
- * 跨域常驻面板：换域不隐藏、不参与「切域后落到默认面板」判定。
- * 依据：explorer/search/git 是文件与版本基础设施，settings 是全局配置 —— 三域都要用。
+ * 该域独占面板 id（不含 common，按域内顺序 `domainOrder` 升序）。
+ *
+ * **派生自注册表**：所有 `PanelRegistration.domain === domainId` 的面板。
+ * 排序刻意用 `domainOrder` 而非 `order` —— 见 panels.tsx「域内顺序」注释：
+ * 按 `order` 排会让 server 域的默认面板 kernel 落到最后。
  */
-const COMMON_PANEL_IDS: readonly string[] = ['explorer', 'search', 'git', 'settings'];
+export function panelsOfDomain(domainId: DomainId): readonly string[] {
+  return getAllPanels()
+    .filter((p) => p.domain === domainId)
+    .sort((a, b) => (a.domainOrder ?? a.order ?? 999) - (b.domainOrder ?? b.order ?? 999))
+    .map((p) => p.id);
+}
 
 /**
- * 全量已注册面板 id 白名单（本任务点名的 16 个）。
- * 只用于「归属表不许偷偷长出/漏掉面板」的完整性断言，以及给未知 id 一个可解释的兜底。
+ * 跨域常驻面板：换域不隐藏、不参与「切域后落到默认面板」判定。
+ *
+ * **派生自注册表**：`domain` 为 null 的面板（explorer/search/git/settings）。
+ * 这样 common 集合与「哪些面板跨域」永远是同一份事实，不存在两处手写列表漂移。
  */
-const KNOWN_PANEL_IDS: readonly string[] = [
-  ...DOMAINS.flatMap((d) => d.panelIds),
-  ...COMMON_PANEL_IDS,
-];
+export function commonPanelIds(): readonly string[] {
+  return getAllPanels()
+    .filter((p) => (p.domain ?? null) === null)
+    .map((p) => p.id);
+}
+
+/**
+ * 全量已注册面板 id（派生自注册表），供完整性断言 / 命令面板等复用。
+ */
+export function knownPanelIds(): readonly string[] {
+  return getAllPanels().map((p) => p.id);
+}
 
 /** 域定义表按 id 索引 */
 const DOMAIN_BY_ID: ReadonlyMap<DomainId, DomainDefinition> = new Map(
@@ -135,19 +177,15 @@ export function getDomain(domainId: DomainId): DomainDefinition {
   return def;
 }
 
-/** 该域独占面板 id（不含 common，返回拷贝防外部改写） */
-export function panelsOfDomain(domainId: DomainId): readonly string[] {
-  return [...getDomain(domainId).panelIds];
-}
-
-/** 跨域常驻面板 id（返回拷贝防外部改写） */
-export function commonPanelIds(): readonly string[] {
-  return [...COMMON_PANEL_IDS];
-}
-
-/** 面板是否是跨域常驻面板 */
+/**
+ * 面板是否是跨域常驻面板（派生：注册表里 `domain` 为 null 且面板存在）。
+ *
+ * 未注册的面板返回 false —— 它们不是 common，只是还没注册，
+ * 两者在导航语义上不能混为一谈。
+ */
 export function isCommonPanel(panelId: string): boolean {
-  return COMMON_PANEL_IDS.includes(panelId);
+  const p = getPanel(panelId);
+  return p !== undefined && (p.domain ?? null) === null;
 }
 
 /**
@@ -155,8 +193,7 @@ export function isCommonPanel(panelId: string): boolean {
  * 「null = 不属于任何域」是刻意的：切域判定要把 common 与「属于别的域」区分开。
  */
 export function domainOfPanel(panelId: string): DomainId | null {
-  if (isCommonPanel(panelId)) return null;
-  return DOMAINS.find((d) => d.panelIds.includes(panelId))?.id ?? null;
+  return getPanel(panelId)?.domain ?? null;
 }
 
 /** 该域的默认面板 id —— **保证属于该域**（domains.test.ts 对三域各断言一次） */
@@ -167,15 +204,6 @@ export function defaultPanelOfDomain(domainId: DomainId): string {
 /** 面板是否适用于该域（common 视为适用；域内面板适用；其它域的/未知面板不适用） */
 export function panelBelongsToDomain(panelId: string, domainId: DomainId): boolean {
   return isCommonPanel(panelId) || domainOfPanel(panelId) === domainId;
-}
-
-/**
- * 面板 → PanelKind 的旧分组，仅用于「换域后不选错面板」的兜底提示与调试。
- * 刻意不参与归属判定：归属真源是上面的 DomainDefinition（见文件头）。
- */
-/** 全量已注册面板 id（拷贝），供完整性断言/命令面板等复用 */
-export function knownPanelIds(): readonly string[] {
-  return [...KNOWN_PANEL_IDS];
 }
 
 /**

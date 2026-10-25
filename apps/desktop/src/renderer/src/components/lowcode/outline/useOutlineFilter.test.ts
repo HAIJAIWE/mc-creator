@@ -1,12 +1,15 @@
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useOutlineFilter, getNodeDisplayTitle, getNodeSearchText } from './useOutlineFilter';
-import type { ModNode, CompileResult } from '@mc-creator/shared';
+import type { ModNode } from '@mc-creator/shared';
+import { ModSpec, ProcedureNodeData, SubgraphNodeData } from '@mc-creator/shared';
+import type { CompileResult } from '../../../lib/compileNodeGraph.js';
 import { useNodeGraphStore } from '../../../store/node-graph-store.js';
 
 vi.mock('../../../store/node-graph-store.js');
 
-const mockUseNodeGraphStore = useNodeGraphStore as vi.MockedFunction<typeof useNodeGraphStore>;
+// 仅需让 store 模块可被 import（hook 本身不依赖它），无需断言具体 mock 行为。
+void useNodeGraphStore;
 
 const mockNodes: ModNode[] = [
   {
@@ -19,7 +22,7 @@ const mockNodes: ModNode[] = [
       label: '铁剑',
       itemId: 'iron_sword',
       displayName: '铁剑',
-      category: 'equipment',
+      category: 'sword',
       maxStackSize: 1,
       maxDamage: 250,
       rarity: 'common',
@@ -80,8 +83,11 @@ const mockNodes: ModNode[] = [
   },
 ];
 
+// ModSpec 有二十多个带默认值的数组字段，用 zod schema 生成合法最小实例。
+const emptySpec = ModSpec.parse({ modId: 'test_mod', name: 'Test Mod' });
+
 const mockCompileResult: CompileResult = {
-  spec: null,
+  spec: emptySpec,
   errors: ['物品节点 item_1 编译失败：缺少材质'],
   warnings: ['方块节点 block_2 没有设置硬度'],
 };
@@ -92,9 +98,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('returns all nodes when no filters applied', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     expect(result.current.filteredNodes).toHaveLength(3);
     expect(result.current.stats.total).toBe(3);
@@ -102,9 +106,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('filters by search query on label', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     act(() => {
       result.current.setSearchQuery('铁剑');
@@ -116,9 +118,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('filters by search query on type', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     act(() => {
       result.current.setSearchQuery('block');
@@ -129,9 +129,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('filters by search query on ID', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     act(() => {
       result.current.setSearchQuery('item_1');
@@ -142,9 +140,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('filters by search query on note', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     act(() => {
       result.current.setSearchQuery('触发合成');
@@ -155,9 +151,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('filters by type filter', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     act(() => {
       result.current.toggleTypeFilter('item');
@@ -168,9 +162,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('filters by multiple type filters', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     act(() => {
       result.current.toggleTypeFilter('item');
@@ -181,9 +173,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('filters disabled nodes when showDisabled is false', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     act(() => {
       result.current.toggleShowDisabled();
@@ -194,9 +184,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('shows only error nodes when showErrors=true and showWarnings=false', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     act(() => {
       result.current.toggleShowWarnings();
@@ -210,9 +198,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('clears all filters', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     act(() => {
       result.current.setSearchQuery('铁剑');
@@ -231,9 +217,7 @@ describe('useOutlineFilter', () => {
   });
 
   it('calculates correct stats', () => {
-    const { result } = renderHook(() =>
-      useOutlineFilter(mockNodes, mockCompileResult),
-    );
+    const { result } = renderHook(() => useOutlineFilter(mockNodes, mockCompileResult));
 
     expect(result.current.stats.errors).toBe(1);
     expect(result.current.stats.warnings).toBe(1);
@@ -254,20 +238,29 @@ describe('getNodeDisplayTitle', () => {
   });
 
   it('returns subgraphName for subgraph nodes', () => {
-    const node = {
+    // 子图节点会残留其它类型的 data（如 displayName），类型专属名称应优先。
+    const node: ModNode = {
       ...mockNodes[0],
-      type: 'subgraph' as const,
-      data: { ...mockNodes[0].data, kind: 'subgraph', subgraphName: '我的子图' },
+      type: 'subgraph',
+      data: SubgraphNodeData.parse({
+        ...mockNodes[0].data,
+        kind: 'subgraph',
+        subgraphName: '我的子图',
+      }),
     };
     const title = getNodeDisplayTitle(node);
     expect(title).toBe('我的子图');
   });
 
   it('returns procedureName for procedure nodes', () => {
-    const node = {
+    const node: ModNode = {
       ...mockNodes[0],
-      type: 'procedure' as const,
-      data: { ...mockNodes[0].data, kind: 'procedure', procedureName: 'myProc' },
+      type: 'procedure',
+      data: ProcedureNodeData.parse({
+        ...mockNodes[0].data,
+        kind: 'procedure',
+        procedureName: 'myProc',
+      }),
     };
     const title = getNodeDisplayTitle(node);
     expect(title).toBe('myProc');

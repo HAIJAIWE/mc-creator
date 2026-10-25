@@ -194,7 +194,9 @@ export function useOutlineFilter(
   }, []);
 
   const toggleTypeFilter = useCallback((type: NodeKind) => {
-    setTypeFilter((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+    setTypeFilter((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
+    );
   }, []);
 
   const clearFilters = useCallback(() => {
@@ -222,11 +224,13 @@ export function useOutlineFilter(
  * 获取节点的显示标题（用于搜索匹配）
  */
 export function getNodeDisplayTitle(node: ModNode): string {
-  if (node.data.label) return node.data.label;
   const data = node.data as Record<string, unknown>;
-  if (data.displayName) return String(data.displayName);
+  // 类型专属名称优先：子图/过程节点复用其它类型的 data 时会残留 displayName，
+  // 若先取 displayName 会掩盖真实名称，故 subgraphName/procedureName 排在前面。
   if (data.subgraphName) return String(data.subgraphName);
   if (data.procedureName) return String(data.procedureName);
+  if (node.data.label) return node.data.label;
+  if (data.displayName) return String(data.displayName);
   const meta = NODE_METADATA.find((m) => m.kind === node.type);
   if (meta) return meta.label;
   return node.type;

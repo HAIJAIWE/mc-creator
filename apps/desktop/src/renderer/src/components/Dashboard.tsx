@@ -10,13 +10,7 @@ import { McIcon } from '../assets/mc-ui/McIcon';
 import { ipcClient } from '../lib/ipc-client.js';
 import { ProjectCreateDialog } from './ProjectCreateDialog.js';
 import type { CreateProjectData } from './ProjectCreateDialog.js';
-
-const LOADER_LABEL: Record<string, string> = {
-  fabric: 'Fabric',
-  neoforge: 'NeoForge',
-  quilt: 'Quilt',
-  legacy_fabric: 'Legacy Fabric',
-};
+import { loaderLabel } from '../../../shared/generator-descriptors.js';
 
 /** 空态「内容类型」按创作方向分组，替代一锅端平铺 */
 const TYPE_GROUPS: { title: string; hint: string; types: GeneratorType[] }[] = [
@@ -293,7 +287,7 @@ export function Dashboard() {
                         <p className="mb-3 line-clamp-2 text-xs text-mc-dim">{p.description}</p>
                       )}
                       <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs text-mc-mute">
-                        <span className="mc-tag">{LOADER_LABEL[p.loader] ?? p.loader}</span>
+                        <span className="mc-tag">{loaderLabel(p.loader)}</span>
                         <span>·</span>
                         <span>{p.mcVersion}</span>
                         <span>·</span>

@@ -187,23 +187,23 @@ export function NodeGraphEditor({
   const rfInstanceRef = useRef<ReactFlowInstance | null>(null);
 
   // 暴露聚焦节点方法供外部调用
-  const focusNode = useCallback(
-    (nodeId: string) => {
-      if (rfInstanceRef.current) {
-        rfInstanceRef.current.fitView({
-          nodes: [nodeId],
-          duration: 300,
-          padding: 0.2,
-        });
-        // 同时选中节点
-        const node = rfInstanceRef.current.getNodes().find((n) => n.id === nodeId);
-        if (node) {
-          rfInstanceRef.current.setNodes((nds) => nds.map((n) => (n.id === nodeId ? { ...n, selected: true } : { ...n, selected: false })));
-        }
+  const focusNode = useCallback((nodeId: string) => {
+    if (rfInstanceRef.current) {
+      rfInstanceRef.current.fitView({
+        // React Flow 的 fitView 接受 Node 或 { id } 简写，不接受裸 id 字符串
+        nodes: [{ id: nodeId }],
+        duration: 300,
+        padding: 0.2,
+      });
+      // 同时选中节点
+      const node = rfInstanceRef.current.getNodes().find((n) => n.id === nodeId);
+      if (node) {
+        rfInstanceRef.current.setNodes((nds) =>
+          nds.map((n) => (n.id === nodeId ? { ...n, selected: true } : { ...n, selected: false })),
+        );
       }
-    },
-    [],
-  );
+    }
+  }, []);
 
   // 将 focusNode 暴露给外部（通过 ref 或回调）
   useEffect(() => {

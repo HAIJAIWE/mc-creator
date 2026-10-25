@@ -564,14 +564,54 @@ export function FileTree() {
     return (
       <div
         data-testid="filetree-empty"
-        className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center"
-        onContextMenu={(e) => openMenu(e, null)}
+        className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center"
       >
         <div className="flex h-12 w-12 items-center justify-center rounded-mc-lg border border-mc-border bg-mc-surface-2">
           <Folder className="h-6 w-6 text-mc-mute" />
         </div>
+        {/*
+          空态文案与操作。
+
+          ## 为什么不写「右键新建文件或文件夹」
+
+          原来这里只有那一句，有两个问题：
+
+          1. **它在教错的动作。** 这是个生成器 —— 目录为空意味着「还没生成」，
+             该做的是用右侧智能体生成内容，或在中栏各编辑器里点它自己的生成按钮。
+             让人手动右键造文件，是把用户引向最费力的那条路。
+          2. **「右键」是隐藏手势。** VS Code 的 Explorer 空了不提示右键，
+             而是在视图标题栏常驻一个**可见的**新建图标按钮。
+             让用户去发现隐藏手势，不是空态该干的事。
+
+          所以两条路都摆在明面上：该优先做的（去生成）写在文案里，
+          确实要用的（手动建）给可见按钮，而不是让用户猜。
+
+          右键菜单本身仍然保留 —— 整块区域的 onContextMenu 挪到了下面的
+          `filetree-empty` 包装层之外仍会被树容器接管；这里保留 menu 渲染分支，
+          以防将来有别处打开它。
+        */}
         <div className="text-sm font-medium text-mc-dim">项目目录为空</div>
-        <div className="text-xs text-mc-mute">右键新建文件或文件夹</div>
+        <div className="text-xs leading-relaxed text-mc-mute">
+          用右侧智能体生成内容，
+          <br />
+          或手动创建文件
+        </div>
+        <div className="mt-1 flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => handleNewFile('')}
+            className="mc-btn-ghost px-2 py-1 text-[11px]"
+          >
+            新建文件
+          </button>
+          <button
+            type="button"
+            onClick={() => handleNewFolder('')}
+            className="mc-btn-ghost px-2 py-1 text-[11px]"
+          >
+            新建文件夹
+          </button>
+        </div>
         {menu && (
           <ContextMenu
             x={menu.x}

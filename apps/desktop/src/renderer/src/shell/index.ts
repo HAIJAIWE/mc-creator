@@ -10,15 +10,7 @@ export function initPanelRegistries(): void {
 
 // 导出常用函数
 export { getAllPanels, getPanelsByGroup } from './register-all-panels.js';
-export { registerCorePanels, getRegisteredCorePanelIds } from './register-shell-panels.js';
-export { registerDomainPanels, getRegisteredDomainPanelIds } from './register-domain-panels.js';
-export {
-  getPanel,
-  createPanelLoader,
-  CORE_PANEL_IDS,
-  DOMAIN_PANEL_IDS,
-  MIDDLE_PANEL_IDS,
-} from './panels.js';
+export { getPanel, createPanelLoader, createShellIcon, createMcIcon } from './panels.js';
 export type {
   PanelRegistration,
   PanelKind,

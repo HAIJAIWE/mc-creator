@@ -15,6 +15,104 @@
  */
 
 import type { GENERATOR_TYPES, GeneratorType } from './ipc-channels.js';
+import { LOADERS, type Loader } from '@mc-creator/shared';
+
+/**
+ * 生成器下拉里**实际开放选择**的加载器。
+ *
+ * 产品决策（用户拍板）：只留 Fabric + NeoForge，与启动器侧的加载器支持保持一致。
+ *
+ * 早先这里是各 UI 手写的字面量，两处各漂各的：`ProjectCreateDialog` 给 6 个
+ * （含 `vanilla` —— 而 ModGenerator 没有 vanilla adapter，选完直接抛
+ * "does not support loader: vanilla"）；`SettingsPanel` 给 4 个，却漏了
+ * 有可用 adapter 的 `forge`。现在统一收到这里。
+ *
+ * ⚠️ 与 `ModGenerator.loaders` 的区别：那边是**生成器能力**
+ * （fabric/neoforge/quilt/legacy_fabric/forge，五个都有真实 adapter），
+ * 这里是**产品开放给用户的范围**。范围窄于能力是允许的，反过来不行 ——
+ * 同目录的测试断言这里的每一项都在生成器能力里，某个加载器真被移出
+ * 生成器时那条测试会立刻红。
+ */
+export const SUPPORTED_GENERATOR_LOADERS: readonly Loader[] = ['fabric', 'neoforge'];
+
+/** 全部 loader 取值。直接取 `@mc-creator/shared` 的 `LOADERS`，不再手抄一份。 */
+const ALL_LOADERS: readonly Loader[] = LOADERS;
+
+/**
+ * 加载器展示名。
+ *
+ * 用 `satisfies Record<Loader, string>` 而不是 `Record<Loader, string>` 注解：
+ * 将来 `@mc-creator/shared` 新增 loader 时这里**编译失败**，逼着起名。
+ * 否则新项会掉到「显示原始枚举值」的分支，用户看到 `legacy_fabric` 这种字串。
+ */
+const GENERATOR_LOADER_LABELS = {
+  fabric: 'Fabric',
+  neoforge: 'NeoForge',
+  quilt: 'Quilt',
+  legacy_fabric: 'Legacy Fabric',
+  forge: 'Forge',
+  vanilla: '原版',
+} as const satisfies Record<Loader, string>;
+
+/** 该 loader 当前是否开放选择。 */
+export function isGeneratorLoaderSupported(loader: string): boolean {
+  return (SUPPORTED_GENERATOR_LOADERS as readonly string[]).includes(loader);
+}
+
+/**
+ * 是不是「认识但已不开放」的 loader。
+ *
+ * 用于把历史项目的旧值在下拉里显式列出来（标为禁用），而不是过滤掉 ——
+ * 过滤掉会让 select 的 value 落在列表外、显示空白，用户既看不到它是什么
+ * 也改不回来。
+ */
+export function isKnownButUnsupportedLoader(loader: string): loader is Loader {
+  return (ALL_LOADERS as readonly string[]).includes(loader) && !isGeneratorLoaderSupported(loader);
+}
+
+/** 加载器展示名；未知值原样返回（比显示空白好）。 */
+export function loaderLabel(loader: string): string {
+  return Object.prototype.hasOwnProperty.call(GENERATOR_LOADER_LABELS, loader)
+    ? GENERATOR_LOADER_LABELS[loader as keyof typeof GENERATOR_LOADER_LABELS]
+    : loader;
+}
+
+/** 加载器下拉的一项 */
+export interface GeneratorLoaderOption {
+  value: string;
+  label: string;
+  disabled: boolean;
+}
+
+/**
+ * 构造「项目加载器」下拉的选项列表。
+ *
+ * 至少三处在用，且它们读写的**是同一个 store 字段**（`mod-store` 的 `loader`）——
+ * 列表本来就必须一致，但历史上各自手写，结果各漂各的：
+ * `ProjectCreateDialog` 给 6 个（含会抛错的 `vanilla`），`SettingsPanel` 给 4 个
+ * （漏了有 adapter 的 `forge`），`CiCdPanel` 给 4 个（又漏了 `vanilla` /
+ * `legacy_fabric`）—— 后两个连「原版项目」都显示不出来。现在都从这里取。
+ *
+ * `current` 传当前值：若它是个「认识但已不开放」的旧加载器，会**补一个禁用项**，
+ * 而不是让它落到列表外。否则 select 的 value 不在选项里，浏览器显示空白 ——
+ * 用户既看不出项目用的什么，也无从改回来（而重选一个会**改变生成产物**，
+ * 只能由用户自己决定）。
+ */
+export function generatorLoaderOptions(current: string): GeneratorLoaderOption[] {
+  const options: GeneratorLoaderOption[] = SUPPORTED_GENERATOR_LOADERS.map((l) => ({
+    value: l,
+    label: loaderLabel(l),
+    disabled: false,
+  }));
+  if (isKnownButUnsupportedLoader(current)) {
+    options.push({
+      value: current,
+      label: `${loaderLabel(current)}（已不在支持列表）`,
+      disabled: true,
+    });
+  }
+  return options;
+}
 
 /** 中英双语文案（本项目面向中文玩家，同时提供英文） */
 export interface LocalizedText {

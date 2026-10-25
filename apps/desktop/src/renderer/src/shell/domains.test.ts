@@ -2,15 +2,28 @@
  * domains.ts 测试：§0.2 域归属表的完整性与行为
  *
  * 覆盖：
- * 1. 归属表完整性 —— 16 个已注册面板 id 全覆盖、不重不漏（不重不漏靠「扁平后长度相等 + 无重复」双向断言）
- * 2. panelsOfDomain / commonPanelIds / defaultPanelOfDomain 行为
+ * 1. 归属表完整性 —— 每个已注册面板都能被某个域或 common 认领，且**恰好一个**归属
+ * 2. panelsOfDomain / commonPanelIds 的派生行为与**域内顺序**（默认面板必须领衔）
  * 3. defaultPanelOfDomain 返回值一定属于本域（**变异测试靶点**：
  *    把某个域的 defaultPanelId 改成别的域的 id，这里必须变红）
  * 4. domainOfPanel / panelBelongsToDomain 的 common 语义
  * 5. emptyStateHintOfDomain 三域文案互不相同
  * 6. i18n 的 domains.* 与 domains.ts 的中文真源不漂移（zh / en-US 双查）
+ *
+ * ## 为什么本文件不再手写「17 个面板 id」的白名单
+ *
+ * 归属表现在**派生自注册表**（`PanelRegistration.domain`），手写白名单等于
+ * 把同一份事实抄第二遍 —— 阶段 0A 加 `build` 面板时正是这样被绊住的：
+ * 注册表改了、白名单没改，测试报的数字差异既费时又不指向真正的问题。
+ *
+ * 派生之后「不重不漏」变成**结构性成立**（一个面板只有一个 `domain` 字段，
+ * 不可能被两个域同时认领），所以这里改断言真正有价值的东西：
+ * 每个已注册面板都必须填了 `domain` 字段（漏填 = 该域 tab 条少一项），
+ * 以及域内顺序是否符合设计意图。
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { initPanelRegistries } from './index.js';
+import { getAllPanels } from './panels.js';
 import {
   DOMAINS,
   DOMAIN_IDS,
@@ -27,28 +40,10 @@ import {
 } from './domains.js';
 import { t } from '../i18n';
 
-/** 本任务点名的 16 个已注册面板 id（register-all-panels.ts 的 allPanelConfigs 全量） */
-const REGISTERED_PANEL_IDS = [
-  // core
-  'explorer',
-  'search',
-  'git',
-  'packages',
-  'settings',
-  // domain
-  'items',
-  'blocks',
-  'entity',
-  'skin',
-  'audio',
-  'cicd',
-  'game',
-  // middle
-  'preview',
-  'resources',
-  'nbt',
-  'kernel',
-] as const;
+// 归属表已改为派生自注册表，读取前必须先注册（App.tsx:198 在模块级做同一件事）
+beforeAll(() => {
+  initPanelRegistries();
+});
 
 describe('域定义表：形状', () => {
   it('恰好三个域，顺序为 launcher → server → dev（切换器从左到右）', () => {
@@ -78,32 +73,37 @@ describe('域定义表：形状', () => {
   });
 });
 
-describe('面板归属表：完整性（不重不漏覆盖全部 16 个已注册面板）', () => {
-  const allAssigned = DOMAINS.flatMap((d) => panelsOfDomain(d.id));
-  const common = commonPanelIds();
-
-  it('三域面板 + common 面板 = 16 个，恰好覆盖已注册面板集合', () => {
-    const union = [...allAssigned, ...common];
-    expect(union.slice().sort()).toEqual(REGISTERED_PANEL_IDS.slice().sort());
-    expect(union).toHaveLength(16);
-    expect(knownPanelIds().slice().sort()).toEqual(REGISTERED_PANEL_IDS.slice().sort());
-  });
-
-  it('不重：没有面板被两个域或 common 重复认领', () => {
-    expect(new Set(allAssigned).size).toBe(allAssigned.length);
-    expect(new Set(common).size).toBe(common.length);
-    const overlap = allAssigned.filter((id) => common.includes(id));
-    expect(overlap).toEqual([]);
-  });
-
-  it('不漏：每个已注册面板都能被某个域或 common 认领', () => {
-    for (const id of REGISTERED_PANEL_IDS) {
-      const owner = domainOfPanel(id);
-      expect(owner === null ? isCommonPanel(id) : true).toBe(true);
+describe('面板归属表：完整性（派生自注册表）', () => {
+  it('每个已注册面板都必须显式声明 domain（漏填会让该域 tab 条少一项）', () => {
+    for (const p of getAllPanels()) {
+      expect(
+        p.domain === null || DOMAIN_IDS.includes(p.domain as never),
+        `面板 ${p.id} 的 domain 字段是 ${JSON.stringify(p.domain)}，需为 null 或某个合法域`,
+      ).toBe(true);
     }
   });
 
-  it('域面板数量符合 §0.2 职责划分：launcher 3 / server 3 / dev 6', () => {
+  it('域面板 + common 面板恰好覆盖已注册面板集，且无重叠', () => {
+    // 注意：必须在用例体内取派生值。describe 体在收集阶段求值，那时
+    // beforeAll 还没跑、注册表还是空的，会拿到空数组而误报。
+    const allAssigned = DOMAINS.flatMap((d) => panelsOfDomain(d.id));
+    const union = [...allAssigned, ...commonPanelIds()];
+    // 「不重」现在是结构性成立的（一个面板只有一个 domain 字段），仍断言一次以防将来改坏
+    expect(new Set(union).size).toBe(union.length);
+    expect(union.slice().sort()).toEqual(knownPanelIds().slice().sort());
+    expect(union).toHaveLength(getAllPanels().length);
+  });
+
+  it('不漏：每个已注册面板都能被某个域或 common 认领', () => {
+    for (const p of getAllPanels()) {
+      expect(p.domain === null ? isCommonPanel(p.id) : true).toBe(true);
+      expect(domainOfPanel(p.id)).toBe(p.domain ?? null);
+    }
+  });
+
+  it('域内顺序符合设计意图，且默认面板领衔：launcher 3 / server 3 / dev 7', () => {
+    // 这份快照是**设计意图**，不是派生结果 —— 它守住「谁排在前面」这个产品决定。
+    // 顺序由 PanelRegistration.domainOrder 决定（见 panels.tsx「域内顺序」注释）。
     expect(panelsOfDomain('launcher')).toEqual(['game', 'packages', 'skin']);
     expect(panelsOfDomain('server')).toEqual(['kernel', 'resources', 'nbt']);
     expect(panelsOfDomain('dev')).toEqual([
@@ -111,9 +111,16 @@ describe('面板归属表：完整性（不重不漏覆盖全部 16 个已注册
       'blocks',
       'entity',
       'audio',
+      'build',
       'cicd',
       'preview',
     ]);
+  });
+
+  it('每个域的默认面板都是该域 tab 条的第一项（用户切域第一眼看到它）', () => {
+    for (const id of DOMAIN_IDS) {
+      expect(panelsOfDomain(id)[0]).toBe(defaultPanelOfDomain(id));
+    }
   });
 
   it('common 是跨域常驻四件套：explorer / search / git / settings', () => {
@@ -158,7 +165,7 @@ describe('defaultPanelOfDomain：默认面板一定属于本域', () => {
 
   it('默认面板都是已注册面板（不会落到 MainPanelView 的 default: 未知面板分支）', () => {
     for (const id of DOMAIN_IDS) {
-      expect(REGISTERED_PANEL_IDS).toContain(defaultPanelOfDomain(id) as never);
+      expect(knownPanelIds()).toContain(defaultPanelOfDomain(id));
     }
   });
 });

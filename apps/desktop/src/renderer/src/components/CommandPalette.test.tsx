@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { CommandPalette, type Command } from './CommandPalette.js';
-import { MC_COMMAND_TEMPLATES } from './CommandPalette.utils.js';
 
 // jsdom 未实现 Element.prototype.scrollIntoView，CommandPalette 内部使用它
 beforeEach(() => {
@@ -209,21 +208,5 @@ describe('CommandPalette', () => {
     render(<CommandPalette open onClose={vi.fn()} commands={cmds} />);
     // "Git" 同时出现在标签栏和命令 A 的分类徽章中
     expect(screen.getAllByText('Git').length).toBeGreaterThan(0);
-  });
-
-  it('MC_COMMAND_TEMPLATES 包含常用命令前缀', () => {
-    // 这是导出的常量，至少应包含 /give /summon /tp
-    const prefixes = MC_COMMAND_TEMPLATES.map((t) => t.prefix);
-    expect(prefixes).toContain('/give');
-    expect(prefixes).toContain('/summon');
-    expect(prefixes).toContain('/tp');
-    expect(prefixes).toContain('@p');
-    // 每条都有 label/description/syntax/example
-    for (const t of MC_COMMAND_TEMPLATES) {
-      expect(t.label).toBeTruthy();
-      expect(t.description).toBeTruthy();
-      expect(t.syntax).toBeTruthy();
-      expect(t.example).toBeTruthy();
-    }
   });
 });

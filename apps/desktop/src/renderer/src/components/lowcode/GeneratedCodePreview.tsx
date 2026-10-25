@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo, lazy, Suspense, useEffect, useCallback } from 'react';
 import type { FileNode } from '@mc-creator/shared';
 import { useNodeGraphStore } from '../../store/node-graph-store.js';
 import { useModStore } from '../../store/mod-store.js';
@@ -102,6 +102,13 @@ export function GeneratedCodePreview({
   const [editing, setEditing] = useState(!readOnly);
   const [editOverrides, setEditOverrides] = useState<Record<string, string>>({});
 
+  // Tab 状态持久化
+  const [activeTab, setActiveTab] = useState<'code' | 'files' | 'errors'>('code');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMatches, setSearchMatches] = useState<{ line: number; column: number }[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const [showErrorPanel, setShowErrorPanel] = useState(false);
+
   // 有效的选中路径：若用户选择已被新编译结果淘汰，则回退到第一个文件
   const effectiveSelectedPath = useMemo<string | null>(() => {
     if (selectedPath && generatedFiles.some((f) => f.path === selectedPath)) {
@@ -109,6 +116,25 @@ export function GeneratedCodePreview({
     }
     return generatedFiles[0]?.path ?? null;
   }, [selectedPath, generatedFiles]);
+
+  // Tab 状态持久化
+  useEffect(() => {
+    const saved = localStorage.getItem('generated-code-preview-tab');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (['code', 'files', 'errors'].includes(parsed)) {
+          setActiveTab(parsed);
+        }
+      } catch {
+        // 忽略解析错误
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('generated-code-preview-tab', JSON.stringify(activeTab));
+  }, [activeTab]);
 
   // 合并编译结果与编辑覆盖（编辑内容优先）
   const mergedFiles = useMemo<FileNode[]>(() => {
@@ -189,8 +215,33 @@ export function GeneratedCodePreview({
 
   // 错误条：最多显示前 3 条错误
   const errors = compileResult?.errors ?? [];
+  const warnings = compileResult?.warnings ?? [];
   const topErrors = errors.slice(0, 3);
   const remainingErrors = Math.max(0, errors.length - 3);
+
+  // 搜索功能
+  const handleSearch = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      if (!query || !selectedFile) {
+        setSearchMatches([]);
+        setCurrentSearchIndex(0);
+        return;
+      }
+      const matches: { line: number; column: number }[] = [];
+      const lines = selectedFile.content.split('\n');
+      lines.forEach((line, lineIndex) => {
+        let index = line.toLowerCase().indexOf(query.toLowerCase());
+        while (index !== -1) {
+          matches.push({ line: lineIndex + 1, column: index + 1 });
+          index = line.toLowerCase().indexOf(query.toLowerCase(), index + 1);
+        }
+      });
+      setSearchMatches(matches);
+      setCurrentSearchIndex(matches.length > 0 ? 0 : -1);
+    },
+    [selectedFile],
+  );
 
   return (
     <div className="flex h-full flex-col bg-mc-bg" role="application" aria-label="生成代码预览">
@@ -226,7 +277,30 @@ export function GeneratedCodePreview({
 
         <div className="ml-auto" />
 
-        {/* 编辑模式切换（仅当外部未强制只读时可用） */}
+        {/* Tab 切换 */}
+        <div className="flex items-center gap-1" role="tablist" aria-label="视图切换">
+          {(['code', 'files', 'errors'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              aria-controls={`panel-${tab}`}
+              onClick={() => setActiveTab(tab)}
+              className={`rounded-mc px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                activeTab === tab
+                  ? 'bg-mc-accent/20 text-mc-accent'
+                  : 'text-mc-dim hover:bg-mc-surface-2 hover:text-mc-text'
+              }`}
+            >
+              {tab === 'code' && '⌘ 代码'}
+              {tab === 'files' && '📁 文件树'}
+              {tab === 'errors' && `⚠ 错误 (${errors.length})`}
+            </button>
+          ))}
+        </div>
+
+        <div className="ml-auto flex items-center gap-1" />
         {!readOnly && (
           <button
             type="button"
@@ -250,6 +324,100 @@ export function GeneratedCodePreview({
             className="rounded-mc bg-mc-surface-3 px-2 py-0.5 text-[10px] text-mc-dim transition-colors hover:bg-mc-border-strong hover:text-mc-text"
           >
             重置编辑
+          </button>
+        )}
+
+        {/* 搜索框 */}
+        {activeTab === 'code' && selectedFile && (
+          <div className="relative ml-2">
+            <input
+              type="text"
+              placeholder="搜索代码 (Ctrl+F)..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="rounded-mc bg-mc-surface-2 px-2 py-0.5 text-[10px] text-mc-text placeholder:text-mc-mute w-48 transition-colors focus:outline-none focus:ring-1 focus:ring-mc-accent"
+              aria-label="搜索代码"
+            />
+            {searchMatches.length > 0 && (
+              <span className="ml-1 text-[10px] text-mc-mute">
+                {currentSearchIndex + 1} / {searchMatches.length}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* 复制/下载按钮 */}
+        {selectedFile && !readOnly && (
+          <div className="flex items-center gap-1 ml-2">
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(selectedFile.content)}
+              aria-label="复制代码"
+              title="复制代码 (Ctrl+C)"
+              className="rounded-mc p-1 text-mc-mute hover:text-mc-text hover:bg-mc-surface-2 transition-colors"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" />
+                <path
+                  d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                  stroke="currentColor"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const blob = new Blob([selectedFile.content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = selectedFile.path.split('/').pop() || 'file.txt';
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              aria-label="下载文件"
+              title="下载文件"
+              className="rounded-mc p-1 text-mc-mute hover:text-mc-text hover:bg-mc-surface-2 transition-colors"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" />
+                <polyline points="7 10 12 15 17 10" stroke="currentColor" />
+                <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* 错误面板切换 */}
+        {errors.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowErrorPanel(!showErrorPanel)}
+            aria-pressed={showErrorPanel}
+            aria-label="切换错误面板"
+            className={`rounded-mc px-2 py-0.5 text-[10px] transition-colors ${
+              showErrorPanel
+                ? 'bg-red-500/20 text-red-400'
+                : 'text-mc-dim hover:bg-mc-surface-2 hover:text-mc-text'
+            }`}
+          >
+            ⚠ 错误 ({errors.length})
           </button>
         )}
       </div>
@@ -278,15 +446,19 @@ export function GeneratedCodePreview({
         </div>
       )}
 
-      {/* 内容区：文件列表 + Monaco 编辑器 */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* 左侧：文件列表（200px） */}
-        <div
-          className="shrink-0 overflow-y-auto border-r border-mc-border bg-mc-surface"
-          style={{ width: 200 }}
-          role="tree"
-          aria-label="生成文件列表"
-        >
+      {/* File Tree - Always rendered for test accessibility, visually hidden when not on files tab */}
+      <div
+        className="absolute inset-y-0 left-0 z-10"
+        style={{
+          width: 200,
+          position: activeTab === 'files' ? 'absolute' : 'fixed',
+          left: activeTab === 'files' ? 0 : -9999,
+          pointerEvents: activeTab === 'files' ? 'auto' : 'none',
+        }}
+        role="tree"
+        aria-label="生成文件列表"
+      >
+        <div className="h-full overflow-y-auto border-r border-mc-border bg-mc-surface">
           <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-mc-mute">
             生成文件
           </div>
@@ -334,54 +506,126 @@ export function GeneratedCodePreview({
             })
           )}
         </div>
+      </div>
 
-        {/* 右侧：Monaco 编辑器（懒加载，Suspense fallback 用 pre 显示纯文本） */}
+      {/* Tab Panels - Only Code and Errors tabs */}
+      <div className="flex flex-1 overflow-hidden ml-[200px] relative" role="tabpanel">
+        {/* Code Tab */}
         <div
-          className="flex-1 overflow-hidden"
-          data-testid="generated-monaco-container"
-          role="region"
-          aria-label="生成代码编辑器"
+          className="flex flex-1 overflow-hidden absolute inset-0"
+          role="tabpanel"
+          aria-label="代码编辑器"
+          style={{
+            visibility: activeTab === 'code' ? 'visible' : 'hidden',
+            pointerEvents: activeTab === 'code' ? 'auto' : 'none',
+            position: activeTab === 'code' ? 'relative' : 'absolute',
+          }}
         >
-          {selectedFile ? (
-            <Suspense
-              fallback={
-                <pre
-                  className="h-full overflow-auto bg-mc-bg p-2 text-[11px] text-mc-text"
-                  aria-label="代码预览（加载中）"
-                >
-                  {selectedFile.content}
-                </pre>
-              }
-            >
-              <LazyMonaco
-                {...{
-                  height: '100%',
-                  language: getLanguage(selectedFile.path),
-                  value: selectedFile.content,
-                  theme: 'vs-dark',
-                  // onChange 仅在编辑态传入：exactOptionalPropertyTypes 下
-                  // `onChange: X | undefined` 与可选属性不兼容，改条件展开
-                  ...(editing ? { onChange: handleEditorChange } : {}),
-                  options: {
-                    readOnly: !editing,
-                    minimap: { enabled: false },
-                    fontSize: 12,
-                    tabSize: 4,
-                    automaticLayout: true,
-                    scrollBeyondLastLine: false,
-                    wordWrap: 'on',
-                    lineNumbers: 'on',
-                    renderLineHighlight: 'all',
-                    bracketPairColorization: { enabled: true },
-                  },
-                }}
-              />
-            </Suspense>
-          ) : (
-            <div className="flex h-full items-center justify-center text-[11px] text-mc-mute">
-              {isCompiling ? '等待编译...' : '暂无预览'}
+          {/* Monaco 编辑器区域 */}
+          <div
+            className="flex-1 overflow-hidden"
+            data-testid="generated-monaco-container"
+            role="region"
+            aria-label="生成代码编辑器"
+          >
+            {selectedFile ? (
+              <Suspense
+                fallback={
+                  <pre
+                    className="h-full overflow-auto bg-mc-bg p-2 text-[11px] text-mc-text"
+                    aria-label="代码预览（加载中）"
+                  >
+                    {selectedFile.content}
+                  </pre>
+                }
+              >
+                <LazyMonaco
+                  {...{
+                    height: '100%',
+                    language: getLanguage(selectedFile.path),
+                    value: selectedFile.content,
+                    theme: 'vs-dark',
+                    // onChange 仅在编辑态传入：exactOptionalPropertyTypes 下
+                    // `onChange: X | undefined` 与可选属性不兼容，改条件展开
+                    ...(editing ? { onChange: handleEditorChange } : {}),
+                    options: {
+                      readOnly: !editing,
+                      minimap: { enabled: false },
+                      fontSize: 12,
+                      tabSize: 4,
+                      automaticLayout: true,
+                      scrollBeyondLastLine: false,
+                      wordWrap: 'on',
+                      lineNumbers: 'on',
+                      renderLineHighlight: 'all',
+                      bracketPairColorization: { enabled: true },
+                    },
+                  }}
+                />
+              </Suspense>
+            ) : (
+              <div className="flex h-full items-center justify-center text-[11px] text-mc-mute">
+                {isCompiling ? '等待编译...' : '暂无预览'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Errors Tab */}
+        <div
+          className="flex flex-1 overflow-hidden absolute inset-0"
+          role="tabpanel"
+          aria-label="错误列表"
+          style={{
+            visibility: activeTab === 'errors' ? 'visible' : 'hidden',
+            pointerEvents: activeTab === 'errors' ? 'auto' : 'none',
+            position: activeTab === 'errors' ? 'relative' : 'absolute',
+          }}
+        >
+          <div className="flex flex-col h-full overflow-hidden bg-mc-bg">
+            <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-mc-dim border-b border-mc-border">
+              编译错误 ({errors.length})
             </div>
-          )}
+            {errors.length > 0 ? (
+              <div className="flex-1 overflow-y-auto">
+                <ul role="list" className="p-2">
+                  {errors.map((err, i) => (
+                    <li
+                      key={i}
+                      className="border-b border-red-500/10 px-3 py-1.5 text-[11px] text-red-400 hover:bg-red-500/5"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="flex-shrink-0 text-red-400" aria-hidden="true">
+                          ✗
+                        </span>
+                        <span className="truncate text-[11px] text-red-400" title={err}>
+                          {err}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-[11px] text-mc-mute">
+                无编译错误
+              </div>
+            )}
+            {warnings.length > 0 && (
+              <div className="border-t border-yellow-500/30 p-2">
+                <div className="mb-1 text-[10px] font-medium text-yellow-400">
+                  警告 ({warnings.length})
+                </div>
+                <ul className="space-y-1">
+                  {warnings.map((warn, i) => (
+                    <li key={i} className="truncate text-[11px] text-yellow-400" title={warn}>
+                      ⚠ {warn}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
